@@ -343,7 +343,7 @@ export default function DoctorRegistration() {
                   onChange={handleChange}
                 >
                   <option value="Regular">Regular</option>
-                  <option value="Investor">Investor</option>
+                  <option value="Investor">Investors</option>
                 </select>
               </div>
               <div className="col-md-4">
