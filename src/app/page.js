@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import LoginPage from "./components/LoginPage";
-import { getTenantIdFromHost } from "./lib/tenant-resolver";
+import { getTenantIdFromHostname, normalizeTenantId } from "./lib/tenant-resolver";
 import { getTenantConfig } from "./lib/tenant-cache";
 import { defaultLabModules } from "./lib/modules";
 
@@ -38,17 +38,16 @@ export default async function Home({ searchParams }) {
   const params = await searchParams;
   const requestHeaders = await headers();
   const host = requestHeaders.get("host");
+  const middlewareTenantId = requestHeaders.get("x-lims-tenant-id");
   const hostname = String(host || "").split(":")[0].toLowerCase();
-  const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(hostname);
-  const isRootDomain = process.env.ROOT_DOMAIN?.toLowerCase() === hostname;
   let hostTenantId = "";
 
-  if (!isLocalHost && !isRootDomain) {
-    try {
-      hostTenantId = getTenantIdFromHost(host);
-    } catch {
-      hostTenantId = "";
-    }
+  try {
+    hostTenantId = middlewareTenantId
+      ? normalizeTenantId(middlewareTenantId)
+      : getTenantIdFromHostname(hostname) || "";
+  } catch {
+    hostTenantId = "";
   }
 
   const initialTenantId = params?.tenantId || hostTenantId || "";

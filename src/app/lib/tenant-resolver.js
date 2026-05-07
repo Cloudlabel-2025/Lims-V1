@@ -33,8 +33,7 @@ export function getTenantIdFromHost(host) {
     return normalizeTenantId(hostname.slice(0, -".localhost".length));
   }
 
-  const [subdomain] = hostname.split(".");
-  return normalizeTenantId(subdomain);
+  throw new Error("Tenant not found for host.");
 }
 
 export function getTenantIdFromHostname(hostname) {
