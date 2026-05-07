@@ -14,10 +14,21 @@ function slugifySubdomain(value) {
 }
 
 function getPreviewUrl(subdomain) {
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "lab.com";
+  if (!subdomain) return "";
+
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
   const protocol = process.env.NEXT_PUBLIC_APP_PROTOCOL || "https";
 
-  return subdomain ? `${protocol.replace(/:$/, "")}://${subdomain}.${rootDomain}/` : "";
+  if (rootDomain) {
+    return `${protocol.replace(/:$/, "")}://${subdomain}.${rootDomain}/`;
+  }
+
+  if (typeof window === "undefined") return "";
+
+  const url = new URL(window.location.origin);
+  url.searchParams.set("tenantId", subdomain);
+  url.searchParams.set("access", "lab");
+  return url.toString();
 }
 
 export default function TenantOnboardingPage() {
@@ -192,7 +203,7 @@ export default function TenantOnboardingPage() {
 
           <div className="tenant-onboarding-preview">
             <span>Tenant URL</span>
-            <strong>{previewUrl || "https://subdomain.lab.com/"}</strong>
+            <strong>{previewUrl || "Generated after entering a tenant ID"}</strong>
           </div>
 
           <button type="submit" disabled={!canSubmit}>
