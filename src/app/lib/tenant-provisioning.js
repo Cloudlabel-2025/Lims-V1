@@ -1,0 +1,187 @@
+import mongoose from "mongoose";
+import connectMasterDB from "@/app/lib/master-db";
+import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
+import { defaultLabModules } from "@/app/lib/modules";
+import { getDoctorModel } from "@/app/models/doctor";
+import { getPatientModel } from "@/app/models/patient";
+import { getVisitModel } from "@/app/models/visit";
+import { getLabModel } from "@/app/models/master/Lab";
+import { getRoleTemplateModel } from "@/app/models/master/RoleTemplate";
+import { getLabOrderModel } from "@/app/models/tenant/LabOrder";
+import { getRoleModel } from "@/app/models/tenant/Role";
+import { getSampleModel } from "@/app/models/tenant/Sample";
+import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
+import { getTestDefinitionModel } from "@/app/models/tenant/TestDefinition";
+import { getTestReportModel } from "@/app/models/tenant/TestReport";
+import { getUserModel } from "@/app/models/tenant/User";
+import { slugifySubdomain, validateSubdomain } from "@/app/lib/subdomain";
+
+const connectionOptions = {
+  bufferCommands: false,
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+};
+
+function cleanString(value) {
+  return String(value || "").trim();
+}
+
+export async function isSubdomainAvailable(subdomain) {
+  const validation = validateSubdomain(subdomain);
+  if (!validation.valid) return false;
+
+  const masterConnection = await connectMasterDB();
+  const Lab = getLabModel(masterConnection);
+  const existingLab = await Lab.exists({ tenantId: validation.subdomain });
+
+  return !existingLab;
+}
+
+export async function getAvailableSubdomain(baseValue) {
+  const base = slugifySubdomain(baseValue);
+  const validation = validateSubdomain(base);
+  const fallbackBase = validation.valid ? validation.subdomain : "lab";
+
+  if (await isSubdomainAvailable(fallbackBase)) {
+    return fallbackBase;
+  }
+
+  for (let index = 1; index <= 100; index += 1) {
+    const candidate = `${fallbackBase}-${index}`;
+    if (await isSubdomainAvailable(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Unable to find an available subdomain");
+}
+
+async function initializeTenantCollections(tenantConnection) {
+  await Promise.all([
+    getRoleModel(tenantConnection).init(),
+    getTestCategoryModel(tenantConnection).init(),
+    getTestDefinitionModel(tenantConnection).init(),
+    getTestReportModel(tenantConnection).init(),
+    getUserModel(tenantConnection).init(),
+    getPatientModel(tenantConnection).init(),
+    getLabOrderModel(tenantConnection).init(),
+    getDoctorModel(tenantConnection).init(),
+    getSampleModel(tenantConnection).init(),
+    getVisitModel(tenantConnection).init(),
+  ]);
+}
+
+async function createTenantRoles(masterConnection, tenantConnection) {
+  const RoleTemplate = getRoleTemplateModel(masterConnection);
+  const Role = getRoleModel(tenantConnection);
+  const templates = await RoleTemplate.find({ isActive: true }).sort({ sortOrder: 1, name: 1 });
+
+  if (templates.length === 0) {
+    throw new Error("No active role templates found. Run seed-rbac first.");
+  }
+
+  for (const template of templates) {
+    await Role.findOneAndUpdate(
+      { name: template.name },
+      {
+        name: template.name,
+        description: template.description,
+        permissions: template.permissions,
+        isDefaultAdmin: template.isDefaultAdmin,
+        isSystemRole: template.isSystemTemplate,
+        status: "active",
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+}
+
+export async function createTenant({ name, subdomain, createdBy }) {
+  const labName = cleanString(name);
+  const validation = validateSubdomain(subdomain);
+
+  if (!labName || labName.length < 2) {
+    throw new Error("Lab name is required");
+  }
+
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  const masterConnection = await connectMasterDB();
+  const Lab = getLabModel(masterConnection);
+  const existingLab = await Lab.findOne({ tenantId: validation.subdomain }).select("tenantId");
+
+  if (existingLab) {
+    const suggestion = await getAvailableSubdomain(validation.subdomain);
+    const error = new Error("Subdomain is already taken");
+    error.code = "SUBDOMAIN_TAKEN";
+    error.suggestion = suggestion;
+    throw error;
+  }
+
+  const masterUri = process.env.MASTER_MONGODB_URI || process.env.MONGODB_URI;
+  const dbConnectionString = cleanString(process.env.TENANT_MONGODB_URI) || masterUri;
+  const dbName = `lims_${validation.subdomain.replaceAll("-", "_")}`;
+
+  if (!dbConnectionString) {
+    throw new Error("Tenant database connection string is not configured");
+  }
+
+  let tenantConnection = null;
+  let createdLab = null;
+
+  try {
+    createdLab = await Lab.create({
+      name: labName,
+      tenantId: validation.subdomain,
+      dbName,
+      dbConnectionString,
+      status: "active",
+      subscriptionPlan: "trial",
+      enabledModules: defaultLabModules,
+      branding: {
+        primaryColor: "#0d9488",
+        secondaryColor: "#0f766e",
+        accentColor: "#f59e0b",
+        loginHighlights: [],
+      },
+      createdBy,
+    });
+
+    tenantConnection = await mongoose
+      .createConnection(dbConnectionString, {
+        ...connectionOptions,
+        dbName,
+      })
+      .asPromise();
+
+    await initializeTenantCollections(tenantConnection);
+    await createTenantRoles(masterConnection, tenantConnection);
+    warmTenantConfigCache({
+      id: String(createdLab._id),
+      labId: createdLab.labId,
+      tenantId: createdLab.tenantId,
+      name: createdLab.name,
+      status: createdLab.status,
+      dbName: createdLab.dbName,
+      dbConnectionString: createdLab.dbConnectionString,
+      subscriptionPlan: createdLab.subscriptionPlan,
+      enabledModules: createdLab.enabledModules || [],
+      branding: createdLab.branding || {},
+    });
+
+    return createdLab;
+  } catch (error) {
+    if (createdLab) {
+      await createdLab.deleteOne().catch(() => {});
+      clearTenantConfigCache(validation.subdomain);
+    }
+
+    throw error;
+  } finally {
+    if (tenantConnection) {
+      await tenantConnection.close();
+    }
+  }
+}

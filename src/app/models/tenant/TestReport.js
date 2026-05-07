@@ -1,0 +1,108 @@
+import mongoose from "mongoose";
+
+function getCounterModel(connection) {
+  return (
+    connection.models.Counter ||
+    connection.model(
+      "Counter",
+      new mongoose.Schema({
+        name: { type: String, required: true, unique: true },
+        seq: { type: Number, default: 0 },
+      })
+    )
+  );
+}
+
+async function getNextSequence(connection, name) {
+  const Counter = getCounterModel(connection);
+  const counter = await Counter.findOneAndUpdate(
+    { name },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+
+  return counter.seq;
+}
+
+const ResultParameterSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    unit: { type: String, trim: true },
+    normalMin: { type: Number },
+    normalMax: { type: Number },
+    required: { type: Boolean, default: true },
+    value: { type: Number },
+    textValue: { type: String, trim: true },
+    flag: {
+      type: String,
+      enum: ["normal", "low", "high", "not-entered"],
+      default: "normal",
+    },
+  },
+  { _id: false }
+);
+
+export const TestReportSchema = new mongoose.Schema(
+  {
+    reportId: {
+      type: String,
+      unique: true,
+      immutable: true,
+      index: true,
+    },
+    patient: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Patient",
+      required: true,
+      index: true,
+    },
+    testDefinition: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TestDefinition",
+      required: true,
+      index: true,
+    },
+    testSnapshot: {
+      testId: String,
+      name: String,
+      code: String,
+      categoryName: String,
+      sampleType: String,
+    },
+    results: {
+      type: [ResultParameterSchema],
+      default: [],
+    },
+    remarks: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
+    status: {
+      type: String,
+      enum: ["draft", "completed", "verified", "released"],
+      default: "completed",
+      index: true,
+    },
+    enteredBy: {
+      type: String,
+      trim: true,
+    },
+  },
+  { timestamps: true }
+);
+
+TestReportSchema.pre("save", async function generateReportId() {
+  if (this.reportId) return;
+
+  const seq = await getNextSequence(this.constructor.db, "testReportId");
+  this.reportId = `RPT-${String(seq).padStart(6, "0")}`;
+});
+
+export function getTestReportModel(connection = mongoose) {
+  return connection.models.TestReport || connection.model("TestReport", TestReportSchema);
+}
+
+const TestReport = getTestReportModel();
+export default TestReport;
