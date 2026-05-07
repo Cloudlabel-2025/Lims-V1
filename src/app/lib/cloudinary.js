@@ -4,12 +4,22 @@ const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxImageSizeBytes = Number(process.env.CLOUDINARY_MAX_IMAGE_SIZE_BYTES || 5 * 1024 * 1024);
 
 function assertCloudinaryConfig() {
+  const cloudinaryUrl = String(process.env.CLOUDINARY_URL || "").trim();
   const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || "").trim();
   const apiKey = String(process.env.CLOUDINARY_API_KEY || "").trim();
   const apiSecret = String(process.env.CLOUDINARY_API_SECRET || "").trim();
 
+  if (cloudinaryUrl) {
+    cloudinary.config({
+      secure: true,
+    });
+    return;
+  }
+
   if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error("Cloudinary is not configured");
+    throw new Error(
+      "Cloudinary is not configured. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET."
+    );
   }
 
   cloudinary.config({
