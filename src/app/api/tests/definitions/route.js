@@ -1,5 +1,6 @@
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import mongoose from "mongoose";
 
 function clean(value) {
   return String(value || "").trim();
@@ -19,9 +20,13 @@ function normalizeParameters(parameters) {
 
   return parameters
     .map((parameter, index) => {
+      if (!parameter) return null;
       const name = clean(parameter.name);
-      if (!name) return null;
 
+      const maleMin = parameter.maleMin === "" || parameter.maleMin === null ? undefined : Number(parameter.maleMin);
+      const maleMax = parameter.maleMax === "" || parameter.maleMax === null ? undefined : Number(parameter.maleMax);
+      const femaleMin = parameter.femaleMin === "" || parameter.femaleMin === null ? undefined : Number(parameter.femaleMin);
+      const femaleMax = parameter.femaleMax === "" || parameter.femaleMax === null ? undefined : Number(parameter.femaleMax);
       const normalMin = parameter.normalMin === "" || parameter.normalMin === null ? undefined : Number(parameter.normalMin);
       const normalMax = parameter.normalMax === "" || parameter.normalMax === null ? undefined : Number(parameter.normalMax);
 
@@ -29,6 +34,10 @@ function normalizeParameters(parameters) {
         key: slug(parameter.key || name, `parameter-${index + 1}`),
         name,
         unit: clean(parameter.unit),
+        maleMin: Number.isFinite(maleMin) ? maleMin : undefined,
+        maleMax: Number.isFinite(maleMax) ? maleMax : undefined,
+        femaleMin: Number.isFinite(femaleMin) ? femaleMin : undefined,
+        femaleMax: Number.isFinite(femaleMax) ? femaleMax : undefined,
         normalMin: Number.isFinite(normalMin) ? normalMin : undefined,
         normalMax: Number.isFinite(normalMax) ? normalMax : undefined,
         required: parameter.required !== false,
@@ -89,9 +98,11 @@ export async function POST(req) {
 
     if (!name) return Response.json({ error: "Test name is required" }, { status: 400 });
     if (!category) return Response.json({ error: "Category is required" }, { status: 400 });
-    if (parameters.length === 0) {
-      return Response.json({ error: "At least one parameter is required" }, { status: 400 });
+
+    if (!mongoose.Types.ObjectId.isValid(category)) {
+      return Response.json({ error: "Invalid Department selected" }, { status: 400 });
     }
+
 
     const { TestDefinition } = await getTenantModels(auth.tenantId);
     const test = await TestDefinition.create({
@@ -112,6 +123,7 @@ export async function POST(req) {
       return Response.json({ error: "A test with this name/code already exists" }, { status: 409 });
     }
 
+    console.error("[TEST_CREATE_ERROR]:", error);
     return Response.json({ error: "Unable to create test", details: error.message }, { status: 500 });
   }
 }

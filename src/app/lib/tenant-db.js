@@ -8,6 +8,7 @@ import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
 import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
 import { getTestDefinitionModel } from "@/app/models/tenant/TestDefinition";
+import { getTestPackageModel } from "@/app/models/tenant/TestPackage";
 import { getTestReportModel } from "@/app/models/tenant/TestReport";
 import { getUserModel } from "@/app/models/tenant/User";
 
@@ -95,6 +96,7 @@ export async function getTenantModels(tenantId) {
     Sample: getSampleModel(connection),
     TestCategory: getTestCategoryModel(connection),
     TestDefinition: getTestDefinitionModel(connection),
+    TestPackage: getTestPackageModel(connection),
     TestReport: getTestReportModel(connection),
     User: getUserModel(connection),
     Visit: getVisitModel(connection),

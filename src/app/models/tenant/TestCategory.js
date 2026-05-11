@@ -63,7 +63,10 @@ TestCategorySchema.pre("save", async function generateCategoryId() {
 });
 
 export function getTestCategoryModel(connection = mongoose) {
-  return connection.models.TestCategory || connection.model("TestCategory", TestCategorySchema);
+  if (connection.models.TestCategory) {
+    delete connection.models.TestCategory;
+  }
+  return connection.model("TestCategory", TestCategorySchema);
 }
 
 const TestCategory = getTestCategoryModel();

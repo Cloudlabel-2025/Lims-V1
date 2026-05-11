@@ -1,0 +1,80 @@
+import { getTenantModels } from "@/app/lib/tenant-db";
+import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+
+function clean(value) {
+  return String(value || "").trim();
+}
+
+export async function GET(req) {
+  try {
+    const auth = requireTenantSession(req, "tests.view");
+    if (auth.error) return auth.error;
+
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "tests.view");
+    if (moduleAuth.error) return moduleAuth.error;
+
+    const { searchParams } = new URL(req.url);
+    const search = clean(searchParams.get("search"));
+    const status = searchParams.get("status");
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { code: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    const { TestPackage } = await getTenantModels(auth.tenantId);
+    const packages = await TestPackage.find(query)
+      .populate("tests", "name code price")
+      .sort({ name: 1 })
+      .limit(50);
+
+    return Response.json({ packages });
+  } catch (error) {
+    return Response.json({ error: "Unable to load packages", details: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(req) {
+  try {
+    const auth = requireTenantSession(req, "tests.edit");
+    if (auth.error) return auth.error;
+
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "tests.view");
+    if (moduleAuth.error) return moduleAuth.error;
+
+    const body = await req.json();
+    const name = clean(body.name);
+    const price = Number(body.price) || 0;
+    const tests = Array.isArray(body.tests) ? body.tests : [];
+
+    if (!name) return Response.json({ error: "Package name is required" }, { status: 400 });
+    if (tests.length === 0) return Response.json({ error: "At least one test must be included" }, { status: 400 });
+
+    const { TestPackage } = await getTenantModels(auth.tenantId);
+    const pkg = await TestPackage.create({
+      name,
+      code: clean(body.code).toUpperCase() || undefined,
+      description: clean(body.description),
+      price,
+      tests,
+      status: body.status === "inactive" ? "inactive" : "active",
+    });
+
+    await pkg.populate("tests", "name code price");
+
+    return Response.json({ package: pkg }, { status: 201 });
+  } catch (error) {
+    if (error.code === 11000) {
+      return Response.json({ error: "A package with this name/code already exists" }, { status: 409 });
+    }
+
+    return Response.json({ error: "Unable to create package", details: error.message }, { status: 500 });
+  }
+}

@@ -59,6 +59,7 @@ export default function MainLayout({ children }) {
         collapsed={collapsed} 
         onLogout={handleLogout} 
         theme={theme}
+        user={user}
       />
       <div className="dash-main">
         <Topbar 
