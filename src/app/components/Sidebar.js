@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 
-export default function Sidebar({ collapsed, onLogout, theme }) {
+export default function Sidebar({ collapsed, onLogout, theme, user }) {
   const pathname = usePathname();
   const labName = theme?.labName || "Uthiram LIMS";
   const [title, subtitle = "LIMS"] = labName.split(/\s+/, 2);
@@ -26,7 +26,13 @@ export default function Sidebar({ collapsed, onLogout, theme }) {
   };
   const navItems = availableLabModules
     .filter((module) => enabledModules.has(module.id))
-    .map((module) => ({ ...module, icon: iconByModule[module.id] || Icons.settings }));
+    .map((module) => {
+      let label = module.label;
+      if (module.id === "tests" && user?.roleName === "Admin") {
+        label = "Test Master";
+      }
+      return { ...module, label, icon: iconByModule[module.id] || Icons.settings };
+    });
 
   const isActive = (href) => {
     if (href === "/dashboard") return pathname === "/dashboard";

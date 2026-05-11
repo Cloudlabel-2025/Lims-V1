@@ -35,15 +35,26 @@ const TestParameterSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
-      minlength: 1,
       maxlength: 100,
     },
     unit: {
       type: String,
       trim: true,
       maxlength: 40,
+    },
+    maleMin: {
+      type: Number,
+    },
+    maleMax: {
+      type: Number,
+    },
+    femaleMin: {
+      type: Number,
+    },
+    femaleMax: {
+      type: Number,
     },
     normalMin: {
       type: Number,
@@ -105,10 +116,7 @@ export const TestDefinitionSchema = new mongoose.Schema(
     },
     parameters: {
       type: [TestParameterSchema],
-      validate: {
-        validator: (value) => Array.isArray(value) && value.length > 0,
-        message: "At least one parameter is required",
-      },
+      default: [],
     },
     status: {
       type: String,
@@ -149,12 +157,18 @@ TestDefinitionSchema.pre("validate", function normalizeParameters() {
 TestDefinitionSchema.pre("save", async function generateTestId() {
   if (this.testId) return;
 
-  const seq = await getNextSequence(this.constructor.db, "testDefinitionId");
+  const connection = this.constructor.db || this.db;
+  if (!connection) return;
+
+  const seq = await getNextSequence(connection, "testDefinitionId");
   this.testId = `TST-${String(seq).padStart(6, "0")}`;
 });
 
 export function getTestDefinitionModel(connection = mongoose) {
-  return connection.models.TestDefinition || connection.model("TestDefinition", TestDefinitionSchema);
+  if (connection.models.TestDefinition) {
+    delete connection.models.TestDefinition;
+  }
+  return connection.model("TestDefinition", TestDefinitionSchema);
 }
 
 const TestDefinition = getTestDefinitionModel();

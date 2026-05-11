@@ -1,24 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Icons } from "@/app/components/Icons";
-
-/* -------------------------------------------------------------------------- */
-/*                                  MOCK DATA                                 */
-/* -------------------------------------------------------------------------- */
-
-const MOCK_PATIENTS = [
-  { _id: "p1", name: "Rahul Sharma", patientId: "PAT-00001", phone: "9876543210" },
-  { _id: "p2", name: "Anjali Gupta", patientId: "PAT-00002", phone: "9876543211" },
-  { _id: "p3", name: "Vikram Singh", patientId: "PAT-00003", phone: "9876543212" },
-];
-
-const MOCK_ITEMS = [
-  { _id: "t1", name: "Complete Blood Count", code: "CBC", price: 350, type: "test" },
-  { _id: "t2", name: "Lipid Profile", code: "LIPID", price: 850, type: "test" },
-  { _id: "pkg1", name: "Executive Health Checkup", code: "EHC", price: 2500, type: "package" },
-  { _id: "pkg2", name: "Fever Panel", code: "FEVER", price: 1200, type: "package" },
-];
 
 const PAYMENT_MODES = ["Cash", "UPI", "Credit Card", "Debit Card", "Net Banking"];
 
@@ -31,23 +14,86 @@ export default function BillingPage() {
   const [discountValue, setDiscountValue] = useState(0);
   const [payments, setPayments] = useState([{ mode: "Cash", amount: 0 }]);
   const [isSplitPayment, setIsSplitPayment] = useState(false);
+  
+  const [patients, setPatients] = useState([]);
+  const [isSearchingPatient, setIsSearchingPatient] = useState(false);
+
+  const [searchItem, setSearchItem] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchingItem, setIsSearchingItem] = useState(false);
+
+  /* ---------- Patient Search ---------- */
+  useEffect(() => {
+    if (!searchPatient.trim()) {
+      setPatients([]);
+      setIsSearchingPatient(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingPatient(true);
+      try {
+        const res = await fetch(`/api/patient?search=${encodeURIComponent(searchPatient)}`);
+        const data = await res.json();
+        setPatients(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Patient search failed:", err);
+      } finally {
+        setIsSearchingPatient(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchPatient]);
+
+  /* ---------- Investigation Search ---------- */
+  useEffect(() => {
+    if (!searchItem.trim()) {
+      setSearchResults([]);
+      setIsSearchingItem(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingItem(true);
+      try {
+        const [testsRes, pkgsRes] = await Promise.all([
+          fetch(`/api/tests/definitions?search=${encodeURIComponent(searchItem)}&status=active`),
+          fetch(`/api/tests/packages?search=${encodeURIComponent(searchItem)}&status=active`)
+        ]);
+
+        const testsData = await testsRes.json();
+        const pkgsData = await pkgsRes.json();
+
+        const combined = [
+          ...(testsData.tests || []).map(t => ({ ...t, type: 'test' })),
+          ...(pkgsData.packages || []).map(p => ({ ...p, type: 'package' }))
+        ];
+
+        setSearchResults(combined);
+      } catch (err) {
+        console.error("Item search failed:", err);
+      } finally {
+        setIsSearchingItem(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchItem]);
 
   /* ---------- Calculations ---------- */
-
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price, 0), [cart]);
   
   const discountAmount = useMemo(() => {
-    if (discountType === "percent") return (subtotal * discountValue) / 100;
+    if (discountType === "percent") return (subtotal * (Number(discountValue) || 0)) / 100;
     return Number(discountValue) || 0;
   }, [subtotal, discountType, discountValue]);
 
   const netAmount = subtotal - discountAmount;
-
   const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0), [payments]);
   const balanceDue = netAmount - totalPaid;
 
   /* ---------- Handlers ---------- */
-
   const toggleCartItem = (item) => {
     setCart(prev => prev.find(i => i._id === item._id) 
       ? prev.filter(i => i._id !== item._id) 
@@ -97,9 +143,6 @@ export default function BillingPage() {
             <small style={{ color: 'var(--text-secondary)' }}>Create orders, apply discounts and record payments</small>
           </div>
         </div>
-        <button className="btn-lims-primary" style={{ height: '40px', padding: '0 20px' }}>
-          {Icons.plus} Register New Patient
-        </button>
       </div>
 
       <div className="billing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px', alignItems: 'start' }}>
@@ -108,7 +151,7 @@ export default function BillingPage() {
         <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* 1. Patient Selection */}
-          <div className="form-card" style={{ padding: '24px' }}>
+          <div className="form-card" style={{ padding: '24px', overflow: 'visible' }}>
             <h6 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '16px' }}>1. Patient Information</h6>
             <div style={{ position: 'relative' }}>
               <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>{Icons.search}</span>
@@ -121,15 +164,25 @@ export default function BillingPage() {
               />
               {searchPatient && !selectedPatient && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '12px', zIndex: 10, marginTop: '8px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-                  {MOCK_PATIENTS.map(p => (
-                    <div key={p._id} className="search-result-item" onClick={() => { setSelectedPatient(p); setSearchPatient(""); }} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontWeight: '700', fontSize: '14px' }}>{p.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{p.patientId}</div>
-                      </div>
-                      <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--primary)', fontWeight: '600' }}>{p.phone}</div>
+                  {isSearchingPatient ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <div className="search-spinner"></div> Searching patients...
                     </div>
-                  ))}
+                  ) : patients.length > 0 ? (
+                    patients.map(p => (
+                      <div key={p._id} className="search-result-item" onClick={() => { setSelectedPatient(p); setSearchPatient(""); }} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ fontWeight: '700', fontSize: '14px' }}>{p.name}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{p.patientId || p._id.slice(-6).toUpperCase()}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--primary)', fontWeight: '600' }}>{p.phone}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      No patients found matching "{searchPatient}"
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -149,43 +202,106 @@ export default function BillingPage() {
           <div className="form-card" style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h6 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>2. Select Investigations</h6>
-              <div style={{ display: 'flex', background: 'var(--border-light)', padding: '3px', borderRadius: '8px' }}>
-                <button style={tabButtonStyle(activeTab === 'tests')} onClick={() => setActiveTab('tests')}>Tests</button>
-                <button style={tabButtonStyle(activeTab === 'packages')} onClick={() => setActiveTab('packages')}>Packages</button>
-              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-              {MOCK_ITEMS.filter(item => activeTab === 'tests' ? item.type === 'test' : item.type === 'package').map(item => (
-                <div 
-                  key={item._id} 
-                  onClick={() => toggleCartItem(item)}
-                  style={{ 
-                    padding: '16px', 
-                    borderRadius: '14px', 
-                    border: cart.find(i => i._id === item._id) ? '2px solid var(--primary)' : '1.5px solid var(--border)', 
-                    background: cart.find(i => i._id === item._id) ? 'var(--primary-50)' : '#fff',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}
-                >
-                  <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: '2px solid var(--primary)', background: cart.find(i => i._id === item._id) ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {cart.find(i => i._id === item._id) && <span style={{ color: '#fff', fontSize: '12px' }}>✓</span>}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>{item.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.code}</div>
-                  </div>
-                  <div style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '14px' }}>₹{item.price}</div>
+            <div style={{ position: 'relative', marginBottom: '24px' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>{Icons.search}</span>
+              <input 
+                className="lims-input" 
+                style={{ paddingLeft: '38px', height: '48px' }} 
+                placeholder="Search Investigation by Name or Short Code (e.g. CBC, Lipid)..." 
+                value={searchItem}
+                onChange={(e) => setSearchItem(e.target.value)}
+              />
+              
+              {searchItem && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '12px', zIndex: 10, marginTop: '8px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+                  {isSearchingItem ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <div className="search-spinner"></div> Searching investigations...
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map(item => {
+                      const inCart = cart.find(i => i._id === item._id);
+                      return (
+                        <div 
+                          key={item._id} 
+                          className="search-result-item" 
+                          onClick={() => { toggleCartItem(item); if (!inCart) setSearchItem(""); }} 
+                          style={{ 
+                            padding: '12px 16px', 
+                            cursor: 'pointer', 
+                            borderBottom: '1px solid var(--border-light)', 
+                            display: 'flex', 
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: inCart ? 'var(--primary-50)' : 'transparent'
+                          }}
+                        >
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: item.type === 'package' ? '#fff7ed' : 'var(--primary-50)', color: item.type === 'package' ? '#ea580c' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {item.type === 'package' ? Icons.grid : Icons.flask}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: '700', fontSize: '14px' }}>{item.name}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.code} • {item.type.toUpperCase()}</div>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary)' }}>₹{item.price}</div>
+                            {inCart && <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase' }}>Added</span>}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      No investigations found matching "{searchItem}"
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
+            </div>
+
+            {/* Quick selection or cart list */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+               {cart.length > 0 ? (
+                 cart.map(item => (
+                    <div 
+                      key={item._id} 
+                      onClick={() => toggleCartItem(item)}
+                      style={{ 
+                        padding: '16px', 
+                        borderRadius: '14px', 
+                        border: '2px solid var(--primary)', 
+                        background: 'var(--primary-50)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: '2px solid var(--primary)', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: '#fff', fontSize: '12px' }}>✓</span>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>{item.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{item.code}</div>
+                      </div>
+                      <div style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '14px' }}>₹{item.price}</div>
+                    </div>
+                 ))
+               ) : (
+                 <div style={{ gridColumn: 'span 2', padding: '40px', textAlign: 'center', border: '2px dashed var(--border)', borderRadius: '16px', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '32px', marginBottom: '12px', opacity: 0.5 }}>{Icons.flask}</div>
+                    <div style={{ fontWeight: '600' }}>No investigations selected</div>
+                    <small>Search and select tests to add to the bill</small>
+                 </div>
+               )}
             </div>
           </div>
 
-          {/* 3. Split Payment UI */}
+          {/* 3. Payment Breakdown */}
           <div className="form-card" style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h6 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>3. Payment Breakdown</h6>
@@ -252,7 +368,6 @@ export default function BillingPage() {
             </div>
 
             <div style={{ padding: '24px' }}>
-              {/* Item List */}
               <div style={{ marginBottom: '24px' }}>
                 {cart.map(item => (
                   <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '13px' }}>
@@ -265,7 +380,6 @@ export default function BillingPage() {
 
               <hr style={{ border: 'none', borderTop: '1px dashed var(--border)', margin: '20px 0' }} />
 
-              {/* Discount Section */}
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
                   <div style={{ fontSize: '13px', fontWeight: '700' }}>Apply Discount</div>
@@ -284,7 +398,6 @@ export default function BillingPage() {
                 />
               </div>
 
-              {/* Total Breakdown */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
                   <span>Subtotal</span>
@@ -311,6 +424,17 @@ export default function BillingPage() {
       <style jsx>{`
         .search-result-item:hover {
           background: var(--surface);
+        }
+        .search-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid var(--border);
+          border-top-color: var(--primary);
+          border-radius: 50%;
+          animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
