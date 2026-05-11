@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAnySession } from "@/app/lib/auth";
+import { hasPermission, requireAnySession } from "@/app/lib/auth";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { uploadImageToCloudinary } from "@/app/lib/cloudinary";
 
@@ -47,6 +47,14 @@ export async function POST(req) {
     const context = String(formData.get("context") || "attachment");
     const tenantId = getUploadTenantId(auth.session, formData.get("tenantId"));
     const folderSuffix = contextFolders[context];
+
+    if (
+      auth.session.userType === "tenant" &&
+      context === "lab-logo" &&
+      !hasPermission(auth.session, "settings.branding")
+    ) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
 
     if (!folderSuffix) {
       return NextResponse.json({ error: "Unsupported upload context" }, { status: 400 });

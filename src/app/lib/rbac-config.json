@@ -511,6 +511,17 @@
       "sortOrder": 170
     },
     {
+      "name": "Manage Lab Branding",
+      "key": "settings.branding",
+      "module": "settings",
+      "action": "branding",
+      "category": "administration",
+      "dependencies": ["settings.manage"],
+      "description": "Update the lab logo shown on lab login and dashboard pages.",
+      "availableForPlans": ["professional", "enterprise"],
+      "sortOrder": 171
+    },
+    {
       "name": "View Inventory",
       "key": "inventory.view",
       "module": "inventory",

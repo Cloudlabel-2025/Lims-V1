@@ -104,7 +104,7 @@ async function createTenantRoles(masterConnection, tenantConnection) {
         isSystemRole: template.isSystemTemplate,
         status: "active",
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
   }
 }

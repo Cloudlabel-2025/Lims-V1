@@ -48,7 +48,7 @@ export async function PUT(req, { params }) {
     const doctor = await Doctor.findByIdAndUpdate(
       id,
       { $set: body },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!doctor) {

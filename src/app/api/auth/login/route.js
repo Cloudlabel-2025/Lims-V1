@@ -32,12 +32,13 @@ function resolveTenantId(req, bodyTenantId) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const email = String(body.email || "").trim().toLowerCase();
+    const loginId = String(body.email || "").trim();
+    const email = loginId.toLowerCase();
     const password = String(body.password || "");
     const userType = body.userType === "developer" ? "developer" : "tenant";
 
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    if (!loginId || !password) {
+      return NextResponse.json({ error: "User ID and password are required" }, { status: 400 });
     }
 
     if (userType === "developer") {
@@ -51,7 +52,7 @@ export async function POST(req) {
 
     return loginTenant({
       tenantId,
-      email,
+      loginId,
       password,
       rememberMe: Boolean(body.rememberMe),
     });
@@ -104,11 +105,15 @@ async function loginDeveloper({ email, password, rememberMe }) {
   return response;
 }
 
-async function loginTenant({ tenantId, email, password, rememberMe }) {
+async function loginTenant({ tenantId, loginId, password, rememberMe }) {
   const tenantConnection = await connectTenantDB(tenantId);
   const User = getUserModel(tenantConnection);
   const Role = getRoleModel(tenantConnection);
-  const user = await User.findOne({ email, status: "active" })
+  const normalizedLoginId = String(loginId || "").trim();
+  const userQuery = normalizedLoginId.includes("@")
+    ? { email: normalizedLoginId.toLowerCase(), status: "active" }
+    : { userId: normalizedLoginId.toUpperCase(), status: "active" };
+  const user = await User.findOne(userQuery)
     .select("_id userId firstName lastName email role +passwordHash")
     .lean();
 

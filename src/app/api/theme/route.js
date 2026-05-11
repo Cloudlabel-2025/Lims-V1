@@ -75,11 +75,6 @@ function cleanString(value) {
   return String(value || "").trim();
 }
 
-function normalizeColor(value, fallback) {
-  const color = cleanString(value);
-  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : fallback;
-}
-
 function normalizeLogo(value, fallbackAltText) {
   if (!value || typeof value !== "object") return undefined;
 
@@ -101,7 +96,7 @@ function normalizeLogo(value, fallbackAltText) {
 
 export async function PATCH(req) {
   try {
-    const auth = requireTenantSession(req, "settings.manage");
+    const auth = requireTenantSession(req, "settings.branding");
     if (auth.error) return auth.error;
 
     const body = await req.json();
@@ -115,13 +110,20 @@ export async function PATCH(req) {
 
     const logoAltText = cleanString(body.logoAltText).slice(0, 120) || `${lab.name} logo`;
     const logo = normalizeLogo(body.logo, logoAltText);
+    const existingLogo = lab.branding?.logo;
 
     lab.branding = {
       ...(lab.branding || {}),
-      ...(logo ? { logo } : {}),
-      primaryColor: normalizeColor(body.primaryColor, lab.branding?.primaryColor || defaultTheme.primaryColor),
-      secondaryColor: normalizeColor(body.secondaryColor, lab.branding?.secondaryColor || defaultTheme.secondaryColor),
-      accentColor: normalizeColor(body.accentColor, lab.branding?.accentColor || defaultTheme.accentColor),
+      ...(logo
+        ? { logo }
+        : existingLogo
+          ? {
+              logo: {
+                ...(existingLogo.toObject?.() || existingLogo),
+                altText: logoAltText,
+              },
+            }
+          : {}),
     };
 
     await lab.save();
@@ -143,7 +145,7 @@ export async function PATCH(req) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: "Unable to update theme", details: error.message },
+      { error: "Unable to update branding", details: error.message },
       { status: 500 }
     );
   }
