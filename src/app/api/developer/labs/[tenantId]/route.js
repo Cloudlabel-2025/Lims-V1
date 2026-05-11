@@ -73,7 +73,7 @@ function serializeLab(lab, req) {
     contactEmail: lab.contactEmail || "",
     contactPhone: lab.contactPhone || "",
     adminEmail: lab.adminAccess?.email || "",
-    adminPassword: lab.adminAccess?.password || "",
+    adminPassword: "",
     primaryColor: lab.branding?.primaryColor || "#0d9488",
     secondaryColor: lab.branding?.secondaryColor || "#0f766e",
     accentColor: lab.branding?.accentColor || "#f59e0b",
@@ -154,6 +154,12 @@ export async function PATCH(req, context) {
     const adminPassword = String(body.adminPassword || "");
     const enabledModules = normalizeEnabledModules(body.enabledModules);
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
+    const status = cleanString(body.status) || lab.status;
+    const subscriptionPlan = cleanString(body.subscriptionPlan) || lab.subscriptionPlan;
+    const adminEmailChanged = Boolean(adminEmail && adminEmail !== lab.adminAccess?.email);
+    const adminPasswordChanged = Boolean(
+      adminPassword && adminPassword !== lab.adminAccess?.password
+    );
 
     if (!name || name.length < 2) {
       return NextResponse.json({ error: "Lab name is required" }, { status: 400 });
@@ -181,14 +187,22 @@ export async function PATCH(req, context) {
       );
     }
 
-    if ((adminEmail || adminPassword) && !adminEmail && !lab.adminAccess?.email) {
+    if (!["pending", "active", "suspended", "archived"].includes(status)) {
+      return NextResponse.json({ error: "Invalid lab status" }, { status: 400 });
+    }
+
+    if (!["trial", "basic", "professional", "enterprise"].includes(subscriptionPlan)) {
+      return NextResponse.json({ error: "Invalid subscription plan" }, { status: 400 });
+    }
+
+    if ((adminEmailChanged || adminPasswordChanged) && !adminEmail && !lab.adminAccess?.email) {
       return NextResponse.json(
         { error: "Lab admin email is required before saving admin credentials" },
         { status: 400 }
       );
     }
 
-    if (adminEmail || adminPassword) {
+    if (adminEmailChanged || adminPasswordChanged) {
       let tenantConnection = null;
 
       try {
@@ -209,8 +223,8 @@ export async function PATCH(req, context) {
           return NextResponse.json({ error: "Lab admin user not found" }, { status: 404 });
         }
 
-        if (adminEmail) adminUser.email = adminEmail;
-        if (adminPassword) adminUser.passwordHash = await hashPassword(adminPassword);
+        if (adminEmailChanged) adminUser.email = adminEmail;
+        if (adminPasswordChanged) adminUser.passwordHash = await hashPassword(adminPassword);
         adminUser.status = "active";
         adminUser.passwordResetTokenHash = undefined;
         adminUser.passwordResetExpiresAt = undefined;
@@ -219,7 +233,7 @@ export async function PATCH(req, context) {
         lab.adminAccess = {
           ...(lab.adminAccess || {}),
           email: adminUser.email,
-          ...(adminPassword ? { password: adminPassword } : {}),
+          ...(adminPasswordChanged ? { password: adminPassword } : {}),
           updatedAt: new Date(),
         };
       } finally {
@@ -231,8 +245,8 @@ export async function PATCH(req, context) {
 
     lab.set({
       name,
-      status: body.status || lab.status,
-      subscriptionPlan: body.subscriptionPlan || lab.subscriptionPlan,
+      status,
+      subscriptionPlan,
       contactName: cleanString(body.contactName),
       contactEmail,
       contactPhone,
@@ -263,6 +277,20 @@ export async function PATCH(req, context) {
 
     return NextResponse.json({ lab: serializeLab(lab, req) });
   } catch (error) {
+    if (error?.code === 11000) {
+      return NextResponse.json(
+        { error: "A lab or admin user already uses this value", details: error.message },
+        { status: 409 }
+      );
+    }
+
+    if (error?.name === "ValidationError") {
+      return NextResponse.json(
+        { error: "Invalid lab update", details: error.message },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Unable to update lab", details: error.message },
       { status: 500 }
