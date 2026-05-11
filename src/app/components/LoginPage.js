@@ -19,7 +19,7 @@ export default function LoginPage({
 }) {
   const router = useRouter();
   const [tenantId, setTenantId] = useState(initialTenantId);
-  const [userType, setUserType] = useState(initialUserType);
+  const [userType] = useState(initialUserType);
   const [theme, setTheme] = useState(initialTheme);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -208,32 +208,6 @@ export default function LoginPage({
             )}
 
             <form onSubmit={handleSubmit} className="login-form">
-              {!lockUserType && (
-                <div className="login-field">
-                <span className="login-label">Access Type</span>
-                <div className="login-access-switch" role="tablist" aria-label="Access type">
-                  <button
-                    type="button"
-                    className={`login-access-option ${userType === "tenant" ? "active" : ""}`}
-                    onClick={() => setUserType("tenant")}
-                    role="tab"
-                    aria-selected={userType === "tenant"}
-                  >
-                    Lab User
-                  </button>
-                  <button
-                    type="button"
-                    className={`login-access-option ${userType === "developer" ? "active" : ""}`}
-                    onClick={() => setUserType("developer")}
-                    role="tab"
-                    aria-selected={userType === "developer"}
-                  >
-                    Developer Access
-                  </button>
-                </div>
-              </div>
-              )}
-
               {isTenantLogin && !lockUserType && (
                 <div className="login-field">
                   <label className="login-label" htmlFor="login-tenant">
@@ -261,15 +235,15 @@ export default function LoginPage({
               {/* Email Field */}
               <div className="login-field">
                 <label className="login-label" htmlFor="login-email">
-                  Email Address
+                  {isTenantLogin ? "User ID or Email" : "Email Address"}
                 </label>
                 <div className="login-input-wrapper">
                   <span className="login-input-icon">{Icons.user}</span>
                   <input
                     id="login-email"
-                    type="email"
+                    type={isTenantLogin ? "text" : "email"}
                     className="login-input"
-                    placeholder="you@uthiram.lab"
+                    placeholder={isTenantLogin ? "USR-000001 or you@lab.com" : "developer@cms.com"}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete="email"

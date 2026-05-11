@@ -5,43 +5,6 @@ import { Icons } from "@/app/components/Icons";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { defaultLabModules } from "@/app/lib/modules";
 
-const sampleRoles = [
-  {
-    name: "Lab Admin",
-    description: "Full lab administration access.",
-    permissions: ["*"],
-  },
-  {
-    name: "Receptionist",
-    description: "Registration, order entry, billing lookup, and report print access.",
-    permissions: [
-      "dashboard.view",
-      "patients.view",
-      "patients.register",
-      "patients.edit",
-      "doctors.view",
-      "orders.view",
-      "orders.create",
-      "reports.view",
-      "reports.print",
-    ],
-  },
-  {
-    name: "Technician",
-    description: "Sample workflow and report entry.",
-    permissions: [
-      "dashboard.view",
-      "orders.view",
-      "samples.view",
-      "samples.collect",
-      "samples.update",
-      "tests.view",
-      "reports.view",
-      "reports.edit",
-    ],
-  },
-];
-
 function groupByModule(permissions) {
   return permissions.reduce((groups, permission) => {
     const moduleId = permission.module || "general";
@@ -62,76 +25,89 @@ function toggleSetValue(values, value) {
   return [...next];
 }
 
+function sameRoleConfiguration(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function normalizeRoleName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 export default function LabAdminSettingsPage() {
   const [theme, setTheme] = useState(null);
-  const [brandingDraft, setBrandingDraft] = useState({
-    logo: null,
-    logoAltText: "",
-    primaryColor: "#0d9488",
-    secondaryColor: "#0f766e",
-    accentColor: "#f59e0b",
-  });
-  const [savedBranding, setSavedBranding] = useState(null);
-  const [logoFile, setLogoFile] = useState(null);
-  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
-  const [brandingSaving, setBrandingSaving] = useState(false);
-  const [brandingMessage, setBrandingMessage] = useState("");
-  const [brandingError, setBrandingError] = useState("");
   const [activeRoleIndex, setActiveRoleIndex] = useState(0);
-  const [roles, setRoles] = useState(sampleRoles);
+  const [roles, setRoles] = useState([]);
+  const [savedRoles, setSavedRoles] = useState([]);
   const [newRoleName, setNewRoleName] = useState("");
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
-    role: "Lab Admin",
+    password: "",
+    roleId: "",
   });
+  const [users, setUsers] = useState([]);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [userSaving, setUserSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [roleMessage, setRoleMessage] = useState("");
+  const [userMessage, setUserMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadTheme() {
+    async function loadSettings() {
       try {
-        const response = await fetch("/api/theme", { credentials: "include" });
-        const data = await response.json();
-        if (!cancelled && response.ok) {
-          setTheme(data.theme);
-          const nextBranding = {
-            logo: data.theme.logo
-              ? {
-                  url: data.theme.logo,
-                  altText: data.theme.logoAltText,
-                }
-              : null,
-            logoAltText: data.theme.logoAltText || "",
-            primaryColor: data.theme.primaryColor || "#0d9488",
-            secondaryColor: data.theme.secondaryColor || "#0f766e",
-            accentColor: data.theme.accentColor || "#f59e0b",
-          };
-          setBrandingDraft(nextBranding);
-          setSavedBranding(nextBranding);
+        setSettingsError("");
+        const [themeResponse, roleResponse, userResponse] = await Promise.all([
+          fetch("/api/theme", { credentials: "include" }),
+          fetch("/api/settings/roles", { credentials: "include" }),
+          fetch("/api/settings/users", { credentials: "include" }),
+        ]);
+        const [themeData, roleData, userData] = await Promise.all([
+          themeResponse.json(),
+          roleResponse.json(),
+          userResponse.json(),
+        ]);
+
+        if (!cancelled && themeResponse.ok) {
+          setTheme(themeData.theme);
         }
-      } catch {
-        if (!cancelled) setTheme(null);
+
+        if (!roleResponse.ok) {
+          throw new Error(roleData.error || roleData.details || "Unable to load roles");
+        }
+
+        if (!userResponse.ok) {
+          throw new Error(userData.error || userData.details || "Unable to load users");
+        }
+
+        if (!cancelled) {
+          const loadedRoles = roleData.roles || [];
+          setRoles(loadedRoles);
+          setSavedRoles(loadedRoles);
+          setUsers(userData.users || []);
+          setNewUser((current) => ({
+            ...current,
+            roleId: current.roleId || loadedRoles[0]?.id || "",
+          }));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setTheme(null);
+          setSettingsError(err.message);
+        }
+      } finally {
+        if (!cancelled) setLoadingSettings(false);
       }
     }
 
-    loadTheme();
+    loadSettings();
 
     return () => {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!logoFile) {
-      setLogoPreviewUrl("");
-      return undefined;
-    }
-
-    const objectUrl = URL.createObjectURL(logoFile);
-    setLogoPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [logoFile]);
 
   const enabledModules = theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules;
   const labPermissions = useMemo(
@@ -139,6 +115,7 @@ export default function LabAdminSettingsPage() {
       rbacConfig.permissions.filter(
         (permission) =>
           permission.scope !== "developer" &&
+          permission.key !== "settings.branding" &&
           (enabledModules.includes(permission.module) || permission.module === "users" || permission.module === "settings")
       ),
     [enabledModules]
@@ -148,6 +125,7 @@ export default function LabAdminSettingsPage() {
   const activePermissions = activeRole?.permissions?.includes("*")
     ? labPermissions.map((permission) => permission.key)
     : activeRole?.permissions || [];
+  const rolesDirty = !sameRoleConfiguration(roles, savedRoles);
 
   function toggleRolePermission(permissionKey) {
     setRoles((current) =>
@@ -169,98 +147,107 @@ export default function LabAdminSettingsPage() {
   function addRole() {
     const roleName = newRoleName.trim();
     if (!roleName) return;
+    if (roles.some((role) => normalizeRoleName(role.name) === normalizeRoleName(roleName))) {
+      setSettingsError("Role name already exists.");
+      return;
+    }
 
+    setSettingsError("");
     setRoles((current) => [
       ...current,
       {
+        id: `new-${Date.now()}`,
         name: roleName,
         description: "Custom lab role.",
         permissions: ["dashboard.view"],
+        isNew: true,
       },
     ]);
     setActiveRoleIndex(roles.length);
     setNewRoleName("");
   }
 
-  async function uploadLogoIfSelected() {
-    if (!logoFile) return brandingDraft.logo;
-
-    const uploadForm = new FormData();
-    uploadForm.append("file", logoFile);
-    uploadForm.append("context", "lab-logo");
-
-    const response = await fetch("/api/uploads/image", {
-      method: "POST",
-      credentials: "include",
-      body: uploadForm,
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || data.details || "Unable to upload logo");
-    }
-
-    return {
-      ...data.image,
-      altText: brandingDraft.logoAltText || `${theme?.labName || "Lab"} logo`,
-    };
+  function cancelRoleChanges() {
+    setRoles(savedRoles);
+    setActiveRoleIndex(0);
+    setRoleMessage("");
+    setSettingsError("");
   }
 
-  async function saveBranding() {
-    setBrandingSaving(true);
-    setBrandingError("");
-    setBrandingMessage("");
+  async function saveRoleConfiguration() {
+    setRoleSaving(true);
+    setRoleMessage("");
+    setSettingsError("");
 
     try {
-      const logo = await uploadLogoIfSelected();
-      const response = await fetch("/api/theme", {
+      const response = await fetch("/api/settings/roles", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          logo,
-          logoAltText: brandingDraft.logoAltText,
-          primaryColor: brandingDraft.primaryColor,
-          secondaryColor: brandingDraft.secondaryColor,
-          accentColor: brandingDraft.accentColor,
+          roles: roles.map((role) => ({
+            id: role.isNew ? undefined : role.id,
+            name: role.name,
+            description: role.description,
+            permissions: role.permissions,
+          })),
         }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || "Unable to save branding");
+        throw new Error(data.error || data.details || "Unable to save role configuration");
       }
 
-      const nextBranding = {
-        logo: data.theme.logo
-          ? {
-              url: data.theme.logo,
-              altText: data.theme.logoAltText,
-            }
-          : null,
-        logoAltText: data.theme.logoAltText || "",
-        primaryColor: data.theme.primaryColor,
-        secondaryColor: data.theme.secondaryColor,
-        accentColor: data.theme.accentColor,
-      };
-
-      setTheme(data.theme);
-      setBrandingDraft(nextBranding);
-      setSavedBranding(nextBranding);
-      setLogoFile(null);
-      setBrandingMessage("Branding saved.");
+      const nextRoles = data.roles || [];
+      setRoles(nextRoles);
+      setSavedRoles(nextRoles);
+      setActiveRoleIndex(0);
+      setNewUser((current) => ({
+        ...current,
+        roleId: nextRoles.some((role) => role.id === current.roleId)
+          ? current.roleId
+          : nextRoles[0]?.id || "",
+      }));
+      setRoleMessage("Role configuration saved.");
     } catch (err) {
-      setBrandingError(err.message);
+      setSettingsError(err.message);
     } finally {
-      setBrandingSaving(false);
+      setRoleSaving(false);
     }
   }
 
-  function cancelBranding() {
-    if (savedBranding) setBrandingDraft(savedBranding);
-    setLogoFile(null);
-    setBrandingError("");
-    setBrandingMessage("");
+  async function createUser() {
+    setUserSaving(true);
+    setUserMessage("");
+    setSettingsError("");
+
+    try {
+      const response = await fetch("/api/settings/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(newUser),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Unable to create user");
+      }
+
+      setUsers((current) => [data.user, ...current]);
+      setUserMessage(`User created. Login User ID: ${data.user.userId}`);
+      setNewUser({
+        name: "",
+        email: "",
+        password: "",
+        roleId: roles[0]?.id || "",
+      });
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setUserSaving(false);
+    }
   }
 
   return (
@@ -272,6 +259,10 @@ export default function LabAdminSettingsPage() {
           <span>{theme?.labName || "Tenant Lab"} configuration, roles, users, and permission mapping.</span>
         </div>
       </div>
+
+      {settingsError && <div className="developer-alert">{settingsError}</div>}
+      {roleMessage && <div className="developer-success">{roleMessage}</div>}
+      {userMessage && <div className="developer-success">{userMessage}</div>}
 
       <div className="settings-summary-grid">
         <article>
@@ -288,87 +279,11 @@ export default function LabAdminSettingsPage() {
         </article>
       </div>
 
+      {loadingSettings ? (
+        <p className="developer-empty">Loading settings...</p>
+      ) : (
+      <>
       <section className="settings-panel">
-        <div className="settings-panel-header">
-          <h2>Lab Branding</h2>
-          <p>Upload the lab logo to Cloudinary and update colors used on the login page.</p>
-        </div>
-        {brandingError && <div className="developer-alert">{brandingError}</div>}
-        {brandingMessage && <div className="developer-success">{brandingMessage}</div>}
-        <div className="settings-branding-grid">
-          <div>
-            <label className="settings-file-label">
-              Logo Image
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => setLogoFile(event.target.files?.[0] || null)}
-              />
-            </label>
-            {(logoPreviewUrl || brandingDraft.logo?.url) && (
-              <div
-                className="developer-logo-preview"
-                role="img"
-                aria-label={brandingDraft.logoAltText || `${theme?.labName || "Lab"} logo`}
-                style={{ backgroundImage: `url("${logoPreviewUrl || brandingDraft.logo?.url}")` }}
-              />
-            )}
-          </div>
-          <div className="settings-form-grid">
-            <label>
-              Logo Alt Text
-              <input
-                value={brandingDraft.logoAltText}
-                onChange={(event) =>
-                  setBrandingDraft((current) => ({ ...current, logoAltText: event.target.value }))
-                }
-                placeholder={`${theme?.labName || "Lab"} logo`}
-              />
-            </label>
-            <label>
-              Primary Color
-              <input
-                type="color"
-                value={brandingDraft.primaryColor}
-                onChange={(event) =>
-                  setBrandingDraft((current) => ({ ...current, primaryColor: event.target.value }))
-                }
-              />
-            </label>
-            <label>
-              Secondary Color
-              <input
-                type="color"
-                value={brandingDraft.secondaryColor}
-                onChange={(event) =>
-                  setBrandingDraft((current) => ({ ...current, secondaryColor: event.target.value }))
-                }
-              />
-            </label>
-            <label>
-              Accent Color
-              <input
-                type="color"
-                value={brandingDraft.accentColor}
-                onChange={(event) =>
-                  setBrandingDraft((current) => ({ ...current, accentColor: event.target.value }))
-                }
-              />
-            </label>
-          </div>
-        </div>
-        <div className="developer-config-actions">
-          <button type="button" className="developer-secondary-link" onClick={cancelBranding} disabled={brandingSaving}>
-            Cancel
-          </button>
-          <button type="button" className="developer-primary-link" onClick={saveBranding} disabled={brandingSaving}>
-            {brandingSaving ? "Saving..." : "Save Branding"}
-          </button>
-        </div>
-      </section>
-
-      <div className="settings-two-column">
-        <section className="settings-panel">
           <div className="settings-panel-header">
             <h2>Lab Roles</h2>
             <p>Create roles inside this lab and assign only allowed permissions.</p>
@@ -379,7 +294,7 @@ export default function LabAdminSettingsPage() {
               <button
                 type="button"
                 className={activeRoleIndex === index ? "active" : ""}
-                key={role.name}
+                key={role.id || role.name}
                 onClick={() => setActiveRoleIndex(index)}
               >
                 <strong>{role.name}</strong>
@@ -398,54 +313,27 @@ export default function LabAdminSettingsPage() {
               {Icons.plus} Add Role
             </button>
           </div>
-        </section>
-
-        <section className="settings-panel">
-          <div className="settings-panel-header">
-            <h2>User Assignment</h2>
-            <p>Create lab users and assign one role for this lab.</p>
+          <div className="developer-config-actions">
+            <button type="button" className="developer-secondary-link" onClick={cancelRoleChanges} disabled={!rolesDirty || roleSaving}>
+              Cancel
+            </button>
+            <button type="button" className="developer-primary-link" onClick={saveRoleConfiguration} disabled={!rolesDirty || roleSaving}>
+              {roleSaving ? "Saving..." : "Save Role Configuration"}
+            </button>
           </div>
-          <div className="settings-form-grid">
-            <label>
-              User Name
-              <input
-                value={newUser.name}
-                onChange={(event) => setNewUser((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Anita Kumar"
-              />
-            </label>
-            <label>
-              Email
-              <input
-                value={newUser.email}
-                onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))}
-                placeholder="anita@lab.com"
-              />
-            </label>
-            <label>
-              Role
-              <select
-                value={newUser.role}
-                onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value }))}
-              >
-                {roles.map((role) => (
-                  <option key={role.name} value={role.name}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </section>
-      </div>
+      </section>
 
       <section className="settings-panel">
         <div className="settings-panel-header">
-          <h2>Permission Mapping For {activeRole?.name}</h2>
+          <h2>Permission Mapping For {activeRole?.name || "New Role"}</h2>
           <p>Checkbox selection is limited to modules enabled by the developer for this lab.</p>
         </div>
 
-        <div className="permission-matrix">
+        {roles.length === 0 ? (
+          <p className="developer-empty">Create a role first, then choose permissions for it.</p>
+        ) : (
+          <>
+          <div className="permission-matrix">
           {Object.entries(permissionsByModule).map(([moduleId, permissions]) => (
             <article className="permission-group" key={moduleId}>
               <div className="permission-group-header">
@@ -467,33 +355,83 @@ export default function LabAdminSettingsPage() {
               ))}
             </article>
           ))}
-        </div>
+          </div>
+          <div className="developer-config-actions">
+            <button type="button" className="developer-secondary-link" onClick={cancelRoleChanges} disabled={!rolesDirty || roleSaving}>
+              Cancel
+            </button>
+            <button type="button" className="developer-primary-link" onClick={saveRoleConfiguration} disabled={!rolesDirty || roleSaving}>
+              {roleSaving ? "Saving..." : "Save Role Configuration"}
+            </button>
+          </div>
+          </>
+        )}
       </section>
 
       <section className="settings-panel">
         <div className="settings-panel-header">
-          <h2>Lab Configuration Sections</h2>
-          <p>Configuration owned by the lab admin.</p>
+          <h2>User Assignment</h2>
+          <p>Create lab users and assign one role for this lab.</p>
         </div>
-        <div className="settings-section-grid">
-          <article>
-            <strong>Lab Profile</strong>
-            <span>Name, contact details, address, report display identity.</span>
-          </article>
-          <article>
-            <strong>Report Settings</strong>
-            <span>Header, footer, signature, templates, print behavior.</span>
-          </article>
-          <article>
-            <strong>Numbering</strong>
-            <span>Patient IDs, order numbers, sample IDs, report numbers.</span>
-          </article>
-          <article>
-            <strong>Workflow</strong>
-            <span>Sample, order, and report approval defaults.</span>
-          </article>
+        <div className="settings-form-grid">
+          <label>
+            User Name
+            <input
+              value={newUser.name}
+              onChange={(event) => setNewUser((current) => ({ ...current, name: event.target.value }))}
+              placeholder="Anita Kumar"
+            />
+          </label>
+          <label>
+            Login Email
+            <input
+              value={newUser.email}
+              onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))}
+              placeholder="anita@lab.com"
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={newUser.password}
+              onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
+              placeholder="Minimum 8 characters"
+            />
+          </label>
+          <label>
+            Role
+            <select
+              value={newUser.roleId}
+              onChange={(event) => setNewUser((current) => ({ ...current, roleId: event.target.value }))}
+            >
+              {roles.map((role) => (
+                <option key={role.id || role.name} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+        <div className="developer-config-actions">
+          <button type="button" className="developer-primary-link" onClick={createUser} disabled={userSaving || rolesDirty}>
+            {userSaving ? "Creating..." : "Create Lab User"}
+          </button>
+        </div>
+        {rolesDirty && <p className="developer-empty">Save role configuration before creating users.</p>}
+        {users.length > 0 && (
+          <div className="settings-role-list">
+            {users.map((user) => (
+              <button type="button" key={user.id}>
+                <strong>{user.userId}</strong>
+                <span>{user.email} - {user.role?.name || "No role"}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
+      </>
+      )}
 
     </section>
   );

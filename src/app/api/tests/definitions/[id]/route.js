@@ -70,7 +70,7 @@ export async function PUT(req, { params }) {
           status: body.status === "inactive" ? "inactive" : "active",
         },
       },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     ).populate("category", "name categoryId");
 
     if (!test) return Response.json({ error: "Test not found" }, { status: 404 });
@@ -98,7 +98,7 @@ export async function DELETE(req, { params }) {
     const test = await TestDefinition.findByIdAndUpdate(
       id,
       { $set: { status: "inactive" } },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!test) return Response.json({ error: "Test not found" }, { status: 404 });

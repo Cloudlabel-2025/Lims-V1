@@ -74,7 +74,7 @@ async function createTenantRoles(masterConnection, tenantConnection) {
     };
 
     const role = existing
-      ? await Role.findByIdAndUpdate(existing._id, { $set: roleData }, { new: true, runValidators: true })
+      ? await Role.findByIdAndUpdate(existing._id, { $set: roleData }, { returnDocument: "after", runValidators: true })
       : await Role.create(roleData);
 
     if (role.isDefaultAdmin) {
