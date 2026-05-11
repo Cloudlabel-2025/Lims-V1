@@ -98,19 +98,16 @@ export default function OrdersPage() {
   if (loading) return <div className="module-page">Loading orders...</div>;
 
   return (
-    <div className="billing-module-page" style={{ padding: '4px' }}>
-      
-      {/* PAGE HEADER */}
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div className="page-header-icon" style={{ background: 'var(--primary-50)', color: 'var(--primary)' }}>
-            {Icons.logo}
-          </div>
-          <div className="page-header-text">
-            <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Billing & Registration</h4>
-            <small style={{ color: 'var(--text-secondary)' }}>Create orders, apply discounts and record payments</small>
-          </div>
+    <div className="module-page">
+      <div className="module-header">
+        <div>
+          <p className="module-kicker">Test Orders</p>
+          <h1>Orders</h1>
+          <span>Create patient test orders and generate pending samples.</span>
         </div>
+        <button className="dash-btn-secondary" type="button" onClick={loadData}>
+          {Icons.logo} Refresh
+        </button>
       </div>
 
       {error && <div className="module-alert">{error}</div>}
@@ -123,61 +120,59 @@ export default function OrdersPage() {
             <p>Select patient and one or more active test definitions.</p>
           </div>
 
-          {/* 3. Payment Breakdown */}
-          <div className="form-card" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h6 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>3. Payment Breakdown</h6>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>Split Payment</span>
-                <div 
-                  onClick={() => setIsSplitPayment(!isSplitPayment)}
-                  style={{ width: '40px', height: '20px', background: isSplitPayment ? 'var(--primary)' : 'var(--border)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'all 0.3s' }}
-                >
-                  <div style={{ width: '16px', height: '16px', background: '#fff', borderRadius: '50%', position: 'absolute', top: '2px', left: isSplitPayment ? '22px' : '2px', transition: 'all 0.3s' }}></div>
-                </div>
-              </div>
+          <form className="module-form" onSubmit={createOrder}>
+            <div className="module-form-grid">
+              <label>
+                Patient
+                <select value={patient} onChange={(e) => setPatient(e.target.value)} required>
+                  <option value="">Select patient</option>
+                  {patients.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name} · {item.patientId}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Priority
+                <select value={priority} onChange={(e) => setPriority(e.target.value)}>
+                  <option value="routine">Routine</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </label>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {payments.map((p, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'center' }}>
-                  <select className="lims-input" value={p.mode} onChange={(e) => updatePayment(idx, "mode", e.target.value)}>
-                    {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: '700', color: 'var(--text-muted)' }}>₹</span>
-                    <input 
-                      type="number" 
-                      className="lims-input" 
-                      style={{ paddingLeft: '28px' }} 
-                      value={p.amount} 
-                      onChange={(e) => updatePayment(idx, "amount", e.target.value)} 
-                    />
-                  </div>
-                  {isSplitPayment && idx > 0 && (
-                    <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }} onClick={() => removePaymentRow(idx)}>{Icons.trash}</button>
-                  )}
-                </div>
+            <div className="order-test-grid">
+              {tests.map((test) => (
+                <label key={test._id} className={`order-test-option ${selectedTests.includes(test._id) ? "selected" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTests.includes(test._id)}
+                    onChange={() => toggleTest(test._id)}
+                  />
+                  <span>
+                    <strong>{test.name}</strong>
+                    <small>{test.category?.name || "General"} · {test.parameters?.length || 0} params</small>
+                  </span>
+                  <em>₹{Number(test.price || 0).toFixed(0)}</em>
+                </label>
               ))}
-              {isSplitPayment && (
-                <button 
-                  onClick={addPaymentRow}
-                  style={{ border: '1.5px dashed var(--primary)', background: 'var(--primary-50)', color: 'var(--primary)', padding: '10px', borderRadius: '10px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', marginTop: '8px' }}
-                >
-                  + Add Payment Mode
-                </button>
-              )}
             </div>
 
-            <div style={{ marginTop: '20px', padding: '12px', borderRadius: '10px', background: balanceDue === 0 ? '#f0fdf4' : '#fff7ed', border: balanceDue === 0 ? '1px solid #bbf7d0' : '1px solid #ffedd5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: balanceDue === 0 ? '#166534' : '#9a3412' }}>
-                {balanceDue === 0 ? "Full Amount Covered" : balanceDue > 0 ? `Remaining: ₹${balanceDue}` : `Excess: ₹${Math.abs(balanceDue)}`}
-              </div>
-              <div style={{ height: '6px', width: '100px', background: 'rgba(0,0,0,0.05)', borderRadius: '3px', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.min(100, (totalPaid / netAmount) * 100)}%`, background: balanceDue === 0 ? '#22c55e' : 'var(--primary)', transition: 'width 0.3s' }}></div>
-              </div>
+            <label className="module-full-label">
+              Notes
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Optional order notes" />
+            </label>
+
+            <div className="order-total-row">
+              <span>{selectedTests.length} tests selected</span>
+              <strong>₹{selectedTotal.toFixed(0)}</strong>
             </div>
-          </div>
+
+            <button className="dash-btn-primary module-save" disabled={!patient || selectedTests.length === 0 || saving}>
+              {saving ? "Creating..." : "Create Order And Samples"}
+            </button>
+          </form>
         </section>
         )}
 
@@ -193,32 +188,12 @@ export default function OrdersPage() {
                   <h3>{order.orderId}</h3>
                   <span>{order.patient?.name} · {order.items?.length || 0} tests</span>
                 </div>
-              </div>
-
-              <button className="btn-lims-primary" style={{ width: '100%', height: '54px', fontSize: '16px' }} disabled={!selectedPatient || cart.length === 0}>
-                Complete Order & Print
-              </button>
-            </div>
+                <strong>{order.status}</strong>
+              </article>
+            ))}
           </div>
         </aside>
       </div>
-
-      <style jsx>{`
-        .search-result-item:hover {
-          background: var(--surface);
-        }
-        .search-spinner {
-          width: 16px;
-          height: 16px;
-          border: 2px solid var(--border);
-          border-top-color: var(--primary);
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
