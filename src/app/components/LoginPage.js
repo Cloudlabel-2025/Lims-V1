@@ -28,7 +28,7 @@ export default function LoginPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const isTenantLogin = userType === "tenant";
-  const labName = theme?.labName || (isTenantLogin ? "Lab LIMS" : "Uthiram LIMS");
+  const labName = theme?.labName || (isTenantLogin ? "Lab LIMS" : "CHC Lab CMS");
   const brandLogoUrl = isTenantLogin ? theme?.logo : null;
   const brandLogoLabel = theme?.logoAltText || `${labName} logo`;
   const brandLogoStyle = brandLogoUrl ? { backgroundImage: `url("${brandLogoUrl}")` } : undefined;

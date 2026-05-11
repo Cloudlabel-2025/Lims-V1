@@ -30,7 +30,6 @@ export const UserSchema = new mongoose.Schema(
       type: String,
       unique: true,
       immutable: true,
-      index: true,
     },
     firstName: {
       type: String,
@@ -92,8 +91,6 @@ export const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-UserSchema.index({ email: 1 }, { unique: true });
-UserSchema.index({ userId: 1 }, { unique: true });
 UserSchema.index({ status: 1, role: 1 });
 UserSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
 

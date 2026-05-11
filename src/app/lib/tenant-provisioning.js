@@ -26,6 +26,19 @@ function cleanString(value) {
   return String(value || "").trim();
 }
 
+function normalizeDbName(value) {
+  return cleanString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+}
+
+function buildDefaultDbName(labName) {
+  const normalizedName = normalizeDbName(labName);
+  return normalizedName || "lab";
+}
+
 export async function isSubdomainAvailable(subdomain) {
   const validation = validateSubdomain(subdomain);
   if (!validation.valid) return false;
@@ -122,10 +135,16 @@ export async function createTenant({ name, subdomain, createdBy }) {
 
   const masterUri = process.env.MASTER_MONGODB_URI || process.env.MONGODB_URI;
   const dbConnectionString = cleanString(process.env.TENANT_MONGODB_URI) || masterUri;
-  const dbName = `lims_${validation.subdomain.replaceAll("-", "_")}`;
+  const dbName = buildDefaultDbName(labName);
 
   if (!dbConnectionString) {
     throw new Error("Tenant database connection string is not configured");
+  }
+
+  const existingDbName = await Lab.findOne({ dbName }).select("dbName");
+
+  if (existingDbName) {
+    throw new Error("A tenant database with this lab name already exists");
   }
 
   let tenantConnection = null;
