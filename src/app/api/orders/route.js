@@ -31,6 +31,10 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  let order = null;
+  let LabOrderModel = null;
+  let SampleModel = null;
+
   try {
     const auth = requireTenantSession(req, "orders.create");
     if (auth.error) return auth.error;
@@ -48,6 +52,8 @@ export async function POST(req) {
     }
 
     const { Patient, TestDefinition, LabOrder, Sample } = await getTenantModels(auth.tenantId);
+    LabOrderModel = LabOrder;
+    SampleModel = Sample;
     const patient = await Patient.findById(patientId);
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
 
@@ -69,7 +75,7 @@ export async function POST(req) {
       status: "sample-pending",
     }));
 
-    const order = await LabOrder.create({
+    order = await LabOrder.create({
       patient: patient._id,
       items,
       priority: body.priority === "urgent" ? "urgent" : "routine",
@@ -77,20 +83,29 @@ export async function POST(req) {
       createdBy: auth.session.email,
     });
 
-    const samples = await Sample.insertMany(
-      order.items.map((item) => ({
-        order: order._id,
-        orderItemId: item._id,
-        patient: patient._id,
-        testDefinition: item.testDefinition,
-        testSnapshot: item.testSnapshot,
-      }))
+    const samples = await Promise.all(
+      order.items.map((item) =>
+        Sample.create({
+          order: order._id,
+          orderItemId: item._id,
+          patient: patient._id,
+          testDefinition: item.testDefinition,
+          testSnapshot: item.testSnapshot,
+        })
+      )
     );
 
     await order.populate("patient", "name patientId age gender phone");
 
     return Response.json({ order, samples }, { status: 201 });
   } catch (error) {
+    if (order?._id) {
+      await Promise.all([
+        LabOrderModel?.deleteOne({ _id: order._id }).catch(() => {}),
+        SampleModel?.deleteMany({ order: order._id }).catch(() => {}),
+      ]);
+    }
+
     return Response.json({ error: "Unable to create order", details: error.message }, { status: 500 });
   }
 }

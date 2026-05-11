@@ -1,4 +1,4 @@
-import { requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireTenantSession } from "@/app/lib/auth";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import rbacConfig from "@/app/lib/rbac-config.json";
@@ -69,8 +69,11 @@ async function getAllowedPermissionsForTenant(auth) {
 
 export async function GET(req) {
   try {
-    const auth = requireTenantSession(req, "settings.manage");
+    const auth = requireTenantSession(req);
     if (auth.error) return auth.error;
+    if (!hasPermission(auth.session, "settings.manage") && !hasPermission(auth.session, "users.manage")) {
+      return Response.json({ error: "Permission denied" }, { status: 403 });
+    }
 
     const allowedPermissionKeys = await getAllowedPermissionsForTenant(auth);
     const { Role } = await getTenantModels(auth.tenantId);

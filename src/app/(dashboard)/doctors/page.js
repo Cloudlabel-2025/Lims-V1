@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 /* ── Helpers ── */
 const getInitials = (name) => {
@@ -27,6 +29,7 @@ const getStatusStyle = (status) => {
 };
 
 export default function DoctorList() {
+  const user = useCurrentUser();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -38,6 +41,9 @@ export default function DoctorList() {
   const [viewType, setViewType] = useState("grid"); // 'grid' or 'list'
   const [deleteModal, setDeleteModal] = useState({ open: false, doctor: null });
   const [deleting, setDeleting] = useState(false);
+  const canRegisterDoctors = hasPermission(user, "doctors.register");
+  const canEditDoctors = hasPermission(user, "doctors.edit");
+  const canDeleteDoctors = hasPermission(user, "doctors.delete");
 
   const fetchAllDoctors = useCallback(async () => {
     setListLoading(true);
@@ -208,7 +214,9 @@ export default function DoctorList() {
               <div className="detail-item"><div className="detail-value">{formatDate(selectedDoctor.createdAt)}</div><div className="detail-label">Registered On</div></div>
             </div>
 
+            {(canEditDoctors || canDeleteDoctors) && (
             <div style={{ padding: '20px 24px', display: 'flex', gap: '12px' }}>
+              {canEditDoctors && (
               <button 
                 className="btn-lims-primary" 
                 style={{ flex: 1, height: '42px', fontSize: '13px' }}
@@ -216,6 +224,8 @@ export default function DoctorList() {
               >
                 {Icons.edit} Edit Profile
               </button>
+              )}
+              {canDeleteDoctors && (
               <button 
                 style={{ 
                   flex: 1, height: '42px', fontSize: '13px', 
@@ -231,7 +241,9 @@ export default function DoctorList() {
               >
                 {Icons.trash} Delete
               </button>
+              )}
             </div>
+            )}
           </div>
         )}
       </aside>
@@ -311,13 +323,15 @@ export default function DoctorList() {
             />
           </div>
           
-          <button 
-            className="btn-lims-primary" 
-            onClick={() => router.push("/doctors/register")}
-            style={{ height: "40px", padding: "0 16px", fontSize: '13px', whiteSpace: 'nowrap' }}
-          >
-            {Icons.plus} Add New Doctor
-          </button>
+          {canRegisterDoctors && (
+            <button 
+              className="btn-lims-primary" 
+              onClick={() => router.push("/doctors/register")}
+              style={{ height: "40px", padding: "0 16px", fontSize: '13px', whiteSpace: 'nowrap' }}
+            >
+              {Icons.plus} Add New Doctor
+            </button>
+          )}
         </div>
       </div>
 
@@ -365,8 +379,10 @@ export default function DoctorList() {
                     
                     <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-light)", fontSize: "10px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span>Clinic: {doc.clinicName || "Private"}</span>
+                      {(canEditDoctors || canDeleteDoctors || selectedDoctor?._id === doc._id) && (
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         {selectedDoctor?._id === doc._id && <span style={{ color: "var(--primary)", fontWeight: "700" }}>SELECTED</span>}
+                        {canEditDoctors && (
                         <button 
                           title="Edit"
                           style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
@@ -376,6 +392,8 @@ export default function DoctorList() {
                         >
                           {Icons.edit}
                         </button>
+                        )}
+                        {canDeleteDoctors && (
                         <button 
                           title="Delete"
                           style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
@@ -385,7 +403,9 @@ export default function DoctorList() {
                         >
                           {Icons.trash}
                         </button>
+                        )}
                       </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -455,6 +475,7 @@ export default function DoctorList() {
                         </td>
                         <td style={{ padding: "12px 20px", textAlign: "center" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                            {canEditDoctors && (
                             <button 
                               title="Edit"
                               style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
@@ -464,6 +485,8 @@ export default function DoctorList() {
                             >
                               {Icons.edit}
                             </button>
+                            )}
+                            {canDeleteDoctors && (
                             <button 
                               title="Delete"
                               style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
@@ -473,6 +496,7 @@ export default function DoctorList() {
                             >
                               {Icons.trash}
                             </button>
+                            )}
                           </div>
                         </td>
                       </tr>

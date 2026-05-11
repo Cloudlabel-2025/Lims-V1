@@ -1,11 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import { canAccessPath, getFirstAllowedHref } from "@/app/lib/client-rbac";
 
 export default function MainLayout({ children }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(null);
@@ -45,6 +47,16 @@ export default function MainLayout({ children }) {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (loading || !user || !theme) return;
+    if (canAccessPath(user, theme, pathname)) return;
+
+    const firstAllowedHref = getFirstAllowedHref(user, theme);
+    if (firstAllowedHref && pathname === "/dashboard") {
+      router.replace(firstAllowedHref);
+    }
+  }, [loading, pathname, router, theme, user]);
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     router.push("/");
@@ -52,6 +64,8 @@ export default function MainLayout({ children }) {
   };
 
   if (loading) return <div style={{ minHeight: "100vh", background: "#f1f5f9" }} />;
+
+  const hasPageAccess = canAccessPath(user, theme, pathname);
 
   return (
     <div className="dash-layout">
@@ -67,7 +81,16 @@ export default function MainLayout({ children }) {
           user={user}
         />
         <div className="dash-content">
-          {children}
+          {hasPageAccess ? (
+            children
+          ) : (
+            <section className="dash-card">
+              <div className="dash-card-header">
+                <h3>Access denied</h3>
+              </div>
+              <p>Your role does not have permission to view this page.</p>
+            </section>
+          )}
         </div>
       </div>
     </div>

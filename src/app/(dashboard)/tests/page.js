@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Icons } from "@/app/components/Icons";
-
-/* -------------------------------------------------------------------------- */
-/*                                  DEFAULTS                                  */
-/* -------------------------------------------------------------------------- */
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 const blankParameter = {
   name: "",
@@ -46,7 +44,7 @@ const blankPackageForm = {
 };
 
 export default function TestsPage() {
-  const [activeTab, setActiveTab] = useState("tests"); // tests | packages | categories
+  const user = useCurrentUser();
   const [categories, setCategories] = useState([]);
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
@@ -60,7 +58,11 @@ export default function TestsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  /* ---------- Initialization ---------- */
+  const canSave = useMemo(
+    () => form.name && form.category && form.parameters.some((parameter) => parameter.name.trim()),
+    [form]
+  );
+  const canEditTests = hasPermission(user, "tests.edit");
 
   const fetchData = useCallback(async () => {
     try {
@@ -243,17 +245,11 @@ export default function TestsPage() {
             <small style={{ color: 'var(--text-secondary)' }}>Configure investigations and clinical bundles</small>
           </div>
         </div>
-
-        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', background: 'var(--border-light)', padding: '4px', borderRadius: '10px' }}>
-            <button style={tabButtonStyle(activeTab === 'tests')} onClick={() => { setActiveTab('tests'); resetForms(); }}>Tests</button>
-            <button style={tabButtonStyle(activeTab === 'packages')} onClick={() => { setActiveTab('packages'); resetForms(); }}>Packages</button>
-            <button style={tabButtonStyle(activeTab === 'categories')} onClick={() => { setActiveTab('categories'); resetForms(); }}>Departments</button>
-          </div>
-          <button className="btn-lims-primary" style={{ height: '40px', padding: '0 16px' }} onClick={resetForms}>
-            {Icons.plus} Add New
+        {canEditTests && (
+          <button className="dash-btn-secondary" type="button" onClick={resetForm}>
+            {Icons.plus} New Test
           </button>
-        </div>
+        )}
       </div>
 
       {error && (
@@ -262,40 +258,49 @@ export default function TestsPage() {
         </div>
       )}
 
-      <div className="dash-content-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
-        
-        {/* LEFT PANEL: Form */}
-        <section>
-          {activeTab === 'tests' && (
-            <div className="form-card" style={{ padding: '24px' }}>
-              <h6 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--primary)', marginBottom: '20px' }}>
-                {editingId ? "Update Test Definition" : "New Test Definition"}
-              </h6>
+      <div className="module-grid">
+        {canEditTests && (
+        <section className="module-panel">
+          <div className="module-panel-header">
+            <h2>{editingId ? "Edit Test" : "Create Test"}</h2>
+            <p>Parameters here drive result entry and reporting.</p>
+          </div>
 
-              <form onSubmit={saveTest} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <label className="form-label">Investigation Name</label>
-                  <input className="lims-input" value={testForm.name} onChange={(e) => setTestForm({...testForm, name: e.target.value})} placeholder="e.g. Lipid Profile" required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Short Code</label>
-                  <input className="lims-input" value={testForm.code} onChange={(e) => setTestForm({...testForm, code: e.target.value})} placeholder="e.g. LIPID" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Price (₹)</label>
-                  <input className="lims-input" type="number" value={testForm.price} onChange={(e) => setTestForm({...testForm, price: e.target.value})} placeholder="0" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Department</label>
-                  <select className="lims-input" value={testForm.category} onChange={(e) => setTestForm({...testForm, category: e.target.value})} required>
-                    <option value="">Select Department</option>
-                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Method</label>
-                  <input className="lims-input" value={testForm.method} onChange={(e) => setTestForm({...testForm, method: e.target.value})} placeholder="Analyzer Name" />
-                </div>
+          <form onSubmit={saveTest} className="module-form">
+            <div className="module-form-grid">
+              <label>
+                Test Name
+                <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Complete Blood Count" required />
+              </label>
+              <label>
+                Code
+                <input value={form.code} onChange={(e) => updateField("code", e.target.value)} placeholder="CBC" />
+              </label>
+              <label>
+                Category
+                <select value={form.category} onChange={(e) => updateField("category", e.target.value)} required>
+                  <option value="">Select category</option>
+                  {categories.map((category) => (
+                    <option key={category._id} value={category._id}>{category.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Sample Type
+                <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Blood / Serum" />
+              </label>
+              <label>
+                Price
+                <input type="number" min="0" value={form.price} onChange={(e) => updateField("price", e.target.value)} placeholder="0" />
+              </label>
+              <label>
+                Status
+                <select value={form.status} onChange={(e) => updateField("status", e.target.value)}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
+            </div>
 
                 <div style={{ gridColumn: 'span 2', marginTop: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -435,60 +440,36 @@ export default function TestsPage() {
             </div>
           )}
         </section>
+        )}
 
-        {/* RIGHT PANEL: Inventory */}
-        <aside>
-          <div className="dash-card" style={{ overflow: 'hidden' }}>
-            <div className="dash-card-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>Active Investigations</h3>
-              <div className="search-container" style={{ position: 'relative', flex: 1, maxWidth: '180px' }}>
-                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>{Icons.search}</span>
-                <input className="lims-input" style={{ height: '36px', paddingLeft: '32px', fontSize: '12px', width: '100%' }} placeholder="Search..." />
-              </div>
-            </div>
-            
-            <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-              {activeTab === 'tests' && tests.map(test => (
-                <div key={test._id} onClick={() => handleEditTest(test)} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', cursor: 'pointer', background: editingId === test._id ? 'var(--primary-50)' : 'transparent', borderLeft: editingId === test._id ? '4px solid var(--primary)' : '4px solid transparent' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: editingId === test._id ? 'var(--primary)' : 'var(--primary-50)', color: editingId === test._id ? '#fff' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {Icons.flask}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{test.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>{test.category?.name} • {test.parameters?.length} Params</div>
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary)', whiteSpace: 'nowrap', marginLeft: '8px' }}>₹{test.price}</div>
-                  </div>
-                </div>
-              ))}
+        <aside className="module-panel">
+          <div className="module-panel-header">
+            <h2>Categories</h2>
+            <p>Group tests by lab department.</p>
+          </div>
+          {canEditTests && (
+            <form className="category-inline-form" onSubmit={createCategory}>
+              <input value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Biochemistry" />
+              <button className="dash-btn-secondary" type="submit">{Icons.plus}</button>
+            </form>
+          )}
 
-              {activeTab === 'packages' && packages.map(pkg => (
-                <div key={pkg._id} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', background: '#fff' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fff7ed', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {Icons.grid}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{pkg.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{pkg.tests?.length} Investigations</div>
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary)' }}>₹{pkg.price}</div>
-                  </div>
-                </div>
-              ))}
-              
-              {activeTab === 'categories' && categories.map(cat => (
-                <div key={cat._id} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', background: '#fff' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--primary-50)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {Icons.activity}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{cat.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{cat.categoryId}</div>
-                    </div>
-                  </div>
+          <div className="module-panel-header compact">
+            <h2>Defined Tests</h2>
+            <p>{tests.length} tests configured</p>
+          </div>
+          <div className="test-card-list">
+            {tests.map((test) => (
+              <article
+                key={test._id}
+                className="test-card"
+                onClick={() => {
+                  if (canEditTests) editTest(test);
+                }}
+              >
+                <div>
+                  <h3>{test.name}</h3>
+                  <span>{test.category?.name || "Uncategorized"} · {test.parameters?.length || 0} parameters</span>
                 </div>
               ))}
             </div>

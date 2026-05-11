@@ -192,6 +192,7 @@ export async function PATCH(req, context) {
     const adminEmail = normalizeOptionalEmail(rawAdminEmail);
     const existingAdminEmail = cleanString(lab.adminAccess?.email).toLowerCase();
     const adminPassword = cleanString(body.adminPassword);
+    const adminPasswordConfirm = cleanString(body.adminPasswordConfirm || body.adminConfirmPassword);
     const enabledModules = normalizeEnabledModules(body.enabledModules);
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
     const status = normalizeEnum(body.status, lab.status, [
@@ -228,6 +229,13 @@ export async function PATCH(req, context) {
     if (adminPasswordChanged && adminPassword.length < 8) {
       return NextResponse.json(
         { error: "Lab admin password must be at least 8 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (adminPasswordChanged && (!adminPasswordConfirm || adminPassword !== adminPasswordConfirm)) {
+      return NextResponse.json(
+        { error: "Lab admin password and confirm password must match" },
         { status: 400 }
       );
     }

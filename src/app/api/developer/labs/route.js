@@ -234,6 +234,7 @@ export async function POST(req) {
     const tenantId = normalizeTenantId(body.tenantId);
     const adminEmail = cleanString(body.adminEmail).toLowerCase();
     const adminPassword = String(body.adminPassword || "");
+    const adminPasswordConfirm = String(body.adminPasswordConfirm || body.adminConfirmPassword || "");
     const enabledModules = normalizeEnabledModules(body.enabledModules);
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
     const logoAltText = cleanString(body.logoAltText).slice(0, 120) || `${name} logo`;
@@ -257,6 +258,13 @@ export async function POST(req) {
     if (adminPassword.length < 8) {
       return NextResponse.json(
         { error: "Lab admin password must be at least 8 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (!adminPasswordConfirm || adminPassword !== adminPasswordConfirm) {
+      return NextResponse.json(
+        { error: "Lab admin password and confirm password must match" },
         { status: 400 }
       );
     }

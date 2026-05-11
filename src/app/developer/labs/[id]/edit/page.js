@@ -5,6 +5,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { availableLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
+import PasswordField from "@/app/components/PasswordField";
 
 const loginHighlightOptions = [
   "Patient Registration & Tracking",
@@ -28,6 +29,7 @@ const emptyForm = {
   contactPhone: "",
   adminEmail: "",
   adminPassword: "",
+  adminConfirmPassword: "",
   primaryColor: "#0d9488",
   secondaryColor: "#0f766e",
   accentColor: "#f59e0b",
@@ -71,6 +73,12 @@ function validateForm(form) {
 
   if (form.adminPassword && form.adminPassword.length < 8) {
     errors.adminPassword = "Password must be at least 8 characters.";
+  }
+
+  if (form.adminPassword && !form.adminConfirmPassword) {
+    errors.adminConfirmPassword = "Confirm password is required.";
+  } else if (form.adminPassword && form.adminPassword !== form.adminConfirmPassword) {
+    errors.adminConfirmPassword = "Password and confirm password must match.";
   }
 
   if (!form.enabledModules.includes("dashboard")) {
@@ -122,6 +130,7 @@ export default function DeveloperEditLabPage({ params }) {
             contactPhone: data.lab.contactPhone || "",
             adminEmail: data.lab.adminEmail || "",
             adminPassword: "",
+            adminConfirmPassword: "",
             primaryColor: data.lab.primaryColor || emptyForm.primaryColor,
             secondaryColor: data.lab.secondaryColor || emptyForm.secondaryColor,
             accentColor: data.lab.accentColor || emptyForm.accentColor,
@@ -237,6 +246,7 @@ export default function DeveloperEditLabPage({ params }) {
 
       if (form.adminPassword.trim()) {
         payload.adminPassword = form.adminPassword.trim();
+        payload.adminPasswordConfirm = form.adminConfirmPassword.trim();
       }
 
       const response = await fetch(`/api/developer/labs/${encodeURIComponent(id)}`, {
@@ -255,6 +265,8 @@ export default function DeveloperEditLabPage({ params }) {
       setForm((current) => ({
         ...current,
         ...data.lab,
+        adminPassword: "",
+        adminConfirmPassword: "",
       }));
       setSuccess("Lab updated successfully.");
       router.refresh();
@@ -287,7 +299,12 @@ export default function DeveloperEditLabPage({ params }) {
           <p className="developer-empty">Loading lab...</p>
         </section>
       ) : (
-        <form className="developer-panel" onSubmit={handleSubmit}>
+        <form
+          className="developer-panel"
+          onSubmit={handleSubmit}
+          autoComplete="on"
+          name="developer-edit-lab-form"
+        >
           <div className="developer-panel-header">
             <h2>Lab Details</h2>
             <p>Tenant ID is locked so existing login URLs and tenant database mapping stay stable.</p>
@@ -354,8 +371,10 @@ export default function DeveloperEditLabPage({ params }) {
               <input
                 className={formErrors.contactEmail ? "invalid" : ""}
                 type="email"
+                name="developer-edit-lab-contact-email"
                 value={form.contactEmail}
                 onChange={(event) => updateField("contactEmail", event.target.value)}
+                autoComplete="section-developer-edit-lab email"
               />
               {formErrors.contactEmail && <em>{formErrors.contactEmail}</em>}
             </label>
@@ -372,21 +391,38 @@ export default function DeveloperEditLabPage({ params }) {
                 <input
                   className={formErrors.adminEmail ? "invalid" : ""}
                   type="email"
+                  name="developer-edit-lab-admin-email"
                   value={form.adminEmail}
                   onChange={(event) => updateField("adminEmail", event.target.value)}
+                  autoComplete="section-developer-edit-lab username"
                 />
                 {formErrors.adminEmail && <em>{formErrors.adminEmail}</em>}
               </label>
               <label>
                 Admin Password
-                <input
-                  className={formErrors.adminPassword ? "invalid" : ""}
-                  type="password"
+                <PasswordField
+                  name="developer-edit-lab-admin-password"
                   value={form.adminPassword}
                   onChange={(event) => updateField("adminPassword", event.target.value)}
+                  invalid={Boolean(formErrors.adminPassword)}
+                  autoComplete="section-developer-edit-lab new-password"
                   placeholder="Leave blank to keep current password"
+                  toggleLabel="admin password"
                 />
                 {formErrors.adminPassword && <em>{formErrors.adminPassword}</em>}
+              </label>
+              <label>
+                Confirm Password
+                <PasswordField
+                  name="developer-edit-lab-admin-confirm-password"
+                  value={form.adminConfirmPassword}
+                  onChange={(event) => updateField("adminConfirmPassword", event.target.value)}
+                  invalid={Boolean(formErrors.adminConfirmPassword)}
+                  autoComplete="section-developer-edit-lab new-password"
+                  placeholder="Repeat new password"
+                  toggleLabel="confirm admin password"
+                />
+                {formErrors.adminConfirmPassword && <em>{formErrors.adminConfirmPassword}</em>}
               </label>
             </div>
           </div>

@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import PasswordField from "@/app/components/PasswordField";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { defaultLabModules } from "@/app/lib/modules";
+import { hasPermission } from "@/app/lib/client-rbac";
 
 function groupByModule(permissions) {
   return permissions.reduce((groups, permission) => {
@@ -35,6 +37,7 @@ function normalizeRoleName(value) {
 
 export default function LabAdminSettingsPage() {
   const [theme, setTheme] = useState(null);
+  const [user, setUser] = useState(null);
   const [activeRoleIndex, setActiveRoleIndex] = useState(0);
   const [roles, setRoles] = useState([]);
   const [savedRoles, setSavedRoles] = useState([]);
@@ -43,6 +46,7 @@ export default function LabAdminSettingsPage() {
     name: "",
     email: "",
     password: "",
+    confirmPassword: "",
     roleId: "",
   });
   const [users, setUsers] = useState([]);
@@ -59,31 +63,46 @@ export default function LabAdminSettingsPage() {
     async function loadSettings() {
       try {
         setSettingsError("");
+        const sessionResponse = await fetch("/api/auth/me", { credentials: "include" });
+        const sessionData = await sessionResponse.json();
+        if (!sessionResponse.ok) {
+          throw new Error(sessionData.error || "Unable to load session");
+        }
+
+        const sessionUser = sessionData.user;
+        const canManageRoles = hasPermission(sessionUser, "settings.manage");
+        const canManageUsers = hasPermission(sessionUser, "users.manage");
+
         const [themeResponse, roleResponse, userResponse] = await Promise.all([
           fetch("/api/theme", { credentials: "include" }),
-          fetch("/api/settings/roles", { credentials: "include" }),
-          fetch("/api/settings/users", { credentials: "include" }),
+          canManageRoles || canManageUsers
+            ? fetch("/api/settings/roles", { credentials: "include" })
+            : Promise.resolve(null),
+          canManageUsers
+            ? fetch("/api/settings/users", { credentials: "include" })
+            : Promise.resolve(null),
         ]);
         const [themeData, roleData, userData] = await Promise.all([
           themeResponse.json(),
-          roleResponse.json(),
-          userResponse.json(),
+          roleResponse ? roleResponse.json() : Promise.resolve({ roles: [] }),
+          userResponse ? userResponse.json() : Promise.resolve({ users: [] }),
         ]);
 
         if (!cancelled && themeResponse.ok) {
           setTheme(themeData.theme);
         }
 
-        if (!roleResponse.ok) {
+        if (roleResponse && !roleResponse.ok) {
           throw new Error(roleData.error || roleData.details || "Unable to load roles");
         }
 
-        if (!userResponse.ok) {
+        if (userResponse && !userResponse.ok) {
           throw new Error(userData.error || userData.details || "Unable to load users");
         }
 
         if (!cancelled) {
           const loadedRoles = roleData.roles || [];
+          setUser(sessionUser);
           setRoles(loadedRoles);
           setSavedRoles(loadedRoles);
           setUsers(userData.users || []);
@@ -110,6 +129,8 @@ export default function LabAdminSettingsPage() {
   }, []);
 
   const enabledModules = theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules;
+  const canManageRoles = hasPermission(user, "settings.manage");
+  const canManageUsers = hasPermission(user, "users.manage");
   const labPermissions = useMemo(
     () =>
       rbacConfig.permissions.filter(
@@ -126,6 +147,23 @@ export default function LabAdminSettingsPage() {
     ? labPermissions.map((permission) => permission.key)
     : activeRole?.permissions || [];
   const rolesDirty = !sameRoleConfiguration(roles, savedRoles);
+  const newUserErrors = useMemo(() => {
+    const errors = {};
+
+    if (newUser.password && newUser.password.length < 8) {
+      errors.password = "Password must be at least 8 characters.";
+    }
+
+    if (newUser.password && !newUser.confirmPassword) {
+      errors.confirmPassword = "Confirm password is required.";
+    } else if (newUser.password && newUser.password !== newUser.confirmPassword) {
+      errors.confirmPassword = "Password and confirm password must match.";
+    }
+
+    return errors;
+  }, [newUser.confirmPassword, newUser.password]);
+  const canCreateUser =
+    Boolean(newUser.password && newUser.confirmPassword) && Object.keys(newUserErrors).length === 0;
 
   function toggleRolePermission(permissionKey) {
     setRoles((current) =>
@@ -241,6 +279,7 @@ export default function LabAdminSettingsPage() {
         name: "",
         email: "",
         password: "",
+        confirmPassword: "",
         roleId: roles[0]?.id || "",
       });
     } catch (err) {
@@ -283,6 +322,7 @@ export default function LabAdminSettingsPage() {
         <p className="developer-empty">Loading settings...</p>
       ) : (
       <>
+      {canManageRoles && (
       <section className="settings-panel">
           <div className="settings-panel-header">
             <h2>Lab Roles</h2>
@@ -322,7 +362,9 @@ export default function LabAdminSettingsPage() {
             </button>
           </div>
       </section>
+      )}
 
+      {canManageRoles && (
       <section className="settings-panel">
         <div className="settings-panel-header">
           <h2>Permission Mapping For {activeRole?.name || "New Role"}</h2>
@@ -367,7 +409,9 @@ export default function LabAdminSettingsPage() {
           </>
         )}
       </section>
+      )}
 
+      {canManageUsers && (
       <section className="settings-panel">
         <div className="settings-panel-header">
           <h2>User Assignment</h2>
@@ -385,19 +429,39 @@ export default function LabAdminSettingsPage() {
           <label>
             Login Email
             <input
+              type="email"
+              name="lab-settings-new-user-email"
               value={newUser.email}
               onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))}
               placeholder="anita@lab.com"
+              autoComplete="section-lab-settings-new-user username"
             />
           </label>
           <label>
             Password
-            <input
-              type="password"
+            <PasswordField
+              name="lab-settings-new-user-password"
               value={newUser.password}
               onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
               placeholder="Minimum 8 characters"
+              autoComplete="section-lab-settings-new-user new-password"
+              invalid={Boolean(newUserErrors.password)}
+              toggleLabel="user password"
             />
+            {newUserErrors.password && <em>{newUserErrors.password}</em>}
+          </label>
+          <label>
+            Confirm Password
+            <PasswordField
+              name="lab-settings-new-user-confirm-password"
+              value={newUser.confirmPassword}
+              onChange={(event) => setNewUser((current) => ({ ...current, confirmPassword: event.target.value }))}
+              placeholder="Repeat password"
+              autoComplete="section-lab-settings-new-user new-password"
+              invalid={Boolean(newUserErrors.confirmPassword)}
+              toggleLabel="confirm user password"
+            />
+            {newUserErrors.confirmPassword && <em>{newUserErrors.confirmPassword}</em>}
           </label>
           <label>
             Role
@@ -414,7 +478,7 @@ export default function LabAdminSettingsPage() {
           </label>
         </div>
         <div className="developer-config-actions">
-          <button type="button" className="developer-primary-link" onClick={createUser} disabled={userSaving || rolesDirty}>
+          <button type="button" className="developer-primary-link" onClick={createUser} disabled={userSaving || rolesDirty || !canCreateUser}>
             {userSaving ? "Creating..." : "Create Lab User"}
           </button>
         </div>
@@ -430,6 +494,13 @@ export default function LabAdminSettingsPage() {
           </div>
         )}
       </section>
+      )}
+
+      {!canManageRoles && !canManageUsers && (
+        <section className="settings-panel">
+          <p className="developer-empty">Your role does not have permission to manage settings or users.</p>
+        </section>
+      )}
       </>
       )}
 

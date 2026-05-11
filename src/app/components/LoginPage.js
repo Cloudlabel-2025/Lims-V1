@@ -28,6 +28,12 @@ export default function LoginPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const isTenantLogin = userType === "tenant";
+  const credentialScope = isTenantLogin
+    ? `section-tenant-${tenantId.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || "lab"}-login`
+    : "section-cms-developer-login";
+  const formId = isTenantLogin ? "tenant-login-form" : "cms-developer-login-form";
+  const usernameInputId = isTenantLogin ? "tenant-login-username" : "cms-developer-login-email";
+  const passwordInputId = isTenantLogin ? "tenant-login-password" : "cms-developer-login-password";
   const labName = theme?.labName || (isTenantLogin ? "Lab LIMS" : "CHC Lab CMS");
   const brandLogoUrl = isTenantLogin ? theme?.logo : null;
   const brandLogoLabel = theme?.logoAltText || `${labName} logo`;
@@ -207,7 +213,13 @@ export default function LoginPage({
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="login-form">
+            <form
+              id={formId}
+              name={formId}
+              onSubmit={handleSubmit}
+              className="login-form"
+              autoComplete="on"
+            >
               {isTenantLogin && !lockUserType && (
                 <div className="login-field">
                   <label className="login-label" htmlFor="login-tenant">
@@ -217,36 +229,44 @@ export default function LoginPage({
                     <span className="login-input-icon">{Icons.shield}</span>
                     <input
                       id="login-tenant"
+                      name="tenant-login-tenant-id"
                       type="text"
                       className="login-input"
                       placeholder="uthiram-main"
                       value={tenantId}
                       onChange={(e) => setTenantId(e.target.value)}
-                      autoComplete="organization"
+                      autoComplete={`${credentialScope} organization`}
                     />
                   </div>
                 </div>
               )}
 
               {isTenantLogin && lockUserType && (
-                <input type="hidden" name="tenantId" value={tenantId} readOnly />
+                <input
+                  type="hidden"
+                  name="tenant-login-tenant-id"
+                  value={tenantId}
+                  autoComplete={`${credentialScope} organization`}
+                  readOnly
+                />
               )}
 
               {/* Email Field */}
               <div className="login-field">
-                <label className="login-label" htmlFor="login-email">
+                <label className="login-label" htmlFor={usernameInputId}>
                   {isTenantLogin ? "User ID or Email" : "Email Address"}
                 </label>
                 <div className="login-input-wrapper">
                   <span className="login-input-icon">{Icons.user}</span>
                   <input
-                    id="login-email"
+                    id={usernameInputId}
+                    name={isTenantLogin ? "tenant-login-username" : "cms-developer-login-username"}
                     type={isTenantLogin ? "text" : "email"}
                     className="login-input"
                     placeholder={isTenantLogin ? "USR-000001 or you@lab.com" : "developer@cms.com"}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
+                    autoComplete={`${credentialScope} username`}
                     required
                   />
                 </div>
@@ -254,19 +274,20 @@ export default function LoginPage({
 
               {/* Password Field */}
               <div className="login-field">
-                <label className="login-label" htmlFor="login-password">
+                <label className="login-label" htmlFor={passwordInputId}>
                   Password
                 </label>
                 <div className="login-input-wrapper">
                   <span className="login-input-icon">{Icons.lock}</span>
                   <input
-                    id="login-password"
+                    id={passwordInputId}
+                    name={isTenantLogin ? "tenant-login-password" : "cms-developer-login-password"}
                     type={showPassword ? "text" : "password"}
                     className="login-input"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
+                    autoComplete={`${credentialScope} current-password`}
                     required
                   />
                   <button

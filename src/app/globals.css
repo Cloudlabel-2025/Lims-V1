@@ -3606,8 +3606,47 @@ body {
   outline: none;
 }
 
+.password-field-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.developer-form-grid .password-field-wrapper input,
+.settings-form-grid .password-field-wrapper input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.password-toggle-button {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.password-toggle-button:hover,
+.password-toggle-button:focus-visible {
+  color: var(--primary);
+  background: rgba(13, 148, 136, 0.08);
+}
+
 .developer-form-grid input.invalid,
 .developer-form-grid select.invalid {
+  border-color: #ef4444;
+  background: #fff7f7;
+}
+
+.settings-form-grid input.invalid {
   border-color: #ef4444;
   background: #fff7f7;
 }
@@ -3620,6 +3659,15 @@ body {
   letter-spacing: 0;
   line-height: 1.35;
   text-transform: none;
+}
+
+.settings-form-grid label em {
+  color: #b91c1c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.35;
 }
 
 .developer-form-grid input:focus,

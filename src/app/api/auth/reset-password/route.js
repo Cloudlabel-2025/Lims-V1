@@ -27,10 +27,21 @@ export async function POST(req) {
     const body = await req.json();
     const token = String(body.token || "").trim();
     const password = String(body.password || "");
+    const confirmPassword = String(body.confirmPassword || body.passwordConfirm || "");
     const userType = body.userType === "developer" ? "developer" : "tenant";
 
-    if (!token || !password) {
-      return Response.json({ error: "Token and new password are required" }, { status: 400 });
+    if (!token || !password || !confirmPassword) {
+      return Response.json(
+        { error: "Token, new password, and confirm password are required" },
+        { status: 400 }
+      );
+    }
+
+    if (password !== confirmPassword) {
+      return Response.json(
+        { error: "Password and confirm password must match" },
+        { status: 400 }
+      );
     }
 
     const tokenHash = hashResetToken(token);
