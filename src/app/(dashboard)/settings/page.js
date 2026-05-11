@@ -310,7 +310,7 @@ export default function LabAdminSettingsPage() {
               placeholder="Create role, e.g. Billing Cashier"
             />
             <button type="button" onClick={addRole}>
-              {Icons.plus} Add Role
+              {Icons.plus} Add Roles
             </button>
           </div>
           <div className="developer-config-actions">
