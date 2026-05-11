@@ -25,7 +25,7 @@ export const availableLabModules = [
   },
   {
     id: "orders",
-    label: "Orders",
+    label: "Billing",
     permission: "orders.view",
     href: "/orders",
   },
