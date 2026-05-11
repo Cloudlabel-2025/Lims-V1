@@ -1,5 +1,5 @@
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 export async function GET(req) {
   try {
@@ -11,27 +11,33 @@ export async function GET(req) {
     if (moduleAuth.error) return moduleAuth.error;
 
     const { Patient, Doctor, TestReport } = await getTenantModels(tenantId);
+    const canViewPatients = hasPermission(auth.session, "patients.view");
+    const canViewDoctors = hasPermission(auth.session, "doctors.view");
+    const canViewReports = hasPermission(auth.session, "reports.view");
 
-    // 1. Total Counts
-    const totalPatients = await Patient.countDocuments({});
-    const totalDoctors = await Doctor.countDocuments({});
-
-    // 2. Today's Registrations
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const todayPatients = await Patient.countDocuments({
-      createdAt: { $gte: startOfToday }
-    });
-
-    // 3. Reports & Tests
-    const reportsReady = await TestReport.countDocuments({ status: { $in: ["completed", "verified", "released"] } });
-    const pendingReports = await TestReport.countDocuments({ status: "draft" });
-
-    // 4. Recent Patients (Last 5)
-    const recentPatients = await Patient.find({})
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select("name patientId age gender createdAt");
+    const [
+      totalPatients,
+      todayPatients,
+      recentPatients,
+      totalDoctors,
+      reportsReady,
+      pendingReports,
+    ] = await Promise.all([
+      canViewPatients ? Patient.countDocuments({}) : Promise.resolve(null),
+      canViewPatients
+        ? Patient.countDocuments({ createdAt: { $gte: startOfToday } })
+        : Promise.resolve(null),
+      canViewPatients
+        ? Patient.find({}).sort({ createdAt: -1 }).limit(5).select("name patientId age gender createdAt")
+        : Promise.resolve([]),
+      canViewDoctors ? Doctor.countDocuments({}) : Promise.resolve(null),
+      canViewReports
+        ? TestReport.countDocuments({ status: { $in: ["completed", "verified", "released"] } })
+        : Promise.resolve(null),
+      canViewReports ? TestReport.countDocuments({ status: "draft" }) : Promise.resolve(null),
+    ]);
 
     return Response.json({
       totalPatients,
@@ -39,7 +45,12 @@ export async function GET(req) {
       todayPatients,
       reportsReady,
       pendingReports,
-      recentPatients
+      recentPatients,
+      permissions: {
+        patients: canViewPatients,
+        doctors: canViewDoctors,
+        reports: canViewReports,
+      },
     });
 
   } catch (err) {

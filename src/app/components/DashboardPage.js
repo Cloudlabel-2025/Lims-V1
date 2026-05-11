@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { hasPermission } from "@/app/lib/client-rbac";
 
 const getInitials = (name) => {
   if (!name) return "?";
@@ -90,6 +91,7 @@ export default function DashboardPage() {
     {
       label: "Total Patients",
       value: stats?.totalPatients || 0,
+      permission: "patients.view",
       trend: "up",
       change: "Live",
       icon: Icons.patients,
@@ -99,6 +101,7 @@ export default function DashboardPage() {
     {
       label: "Registrations Today",
       value: stats?.todayPatients || 0,
+      permission: "patients.view",
       trend: "up",
       change: "Today",
       icon: Icons.flask,
@@ -108,6 +111,7 @@ export default function DashboardPage() {
     {
       label: "Consulting Doctors",
       value: stats?.totalDoctors || 0,
+      permission: "doctors.view",
       trend: "up",
       change: "Active",
       icon: Icons.stethoscope,
@@ -117,6 +121,7 @@ export default function DashboardPage() {
     {
       label: "Reports Ready",
       value: stats?.reportsReady || 0,
+      permission: "reports.view",
       trend: "up",
       change: "Ready",
       icon: Icons.report,
@@ -126,6 +131,7 @@ export default function DashboardPage() {
     {
       label: "Pending Reports",
       value: stats?.pendingReports || 0,
+      permission: "reports.view",
       trend: "down",
       change: "Action",
       icon: Icons.clock,
@@ -133,6 +139,10 @@ export default function DashboardPage() {
       bg: "linear-gradient(135deg, #fff1f2, #ffe4e6)",
     },
   ];
+  const visibleStatCards = statCards.filter((stat) => hasPermission(user, stat.permission));
+  const canRegisterPatients = hasPermission(user, "patients.register");
+  const canViewPatients = hasPermission(user, "patients.view");
+  const canEditTests = hasPermission(user, "tests.edit");
 
   const recentPatients = stats?.recentPatients || [];
   const activityFeed = recentPatients.map((patient) => ({
@@ -167,17 +177,21 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="dash-welcome-actions">
-          <button className="dash-btn-primary" onClick={() => router.push("/patients/register")}>
-            {Icons.plus} Register Patient
-          </button>
-          <button className="dash-btn-secondary" onClick={() => router.push("/tests")}>
-            {Icons.flask} New Test
-          </button>
+          {canRegisterPatients && (
+            <button className="dash-btn-primary" onClick={() => router.push("/patients/register")}>
+              {Icons.plus} Register Patient
+            </button>
+          )}
+          {canEditTests && (
+            <button className="dash-btn-secondary" onClick={() => router.push("/tests")}>
+              {Icons.flask} New Test
+            </button>
+          )}
         </div>
       </div>
 
       <div className="dash-stats-grid">
-        {statCards.map((stat) => (
+        {visibleStatCards.map((stat) => (
           <div key={stat.label} className="dash-stat-card">
             <div className="dash-stat-header">
               <div className="dash-stat-icon" style={{ background: stat.bg, color: stat.color }}>
@@ -195,12 +209,15 @@ export default function DashboardPage() {
       </div>
 
       <div className="dash-content-grid">
+        {canViewPatients && (
         <div className="dash-card dash-recent-patients">
           <div className="dash-card-header">
             <h3>{Icons.activity} Recent Patients</h3>
-            <button className="dash-card-action" onClick={() => router.push("/patients")}>
-              View All {Icons.chevronRight}
-            </button>
+            {canViewPatients && (
+              <button className="dash-card-action" onClick={() => router.push("/patients")}>
+                View All {Icons.chevronRight}
+              </button>
+            )}
           </div>
 
           <div className="dash-patient-table">
@@ -256,6 +273,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+        )}
 
         <div className="dash-card dash-activity-feed">
           <div className="dash-card-header">
@@ -289,11 +307,15 @@ export default function DashboardPage() {
             <div className="dash-quick-title">Quick Summary</div>
             <div className="dash-quick-row">
               <span className="dash-quick-label">Total Doctors</span>
-              <span className="dash-quick-value">{stats?.totalDoctors || 0}</span>
+              <span className="dash-quick-value">
+                {hasPermission(user, "doctors.view") ? stats?.totalDoctors || 0 : "Hidden"}
+              </span>
             </div>
             <div className="dash-quick-row">
               <span className="dash-quick-label">Registrations Today</span>
-              <span className="dash-quick-value">{stats?.todayPatients || 0}</span>
+              <span className="dash-quick-value">
+                {canViewPatients ? stats?.todayPatients || 0 : "Hidden"}
+              </span>
             </div>
           </div>
         </div>

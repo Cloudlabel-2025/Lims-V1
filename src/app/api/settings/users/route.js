@@ -58,6 +58,7 @@ export async function POST(req) {
     const body = await req.json();
     const email = clean(body.email).toLowerCase();
     const password = String(body.password || "");
+    const confirmPassword = String(body.confirmPassword || body.passwordConfirm || "");
     const roleId = clean(body.roleId);
     const { firstName, lastName } = splitName(body.name);
 
@@ -72,6 +73,13 @@ export async function POST(req) {
     if (!password || password.length < 8) {
       return Response.json(
         { error: "Password must be at least 8 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (!confirmPassword || password !== confirmPassword) {
+      return Response.json(
+        { error: "Password and confirm password must match" },
         { status: 400 }
       );
     }

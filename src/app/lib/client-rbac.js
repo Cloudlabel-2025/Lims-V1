@@ -1,0 +1,66 @@
+import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
+
+export function hasPermission(user, permission) {
+  if (!permission) return true;
+  const permissions = user?.permissions || [];
+  return permissions.includes("*") || permissions.includes(permission);
+}
+
+export function hasAnyPermission(user, permissions) {
+  return permissions.some((permission) => hasPermission(user, permission));
+}
+
+export function getEnabledModules(theme) {
+  return new Set(theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules);
+}
+
+export function getAllowedNavItems(user, theme) {
+  const enabledModules = getEnabledModules(theme);
+
+  return availableLabModules.filter(
+    (module) => enabledModules.has(module.id) && hasPermission(user, module.permission)
+  );
+}
+
+export function getFirstAllowedHref(user, theme) {
+  return getAllowedNavItems(user, theme)[0]?.href || (hasAnyPermission(user, ["settings.manage", "users.manage"]) ? "/settings" : "");
+}
+
+export function getRequiredPermissionsForPath(pathname) {
+  if (!pathname) return [];
+
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+    return ["settings.manage", "users.manage"];
+  }
+
+  if (pathname.startsWith("/patients/register")) return ["patients.register"];
+  if (pathname.startsWith("/patients/edit")) return ["patients.edit"];
+  if (pathname === "/patients" || pathname.startsWith("/patients/")) return ["patients.view"];
+
+  if (pathname.startsWith("/doctors/register")) return ["doctors.register"];
+  if (pathname.startsWith("/doctors/edit")) return ["doctors.edit"];
+  if (pathname === "/doctors" || pathname.startsWith("/doctors/")) return ["doctors.view"];
+
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return ["dashboard.view"];
+
+  const moduleMatch = availableLabModules.find(
+    (module) => module.href !== "/dashboard" && (pathname === module.href || pathname.startsWith(`${module.href}/`))
+  );
+
+  return moduleMatch?.permission ? [moduleMatch.permission] : [];
+}
+
+export function canAccessPath(user, theme, pathname) {
+  const requiredPermissions = getRequiredPermissionsForPath(pathname);
+  if (requiredPermissions.length === 0) return true;
+
+  if (pathname !== "/settings" && !pathname.startsWith("/settings/")) {
+    const enabledModules = getEnabledModules(theme);
+    const moduleMatch = availableLabModules.find(
+      (module) => module.href !== "/dashboard" && (pathname === module.href || pathname.startsWith(`${module.href}/`))
+    );
+    if (moduleMatch && !enabledModules.has(moduleMatch.id)) return false;
+  }
+
+  return hasAnyPermission(user, requiredPermissions);
+}

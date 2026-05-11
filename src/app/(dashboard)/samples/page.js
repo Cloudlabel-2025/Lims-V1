@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 export default function SamplesPage() {
+  const user = useCurrentUser();
   const [samples, setSamples] = useState([]);
   const [status, setStatus] = useState("all");
   const [collectorName, setCollectorName] = useState("");
@@ -11,6 +14,10 @@ export default function SamplesPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState("");
   const [error, setError] = useState("");
+  const canCollectSamples = hasPermission(user, "samples.collect");
+  const canUpdateSamples = hasPermission(user, "samples.update");
+  const canRejectSamples = hasPermission(user, "samples.reject");
+  const canActOnSamples = canCollectSamples || canUpdateSamples || canRejectSamples;
 
   const loadSamples = useCallback(async (nextStatus = status) => {
     setLoading(true);
@@ -87,14 +94,18 @@ export default function SamplesPage() {
               <option value="reported">Reported</option>
             </select>
           </label>
-          <label>
-            Collector
-            <input value={collectorName} onChange={(e) => setCollectorName(e.target.value)} placeholder="Collector name" />
-          </label>
-          <label>
-            Rejection Reason
-            <input value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Required for reject" />
-          </label>
+          {canCollectSamples && (
+            <label>
+              Collector
+              <input value={collectorName} onChange={(e) => setCollectorName(e.target.value)} placeholder="Collector name" />
+            </label>
+          )}
+          {canRejectSamples && (
+            <label>
+              Rejection Reason
+              <input value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Required for reject" />
+            </label>
+          )}
         </div>
 
         {loading ? (
@@ -107,7 +118,7 @@ export default function SamplesPage() {
               <span>Test</span>
               <span>Order</span>
               <span>Status</span>
-              <span>Actions</span>
+              {canActOnSamples && <span>Actions</span>}
             </div>
             {samples.map((sample) => (
               <div key={sample._id} className={`sample-table-row ${sample.status}`}>
@@ -119,11 +130,19 @@ export default function SamplesPage() {
                 <span>{sample.testSnapshot?.name}<small>{sample.testSnapshot?.sampleType || "-"}</small></span>
                 <span>{sample.order?.orderId}<small>{sample.order?.priority}</small></span>
                 <span><em>{sample.status}</em></span>
-                <span className="sample-actions">
-                  <button disabled={updatingId === sample._id || sample.status !== "pending"} onClick={() => updateSample(sample._id, "collect")}>Collect</button>
-                  <button disabled={updatingId === sample._id || !["collected"].includes(sample.status)} onClick={() => updateSample(sample._id, "processing")}>Process</button>
-                  <button disabled={updatingId === sample._id || sample.status === "reported"} onClick={() => updateSample(sample._id, "reject")}>Reject</button>
-                </span>
+                {canActOnSamples && (
+                  <span className="sample-actions">
+                    {canCollectSamples && (
+                      <button disabled={updatingId === sample._id || sample.status !== "pending"} onClick={() => updateSample(sample._id, "collect")}>Collect</button>
+                    )}
+                    {canUpdateSamples && (
+                      <button disabled={updatingId === sample._id || !["collected"].includes(sample.status)} onClick={() => updateSample(sample._id, "processing")}>Process</button>
+                    )}
+                    {canRejectSamples && (
+                      <button disabled={updatingId === sample._id || sample.status === "reported"} onClick={() => updateSample(sample._id, "reject")}>Reject</button>
+                    )}
+                  </span>
+                )}
               </div>
             ))}
           </div>

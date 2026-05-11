@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
+import PasswordField from "@/app/components/PasswordField";
 
 const defaultForm = {
   name: "",
@@ -13,6 +14,7 @@ const defaultForm = {
   adminLastName: "Admin",
   adminEmail: "",
   adminPassword: "",
+  adminConfirmPassword: "",
   contactName: "",
   contactEmail: "",
   contactPhone: "",
@@ -86,6 +88,12 @@ function validateDeveloperForm(form) {
 
   if (form.adminPassword.length < 8) {
     errors.adminPassword = "Password must be at least 8 characters.";
+  }
+
+  if (!form.adminConfirmPassword) {
+    errors.adminConfirmPassword = "Confirm password is required.";
+  } else if (form.adminPassword !== form.adminConfirmPassword) {
+    errors.adminConfirmPassword = "Password and confirm password must match.";
   }
 
   return errors;
@@ -327,7 +335,12 @@ export default function DeveloperCreateLabPage() {
         </section>
       )}
 
-      <form className="developer-panel" onSubmit={handleSubmit}>
+      <form
+        className="developer-panel"
+        onSubmit={handleSubmit}
+        autoComplete="on"
+        name="developer-create-lab-form"
+      >
         <div className="developer-panel-header">
           <h2>Lab Details</h2>
           <p>Tenant ID becomes the lab subdomain or local lab login identifier.</p>
@@ -385,9 +398,11 @@ export default function DeveloperCreateLabPage() {
             <input
               className={formErrors.contactEmail ? "invalid" : ""}
               type="email"
+              name="developer-create-lab-contact-email"
               value={form.contactEmail}
               onChange={(e) => updateField("contactEmail", e.target.value)}
               placeholder="contact@lab.com"
+              autoComplete="section-developer-create-lab email"
             />
             {formErrors.contactEmail && <em>{formErrors.contactEmail}</em>}
           </label>
@@ -416,24 +431,42 @@ export default function DeveloperCreateLabPage() {
             <input
               className={formErrors.adminEmail ? "invalid" : ""}
               type="email"
+              name="developer-create-lab-admin-email"
               value={form.adminEmail}
               onChange={(e) => updateField("adminEmail", e.target.value)}
               placeholder="admin@lab.com"
+              autoComplete="section-developer-create-lab username"
               required
             />
             {formErrors.adminEmail && <em>{formErrors.adminEmail}</em>}
           </label>
           <label>
             Admin Password
-            <input
-              className={formErrors.adminPassword ? "invalid" : ""}
-              type="password"
+            <PasswordField
+              name="developer-create-lab-admin-password"
               value={form.adminPassword}
               onChange={(e) => updateField("adminPassword", e.target.value)}
+              invalid={Boolean(formErrors.adminPassword)}
+              autoComplete="section-developer-create-lab new-password"
+              toggleLabel="admin password"
               minLength={8}
               required
             />
             {formErrors.adminPassword && <em>{formErrors.adminPassword}</em>}
+          </label>
+          <label>
+            Confirm Password
+            <PasswordField
+              name="developer-create-lab-admin-confirm-password"
+              value={form.adminConfirmPassword}
+              onChange={(e) => updateField("adminConfirmPassword", e.target.value)}
+              invalid={Boolean(formErrors.adminConfirmPassword)}
+              autoComplete="section-developer-create-lab new-password"
+              toggleLabel="confirm admin password"
+              minLength={8}
+              required
+            />
+            {formErrors.adminConfirmPassword && <em>{formErrors.adminConfirmPassword}</em>}
           </label>
         </div>
 

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 function rangeText(result) {
   const hasMin = Number.isFinite(result.normalMin);
@@ -13,6 +15,7 @@ function rangeText(result) {
 }
 
 export default function ReportsPage() {
+  const user = useCurrentUser();
   const [patients, setPatients] = useState([]);
   const [tests, setTests] = useState([]);
   const [samples, setSamples] = useState([]);
@@ -31,31 +34,29 @@ export default function ReportsPage() {
     () => tests.find((item) => item._id === selectedTest),
     [tests, selectedTest]
   );
+  const canEditReports = hasPermission(user, "reports.edit");
+  const canPrintReports = hasPermission(user, "reports.print");
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [patientResponse, testResponse, sampleResponse, reportResponse] = await Promise.all([
-        fetch("/api/patient", { credentials: "include" }),
-        fetch("/api/tests/definitions?status=active", { credentials: "include" }),
-        fetch("/api/samples?status=all", { credentials: "include" }),
+        canEditReports ? fetch("/api/patient", { credentials: "include" }) : Promise.resolve(null),
+        canEditReports ? fetch("/api/tests/definitions?status=active", { credentials: "include" }) : Promise.resolve(null),
+        canEditReports ? fetch("/api/samples?status=all", { credentials: "include" }) : Promise.resolve(null),
         fetch("/api/reports", { credentials: "include" }),
       ]);
       const [patientData, testData, sampleData, reportData] = await Promise.all([
-        patientResponse.json(),
-        testResponse.json(),
-        sampleResponse.json(),
+        patientResponse ? patientResponse.json() : Promise.resolve([]),
+        testResponse ? testResponse.json() : Promise.resolve({ tests: [] }),
+        sampleResponse ? sampleResponse.json() : Promise.resolve({ samples: [] }),
         reportResponse.json(),
       ]);
 
-      if (!patientResponse.ok) throw new Error(patientData.error || "Unable to load patients");
-      if (!testResponse.ok) throw new Error(testData.error || "Unable to load tests");
-      if (!sampleResponse.ok) throw new Error(sampleData.error || "Unable to load samples");
+      if (patientResponse && !patientResponse.ok) throw new Error(patientData.error || "Unable to load patients");
+      if (testResponse && !testResponse.ok) throw new Error(testData.error || "Unable to load tests");
+      if (sampleResponse && !sampleResponse.ok) throw new Error(sampleData.error || "Unable to load samples");
       if (!reportResponse.ok) throw new Error(reportData.error || "Unable to load reports");
 
       setPatients(Array.isArray(patientData) ? patientData : []);
@@ -67,7 +68,11 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [canEditReports]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   function updateTest(value) {
     setSelectedSample("");
@@ -149,6 +154,7 @@ export default function ReportsPage() {
       {error && <div className="module-alert">{error}</div>}
 
       <div className="module-grid">
+        {canEditReports && (
         <section className="module-panel">
           <div className="module-panel-header">
             <h2>Result Entry</h2>
@@ -246,6 +252,7 @@ export default function ReportsPage() {
             </button>
           </form>
         </section>
+        )}
 
         <aside className="module-panel">
           <div className="module-panel-header">
@@ -274,9 +281,11 @@ export default function ReportsPage() {
               <h2>{selectedReport.testSnapshot?.name}</h2>
               <span>{selectedReport.reportId}</span>
             </div>
-            <button className="dash-btn-secondary" type="button" onClick={() => window.print()}>
-              {Icons.report} Print
-            </button>
+            {canPrintReports && (
+              <button className="dash-btn-secondary" type="button" onClick={() => window.print()}>
+                {Icons.report} Print
+              </button>
+            )}
           </div>
 
           <div className="report-patient-grid">

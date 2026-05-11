@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 const blankParameter = {
   name: "",
@@ -22,6 +24,7 @@ const blankForm = {
 };
 
 export default function TestsPage() {
+  const user = useCurrentUser();
   const [categories, setCategories] = useState([]);
   const [tests, setTests] = useState([]);
   const [form, setForm] = useState(blankForm);
@@ -35,6 +38,7 @@ export default function TestsPage() {
     () => form.name && form.category && form.parameters.some((parameter) => parameter.name.trim()),
     [form]
   );
+  const canEditTests = hasPermission(user, "tests.edit");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -188,14 +192,17 @@ export default function TestsPage() {
           <h1>Test Master</h1>
           <span>Build each lab&apos;s own test structure and parameters.</span>
         </div>
-        <button className="dash-btn-secondary" type="button" onClick={resetForm}>
-          {Icons.plus} New Test
-        </button>
+        {canEditTests && (
+          <button className="dash-btn-secondary" type="button" onClick={resetForm}>
+            {Icons.plus} New Test
+          </button>
+        )}
       </div>
 
       {error && <div className="module-alert">{error}</div>}
 
       <div className="module-grid">
+        {canEditTests && (
         <section className="module-panel">
           <div className="module-panel-header">
             <h2>{editingId ? "Edit Test" : "Create Test"}</h2>
@@ -268,16 +275,19 @@ export default function TestsPage() {
             </button>
           </form>
         </section>
+        )}
 
         <aside className="module-panel">
           <div className="module-panel-header">
             <h2>Categories</h2>
             <p>Group tests by lab department.</p>
           </div>
-          <form className="category-inline-form" onSubmit={createCategory}>
-            <input value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Biochemistry" />
-            <button className="dash-btn-secondary" type="submit">{Icons.plus}</button>
-          </form>
+          {canEditTests && (
+            <form className="category-inline-form" onSubmit={createCategory}>
+              <input value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Biochemistry" />
+              <button className="dash-btn-secondary" type="submit">{Icons.plus}</button>
+            </form>
+          )}
 
           <div className="module-panel-header compact">
             <h2>Defined Tests</h2>
@@ -285,7 +295,13 @@ export default function TestsPage() {
           </div>
           <div className="test-card-list">
             {tests.map((test) => (
-              <article key={test._id} className="test-card" onClick={() => editTest(test)}>
+              <article
+                key={test._id}
+                className="test-card"
+                onClick={() => {
+                  if (canEditTests) editTest(test);
+                }}
+              >
                 <div>
                   <h3>{test.name}</h3>
                   <span>{test.category?.name || "Uncategorized"} · {test.parameters?.length || 0} parameters</span>

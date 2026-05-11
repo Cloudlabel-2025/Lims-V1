@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 export default function OrdersPage() {
+  const user = useCurrentUser();
   const [patients, setPatients] = useState([]);
   const [tests, setTests] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -22,28 +25,25 @@ export default function OrdersPage() {
         .reduce((sum, test) => sum + (Number(test.price) || 0), 0),
     [tests, selectedTests]
   );
+  const canCreateOrders = hasPermission(user, "orders.create");
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [patientResponse, testResponse, orderResponse] = await Promise.all([
-        fetch("/api/patient", { credentials: "include" }),
-        fetch("/api/tests/definitions?status=active", { credentials: "include" }),
+        canCreateOrders ? fetch("/api/patient", { credentials: "include" }) : Promise.resolve(null),
+        canCreateOrders ? fetch("/api/tests/definitions?status=active", { credentials: "include" }) : Promise.resolve(null),
         fetch("/api/orders", { credentials: "include" }),
       ]);
       const [patientData, testData, orderData] = await Promise.all([
-        patientResponse.json(),
-        testResponse.json(),
+        patientResponse ? patientResponse.json() : Promise.resolve([]),
+        testResponse ? testResponse.json() : Promise.resolve({ tests: [] }),
         orderResponse.json(),
       ]);
 
-      if (!patientResponse.ok) throw new Error(patientData.error || "Unable to load patients");
-      if (!testResponse.ok) throw new Error(testData.error || "Unable to load tests");
+      if (patientResponse && !patientResponse.ok) throw new Error(patientData.error || "Unable to load patients");
+      if (testResponse && !testResponse.ok) throw new Error(testData.error || "Unable to load tests");
       if (!orderResponse.ok) throw new Error(orderData.error || "Unable to load orders");
 
       setPatients(Array.isArray(patientData) ? patientData : []);
@@ -54,7 +54,11 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [canCreateOrders]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   function toggleTest(testId) {
     setSelectedTests((current) =>
@@ -109,6 +113,7 @@ export default function OrdersPage() {
       {error && <div className="module-alert">{error}</div>}
 
       <div className="module-grid">
+        {canCreateOrders && (
         <section className="module-panel">
           <div className="module-panel-header">
             <h2>Create Order</h2>
@@ -169,6 +174,7 @@ export default function OrdersPage() {
             </button>
           </form>
         </section>
+        )}
 
         <aside className="module-panel">
           <div className="module-panel-header">
