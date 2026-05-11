@@ -110,7 +110,7 @@ export default function DeveloperEditLabPage({ params }) {
             contactEmail: data.lab.contactEmail || "",
             contactPhone: data.lab.contactPhone || "",
             adminEmail: data.lab.adminEmail || "",
-            adminPassword: data.lab.adminPassword || "",
+            adminPassword: "",
             primaryColor: data.lab.primaryColor || emptyForm.primaryColor,
             secondaryColor: data.lab.secondaryColor || emptyForm.secondaryColor,
             accentColor: data.lab.accentColor || emptyForm.accentColor,
@@ -333,7 +333,7 @@ export default function DeveloperEditLabPage({ params }) {
           <div className="developer-module-picker">
             <div className="developer-panel-header">
               <h2>Lab Admin Login</h2>
-              <p>These are the credentials shown on the developer lab list for quick copy.</p>
+              <p>Change the admin email or enter a new password only when credentials need updating.</p>
             </div>
             <div className="developer-form-grid">
               <label>
@@ -350,9 +350,10 @@ export default function DeveloperEditLabPage({ params }) {
                 Admin Password
                 <input
                   className={formErrors.adminPassword ? "invalid" : ""}
-                  type="text"
+                  type="password"
                   value={form.adminPassword}
                   onChange={(event) => updateField("adminPassword", event.target.value)}
+                  placeholder="Leave blank to keep current password"
                 />
                 {formErrors.adminPassword && <em>{formErrors.adminPassword}</em>}
               </label>
