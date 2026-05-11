@@ -39,6 +39,17 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+async function readResponseJson(response) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text };
+  }
+}
+
 function validateForm(form) {
   const errors = {};
 
@@ -209,16 +220,36 @@ export default function DeveloperEditLabPage({ params }) {
     setSaving(true);
 
     try {
+      const payload = {
+        name: form.name.trim(),
+        status: form.status,
+        subscriptionPlan: form.subscriptionPlan,
+        contactName: form.contactName.trim(),
+        contactEmail: form.contactEmail.trim(),
+        contactPhone: form.contactPhone.replace(/\D/g, ""),
+        adminEmail: form.adminEmail.trim(),
+        primaryColor: form.primaryColor,
+        secondaryColor: form.secondaryColor,
+        accentColor: form.accentColor,
+        enabledModules: form.enabledModules,
+        loginHighlights: form.loginHighlights,
+      };
+
+      if (form.adminPassword.trim()) {
+        payload.adminPassword = form.adminPassword.trim();
+      }
+
       const response = await fetch(`/api/developer/labs/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || "Unable to update lab");
+        const message = [data.error, data.details].filter(Boolean).join(": ");
+        throw new Error(message || `Unable to update lab (${response.status})`);
       }
 
       setForm((current) => ({

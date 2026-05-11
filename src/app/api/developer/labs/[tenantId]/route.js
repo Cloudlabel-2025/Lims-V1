@@ -36,6 +36,41 @@ function normalizeColor(value, fallback) {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : fallback;
 }
 
+function normalizeEnum(value, fallback, allowedValues) {
+  const normalizedValue = cleanString(value).toLowerCase();
+  const normalizedFallback = cleanString(fallback).toLowerCase();
+
+  if (allowedValues.includes(normalizedValue)) return normalizedValue;
+  if (allowedValues.includes(normalizedFallback)) return normalizedFallback;
+
+  return allowedValues[0];
+}
+
+function normalizePhone(value) {
+  const digits = cleanString(value).replace(/\D/g, "");
+  if (!digits) return "";
+
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+function normalizeOptionalEmail(value) {
+  const email = cleanString(value).toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+}
+
+function normalizeRequiredName(value, fallback) {
+  const name = cleanString(value);
+  if (name.length >= 2) return name;
+
+  const fallbackName = cleanString(fallback);
+  return fallbackName.length >= 2 ? fallbackName : "Lab";
+}
+
+function normalizePersistedPhone(value) {
+  const phone = normalizePhone(value);
+  return /^\d{10}$/.test(phone) ? phone : "";
+}
+
 function buildLabLoginUrl(req, tenantId) {
   const url = new URL(req.url);
   const rootDomain = cleanString(process.env.ROOT_DOMAIN)
@@ -147,55 +182,57 @@ export async function PATCH(req, context) {
       return NextResponse.json({ error: "Lab not found" }, { status: 404 });
     }
 
-    const name = cleanString(body.name);
-    const contactEmail = cleanString(body.contactEmail).toLowerCase();
-    const contactPhone = cleanString(body.contactPhone);
-    const adminEmail = cleanString(body.adminEmail).toLowerCase();
-    const adminPassword = String(body.adminPassword || "");
+    const name = normalizeRequiredName(body.name, lab.name);
+    const rawContactEmail = cleanString(body.contactEmail).toLowerCase();
+    const existingContactEmail = cleanString(lab.contactEmail).toLowerCase();
+    const contactEmail = normalizeOptionalEmail(rawContactEmail || existingContactEmail);
+    const rawContactPhone = normalizePhone(body.contactPhone);
+    const contactPhone = normalizePersistedPhone(rawContactPhone);
+    const rawAdminEmail = cleanString(body.adminEmail).toLowerCase();
+    const adminEmail = normalizeOptionalEmail(rawAdminEmail);
+    const existingAdminEmail = cleanString(lab.adminAccess?.email).toLowerCase();
+    const adminPassword = cleanString(body.adminPassword);
     const enabledModules = normalizeEnabledModules(body.enabledModules);
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
-    const status = cleanString(body.status) || lab.status;
-    const subscriptionPlan = cleanString(body.subscriptionPlan) || lab.subscriptionPlan;
-    const adminEmailChanged = Boolean(adminEmail && adminEmail !== lab.adminAccess?.email);
+    const status = normalizeEnum(body.status, lab.status, [
+      "pending",
+      "active",
+      "suspended",
+      "archived",
+    ]);
+    const subscriptionPlan = normalizeEnum(body.subscriptionPlan, lab.subscriptionPlan, [
+      "trial",
+      "basic",
+      "professional",
+      "enterprise",
+    ]);
+    const adminEmailChanged = Boolean(rawAdminEmail && rawAdminEmail !== existingAdminEmail);
     const adminPasswordChanged = Boolean(
       adminPassword && adminPassword !== lab.adminAccess?.password
     );
+    const contactEmailChanged = rawContactEmail !== existingContactEmail;
 
-    if (!name || name.length < 2) {
-      return NextResponse.json({ error: "Lab name is required" }, { status: 400 });
-    }
-
-    if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+    if (contactEmailChanged && rawContactEmail && !contactEmail) {
       return NextResponse.json({ error: "Valid contact email is required" }, { status: 400 });
     }
 
-    if (contactPhone && !/^\d{10}$/.test(contactPhone)) {
-      return NextResponse.json(
-        { error: "Contact phone must be exactly 10 digits" },
-        { status: 400 }
-      );
+    const phoneChanged = rawContactPhone !== normalizePhone(lab.contactPhone);
+    if (phoneChanged && rawContactPhone && !contactPhone) {
+      return NextResponse.json({ error: "Enter a valid 10 digit contact phone" }, { status: 400 });
     }
 
-    if (adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    if (adminEmailChanged && rawAdminEmail && !adminEmail) {
       return NextResponse.json({ error: "Valid lab admin email is required" }, { status: 400 });
     }
 
-    if (adminPassword && adminPassword.length < 8) {
+    if (adminPasswordChanged && adminPassword.length < 8) {
       return NextResponse.json(
         { error: "Lab admin password must be at least 8 characters" },
         { status: 400 }
       );
     }
 
-    if (!["pending", "active", "suspended", "archived"].includes(status)) {
-      return NextResponse.json({ error: "Invalid lab status" }, { status: 400 });
-    }
-
-    if (!["trial", "basic", "professional", "enterprise"].includes(subscriptionPlan)) {
-      return NextResponse.json({ error: "Invalid subscription plan" }, { status: 400 });
-    }
-
-    if ((adminEmailChanged || adminPasswordChanged) && !adminEmail && !lab.adminAccess?.email) {
+    if ((adminEmailChanged || adminPasswordChanged) && !adminEmail && !existingAdminEmail) {
       return NextResponse.json(
         { error: "Lab admin email is required before saving admin credentials" },
         { status: 400 }
@@ -214,7 +251,7 @@ export async function PATCH(req, context) {
           .asPromise();
 
         const User = getUserModel(tenantConnection);
-        const currentAdminEmail = lab.adminAccess?.email || adminEmail;
+        const currentAdminEmail = existingAdminEmail || adminEmail;
         const adminUser = await User.findOne({
           email: currentAdminEmail,
         }).select("+passwordHash");
@@ -251,14 +288,11 @@ export async function PATCH(req, context) {
       contactEmail,
       contactPhone,
       enabledModules,
-      branding: {
-        ...(lab.branding || {}),
-        primaryColor: normalizeColor(body.primaryColor, lab.branding?.primaryColor || "#0d9488"),
-        secondaryColor: normalizeColor(body.secondaryColor, lab.branding?.secondaryColor || "#0f766e"),
-        accentColor: normalizeColor(body.accentColor, lab.branding?.accentColor || "#f59e0b"),
-        loginHighlights,
-      },
     });
+    lab.set("branding.primaryColor", normalizeColor(body.primaryColor, lab.branding?.primaryColor || "#0d9488"));
+    lab.set("branding.secondaryColor", normalizeColor(body.secondaryColor, lab.branding?.secondaryColor || "#0f766e"));
+    lab.set("branding.accentColor", normalizeColor(body.accentColor, lab.branding?.accentColor || "#f59e0b"));
+    lab.set("branding.loginHighlights", loginHighlights);
 
     await lab.save();
     clearTenantConfigCache(lab.tenantId);
@@ -285,8 +319,13 @@ export async function PATCH(req, context) {
     }
 
     if (error?.name === "ValidationError") {
+      const details = Object.values(error.errors || {})
+        .map((item) => item.message)
+        .filter(Boolean)
+        .join("; ");
+
       return NextResponse.json(
-        { error: "Invalid lab update", details: error.message },
+        { error: details || "Invalid lab update", details: error.message },
         { status: 400 }
       );
     }
