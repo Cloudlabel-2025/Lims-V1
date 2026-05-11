@@ -3364,6 +3364,7 @@ body {
 .developer-submit,
 .developer-success a,
 .developer-lab-card a,
+.developer-link-actions a,
 .developer-link-actions button {
   border: none;
   border-radius: 8px;
@@ -3373,6 +3374,7 @@ body {
   cursor: pointer;
 }
 
+.developer-link-actions a,
 .developer-link-actions button {
   min-height: 36px;
 }
@@ -3432,6 +3434,7 @@ body {
 
 .developer-success a,
 .developer-lab-card a,
+.developer-link-actions a,
 .developer-link-actions button {
   display: inline-flex;
   align-items: center;
@@ -3450,10 +3453,36 @@ body {
   justify-content: flex-end;
 }
 
+.developer-link-actions a,
 .developer-link-actions button {
   background: #fff;
   color: var(--primary);
   border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+}
+
+.developer-link-actions a,
+.developer-link-actions button {
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.developer-link-actions button.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.developer-link-actions a:hover,
+.developer-link-actions button:hover:not(:disabled) {
+  background: var(--primary-50);
+}
+
+.developer-link-actions button.danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.developer-link-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .developer-url-link {
@@ -3688,6 +3717,69 @@ body {
   font-size: 11px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.developer-credential-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.developer-credential-grid div {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.developer-credential-grid div > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.developer-credential-grid button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.developer-credential-grid button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.developer-credential-grid button svg {
+  flex: 0 0 auto;
+}
+
+.developer-credential-grid button:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.developer-credential-grid button:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .developer-empty-state {
@@ -4523,6 +4615,10 @@ body {
   .developer-lab-card .developer-link-actions {
     grid-column: 2;
     justify-content: flex-start;
+  }
+
+  .developer-credential-grid {
+    grid-template-columns: 1fr;
   }
 }
 

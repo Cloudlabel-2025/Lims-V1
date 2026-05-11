@@ -33,6 +33,19 @@ function normalizeTenantId(value) {
   return cleanString(value).toLowerCase();
 }
 
+function normalizeDbName(value) {
+  return cleanString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+}
+
+function buildDefaultDbName(labName) {
+  const normalizedName = normalizeDbName(labName);
+  return normalizedName || "lab";
+}
+
 function normalizeLoginHighlights(value) {
   if (!Array.isArray(value)) return [];
 
@@ -165,7 +178,20 @@ export async function GET(req) {
     const Lab = getLabModel(masterConnection);
     const labs = await Lab.find({})
       .sort({ createdAt: -1 })
-      .select("labId name tenantId dbName status subscriptionPlan contactEmail contactPhone branding enabledModules createdAt");
+      .select({
+        labId: 1,
+        name: 1,
+        tenantId: 1,
+        dbName: 1,
+        status: 1,
+        subscriptionPlan: 1,
+        contactEmail: 1,
+        contactPhone: 1,
+        "adminAccess.email": 1,
+        branding: 1,
+        enabledModules: 1,
+        createdAt: 1,
+      });
 
     return NextResponse.json({
       labs: labs.map((lab) => ({
@@ -178,6 +204,7 @@ export async function GET(req) {
         subscriptionPlan: lab.subscriptionPlan,
         contactEmail: lab.contactEmail,
         contactPhone: lab.contactPhone,
+        adminEmail: lab.adminAccess?.email || "",
         primaryColor: lab.branding?.primaryColor,
         logoUrl: lab.branding?.logo?.url || null,
         loginHighlights: lab.branding?.loginHighlights || [],
@@ -247,12 +274,21 @@ export async function POST(req) {
 
     const masterUri = process.env.MASTER_MONGODB_URI || process.env.MONGODB_URI;
     const dbConnectionString = cleanString(body.dbConnectionString) || process.env.TENANT_MONGODB_URI || masterUri;
-    const dbName = cleanString(body.dbName) || `lims_${tenantId.replaceAll("-", "_")}`;
+    const dbName = normalizeDbName(body.dbName) || buildDefaultDbName(name);
 
     if (!dbConnectionString) {
       return NextResponse.json(
         { error: "Tenant database connection string is not configured" },
         { status: 500 }
+      );
+    }
+
+    const existingDbName = await Lab.findOne({ dbName });
+
+    if (existingDbName) {
+      return NextResponse.json(
+        { error: "A tenant database with this lab name already exists" },
+        { status: 409 }
       );
     }
 
@@ -294,6 +330,7 @@ export async function POST(req) {
     const adminFirstName = cleanString(body.adminFirstName) || "Lab";
     const adminLastName = cleanString(body.adminLastName) || "Admin";
     const existingAdmin = await User.findOne({ email: adminEmail }).select("+passwordHash");
+    let adminUser = existingAdmin;
 
     if (existingAdmin) {
       existingAdmin.set({
@@ -307,7 +344,7 @@ export async function POST(req) {
       });
       await existingAdmin.save();
     } else {
-      await User.create({
+      adminUser = await User.create({
         firstName: adminFirstName,
         lastName: adminLastName,
         email: adminEmail,
@@ -316,6 +353,13 @@ export async function POST(req) {
         status: "active",
       });
     }
+
+    lab.adminAccess = {
+      email: adminUser.email,
+      password: adminPassword,
+      updatedAt: new Date(),
+    };
+    await lab.save();
 
     warmTenantConfigCache({
       id: String(lab._id),
@@ -343,9 +387,12 @@ export async function POST(req) {
           enabledModules,
           loginHighlights,
           logoUrl: logo?.url || null,
+          adminEmail: adminUser.email,
+          adminPassword,
         },
         admin: {
           email: adminEmail,
+          password: adminPassword,
           firstName: adminFirstName,
           lastName: adminLastName,
         },

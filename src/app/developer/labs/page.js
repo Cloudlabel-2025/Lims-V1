@@ -33,6 +33,7 @@ export default function DeveloperLabsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copiedLoginUrl, setCopiedLoginUrl] = useState("");
+  const [deletingLabId, setDeletingLabId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -64,19 +65,53 @@ export default function DeveloperLabsListPage() {
   async function copyLoginUrl(loginUrl) {
     if (!loginUrl) return;
 
+    await copyValue(loginUrl, "Unable to copy login link. Please copy it manually.");
+    setCopiedLoginUrl(loginUrl);
+    window.setTimeout(() => {
+      setCopiedLoginUrl((current) => (current === loginUrl ? "" : current));
+    }, 1800);
+  }
+
+  async function copyValue(value, failureMessage = "Unable to copy value. Please copy it manually.") {
+    if (!value) return;
+
     try {
-      await navigator.clipboard.writeText(loginUrl);
-      setCopiedLoginUrl(loginUrl);
-      window.setTimeout(() => {
-        setCopiedLoginUrl((current) => (current === loginUrl ? "" : current));
-      }, 1800);
+      await navigator.clipboard.writeText(value);
     } catch {
-      setError("Unable to copy login link. Please copy it manually.");
+      setError(failureMessage);
     }
   }
 
   function openLoginUrl(lab) {
     window.open(getActiveLabLoginUrl(lab), "_blank", "noopener,noreferrer");
+  }
+
+  async function deleteLab(lab) {
+    const confirmed = window.confirm(
+      `Delete ${lab.name}? This removes the lab from developer management.`
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setDeletingLabId(lab.id);
+
+    try {
+      const response = await fetch(`/api/developer/labs/${encodeURIComponent(lab.id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Unable to delete lab");
+      }
+
+      setLabs((current) => current.filter((item) => item.id !== lab.id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingLabId("");
+    }
   }
 
   const activeLabs = labs.filter((lab) => lab.status === "active").length;
@@ -154,6 +189,22 @@ export default function DeveloperLabsListPage() {
                     {getLocalLabLoginUrl(lab.tenantId) && (
                       <small className="developer-production-url">Production: {lab.loginUrl}</small>
                     )}
+                    <div className="developer-credential-grid">
+                      <div>
+                        <span>Lab Admin User ID</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyValue(lab.adminEmail, "Unable to copy lab admin user ID.")
+                          }
+                          disabled={!lab.adminEmail}
+                          title="Copy lab admin user ID"
+                        >
+                          <span>{lab.adminEmail || "Not set"}</span>
+                          {lab.adminEmail && Icons.copy}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div className="developer-link-actions">
                     <button type="button" onClick={() => openLoginUrl(lab)}>
@@ -161,6 +212,19 @@ export default function DeveloperLabsListPage() {
                     </button>
                     <button type="button" onClick={() => copyLoginUrl(loginUrl)}>
                       {copiedLoginUrl === loginUrl ? "Copied" : "Copy Link"}
+                    </button>
+                    <Link href={`/developer/labs/${encodeURIComponent(lab.id)}/edit`}>
+                      {Icons.edit}
+                      Edit
+                    </Link>
+                    <button
+                      type="button"
+                      className="danger"
+                      disabled={deletingLabId === lab.id}
+                      onClick={() => deleteLab(lab)}
+                    >
+                      {Icons.trash}
+                      {deletingLabId === lab.id ? "Deleting" : "Delete"}
                     </button>
                   </div>
                 </article>

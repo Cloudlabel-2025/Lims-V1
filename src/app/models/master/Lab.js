@@ -94,6 +94,20 @@ export const LabSchema = new mongoose.Schema(
       type: [String],
       default: ["dashboard", "patients", "doctors", "tests", "reports"],
     },
+    adminAccess: {
+      email: {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+      password: {
+        type: String,
+        trim: true,
+      },
+      updatedAt: {
+        type: Date,
+      },
+    },
     branding: {
       logo: {
         url: {

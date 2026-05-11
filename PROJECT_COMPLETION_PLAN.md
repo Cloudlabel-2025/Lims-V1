@@ -14,7 +14,7 @@ This project is now being completed as a multi-tenant LIMS platform. The foundat
 - Complete forgot/reset password screens.
 - Add developer-owner and tenant-user UX differences.
 
-## 3. Lab Onboarding
+## 3. Lab Onboarding 
 - Seed RBAC catalog with `scripts/seed-rbac.mjs`.
 - Seed developer owner with `scripts/seed-developer-owner.mjs`.
 - Onboard labs with `scripts/onboard-lab.mjs`.

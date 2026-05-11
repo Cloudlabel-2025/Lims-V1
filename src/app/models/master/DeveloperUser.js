@@ -30,7 +30,6 @@ export const DeveloperUserSchema = new mongoose.Schema(
       type: String,
       unique: true,
       immutable: true,
-      index: true,
     },
     singletonKey: {
       type: String,
@@ -94,10 +93,6 @@ export const DeveloperUserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-DeveloperUserSchema.index({ email: 1 }, { unique: true });
-DeveloperUserSchema.index({ developerUserId: 1 }, { unique: true });
-DeveloperUserSchema.index({ singletonKey: 1 }, { unique: true });
-DeveloperUserSchema.index({ status: 1 });
 DeveloperUserSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
 
 DeveloperUserSchema.pre("save", async function generateDeveloperUserId() {

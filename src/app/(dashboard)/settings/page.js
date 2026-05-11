@@ -8,7 +8,7 @@ import { defaultLabModules } from "@/app/lib/modules";
 const sampleRoles = [
   {
     name: "Lab Admin",
-    description: "Full tenant administration access.",
+    description: "Full lab administration access.",
     permissions: ["*"],
   },
   {
@@ -371,7 +371,7 @@ export default function LabAdminSettingsPage() {
         <section className="settings-panel">
           <div className="settings-panel-header">
             <h2>Lab Roles</h2>
-            <p>Create roles inside this lab and assign only allowed tenant permissions.</p>
+            <p>Create roles inside this lab and assign only allowed permissions.</p>
           </div>
 
           <div className="settings-role-list">
@@ -403,7 +403,7 @@ export default function LabAdminSettingsPage() {
         <section className="settings-panel">
           <div className="settings-panel-header">
             <h2>User Assignment</h2>
-            <p>Create lab users and assign one role from this tenant.</p>
+            <p>Create lab users and assign one role for this lab.</p>
           </div>
           <div className="settings-form-grid">
             <label>
@@ -435,9 +435,6 @@ export default function LabAdminSettingsPage() {
                 ))}
               </select>
             </label>
-          </div>
-          <div className="settings-config-note">
-            User creation should save into the tenant DB and never into the developer master RBAC area.
           </div>
         </section>
       </div>
@@ -476,7 +473,7 @@ export default function LabAdminSettingsPage() {
       <section className="settings-panel">
         <div className="settings-panel-header">
           <h2>Lab Configuration Sections</h2>
-          <p>Tenant-level configuration owned by the lab admin.</p>
+          <p>Configuration owned by the lab admin.</p>
         </div>
         <div className="settings-section-grid">
           <article>
@@ -498,9 +495,6 @@ export default function LabAdminSettingsPage() {
         </div>
       </section>
 
-      <div className="settings-config-note">
-        This page defines the tenant-level configuration workspace. Persisting roles, users, and role permissions should be backed by tenant DB APIs protected by <strong>settings.manage</strong> and <strong>users.manage</strong>.
-      </div>
     </section>
   );
 }

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import connectMasterDB from "@/app/lib/master-db";
 import { createSessionToken, setSessionCookie } from "@/app/lib/session";
-import { getTenantModels } from "@/app/lib/tenant-db";
+import { connectTenantDB } from "@/app/lib/tenant-db";
 import { getTenantIdFromRequest, normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { verifyPassword } from "@/app/lib/password";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
+import { getRoleModel } from "@/app/models/tenant/Role";
+import { getUserModel } from "@/app/models/tenant/User";
 
 function resolveTenantId(req, bodyTenantId) {
   let requestTenantId = null;
@@ -68,14 +70,15 @@ export async function POST(req) {
 async function loginDeveloper({ email, password, rememberMe }) {
   const masterConnection = await connectMasterDB();
   const DeveloperUser = getDeveloperUserModel(masterConnection);
-  const user = await DeveloperUser.findOne({ email, status: "active" }).select("+passwordHash");
+  const user = await DeveloperUser.findOne({ email, status: "active" })
+    .select("_id developerUserId firstName lastName email isSystemOwner +passwordHash")
+    .lean();
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  user.lastLogin = new Date();
-  await user.save();
+  await DeveloperUser.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
 
   const token = createSessionToken({
     userType: "developer",
@@ -102,27 +105,33 @@ async function loginDeveloper({ email, password, rememberMe }) {
 }
 
 async function loginTenant({ tenantId, email, password, rememberMe }) {
-  const { User } = await getTenantModels(tenantId);
+  const tenantConnection = await connectTenantDB(tenantId);
+  const User = getUserModel(tenantConnection);
+  const Role = getRoleModel(tenantConnection);
   const user = await User.findOne({ email, status: "active" })
-    .select("+passwordHash")
-    .populate("role");
+    .select("_id userId firstName lastName email role +passwordHash")
+    .lean();
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  user.lastLogin = new Date();
-  await user.save();
+  const [role] = await Promise.all([
+    user.role
+      ? Role.findById(user.role).select("_id name permissions").lean()
+      : Promise.resolve(null),
+    User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }),
+  ]);
 
-  const permissions = user.role?.permissions || [];
+  const permissions = role?.permissions || [];
   const token = createSessionToken({
     userType: "tenant",
     tenantId,
     userId: String(user._id),
     userCode: user.userId,
     email: user.email,
-    roleId: user.role ? String(user.role._id) : null,
-    roleName: user.role?.name || null,
+    roleId: role ? String(role._id) : null,
+    roleName: role?.name || null,
     permissions,
   });
 
@@ -135,10 +144,10 @@ async function loginTenant({ tenantId, email, password, rememberMe }) {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      role: user.role
+      role: role
         ? {
-            id: user.role._id,
-            name: user.role.name,
+            id: role._id,
+            name: role.name,
             permissions,
           }
         : null,
