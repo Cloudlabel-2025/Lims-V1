@@ -59,18 +59,21 @@ export function validateSubdomain(value) {
   return { valid: true, subdomain, error: "" };
 }
 
-export function buildTenantUrl(subdomain, requestUrl) {
+export function buildTenantUrl(subdomain, requestUrl, pathname = "/") {
   const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
   const protocol = String(process.env.PUBLIC_APP_PROTOCOL || "https").replace(/:$/, "");
+  const normalizedPathname = pathname.startsWith("/") ? pathname : `/${pathname}`;
 
   if (rootDomain) {
-    return `${protocol}://${subdomain}.${rootDomain}/`;
+    return `${protocol}://${subdomain}.${rootDomain}${normalizedPathname}`;
   }
 
   const url = new URL(requestUrl);
-  url.pathname = "/";
+  url.pathname = normalizedPathname;
   url.search = "";
   url.searchParams.set("tenantId", subdomain);
-  url.searchParams.set("access", "lab");
+  if (normalizedPathname === "/") {
+    url.searchParams.set("access", "lab");
+  }
   return url.toString();
 }
