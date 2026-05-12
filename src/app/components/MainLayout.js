@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { canAccessPath, getFirstAllowedHref } from "@/app/lib/client-rbac";
+import { applyTheme } from "@/app/components/ThemeProvider";
 
 function isCurrentTenantHost(tenantId) {
   if (typeof window === "undefined" || !tenantId) return false;
@@ -77,6 +78,7 @@ export default function MainLayout({ children }) {
 
   useEffect(() => {
     if (loading || !user || !theme) return;
+    applyTheme(theme);
 
     if (user.userType === "tenant" && user.tenantId && !isCurrentTenantHost(user.tenantId)) {
       const params = new URLSearchParams(window.location.search);
