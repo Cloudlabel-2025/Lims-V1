@@ -38,6 +38,23 @@ function normalizeParameters(parameters) {
     .filter(Boolean);
 }
 
+export async function GET(req, { params }) {
+  try {
+    const auth = requireTenantSession(req, "tests.view");
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const { TestDefinition } = await getTenantModels(auth.tenantId);
+    const test = await TestDefinition.findById(id).populate("category", "name categoryId");
+
+    if (!test) return Response.json({ error: "Test not found" }, { status: 404 });
+
+    return Response.json({ test });
+  } catch (error) {
+    return Response.json({ error: "Unable to fetch test", details: error.message }, { status: 500 });
+  }
+}
+
 export async function PUT(req, { params }) {
   try {
     const auth = requireTenantSession(req, "tests.edit");

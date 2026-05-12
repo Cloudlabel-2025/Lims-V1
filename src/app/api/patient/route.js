@@ -12,10 +12,10 @@ export async function POST(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "patients.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Patient } = await getTenantModels(tenantId);
+    const { Patient, LabOrder, TestDefinition, TestPackage, Doctor } = await getTenantModels(tenantId);
     const body = await req.json();
 
-    const { name, dob, age, gender, phone, receivedTime, address, force } = body;
+    const { name, dob, age, gender, phone, receivedTime, address, selectedTests, force } = body;
 
     const missing = [];
     if (!name)         missing.push("Full Name");
@@ -76,11 +76,91 @@ export async function POST(req) {
       }
     }
 
+    // 🔥 Fetch Doctor if referral provided
+    let doctor = null;
+    if (body.refDoctorName) {
+      doctor = await Doctor.findOne({ name: body.refDoctorName });
+    }
+
     const patient = await Patient.create({
       ...body,
       phone: String(phone),
       refDoctorName: body.refDoctorName || undefined,
     });
+
+    // 🔬 Create Lab Order if tests selected
+    if (selectedTests && selectedTests.length > 0) {
+      const orderItems = [];
+      let totalAmount = 0;
+      
+      for (const itemKey of selectedTests) {
+        if (itemKey.startsWith("test_")) {
+          const testId = itemKey.replace("test_", "");
+          const test = await TestDefinition.findById(testId).populate("category");
+          if (test) {
+            const price = Number(test.price) || 0;
+            totalAmount += price;
+            orderItems.push({
+              testDefinition: test._id,
+              testSnapshot: {
+                testId: test.testId,
+                name: test.name,
+                code: test.code,
+                categoryName: test.category?.name,
+                sampleType: test.sampleType,
+                price: price
+              }
+            });
+          }
+        } else if (itemKey.startsWith("pkg_")) {
+          const pkgId = itemKey.replace("pkg_", "");
+          const pkg = await TestPackage.findById(pkgId).populate({
+            path: "tests",
+            populate: { path: "category" }
+          });
+          
+          if (pkg) {
+            const price = Number(pkg.price) || 0;
+            totalAmount += price;
+            
+            if (pkg.tests) {
+              for (const test of pkg.tests) {
+                // Avoid duplicates in items list (but price is handled by package)
+                if (!orderItems.find(item => item.testDefinition.toString() === test._id.toString())) {
+                  orderItems.push({
+                    testDefinition: test._id,
+                    testSnapshot: {
+                      testId: test.testId,
+                      name: test.name,
+                      code: test.code,
+                      categoryName: test.category?.name,
+                      sampleType: test.sampleType,
+                      price: 0 // Price is bundled in totalAmount
+                    }
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (orderItems.length > 0) {
+        const commissionRate = doctor?.commission || 0;
+        const commissionAmount = (totalAmount * commissionRate) / 100;
+
+        await LabOrder.create({
+          patient: patient._id,
+          items: orderItems,
+          referralDoctor: doctor?._id,
+          totalAmount,
+          commissionAmount,
+          billingStatus: "unpaid",
+          createdBy: auth.session?.email || "System",
+          status: "open"
+        });
+      }
+    }
 
     return Response.json(patient, { status: 201 });
 

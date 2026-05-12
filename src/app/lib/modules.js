@@ -19,7 +19,7 @@ export const availableLabModules = [
   },
   {
     id: "tests",
-    label: "Lab Tests",
+    label: "Test Master",
     permission: "tests.view",
     href: "/tests",
   },

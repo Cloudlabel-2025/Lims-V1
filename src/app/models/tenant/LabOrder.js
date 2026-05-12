@@ -86,6 +86,29 @@ export const LabOrderSchema = new mongoose.Schema(
       trim: true,
       maxlength: 500,
     },
+    referralDoctor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Doctor",
+    },
+    totalAmount: {
+      type: Number,
+      default: 0,
+    },
+    commissionAmount: {
+      type: Number,
+      default: 0,
+    },
+    paymentBreakdown: {
+      cash: { type: Number, default: 0 },
+      card: { type: Number, default: 0 },
+      online: { type: Number, default: 0 },
+    },
+    billingStatus: {
+      type: String,
+      enum: ["unpaid", "paid", "cancelled"],
+      default: "unpaid",
+      index: true,
+    },
     createdBy: {
       type: String,
       trim: true,

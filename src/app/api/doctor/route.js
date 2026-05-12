@@ -22,7 +22,7 @@ export async function POST(req) {
     if (!specialty)      missing.push("Specialty");
     if (!degree)         missing.push("Degree/Qualification");
     if (experience === undefined || experience === "") missing.push("Experience");
-    if (!mciNumber)      missing.push("MCI Registration Number");
+
     if (!phone)          missing.push("Mobile Number");
     if (!clinicName)     missing.push("Clinic/Hospital Name");
     if (!location)       missing.push("Practice Location");
@@ -53,7 +53,7 @@ export async function POST(req) {
 
     // --- Duplicate Checks ---
     const [existingMCI, existingPhone] = await Promise.all([
-      Doctor.findOne({ mciNumber: String(mciNumber) }),
+      mciNumber ? Doctor.findOne({ mciNumber: String(mciNumber) }) : null,
       Doctor.findOne({ phone: String(phone) })
     ]);
 

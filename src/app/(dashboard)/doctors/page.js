@@ -41,6 +41,7 @@ export default function DoctorList() {
   const [viewType, setViewType] = useState("grid"); // 'grid' or 'list'
   const [deleteModal, setDeleteModal] = useState({ open: false, doctor: null });
   const [deleting, setDeleting] = useState(false);
+  const [paying, setPaying] = useState(false);
   const canRegisterDoctors = hasPermission(user, "doctors.register");
   const canEditDoctors = hasPermission(user, "doctors.edit");
   const canDeleteDoctors = hasPermission(user, "doctors.delete");
@@ -130,6 +131,31 @@ export default function DoctorList() {
     }
   };
 
+  const handlePayout = async () => {
+    if (!selectedDoctor || selectedDoctor.pendingPayout <= 0) return;
+    if (!confirm(`Clear pending payout of ₹${selectedDoctor.pendingPayout} for ${selectedDoctor.name}?`)) return;
+
+    setPaying(true);
+    try {
+      const res = await fetch("/api/doctor/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId: selectedDoctor._id })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAllDoctors(prev => prev.map(d => d._id === selectedDoctor._id ? { ...d, pendingPayout: 0 } : d));
+        setSelectedDoctor(prev => ({ ...prev, pendingPayout: 0 }));
+      } else {
+        alert(data.error || "Failed to clear payout");
+      }
+    } catch {
+      alert("Network error");
+    } finally {
+      setPaying(false);
+    }
+  };
+
   if (!mounted) return null;
 
   return (
@@ -184,14 +210,14 @@ export default function DoctorList() {
                   </div>
                 </div>
 
-                <div className="vitals-grid-mini">
-                  <div className="vital-mini-box">
-                    <div className="vital-mini-label" style={{ fontSize: '10px', opacity: 1, fontWeight: '600' }}>TYPE</div>
-                    <div className="vital-mini-value" style={{ fontSize: '15px', fontWeight: '700' }}>{selectedDoctor.doctorType}</div>
-                  </div>
+                <div className="vitals-grid-mini" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                   <div className="vital-mini-box">
                     <div className="vital-mini-label" style={{ fontSize: '10px', opacity: 1, fontWeight: '600' }}>COMMISSION</div>
                     <div className="vital-mini-value" style={{ fontSize: '15px', fontWeight: '700' }}>{selectedDoctor.commission || 0}%</div>
+                  </div>
+                  <div className="vital-mini-box" style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}>
+                    <div className="vital-mini-label" style={{ fontSize: '10px', opacity: 1, fontWeight: '600' }}>PENDING</div>
+                    <div className="vital-mini-value" style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>₹{selectedDoctor.pendingPayout || 0}</div>
                   </div>
                   <div className="vital-mini-box">
                     <div className="vital-mini-label" style={{ fontSize: '10px', opacity: 1, fontWeight: '600' }}>STATUS</div>
@@ -213,6 +239,19 @@ export default function DoctorList() {
               <div className="detail-item"><div className="detail-value">{selectedDoctor.location}</div><div className="detail-label">Practice Location</div></div>
               <div className="detail-item"><div className="detail-value">{formatDate(selectedDoctor.createdAt)}</div><div className="detail-label">Registered On</div></div>
             </div>
+
+            {selectedDoctor.pendingPayout > 0 && (
+              <div style={{ padding: '0 24px 20px' }}>
+                <button 
+                  className="dash-btn-primary" 
+                  style={{ width: '100%', background: 'var(--success)', border: 'none', height: '42px', gap: '8px' }}
+                  onClick={handlePayout}
+                  disabled={paying}
+                >
+                  {paying ? "Processing..." : `${Icons.checkCircle || "✓"} Clear ₹${selectedDoctor.pendingPayout} Payout`}
+                </button>
+              </div>
+            )}
 
             {(canEditDoctors || canDeleteDoctors) && (
             <div style={{ padding: '20px 24px', display: 'flex', gap: '12px' }}>
@@ -376,6 +415,11 @@ export default function DoctorList() {
                         {doc.status}
                       </span>
                     </div>
+
+                    <div style={{ marginTop: "12px", background: "var(--surface)", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" }}>PENDING PAYOUT</span>
+                        <strong style={{ fontSize: "14px", color: doc.pendingPayout > 0 ? "var(--danger)" : "var(--success)" }}>₹{doc.pendingPayout || 0}</strong>
+                    </div>
                     
                     <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-light)", fontSize: "10px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span>Clinic: {doc.clinicName || "Private"}</span>
@@ -419,6 +463,7 @@ export default function DoctorList() {
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Doctor Details</th>
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Specialty</th>
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Experience</th>
+                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Pending Payout</th>
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Status</th>
                     <th style={{ padding: "12px 20px", textAlign: "center", color: "var(--text-secondary)", fontWeight: "600" }}>Actions</th>
                   </tr>
@@ -461,6 +506,9 @@ export default function DoctorList() {
                         </td>
                         <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{doc.specialty}</td>
                         <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{doc.experience} Yrs</td>
+                        <td style={{ padding: "12px 20px" }}>
+                          <strong style={{ color: doc.pendingPayout > 0 ? "var(--danger)" : "var(--text-muted)" }}>₹{doc.pendingPayout || 0}</strong>
+                        </td>
                         <td style={{ padding: "12px 20px" }}>
                           <span style={{ 
                             padding: "2px 8px", 

@@ -40,8 +40,8 @@ const doctorSchema = new mongoose.Schema({
     },
     mciNumber: {
         type: String,
-        required: true,
-        unique: true
+        unique: true,
+        sparse: true
     },
     phone: {
         type: String,
@@ -90,6 +90,10 @@ const doctorSchema = new mongoose.Schema({
         type: String,
         enum: ["Active", "On Leave", "Inactive"],
         default: "Active"
+    },
+    pendingPayout: {
+        type: Number,
+        default: 0
     }
 }, { timestamps: true });
 

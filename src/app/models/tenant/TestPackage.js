@@ -38,7 +38,6 @@ export const TestPackageSchema = new mongoose.Schema(
       trim: true,
       minlength: 2,
       maxlength: 150,
-      index: true,
     },
     code: {
       type: String,

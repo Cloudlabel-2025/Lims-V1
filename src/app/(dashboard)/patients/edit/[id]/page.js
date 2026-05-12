@@ -2,6 +2,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import SearchableSelect from "@/app/components/SearchableSelect";
 import { calculateAge } from "@/app/utils/patient-helpers";
 
 export default function EditPatient({ params }) {
@@ -16,6 +17,7 @@ export default function EditPatient({ params }) {
   const [status, setStatus] = useState({ type: "", message: "" });
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [doctors, setDoctors] = useState([]);
 
   useEffect(() => {
     async function fetchPatient() {
@@ -44,6 +46,17 @@ export default function EditPatient({ params }) {
       }
     }
     fetchPatient();
+
+    async function fetchDoctors() {
+      try {
+        const res = await fetch("/api/doctor");
+        const data = await res.json();
+        if (res.ok) setDoctors(data);
+      } catch (err) {
+        console.error("Failed to fetch doctors:", err);
+      }
+    }
+    fetchDoctors();
   }, [id]);
 
   const handleChange = (e) => {
@@ -239,7 +252,15 @@ export default function EditPatient({ params }) {
               {hasRefDoctor && (
                 <div className="col-md-6">
                   <label className="lims-label">Referring Doctor <span className="required">*</span></label>
-                  <input name="refDoctorName" className="lims-input" value={form.refDoctorName || ""} onChange={handleChange} />
+                  <SearchableSelect
+                    name="refDoctorName"
+                    options={doctors.map(doc => ({ value: doc.name, label: doc.name, sublabel: doc.doctorId }))}
+                    value={form.refDoctorName || ""}
+                    onChange={handleChange}
+                    placeholder="Search & Select Doctor"
+                    error={!!errors.refDoctorName}
+                  />
+                  {errors.refDoctorName && <div className="lims-error-text">{errors.refDoctorName}</div>}
                 </div>
               )}
             </div>

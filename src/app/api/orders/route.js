@@ -21,6 +21,7 @@ export async function GET(req) {
     const { LabOrder } = await getTenantModels(auth.tenantId);
     const orders = await LabOrder.find(query)
       .populate("patient", "name patientId age gender phone")
+      .populate("referralDoctor", "name doctorId commission pendingPayout")
       .sort({ createdAt: -1 })
       .limit(100);
 
@@ -51,36 +52,87 @@ export async function POST(req) {
       return Response.json({ error: "At least one test is required" }, { status: 400 });
     }
 
-    const { Patient, TestDefinition, LabOrder, Sample } = await getTenantModels(auth.tenantId);
+    const { Patient, TestDefinition, LabOrder, Sample, Doctor, TestPackage } = await getTenantModels(auth.tenantId);
     LabOrderModel = LabOrder;
     SampleModel = Sample;
     const patient = await Patient.findById(patientId);
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
 
-    const tests = await TestDefinition.find({ _id: { $in: testIds }, status: "active" }).populate("category", "name");
-    if (tests.length !== testIds.length) {
-      return Response.json({ error: "One or more selected tests are inactive or missing" }, { status: 400 });
+    const doctor = patient.refDoctorName ? await Doctor.findOne({ name: patient.refDoctorName }) : null;
+
+    const orderItems = [];
+    let totalAmount = 0;
+
+    for (const itemKey of testIds) {
+      if (itemKey.startsWith("test_")) {
+        const testId = itemKey.replace("test_", "");
+        const test = await TestDefinition.findById(testId).populate("category");
+        if (test) {
+          const price = Number(test.price) || 0;
+          totalAmount += price;
+          orderItems.push({
+            testDefinition: test._id,
+            testSnapshot: {
+              testId: test.testId,
+              name: test.name,
+              code: test.code,
+              categoryName: test.category?.name,
+              sampleType: test.sampleType,
+              price: price
+            },
+            status: "sample-pending"
+          });
+        }
+      } else if (itemKey.startsWith("pkg_")) {
+        const pkgId = itemKey.replace("pkg_", "");
+        const pkg = await TestPackage.findById(pkgId).populate({
+          path: "tests",
+          populate: { path: "category" }
+        });
+        
+        if (pkg) {
+          const price = Number(pkg.price) || 0;
+          totalAmount += price;
+          if (pkg.tests) {
+            for (const test of pkg.tests) {
+              if (!orderItems.find(item => item.testDefinition.toString() === test._id.toString())) {
+                orderItems.push({
+                  testDefinition: test._id,
+                  testSnapshot: {
+                    testId: test.testId,
+                    name: test.name,
+                    code: test.code,
+                    categoryName: test.category?.name,
+                    sampleType: test.sampleType,
+                    price: 0
+                  },
+                  status: "sample-pending"
+                });
+              }
+            }
+          }
+        }
+      }
     }
 
-    const items = tests.map((test) => ({
-      testDefinition: test._id,
-      testSnapshot: {
-        testId: test.testId,
-        name: test.name,
-        code: test.code,
-        categoryName: test.category?.name,
-        sampleType: test.sampleType,
-        price: test.price,
-      },
-      status: "sample-pending",
-    }));
+    if (orderItems.length === 0) {
+      return Response.json({ error: "No valid tests selected" }, { status: 400 });
+    }
+
+    const commissionRate = doctor?.commission || 0;
+    const commissionAmount = (totalAmount * commissionRate) / 100;
 
     order = await LabOrder.create({
       patient: patient._id,
-      items,
+      items: orderItems,
+      referralDoctor: doctor?._id,
+      totalAmount,
+      commissionAmount,
+      billingStatus: "unpaid",
       priority: body.priority === "urgent" ? "urgent" : "routine",
       notes: clean(body.notes),
       createdBy: auth.session.email,
+      status: "open"
     });
 
     const samples = await Promise.all(

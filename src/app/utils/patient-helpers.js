@@ -19,6 +19,7 @@ export const getEmptyForm = () => ({
   refDoctorName: "",
   reportType: "Hand",
   barcode: "",
+  selectedTests: [],
 });
 
 export const calculateAge = (dobString) => {

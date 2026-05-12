@@ -57,7 +57,7 @@ export default function DoctorRegistration() {
     if (!form.experience.toString().trim()) newErrors.experience = "Experience is required";
     else if (isNaN(form.experience) || parseInt(form.experience) < 0) newErrors.experience = "Invalid experience";
     
-    if (!form.mciNumber.trim()) newErrors.mciNumber = "MCI Registration Number is required";
+
     if (!form.phone.trim()) newErrors.phone = "Mobile number is required";
     else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
@@ -170,7 +170,7 @@ export default function DoctorRegistration() {
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
               </div>
               <div className="col-md-4">
-                <label className="lims-label">MCI Registration Number <span className="required">*</span></label>
+                <label className="lims-label">MCI Registration Number</label>
                 <input 
                   name="mciNumber" 
                   className={`lims-input ${errors.mciNumber ? 'invalid' : ''}`} 

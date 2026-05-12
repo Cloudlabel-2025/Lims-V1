@@ -1114,7 +1114,6 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   margin-bottom: 16px;
-  overflow: hidden;
   box-shadow: var(--shadow-xs);
   transition: box-shadow var(--duration-normal) var(--ease-out);
 }

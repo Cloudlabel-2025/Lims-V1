@@ -1,7 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import SearchableSelect from "@/app/components/SearchableSelect";
+import MultiSelect from "@/app/components/MultiSelect";
 import { getISTNow, getEmptyForm, calculateAge } from "@/app/utils/patient-helpers";
 
 export default function PatientRegistration() {
@@ -16,10 +18,50 @@ export default function PatientRegistration() {
   const [hasRefDoctor, setHasRefDoctor] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
   const [loading, setLoading] = useState(false);
+  const [doctors, setDoctors] = useState([]);
+  const [availableTests, setAvailableTests] = useState([]);
+  const [availablePackages, setAvailablePackages] = useState([]);
+
+  const selectedTotal = useMemo(() => {
+    let total = 0;
+    (form.selectedTests || []).forEach(itemKey => {
+      if (itemKey.startsWith("test_")) {
+        const t = availableTests.find(t => t._id === itemKey.replace("test_", ""));
+        total += Number(t?.price || 0);
+      } else if (itemKey.startsWith("pkg_")) {
+        const p = availablePackages.find(p => p._id === itemKey.replace("pkg_", ""));
+        total += Number(p?.price || 0);
+      }
+    });
+    return total;
+  }, [availableTests, availablePackages, form.selectedTests]);
 
   useEffect(() => {
     setMounted(true);
     setForm(prev => ({ ...prev, receivedTime: getISTNow() }));
+
+    async function fetchData() {
+      try {
+        const [docRes, testRes, pkgRes] = await Promise.all([
+          fetch("/api/doctor"),
+          fetch("/api/tests/definitions"),
+          fetch("/api/tests/packages")
+        ]);
+        
+        const [docData, testData, pkgData] = await Promise.all([
+          docRes.json(),
+          testRes.json(),
+          pkgRes.json()
+        ]);
+
+        if (docRes.ok) setDoctors(docData);
+        if (testRes.ok) setAvailableTests(testData.tests || []);
+        if (pkgRes.ok) setAvailablePackages(pkgData.packages || []);
+      } catch (err) {
+        console.error("Failed to fetch registration data:", err);
+      }
+    }
+    fetchData();
   }, []);
 
   const handleChange = (e) => {
@@ -68,6 +110,7 @@ export default function PatientRegistration() {
     }
     if (hasRefDoctor && !form.refDoctorName?.trim()) newErrors.refDoctorName = "Referring doctor name is required";
     if (form.uhId && form.uhId.toString().length !== 14) newErrors.uhId = "UHID must be exactly 14 digits";
+    if (!form.selectedTests || form.selectedTests.length === 0) newErrors.selectedTests = "At least one test or package must be selected";
     return newErrors;
   };
 
@@ -100,7 +143,7 @@ export default function PatientRegistration() {
 
     if (payload.barcode) {
       try {
-        const barRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.barcode)}`);
+        const barRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.barcode)}`, { credentials: "include" });
         const barData = await barRes.json();
         if (Array.isArray(barData) && barData.some(p => p.barcode === payload.barcode)) {
           setErrors(prev => ({ ...prev, barcode: "This barcode is already assigned to another patient" }));
@@ -112,7 +155,7 @@ export default function PatientRegistration() {
     }
 
     try {
-      const dupRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.phone)}`);
+      const dupRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.phone)}`, { credentials: "include" });
       const dupData = await dupRes.json();
       const matchingPatient = Array.isArray(dupData) ? dupData.find(p => p.phone === payload.phone) : null;
       if (matchingPatient) {
@@ -128,14 +171,20 @@ export default function PatientRegistration() {
       const res = await fetch("/api/patient", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (res.ok) {
-        setStatus({ type: "success", message: `Patient registered successfully — ID: ${data.patientId}` });
+        setStatus({ 
+          type: "success", 
+          message: `Patient registered successfully — ID: ${data.patientId}. A pending bill has been generated in the Billing Center.`
+        });
         setForm(getEmptyForm());
         setHasRefDoctor(false);
         setShowErrors(false);
+        // Optionally redirect after a short delay
+        setTimeout(() => router.push("/orders"), 2500);
       } else {
         setStatus({ type: "danger", message: data.error || "Something went wrong." });
       }
@@ -253,9 +302,70 @@ export default function PatientRegistration() {
             <div className="row g-3 mt-1">
               <div className="col-12"><label className="lims-label">Doctor Referral</label><div className="radio-group"><label className="radio-item"><input type="radio" name="refDoctorToggle" checked={!hasRefDoctor} onChange={() => { setHasRefDoctor(false); setForm(p => ({ ...p, refDoctorName: "" })); }} /> No</label><label className="radio-item"><input type="radio" name="refDoctorToggle" checked={hasRefDoctor} onChange={() => setHasRefDoctor(true)} /> Yes</label></div></div>
               {hasRefDoctor && (
-                <div className="col-md-6"><label className="lims-label">Referring Doctor <span className="required">*</span></label><input name="refDoctorName" className={`lims-input ${errors.refDoctorName ? 'invalid' : ''}`} placeholder="Enter doctor name" value={form.refDoctorName} onChange={handleChange} />{errors.refDoctorName && <div className="lims-error-text">{errors.refDoctorName}</div>}</div>
+                <div className="col-md-6">
+                  <label className="lims-label">Referring Doctor <span className="required">*</span></label>
+                  <SearchableSelect
+                    name="refDoctorName"
+                    options={doctors.map(doc => ({ value: doc.name, label: doc.name, sublabel: doc.doctorId }))}
+                    value={form.refDoctorName}
+                    onChange={handleChange}
+                    placeholder="Search & Select Doctor"
+                    error={!!errors.refDoctorName}
+                  />
+                  {errors.refDoctorName && <div className="lims-error-text">{errors.refDoctorName}</div>}
+                </div>
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="form-card">
+          <div className="form-card-header"><h6><span className="step-badge">4</span>Test Selection</h6></div>
+          <div className="form-card-body">
+            <div className="row g-3">
+              <div className="col-12">
+                <label className="lims-label">Select Tests / Packages <span className="required">*</span></label>
+                <MultiSelect 
+                  name="selectedTests"
+                  options={[
+                    ...availablePackages.map(pkg => ({ 
+                      value: `pkg_${pkg._id}`, 
+                      label: pkg.name, 
+                      sublabel: `Package (${pkg.tests?.length || 0} tests) · ₹${pkg.price}` 
+                    })),
+                    ...availableTests.map(test => ({ 
+                      value: `test_${test._id}`, 
+                      label: test.name, 
+                      sublabel: `${test.category?.name || "Test"} · ₹${test.price}` 
+                    }))
+                  ]}
+                  value={form.selectedTests || []}
+                  onChange={handleChange}
+                  placeholder="Search for investigations or health packages..."
+                  error={!!errors.selectedTests}
+                />
+                {errors.selectedTests && <div className="lims-error-text">{errors.selectedTests}</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ 
+          background: "var(--surface)", 
+          padding: "20px 24px", 
+          borderRadius: "12px", 
+          border: "1px solid var(--border-light)",
+          marginBottom: "24px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <div>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Total Bill Amount</span>
+            <strong style={{ fontSize: "24px", color: "var(--primary)" }}>₹{selectedTotal}</strong>
+          </div>
+          <div style={{ color: "var(--text-secondary)", fontSize: "14px", fontWeight: "600" }}>
+            {form.selectedTests?.length || 0} Investigations Selected
           </div>
         </div>
 
