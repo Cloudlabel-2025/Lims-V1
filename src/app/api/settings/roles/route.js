@@ -157,3 +157,52 @@ export async function PATCH(req) {
     );
   }
 }
+
+export async function DELETE(req) {
+  try {
+    const auth = requireTenantSession(req, "settings.manage");
+    if (auth.error) return auth.error;
+
+    const { searchParams } = new URL(req.url);
+    const roleId = clean(searchParams.get("id"));
+    if (!roleId) {
+      return Response.json({ error: "Role ID is required" }, { status: 400 });
+    }
+
+    const { Role, User } = await getTenantModels(auth.tenantId);
+    const role = await Role.findOne({ _id: roleId, isSystemRole: { $ne: true } });
+
+    if (!role) {
+      return Response.json({ error: "Role not found" }, { status: 404 });
+    }
+
+    if (role.isDefaultAdmin) {
+      return Response.json({ error: "Default admin role cannot be deleted" }, { status: 403 });
+    }
+
+    const assignedUsers = await User.countDocuments({
+      role: role._id,
+      status: { $in: ["active", "inactive", "invited", "locked"] },
+    });
+
+    if (assignedUsers > 0) {
+      return Response.json(
+        { error: "Role is assigned to lab users. Reassign those users before deleting it." },
+        { status: 409 }
+      );
+    }
+
+    await role.deleteOne();
+
+    const roles = await Role.find({ status: "active", isSystemRole: { $ne: true } }).sort({
+      name: 1,
+    });
+
+    return Response.json({ roles: dedupeRolesByName(roles).map(serializeRole) });
+  } catch (error) {
+    return Response.json(
+      { error: "Unable to delete role", details: error.message },
+      { status: 500 }
+    );
+  }
+}

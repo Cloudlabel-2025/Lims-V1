@@ -59,16 +59,40 @@ export function validateSubdomain(value) {
   return { valid: true, subdomain, error: "" };
 }
 
+function getRequestHostname(requestUrl) {
+  try {
+    return new URL(requestUrl).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function shouldUseLocalTenantHost(requestUrl) {
+  const hostname = getRequestHostname(requestUrl);
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname.endsWith(".localhost")
+  );
+}
+
 export function buildTenantUrl(subdomain, requestUrl, pathname = "/") {
+  const normalizedPathname = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const url = new URL(requestUrl);
+
+  if (shouldUseLocalTenantHost(requestUrl)) {
+    const port = url.port ? `:${url.port}` : "";
+    return `${url.protocol}//${subdomain}.localhost${port}${normalizedPathname}`;
+  }
+
   const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
   const protocol = String(process.env.PUBLIC_APP_PROTOCOL || "https").replace(/:$/, "");
-  const normalizedPathname = pathname.startsWith("/") ? pathname : `/${pathname}`;
 
   if (rootDomain) {
     return `${protocol}://${subdomain}.${rootDomain}${normalizedPathname}`;
   }
 
-  const url = new URL(requestUrl);
   url.pathname = normalizedPathname;
   url.search = "";
   url.searchParams.set("tenantId", subdomain);

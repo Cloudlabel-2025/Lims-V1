@@ -44,6 +44,13 @@ export async function POST(req) {
       );
     }
 
+    if (password.length < 8) {
+      return Response.json(
+        { error: "Password must be at least 8 characters long" },
+        { status: 400 }
+      );
+    }
+
     const tokenHash = hashResetToken(token);
     const expiresQuery = { $gt: new Date() };
     let user = null;
@@ -52,6 +59,7 @@ export async function POST(req) {
       const masterConnection = await connectMasterDB();
       const DeveloperUser = getDeveloperUserModel(masterConnection);
       user = await DeveloperUser.findOne({
+        status: "active",
         passwordResetTokenHash: tokenHash,
         passwordResetExpiresAt: expiresQuery,
       }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
@@ -63,6 +71,7 @@ export async function POST(req) {
 
       const { User } = await getTenantModels(tenantId);
       user = await User.findOne({
+        status: { $in: ["active", "invited"] },
         passwordResetTokenHash: tokenHash,
         passwordResetExpiresAt: expiresQuery,
       }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");

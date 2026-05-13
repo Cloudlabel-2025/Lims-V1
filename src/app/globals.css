@@ -4168,6 +4168,12 @@ body {
   gap: 8px;
 }
 
+.settings-role-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .settings-role-list button {
   display: flex;
   align-items: center;
@@ -4180,6 +4186,10 @@ body {
   color: var(--text-primary);
   font-family: var(--font-main);
   cursor: pointer;
+}
+
+.settings-role-row > button:first-child {
+  flex: 1;
 }
 
 .settings-role-list button.active {
@@ -4197,6 +4207,21 @@ body {
 .settings-role-list span {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.settings-role-delete {
+  flex: 0 0 auto;
+  justify-content: center !important;
+  min-width: 92px;
+  background: #fff4f4 !important;
+  color: #b42318 !important;
+  border-color: #f3b7b7 !important;
+}
+
+.settings-role-delete:disabled {
+  color: var(--text-muted) !important;
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
 }
 
 .settings-inline-form {

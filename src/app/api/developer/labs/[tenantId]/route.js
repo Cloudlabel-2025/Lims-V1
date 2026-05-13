@@ -7,6 +7,7 @@ import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { getLabModel } from "@/app/models/master/Lab";
 import { getUserModel } from "@/app/models/tenant/User";
+import { buildTenantUrl } from "@/app/lib/subdomain";
 
 const connectionOptions = {
   bufferCommands: false,
@@ -72,27 +73,7 @@ function normalizePersistedPhone(value) {
 }
 
 function buildLabLoginUrl(req, tenantId) {
-  const url = new URL(req.url);
-  const rootDomain = cleanString(process.env.ROOT_DOMAIN)
-    .replace(/^https?:\/\//i, "")
-    .replace(/\/.*$/, "")
-    .toLowerCase();
-
-  if (rootDomain) {
-    const protocol = cleanString(process.env.PUBLIC_APP_PROTOCOL || "https").replace(/:$/, "");
-    url.protocol = `${protocol}:`;
-    url.host = `${tenantId}.${rootDomain}`;
-    url.port = "";
-    url.pathname = "/";
-    url.search = "";
-    return url.toString();
-  }
-
-  url.pathname = "/";
-  url.search = "";
-  url.searchParams.set("tenantId", tenantId);
-  url.searchParams.set("access", "lab");
-  return url.toString();
+  return buildTenantUrl(tenantId, req.url);
 }
 
 function serializeLab(lab, req) {
@@ -142,7 +123,6 @@ async function getLabById(req, params) {
     contactEmail: 1,
     contactPhone: 1,
     "adminAccess.email": 1,
-    "adminAccess.password": 1,
     branding: 1,
     enabledModules: 1,
     createdAt: 1,
@@ -208,9 +188,7 @@ export async function PATCH(req, context) {
       "enterprise",
     ]);
     const adminEmailChanged = Boolean(rawAdminEmail && rawAdminEmail !== existingAdminEmail);
-    const adminPasswordChanged = Boolean(
-      adminPassword && adminPassword !== lab.adminAccess?.password
-    );
+    const adminPasswordChanged = Boolean(adminPassword);
     const contactEmailChanged = rawContactEmail !== existingContactEmail;
 
     if (contactEmailChanged && rawContactEmail && !contactEmail) {
@@ -278,7 +256,6 @@ export async function PATCH(req, context) {
         lab.adminAccess = {
           ...(lab.adminAccess || {}),
           email: adminUser.email,
-          ...(adminPasswordChanged ? { password: adminPassword } : {}),
           updatedAt: new Date(),
         };
       } finally {

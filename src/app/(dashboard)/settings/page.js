@@ -35,6 +35,11 @@ function normalizeRoleName(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function clampRoleIndex(nextRoles, preferredIndex) {
+  if (nextRoles.length === 0) return 0;
+  return Math.min(preferredIndex, nextRoles.length - 1);
+}
+
 export default function LabAdminSettingsPage() {
   const [theme, setTheme] = useState(null);
   const [user, setUser] = useState(null);
@@ -212,6 +217,55 @@ export default function LabAdminSettingsPage() {
     setSettingsError("");
   }
 
+  async function deleteRole(role, index) {
+    setRoleMessage("");
+    setSettingsError("");
+
+    if (!role) return;
+
+    if (role.isDefaultAdmin || role.isSystemRole) {
+      setSettingsError("This role cannot be deleted.");
+      return;
+    }
+
+    if (role.isNew) {
+      const nextRoles = roles.filter((_, roleIndex) => roleIndex !== index);
+      setRoles(nextRoles);
+      setActiveRoleIndex((current) => clampRoleIndex(nextRoles, Math.max(0, current - (current >= index ? 1 : 0))));
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete the role "${role.name}"?`);
+    if (!confirmed) return;
+
+    setRoleSaving(true);
+    try {
+      const response = await fetch(`/api/settings/roles?id=${encodeURIComponent(role.id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Unable to delete role");
+      }
+
+      const nextRoles = data.roles || [];
+      setRoles(nextRoles);
+      setSavedRoles(nextRoles);
+      setActiveRoleIndex((current) => clampRoleIndex(nextRoles, Math.max(0, current - (current >= index ? 1 : 0))));
+      setNewUser((current) => ({
+        ...current,
+        roleId: nextRoles.some((item) => item.id === current.roleId) ? current.roleId : nextRoles[0]?.id || "",
+      }));
+      setRoleMessage(`Role "${role.name}" deleted.`);
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setRoleSaving(false);
+    }
+  }
+
   async function saveRoleConfiguration() {
     setRoleSaving(true);
     setRoleMessage("");
@@ -331,15 +385,26 @@ export default function LabAdminSettingsPage() {
 
           <div className="settings-role-list">
             {roles.map((role, index) => (
-              <button
-                type="button"
-                className={activeRoleIndex === index ? "active" : ""}
-                key={role.id || role.name}
-                onClick={() => setActiveRoleIndex(index)}
-              >
-                <strong>{role.name}</strong>
-                <span>{role.permissions.includes("*") ? "All permissions" : `${role.permissions.length} permissions`}</span>
-              </button>
+              <div className="settings-role-row" key={role.id || role.name}>
+                <button
+                  type="button"
+                  className={activeRoleIndex === index ? "active" : ""}
+                  onClick={() => setActiveRoleIndex(index)}
+                >
+                  <strong>{role.name}</strong>
+                  <span>{role.permissions.includes("*") ? "All permissions" : `${role.permissions.length} permissions`}</span>
+                </button>
+                {!role.isDefaultAdmin && !role.isSystemRole && (
+                  <button
+                    type="button"
+                    className="settings-role-delete"
+                    onClick={() => deleteRole(role, index)}
+                    disabled={roleSaving}
+                  >
+                    {Icons.trash || "Delete"} Delete
+                  </button>
+                )}
+              </div>
             ))}
           </div>
 
