@@ -5,7 +5,7 @@ import { Icons } from "@/app/components/Icons";
 
 const EMPTY_FORM = {
   name: "",
-  specialty: "",
+  speciality: "",
   degree: "",
   experience: "",
   mciNumber: "",
@@ -51,7 +51,7 @@ export default function DoctorRegistration() {
     else if (form.name.trim().length < 2) newErrors.name = "Name must be at least 2 characters";
     else if (form.name.length > 50) newErrors.name = "Name must not exceed 50 characters";
     else if (!/^[A-Za-z .]+$/.test(form.name)) newErrors.name = "Only letters, spaces, and periods allowed";
-    if (!form.specialty.trim()) newErrors.specialty = "Specialty is required";
+    if (!form.speciality.trim()) newErrors.speciality = "speciality is required";
     if (!form.degree.trim()) newErrors.degree = "Qualification/Degree is required";
     else if (!/^[A-Za-z .,]+$/.test(form.degree)) newErrors.degree = "Only letters, spaces, and periods/commas allowed";
     if (!form.experience.toString().trim()) newErrors.experience = "Experience is required";
@@ -181,14 +181,14 @@ export default function DoctorRegistration() {
                 {errors.mciNumber && <div className="lims-error-text">{errors.mciNumber}</div>}
               </div>
               <div className="col-md-4">
-                <label className="lims-label">Specialty <span className="required">*</span></label>
+                <label className="lims-label">speciality <span className="required">*</span></label>
                 <select 
-                  name="specialty" 
-                  className={`lims-select ${errors.specialty ? 'invalid' : ''}`} 
-                  value={form.specialty} 
+                  name="speciality" 
+                  className={`lims-select ${errors.speciality ? 'invalid' : ''}`} 
+                  value={form.speciality} 
                   onChange={handleChange}
                 >
-                  <option value="">Select Specialty</option>
+                  <option value="">Select speciality</option>
                   <option value="Cardiologist">Cardiologist</option>
                   <option value="Pathologist">Pathologist</option>
                   <option value="Hematologist">Hematologist</option>
@@ -206,7 +206,7 @@ export default function DoctorRegistration() {
                   <option value="Endocrinologist">Endocrinologist</option>
                   <option value="Other">Other</option>
                 </select>
-                {errors.specialty && <div className="lims-error-text">{errors.specialty}</div>}
+                {errors.speciality && <div className="lims-error-text">{errors.speciality}</div>}
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Degree/Qualification <span className="required">*</span></label>

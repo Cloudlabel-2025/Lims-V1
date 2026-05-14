@@ -14,12 +14,12 @@ export async function POST(req) {
     const { Doctor } = await getTenantModels(tenantId);
     const body = await req.json();
 
-    const { name, specialty, degree, experience, mciNumber, phone, clinicName, location, clinicAddress } = body;
+    const { name, speciality, degree, experience, mciNumber, phone, clinicName, location, clinicAddress } = body;
 
     // Required field validation
     const missing = [];
     if (!name)           missing.push("Doctor Name");
-    if (!specialty)      missing.push("Specialty");
+    if (!speciality)      missing.push("speciality");
     if (!degree)         missing.push("Degree/Qualification");
     if (experience === undefined || experience === "") missing.push("Experience");
 
@@ -128,7 +128,7 @@ export async function GET(req) {
         { phone: { $regex: search, $options: "i" } },
         { doctorId: { $regex: search, $options: "i" } },
         { mciNumber: { $regex: search, $options: "i" } },
-        { specialty: { $regex: search, $options: "i" } },
+        { speciality: { $regex: search, $options: "i" } },
       ];
     }
 

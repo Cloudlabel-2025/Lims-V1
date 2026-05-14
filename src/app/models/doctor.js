@@ -25,7 +25,7 @@ const doctorSchema = new mongoose.Schema({
         maxlength: 50,
         match: /^[A-Za-z .]+$/
     },
-    specialty: {
+    speciality: {
         type: String,
         required: true
     },
