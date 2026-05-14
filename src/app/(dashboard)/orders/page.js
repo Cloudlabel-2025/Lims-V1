@@ -107,7 +107,7 @@ export default function OrdersPage() {
 
   const openCloseModal = async (order) => {
     setSelectedOrder(order);
-    const netPayable = (order.totalAmount || 0) - (order.commissionAmount || 0);
+    const netPayable = order.totalAmount || 0;
     setPayment({ cash: netPayable, card: 0, online: 0 });
     
     // Initialize results structure
@@ -281,19 +281,19 @@ export default function OrdersPage() {
                     }}>
                       {order.referralDoctor && order.commissionAmount > 0 && (
                         <div style={{ 
-                          background: "var(--warning-50)", 
+                          background: "var(--primary-50)", 
                           padding: "8px 12px", 
                           borderRadius: "8px", 
                           marginBottom: "12px",
-                          fontSize: "12px"
+                          fontSize: "12px",
+                          border: "1px solid var(--primary-100)"
                         }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                            <span style={{ color: "var(--text-secondary)" }}>Ref. Dr. {order.referralDoctor?.name}</span>
-                            <span style={{ color: "var(--warning-700)", fontWeight: "700" }}>-₹{order.commissionAmount}</span>
-                          </div>
                           <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ color: "var(--text-muted)" }}>Net Lab Revenue</span>
-                            <span style={{ color: "var(--text-primary)", fontWeight: "600" }}>₹{order.totalAmount - order.commissionAmount}</span>
+                            <span style={{ color: "var(--primary-700)", fontWeight: "500" }}>Referral Commission</span>
+                            <span style={{ color: "var(--primary-700)", fontWeight: "700" }}>₹{order.commissionAmount}</span>
+                          </div>
+                          <div style={{ fontSize: "10px", color: "var(--primary-600)", marginTop: "2px" }}>
+                            Payable to Dr. {order.referralDoctor?.name}
                           </div>
                         </div>
                       )}
@@ -469,7 +469,7 @@ export default function OrdersPage() {
         </div>
       )}
       {showCloseModal && selectedOrder && (() => {
-        const netPayable = (selectedOrder.totalAmount || 0) - (selectedOrder.commissionAmount || 0);
+        const netPayable = selectedOrder.totalAmount || 0;
         const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
         const remaining = netPayable - totalPaid;
         return (
@@ -494,24 +494,15 @@ export default function OrdersPage() {
 
                   {/* Bill Summary */}
                   <div style={{ background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: "var(--radius-md)", padding: "16px", marginBottom: "18px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", color: "var(--text-secondary)" }}>
-                      <span>Gross Amount</span>
-                      <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>₹{selectedOrder.totalAmount}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "14px" }}>
+                      <span style={{ fontWeight: "700", color: "var(--text-primary)" }}>Total Amount</span>
+                      <span style={{ fontWeight: "800", fontSize: "20px", color: "var(--primary-dark)" }}>₹{netPayable}</span>
                     </div>
                     {selectedOrder.commissionAmount > 0 && (
-                      <>
-                        <div style={{ height: "1px", background: "var(--primary-200)", margin: "6px 0", opacity: 0.5 }} />
-                        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px" }}>
-                          <span style={{ color: "var(--text-secondary)" }}>Commission · Dr. {selectedOrder.referralDoctor?.name}</span>
-                          <span style={{ fontWeight: "600", color: "#dc2626" }}>−₹{selectedOrder.commissionAmount}</span>
-                        </div>
-                      </>
+                      <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--primary-200)", fontSize: "11px", color: "var(--primary-700)" }}>
+                        Includes internal commission of <strong>₹{selectedOrder.commissionAmount}</strong> for Dr. {selectedOrder.referralDoctor?.name}
+                      </div>
                     )}
-                    <div style={{ height: "1px", background: "var(--primary-200)", margin: "6px 0", opacity: 0.5 }} />
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-                      <span style={{ fontWeight: "700", fontSize: "13px", color: "var(--text-primary)" }}>Patient Payable</span>
-                      <span style={{ fontWeight: "800", fontSize: "18px", color: "var(--primary-dark)" }}>₹{netPayable}</span>
-                    </div>
                   </div>
 
                   {/* Split Payments */}

@@ -236,6 +236,7 @@ export default function LoginPage({
                       value={tenantId}
                       onChange={(e) => setTenantId(e.target.value)}
                       autoComplete={`${credentialScope} organization`}
+                      suppressHydrationWarning
                     />
                   </div>
                 </div>
@@ -268,6 +269,7 @@ export default function LoginPage({
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete={`${credentialScope} username`}
                     required
+                    suppressHydrationWarning
                   />
                 </div>
               </div>
@@ -289,6 +291,7 @@ export default function LoginPage({
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete={`${credentialScope} current-password`}
                     required
+                    suppressHydrationWarning
                   />
                   <button
                     type="button"
@@ -313,7 +316,7 @@ export default function LoginPage({
                   <span className="login-checkbox-custom" />
                   Remember me
                 </label>
-                <button type="button" className="login-forgot">
+                <button type="button" className="login-forgot" suppressHydrationWarning>
                   Forgot password?
                 </button>
               </div>
@@ -324,6 +327,7 @@ export default function LoginPage({
                 className="login-submit"
                 disabled={loading}
                 id="login-submit-btn"
+                suppressHydrationWarning
               >
                 {loading ? (
                   <>
@@ -343,7 +347,7 @@ export default function LoginPage({
             <div className="login-form-footer">
               <p>
                 Don&apos;t have an account?{" "}
-                <button type="button" className="login-link">Contact Admin</button>
+                <button type="button" className="login-link" suppressHydrationWarning>Contact Admin</button>
               </p>
             </div>
           </div>
