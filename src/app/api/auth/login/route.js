@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import connectMasterDB from "@/app/lib/master-db";
 import { createSessionToken, setSessionCookie } from "@/app/lib/session";
+import { buildTenantUrl } from "@/app/lib/subdomain";
 import { connectTenantDB } from "@/app/lib/tenant-db";
 import { getTenantIdFromRequest, normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { verifyPassword } from "@/app/lib/password";
@@ -51,6 +52,7 @@ export async function POST(req) {
     }
 
     return loginTenant({
+      req,
       tenantId,
       loginId,
       password,
@@ -105,7 +107,7 @@ async function loginDeveloper({ email, password, rememberMe }) {
   return response;
 }
 
-async function loginTenant({ tenantId, loginId, password, rememberMe }) {
+async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
   const tenantConnection = await connectTenantDB(tenantId);
   const User = getUserModel(tenantConnection);
   const Role = getRoleModel(tenantConnection);
@@ -143,6 +145,8 @@ async function loginTenant({ tenantId, loginId, password, rememberMe }) {
   const response = NextResponse.json({
     userType: "tenant",
     tenantId,
+    redirectUrl: buildTenantUrl(tenantId, req.url, "/dashboard"),
+    loginUrl: buildTenantUrl(tenantId, req.url),
     user: {
       id: user._id,
       userId: user.userId,

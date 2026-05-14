@@ -100,10 +100,6 @@ export const LabSchema = new mongoose.Schema(
         trim: true,
         lowercase: true,
       },
-      password: {
-        type: String,
-        trim: true,
-      },
       updatedAt: {
         type: Date,
       },

@@ -114,7 +114,7 @@ export default function LoginPage({
       }
 
       if (onLogin) onLogin(data.user);
-      router.push(userType === "developer" ? "/developer/dashboard" : "/dashboard");
+      router.push(userType === "developer" ? "/developer/dashboard" : data.redirectUrl || "/dashboard");
       router.refresh();
     } catch {
       setError("Login failed. Please try again.");

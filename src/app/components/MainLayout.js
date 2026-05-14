@@ -4,6 +4,35 @@ import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { canAccessPath, getFirstAllowedHref } from "@/app/lib/client-rbac";
+import { applyTheme } from "@/app/components/ThemeProvider";
+
+function isCurrentTenantHost(tenantId) {
+  if (typeof window === "undefined" || !tenantId) return false;
+
+  const hostname = window.location.hostname.toLowerCase();
+  return hostname === `${tenantId}.localhost` || hostname.startsWith(`${tenantId}.`);
+}
+
+function buildTenantQueryPath(pathname, tenantId) {
+  if (typeof window === "undefined" || !tenantId || isCurrentTenantHost(tenantId)) {
+    return pathname;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  params.set("tenantId", tenantId);
+  return `${pathname}?${params.toString()}`;
+}
+
+function buildTenantLoginFallback() {
+  if (typeof window === "undefined") return "/";
+
+  const params = new URLSearchParams(window.location.search);
+  const tenantId = params.get("tenantId");
+  if (!tenantId) return "/";
+
+  params.set("access", "lab");
+  return `/?${params.toString()}`;
+}
 
 export default function MainLayout({ children }) {
   const router = useRouter();
@@ -30,11 +59,11 @@ export default function MainLayout({ children }) {
               if (!cancelled) setTheme(themeData.theme);
             }
           } else {
-            router.replace("/");
+            router.replace(buildTenantLoginFallback());
           }
         }
       } catch {
-        if (!cancelled) router.replace("/");
+        if (!cancelled) router.replace(buildTenantLoginFallback());
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -49,17 +78,28 @@ export default function MainLayout({ children }) {
 
   useEffect(() => {
     if (loading || !user || !theme) return;
+    applyTheme(theme);
+
+    if (user.userType === "tenant" && user.tenantId && !isCurrentTenantHost(user.tenantId)) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tenantId") !== user.tenantId) {
+        router.replace(buildTenantQueryPath(pathname, user.tenantId));
+        return;
+      }
+    }
+
     if (canAccessPath(user, theme, pathname)) return;
 
     const firstAllowedHref = getFirstAllowedHref(user, theme);
     if (firstAllowedHref && pathname === "/dashboard") {
-      router.replace(firstAllowedHref);
+      router.replace(buildTenantQueryPath(firstAllowedHref, user.tenantId));
     }
   }, [loading, pathname, router, theme, user]);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    router.push("/");
+    const response = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    const data = await response.json().catch(() => ({}));
+    router.push(data.redirectUrl || buildTenantLoginFallback());
     router.refresh();
   };
 

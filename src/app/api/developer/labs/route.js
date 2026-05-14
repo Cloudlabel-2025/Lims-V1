@@ -17,6 +17,7 @@ import { getUserModel } from "@/app/models/tenant/User";
 import { getVisitModel } from "@/app/models/visit";
 import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
+import { buildTenantUrl } from "@/app/lib/subdomain";
 
 const tenantIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const connectionOptions = {
@@ -92,27 +93,7 @@ function normalizeCloudinaryLogo(value, fallbackAltText) {
 }
 
 function buildLabLoginUrl(req, tenantId) {
-  const url = new URL(req.url);
-  const rootDomain = cleanString(process.env.ROOT_DOMAIN)
-    .replace(/^https?:\/\//i, "")
-    .replace(/\/.*$/, "")
-    .toLowerCase();
-
-  if (rootDomain) {
-    const protocol = cleanString(process.env.PUBLIC_APP_PROTOCOL || "https").replace(/:$/, "");
-    url.protocol = `${protocol}:`;
-    url.host = `${tenantId}.${rootDomain}`;
-    url.port = "";
-    url.pathname = "/";
-    url.search = "";
-    return url.toString();
-  }
-
-  url.pathname = "/";
-  url.search = "";
-  url.searchParams.set("tenantId", tenantId);
-  url.searchParams.set("access", "lab");
-  return url.toString();
+  return buildTenantUrl(tenantId, req.url);
 }
 
 async function initializeTenantCollections(tenantConnection) {
@@ -364,7 +345,6 @@ export async function POST(req) {
 
     lab.adminAccess = {
       email: adminUser.email,
-      password: adminPassword,
       updatedAt: new Date(),
     };
     await lab.save();

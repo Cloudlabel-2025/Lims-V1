@@ -16,14 +16,26 @@ function slugifySubdomain(value) {
 function getPreviewUrl(subdomain) {
   if (!subdomain) return "";
 
+  if (typeof window !== "undefined") {
+    const { hostname, port, protocol } = window.location;
+    const isLocal =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname.endsWith(".localhost");
+
+    if (isLocal) {
+      const host = port ? `${subdomain}.localhost:${port}` : `${subdomain}.localhost`;
+      return `${protocol}//${host}/`;
+    }
+  }
+
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
   const protocol = process.env.NEXT_PUBLIC_APP_PROTOCOL || "https";
 
   if (rootDomain) {
     return `${protocol.replace(/:$/, "")}://${subdomain}.${rootDomain}/`;
   }
-
-  if (typeof window === "undefined") return "";
 
   const url = new URL(window.location.origin);
   url.searchParams.set("tenantId", subdomain);
