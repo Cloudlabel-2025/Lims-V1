@@ -197,8 +197,8 @@ export default function DoctorList() {
 
                 <div style={{ margin: '12px 0 20px', padding: '14px 16px', background: 'rgba(255,255,255,0.12)', borderRadius: '14px', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '10px' }}>
-                    <div style={{ fontSize: '11px', opacity: 0.9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Specialty</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{selectedDoctor.specialty}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.04em' }}>speciality</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{selectedDoctor.speciality}</div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '10px' }}>
                     <div style={{ fontSize: '11px', opacity: 0.9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Qualification</div>
@@ -402,7 +402,7 @@ export default function DoctorList() {
                     </div>
                     <div style={{ marginTop: "15px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-secondary)" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <span><strong>{doc.specialty}</strong></span>
+                        <span><strong>{doc.speciality}</strong></span>
                         <span style={{ opacity: 0.8 }}>{doc.experience} Yrs Exp</span>
                       </div>
                       <span style={{ 
@@ -461,7 +461,7 @@ export default function DoctorList() {
                 <thead>
                   <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Doctor Details</th>
-                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Specialty</th>
+                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>speciality</th>
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Experience</th>
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Pending Payout</th>
                     <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Status</th>
@@ -504,7 +504,7 @@ export default function DoctorList() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{doc.specialty}</td>
+                        <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{doc.speciality}</td>
                         <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{doc.experience} Yrs</td>
                         <td style={{ padding: "12px 20px" }}>
                           <strong style={{ color: doc.pendingPayout > 0 ? "var(--danger)" : "var(--text-muted)" }}>₹{doc.pendingPayout || 0}</strong>
@@ -558,7 +558,7 @@ export default function DoctorList() {
           <div style={{ textAlign: "center", padding: "60px", background: "#fff", borderRadius: "16px", border: "1px solid var(--border)" }}>
             <div style={{ fontSize: "32px", color: "var(--text-muted)", marginBottom: "12px" }}>{Icons.search}</div>
             <h5 style={{ color: "var(--text-primary)" }}>No doctors found</h5>
-            <p style={{ color: "var(--text-muted)" }}>Try searching for a different name or specialty.</p>
+            <p style={{ color: "var(--text-muted)" }}>Try searching for a different name or speciality.</p>
           </div>
         )}
       </div>
