@@ -3,33 +3,31 @@ import { requireTenantSession } from "@/app/lib/auth";
 
 export async function POST(req) {
   try {
-    const auth = requireTenantSession(req, "orders.view");
+    const auth = requireTenantSession(req, "billing.collect");
     if (auth.error) return auth.error;
 
     const { tenantId } = auth;
-    const { LabOrder, Doctor, TestReport, TestDefinition } = await getTenantModels(tenantId);
+    const { BillingRecord, Doctor, TestReport, TestDefinition } = await getTenantModels(tenantId);
     
-    const { orderId, payment, results } = await req.json();
+    const { billingRecordId, payment, results } = await req.json();
 
-    if (!orderId) {
-      return Response.json({ error: "Order ID is required" }, { status: 400 });
+    if (!billingRecordId) {
+      return Response.json({ error: "Billing record ID is required" }, { status: 400 });
     }
 
-    const order = await LabOrder.findById(orderId);
-    if (!order) {
-      return Response.json({ error: "Order not found" }, { status: 404 });
+    const billingRecord = await BillingRecord.findById(billingRecordId);
+    if (!billingRecord) {
+      return Response.json({ error: "Billing record not found" }, { status: 404 });
     }
 
-    if (order.billingStatus === "paid") {
-      return Response.json({ error: "Order is already paid" }, { status: 400 });
+    if (billingRecord.billingStatus === "paid") {
+      return Response.json({ error: "Bill is already paid" }, { status: 400 });
     }
 
-    // 1. Mark order as paid and save payment details
-    order.billingStatus = "paid";
-    order.status = "completed";
-    order.status = "completed";
+    billingRecord.billingStatus = "paid";
+    billingRecord.status = "completed";
     if (payment) {
-      order.paymentBreakdown = {
+      billingRecord.paymentBreakdown = {
         cash: Number(payment.cash) || 0,
         card: Number(payment.card) || 0,
         online: Number(payment.online) || 0,
@@ -38,7 +36,7 @@ export async function POST(req) {
 
     // 2. Process results if provided
     if (results) {
-      for (const item of order.items) {
+      for (const item of billingRecord.items) {
         const itemResults = results[item._id];
         if (itemResults && Object.keys(itemResults).length > 0) {
           const testDef = await TestDefinition.findById(item.testDefinition);
@@ -66,7 +64,7 @@ export async function POST(req) {
             });
 
             await TestReport.create({
-              patient: order.patient,
+              patient: billingRecord.patient,
               testDefinition: testDef._id,
               testSnapshot: item.testSnapshot,
               results: reportResults,
@@ -80,23 +78,22 @@ export async function POST(req) {
       }
     }
 
-    await order.save();
+    await billingRecord.save();
 
-    // 3. If there is a referral doctor and a commission, add it to their pendingPayout
-    if (order.referralDoctor && order.commissionAmount > 0) {
-      await Doctor.findByIdAndUpdate(order.referralDoctor, {
-        $inc: { pendingPayout: order.commissionAmount }
+    if (billingRecord.referralDoctor && billingRecord.commissionAmount > 0) {
+      await Doctor.findByIdAndUpdate(billingRecord.referralDoctor, {
+        $inc: { pendingPayout: billingRecord.commissionAmount }
       });
     }
 
     return Response.json({ 
       message: "Bill closed successfully", 
-      orderId: order.orderId,
-      paidAmount: order.totalAmount
+      billId: billingRecord.billId,
+      paidAmount: billingRecord.totalAmount
     });
 
   } catch (err) {
-    console.error("POST /api/orders/close error:", err);
+    console.error("POST /api/billing/settle error:", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }

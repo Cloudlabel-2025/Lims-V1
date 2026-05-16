@@ -184,7 +184,7 @@ export default function PatientRegistration() {
         setHasRefDoctor(false);
         setShowErrors(false);
         // Optionally redirect after a short delay
-        setTimeout(() => router.push("/orders"), 2500);
+        setTimeout(() => router.push("/billing"), 2500);
       } else {
         setStatus({ type: "danger", message: data.error || "Something went wrong." });
       }

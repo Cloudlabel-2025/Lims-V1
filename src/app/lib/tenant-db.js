@@ -3,7 +3,7 @@ import { getDoctorModel } from "@/app/models/doctor";
 import { getPatientModel } from "@/app/models/patient";
 import { getVisitModel } from "@/app/models/visit";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
-import { getLabOrderModel } from "@/app/models/tenant/LabOrder";
+import { getBillingRecordModel } from "@/app/models/tenant/BillingRecord";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
 import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
@@ -91,7 +91,7 @@ export async function getTenantModels(tenantId) {
     connection,
     Doctor: getDoctorModel(connection),
     Patient: getPatientModel(connection),
-    LabOrder: getLabOrderModel(connection),
+    BillingRecord: getBillingRecordModel(connection),
     Role: getRoleModel(connection),
     Sample: getSampleModel(connection),
     TestCategory: getTestCategoryModel(connection),

@@ -6,13 +6,13 @@ import { hasPermission } from "@/app/lib/client-rbac";
 import { useCurrentUser } from "@/app/lib/use-current-user";
 import MultiSelect from "@/app/components/MultiSelect";
 
-export default function OrdersPage() {
+export default function BillingPage() {
   const user = useCurrentUser();
   const [activeTab, setActiveTab] = useState("pending");
   const [patients, setPatients] = useState([]);
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [billingRecords, setBillingRecords] = useState([]);
   const [patient, setPatient] = useState("");
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState("routine");
@@ -22,12 +22,15 @@ export default function OrdersPage() {
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedBillingRecord, setSelectedBillingRecord] = useState(null);
   const [payment, setPayment] = useState({ cash: 0, card: 0, online: 0 });
-  const [results, setResults] = useState({}); // { [orderItemId]: { [paramKey]: value } }
+  const [results, setResults] = useState({}); // { [billingItemId]: { [paramKey]: value } }
   const [testDetails, setTestDetails] = useState({}); // { [testDefId]: parameters }
 
-  const pendingOrders = useMemo(() => orders.filter(o => o.billingStatus !== "paid"), [orders]);
+  const pendingBills = useMemo(
+    () => billingRecords.filter((billingRecord) => billingRecord.billingStatus !== "paid"),
+    [billingRecords]
+  );
   
   const selectedTotal = useMemo(() => {
     let total = 0;
@@ -43,30 +46,30 @@ export default function OrdersPage() {
     return total;
   }, [tests, packages, selectedTests]);
 
-  const canCreateOrders = hasPermission(user, "orders.create");
+  const canCreateBilling = hasPermission(user, "billing.create");
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [patientRes, testRes, pkgRes, orderRes] = await Promise.all([
+      const [patientRes, testRes, pkgRes, billingRes] = await Promise.all([
         fetch("/api/patient", { credentials: "include" }),
         fetch("/api/tests/definitions?status=active", { credentials: "include" }),
         fetch("/api/tests/packages", { credentials: "include" }),
-        fetch("/api/orders", { credentials: "include" }),
+        fetch("/api/billing", { credentials: "include" }),
       ]);
       
-      const [patientData, testData, pkgData, orderData] = await Promise.all([
+      const [patientData, testData, pkgData, billingData] = await Promise.all([
         patientRes.json(),
         testRes.json(),
         pkgRes.json(),
-        orderRes.json(),
+        billingRes.json(),
       ]);
 
       setPatients(Array.isArray(patientData) ? patientData : []);
       setTests(testData.tests || []);
       setPackages(pkgData.packages || []);
-      setOrders(orderData.orders || []);
+      setBillingRecords(billingData.billingRecords || []);
     } catch (err) {
       setError("Failed to load data. Please refresh.");
     } finally {
@@ -78,21 +81,21 @@ export default function OrdersPage() {
     loadData();
   }, [loadData]);
 
-  async function createOrder(event) {
+  async function createBill(event) {
     event.preventDefault();
     setSaving(true);
     setError("");
 
     try {
-      const response = await fetch("/api/orders", {
+      const response = await fetch("/api/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ patient, tests: selectedTests, priority, notes }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to create order");
+      if (!response.ok) throw new Error(data.error || "Unable to create bill");
 
-      setOrders((current) => [data.order, ...current]);
+      setBillingRecords((current) => [data.billingRecord, ...current]);
       setPatient("");
       setSelectedTests([]);
       setPriority("routine");
@@ -105,16 +108,16 @@ export default function OrdersPage() {
     }
   }
 
-  const openCloseModal = async (order) => {
-    setSelectedOrder(order);
-    const netPayable = order.totalAmount || 0;
+  const openCloseModal = async (billingRecord) => {
+    setSelectedBillingRecord(billingRecord);
+    const netPayable = billingRecord.totalAmount || 0;
     setPayment({ cash: netPayable, card: 0, online: 0 });
     
     // Initialize results structure
     const initialResults = {};
     const details = { ...testDetails };
 
-    for (const item of order.items || []) {
+    for (const item of billingRecord.items || []) {
       const defId = item.testDefinition;
       if (!details[defId]) {
         try {
@@ -138,18 +141,18 @@ export default function OrdersPage() {
 
   const handleCloseBill = async () => {
     const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
-    if (totalPaid < selectedOrder.totalAmount) {
-      if (!confirm(`Total paid (₹${totalPaid}) is less than bill amount (₹${selectedOrder.totalAmount}). Proceed?`)) return;
+    if (totalPaid < selectedBillingRecord.totalAmount) {
+      if (!confirm(`Total paid (₹${totalPaid}) is less than bill amount (₹${selectedBillingRecord.totalAmount}). Proceed?`)) return;
     }
 
     setClosing(true);
     try {
-      const res = await fetch("/api/orders/close", {
+      const res = await fetch("/api/billing/settle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ 
-          orderId: selectedOrder._id,
+          billingRecordId: selectedBillingRecord._id,
           payment,
           results
         })
@@ -157,7 +160,13 @@ export default function OrdersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to close bill");
 
-      setOrders(current => current.map(o => o._id === selectedOrder._id ? { ...o, billingStatus: "paid" } : o));
+      setBillingRecords((current) =>
+        current.map((billingRecord) =>
+          billingRecord._id === selectedBillingRecord._id
+            ? { ...billingRecord, billingStatus: "paid" }
+            : billingRecord
+        )
+      );
       setShowCloseModal(false);
     } catch (err) {
       alert(err.message);
@@ -174,7 +183,7 @@ export default function OrdersPage() {
         <div>
           <p className="module-kicker">Billing & Revenue</p>
           <h1>Billing Center</h1>
-          <span>Manage patient payments, commissions, and order tracking.</span>
+          <span>Manage patient payments, commissions, and billing workflow.</span>
         </div>
         <div className="module-actions">
           <button className="dash-btn-secondary" onClick={loadData}>
@@ -190,8 +199,8 @@ export default function OrdersPage() {
         marginBottom: "24px" 
       }}>
         {[
-          { id: "pending", label: "Pending Payments", count: pendingOrders.length },
-          { id: "create", label: "Create New Bill", hide: !canCreateOrders },
+          { id: "pending", label: "Pending Payments", count: pendingBills.length },
+          { id: "create", label: "Create New Bill", hide: !canCreateBilling },
           { id: "history", label: "Billing History" }
         ].map(tab => !tab.hide && (
           <button 
@@ -229,18 +238,18 @@ export default function OrdersPage() {
       {activeTab === "pending" && (
         <div className="module-grid" style={{ gridTemplateColumns: "1fr" }}>
           <div className="test-card-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", gap: "20px" }}>
-            {pendingOrders.length === 0 ? (
+            {pendingBills.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px", color: "var(--text-muted)", gridColumn: "1 / -1" }}>
                 {Icons.checkCircle}
                 <p style={{ marginTop: "12px" }}>No pending payments. All clear!</p>
               </div>
             ) : (
-              pendingOrders.map((order) => (
-                <article key={order._id} className="form-card" style={{ padding: "0", overflow: "hidden" }}>
+              pendingBills.map((billingRecord) => (
+                <article key={billingRecord._id} className="form-card" style={{ padding: "0", overflow: "hidden" }}>
                   <div className="form-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <h6 style={{ marginBottom: "2px" }}>{order.patient?.name || "Unknown Patient"}</h6>
-                      <small style={{ color: "var(--text-muted)" }}>{order.orderId} · {order.patient?.patientId}</small>
+                      <h6 style={{ marginBottom: "2px" }}>{billingRecord.patient?.name || "Unknown Patient"}</h6>
+                      <small style={{ color: "var(--text-muted)" }}>{billingRecord.billId} · {billingRecord.patient?.patientId}</small>
                     </div>
                     <span style={{ 
                       background: "var(--warning-50)", 
@@ -256,14 +265,14 @@ export default function OrdersPage() {
                         <small style={{ color: "var(--text-muted)", fontWeight: "600" }}>INVESTIGATIONS</small>
                         <span style={{ 
                             fontSize: "11px", 
-                            color: order.items?.every(i => i.status === "completed") ? "var(--success)" : "var(--primary)",
+                            color: billingRecord.items?.every(i => i.status === "completed") ? "var(--success)" : "var(--primary)",
                             fontWeight: "700"
                         }}>
-                            {order.items?.filter(i => i.status === "completed").length || 0} / {order.items?.length || 0} READY
+                            {billingRecord.items?.filter(i => i.status === "completed").length || 0} / {billingRecord.items?.length || 0} READY
                         </span>
                     </div>
                     <div style={{ marginBottom: "16px" }}>
-                      {order.items?.map((item, i) => (
+                      {billingRecord.items?.map((item, i) => (
                         <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
                           <span style={{ color: "var(--text)", display: "flex", alignItems: "center", gap: "6px" }}>
                             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: item.status === "completed" ? "var(--success)" : "var(--border)" }}></div>
@@ -279,7 +288,7 @@ export default function OrdersPage() {
                       borderTop: "1px dashed var(--border)", 
                       paddingTop: "12px"
                     }}>
-                      {order.referralDoctor && order.commissionAmount > 0 && (
+                      {billingRecord.referralDoctor && billingRecord.commissionAmount > 0 && (
                         <div style={{ 
                           background: "var(--primary-50)", 
                           padding: "8px 12px", 
@@ -290,21 +299,21 @@ export default function OrdersPage() {
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between" }}>
                             <span style={{ color: "var(--primary-700)", fontWeight: "500" }}>Referral Commission</span>
-                            <span style={{ color: "var(--primary-700)", fontWeight: "700" }}>₹{order.commissionAmount}</span>
+                            <span style={{ color: "var(--primary-700)", fontWeight: "700" }}>₹{billingRecord.commissionAmount}</span>
                           </div>
                           <div style={{ fontSize: "10px", color: "var(--primary-600)", marginTop: "2px" }}>
-                            Payable to Dr. {order.referralDoctor?.name}
+                            Payable to Dr. {billingRecord.referralDoctor?.name}
                           </div>
                         </div>
                       )}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <small style={{ color: "var(--text-muted)", display: "block" }}>Total Amount</small>
-                          <strong style={{ fontSize: "18px", color: "var(--primary-dark)" }}>₹{order.totalAmount || 0}</strong>
+                          <strong style={{ fontSize: "18px", color: "var(--primary-dark)" }}>₹{billingRecord.totalAmount || 0}</strong>
                         </div>
                         <button 
                           className="dash-btn-primary" 
-                          onClick={() => openCloseModal(order)}
+                          onClick={() => openCloseModal(billingRecord)}
                           disabled={closing}
                           style={{ padding: "8px 20px" }}
                         >
@@ -327,7 +336,7 @@ export default function OrdersPage() {
               <h2>New Investigation Bill</h2>
               <p>Register tests for existing patients.</p>
             </div>
-            <form className="module-form" onSubmit={createOrder}>
+            <form className="module-form" onSubmit={createBill}>
               <div className="module-form-grid">
                 <label>
                   Select Patient <span className="required">*</span>
@@ -389,16 +398,16 @@ export default function OrdersPage() {
           <aside className="module-panel">
              <div className="module-panel-header">
                <h2>Recently Created</h2>
-               <p>Quick view of latest orders</p>
+               <p>Quick view of latest bills</p>
              </div>
              <div className="test-card-list">
-               {orders.slice(0, 5).map(order => (
-                 <article key={order._id} className="test-card">
+               {billingRecords.slice(0, 5).map((billingRecord) => (
+                 <article key={billingRecord._id} className="test-card">
                    <div>
-                     <h3>{order.patient?.name}</h3>
-                     <span>{order.orderId} · ₹{order.totalAmount}</span>
+                     <h3>{billingRecord.patient?.name}</h3>
+                     <span>{billingRecord.billId} · ₹{billingRecord.totalAmount}</span>
                    </div>
-                   <strong className={order.billingStatus}>{order.billingStatus}</strong>
+                   <strong className={billingRecord.billingStatus}>{billingRecord.billingStatus}</strong>
                  </article>
                ))}
              </div>
@@ -410,13 +419,13 @@ export default function OrdersPage() {
         <div className="form-card" style={{ padding: "0", overflow: "hidden" }}>
           <div className="form-card-header">
             <h6 style={{ margin: 0 }}>Billing History</h6>
-            <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>All laboratory orders and payment statuses.</p>
+            <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>All laboratory bills and payment statuses.</p>
           </div>
           <div className="lims-table-container">
             <table className="lims-table" style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Order ID</th>
+                  <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill ID</th>
                   <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Patient Details</th>
                   <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Date</th>
                   <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Investigation(s)</th>
@@ -425,27 +434,27 @@ export default function OrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => (
-                  <tr key={order._id} style={{ borderBottom: "1px solid var(--border-light)", transition: "background 0.2s" }}>
+                {billingRecords.map((billingRecord) => (
+                  <tr key={billingRecord._id} style={{ borderBottom: "1px solid var(--border-light)", transition: "background 0.2s" }}>
                     <td style={{ padding: "14px 20px" }}>
-                      <span style={{ fontWeight: "700", color: "var(--primary)", fontSize: "13px" }}>{order.orderId}</span>
+                      <span style={{ fontWeight: "700", color: "var(--primary)", fontSize: "13px" }}>{billingRecord.billId}</span>
                     </td>
                     <td style={{ padding: "14px 20px" }}>
                       <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "14px" }}>{order.patient?.name || "N/A"}</span>
-                        <small style={{ color: "var(--text-muted)", fontSize: "11px" }}>ID: {order.patient?.patientId || "—"}</small>
+                        <span style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "14px" }}>{billingRecord.patient?.name || "N/A"}</span>
+                        <small style={{ color: "var(--text-muted)", fontSize: "11px" }}>ID: {billingRecord.patient?.patientId || "—"}</small>
                       </div>
                     </td>
                     <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
-                      {new Date(order.createdAt).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })}
+                      {new Date(billingRecord.createdAt).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
                       <span style={{ background: "var(--border-light)", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "600" }}>
-                        {order.items?.length || 0} Tests
+                        {billingRecord.items?.length || 0} Tests
                       </span>
                     </td>
                     <td style={{ padding: "14px 20px" }}>
-                      <strong style={{ color: "var(--text-primary)", fontSize: "14px" }}>₹{order.totalAmount || 0}</strong>
+                      <strong style={{ color: "var(--text-primary)", fontSize: "14px" }}>₹{billingRecord.totalAmount || 0}</strong>
                     </td>
                     <td style={{ padding: "14px 20px", textAlign: "center" }}>
                       <span style={{ 
@@ -454,11 +463,11 @@ export default function OrdersPage() {
                         borderRadius: "6px", 
                         fontSize: "11px", 
                         fontWeight: "700",
-                        background: order.billingStatus === "paid" ? "var(--success-50)" : "var(--warning-50)",
-                        color: order.billingStatus === "paid" ? "var(--success-700)" : "var(--warning-700)",
+                        background: billingRecord.billingStatus === "paid" ? "var(--success-50)" : "var(--warning-50)",
+                        color: billingRecord.billingStatus === "paid" ? "var(--success-700)" : "var(--warning-700)",
                         textTransform: "uppercase"
                       }}>
-                        {order.billingStatus}
+                        {billingRecord.billingStatus}
                       </span>
                     </td>
                   </tr>
@@ -468,8 +477,8 @@ export default function OrdersPage() {
           </div>
         </div>
       )}
-      {showCloseModal && selectedOrder && (() => {
-        const netPayable = selectedOrder.totalAmount || 0;
+      {showCloseModal && selectedBillingRecord && (() => {
+        const netPayable = selectedBillingRecord.totalAmount || 0;
         const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
         const remaining = netPayable - totalPaid;
         return (
@@ -480,7 +489,7 @@ export default function OrdersPage() {
             <div style={{ padding: "24px 28px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <h4 style={{ margin: 0, fontSize: "18px" }}>Finalize Settlement</h4>
-                <p style={{ margin: "4px 0 0", fontSize: "13px", color: "var(--text-muted)" }}>{selectedOrder.orderId} · {selectedOrder.patient?.name} · {selectedOrder.items?.length || 0} investigations</p>
+                <p style={{ margin: "4px 0 0", fontSize: "13px", color: "var(--text-muted)" }}>{selectedBillingRecord.billId} · {selectedBillingRecord.patient?.name} · {selectedBillingRecord.items?.length || 0} investigations</p>
               </div>
               <button onClick={() => setShowCloseModal(false)} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", transition: "all var(--duration-fast)" }}>{Icons.close}</button>
             </div>
@@ -498,9 +507,9 @@ export default function OrdersPage() {
                       <span style={{ fontWeight: "700", color: "var(--text-primary)" }}>Total Amount</span>
                       <span style={{ fontWeight: "800", fontSize: "20px", color: "var(--primary-dark)" }}>₹{netPayable}</span>
                     </div>
-                    {selectedOrder.commissionAmount > 0 && (
+                    {selectedBillingRecord.commissionAmount > 0 && (
                       <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--primary-200)", fontSize: "11px", color: "var(--primary-700)" }}>
-                        Includes internal commission of <strong>₹{selectedOrder.commissionAmount}</strong> for Dr. {selectedOrder.referralDoctor?.name}
+                        Includes internal commission of <strong>₹{selectedBillingRecord.commissionAmount}</strong> for Dr. {selectedBillingRecord.referralDoctor?.name}
                       </div>
                     )}
                   </div>
@@ -553,7 +562,7 @@ export default function OrdersPage() {
                   </div>
 
                   <div style={{ maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}>
-                    {(selectedOrder.items || []).map((item) => (
+                    {(selectedBillingRecord.items || []).map((item) => (
                       <div key={item._id} style={{ marginBottom: "14px", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
                         <div style={{ padding: "10px 14px", background: "var(--surface)", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)" }}>
                           <span style={{ fontWeight: "700", fontSize: "12px", color: "var(--text-primary)" }}>{item.testSnapshot?.name}</span>
@@ -610,3 +619,5 @@ export default function OrdersPage() {
     </div>
   );
 }
+
+

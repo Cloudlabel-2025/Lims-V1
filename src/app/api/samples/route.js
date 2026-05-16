@@ -17,7 +17,7 @@ export async function GET(req) {
     const { Sample } = await getTenantModels(auth.tenantId);
     const samples = await Sample.find(query)
       .populate("patient", "name patientId age gender phone")
-      .populate("order", "orderId priority status")
+      .populate("billingRecord", "billId priority status")
       .sort({ createdAt: -1 })
       .limit(150);
 

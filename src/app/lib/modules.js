@@ -24,10 +24,10 @@ export const availableLabModules = [
     href: "/tests",
   },
   {
-    id: "orders",
+    id: "billing",
     label: "Billing",
-    permission: "orders.view",
-    href: "/orders",
+    permission: "billing.view",
+    href: "/billing",
   },
   {
     id: "samples",
@@ -46,12 +46,6 @@ export const availableLabModules = [
     label: "Analytics",
     permission: "analytics.view",
     href: "/analytics",
-  },
-  {
-    id: "billing",
-    label: "Billing",
-    permission: "billing.view",
-    href: "/billing",
   },
   {
     id: "accounts",
@@ -73,7 +67,7 @@ export const availableLabModules = [
   },
 ];
 
-export const defaultLabModules = ["dashboard", "patients", "doctors", "tests", "orders", "samples", "reports"];
+export const defaultLabModules = ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports"];
 
 export function normalizeEnabledModules(value) {
   const allowed = new Set(availableLabModules.map((module) => module.id));

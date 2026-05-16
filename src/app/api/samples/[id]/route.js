@@ -5,7 +5,7 @@ function clean(value) {
   return String(value || "").trim();
 }
 
-function deriveOrderStatus(items) {
+function deriveBillingStatus(items) {
   if (items.every((item) => item.status === "reported")) return "completed";
   if (items.some((item) => item.status !== "sample-pending")) return "in-progress";
   return "open";
@@ -33,7 +33,7 @@ export async function PUT(req, { params }) {
       return Response.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const { Sample, LabOrder } = await getTenantModels(auth.tenantId);
+    const { Sample, BillingRecord } = await getTenantModels(auth.tenantId);
     const sample = await Sample.findById(id);
     if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
 
@@ -56,9 +56,9 @@ export async function PUT(req, { params }) {
 
     await sample.save();
 
-    const order = await LabOrder.findById(sample.order);
-    if (order) {
-      const item = order.items.id(sample.orderItemId);
+    const billingRecord = await BillingRecord.findById(sample.billingRecord);
+    if (billingRecord) {
+      const item = billingRecord.items.id(sample.billingItemId);
       if (item) {
         item.status =
           sample.status === "collected"
@@ -67,12 +67,12 @@ export async function PUT(req, { params }) {
               ? "processing"
               : sample.status;
       }
-      order.status = deriveOrderStatus(order.items);
-      await order.save();
+      billingRecord.status = deriveBillingStatus(billingRecord.items);
+      await billingRecord.save();
     }
 
     await sample.populate("patient", "name patientId age gender phone");
-    await sample.populate("order", "orderId priority status");
+    await sample.populate("billingRecord", "billId priority status");
 
     return Response.json({ sample });
   } catch (error) {

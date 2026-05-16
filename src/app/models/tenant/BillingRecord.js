@@ -24,7 +24,7 @@ async function getNextSequence(connection, name) {
   return counter.seq;
 }
 
-const OrderItemSchema = new mongoose.Schema(
+const BillingItemSchema = new mongoose.Schema(
   {
     testDefinition: {
       type: mongoose.Schema.Types.ObjectId,
@@ -49,9 +49,9 @@ const OrderItemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export const LabOrderSchema = new mongoose.Schema(
+export const BillingRecordSchema = new mongoose.Schema(
   {
-    orderId: {
+    billId: {
       type: String,
       unique: true,
       immutable: true,
@@ -64,7 +64,7 @@ export const LabOrderSchema = new mongoose.Schema(
       index: true,
     },
     items: {
-      type: [OrderItemSchema],
+      type: [BillingItemSchema],
       validate: {
         validator: (value) => Array.isArray(value) && value.length > 0,
         message: "At least one test is required",
@@ -117,16 +117,16 @@ export const LabOrderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-LabOrderSchema.pre("save", async function generateOrderId() {
-  if (this.orderId) return;
+BillingRecordSchema.pre("save", async function generateBillId() {
+  if (this.billId) return;
 
-  const seq = await getNextSequence(this.constructor.db, "labOrderId");
-  this.orderId = `ORD-${String(seq).padStart(6, "0")}`;
+  const seq = await getNextSequence(this.constructor.db, "billingRecordId");
+  this.billId = `BILL-${String(seq).padStart(6, "0")}`;
 });
 
-export function getLabOrderModel(connection = mongoose) {
-  return connection.models.LabOrder || connection.model("LabOrder", LabOrderSchema);
+export function getBillingRecordModel(connection = mongoose) {
+  return connection.models.BillingRecord || connection.model("BillingRecord", BillingRecordSchema);
 }
 
-const LabOrder = getLabOrderModel();
-export default LabOrder;
+const BillingRecord = getBillingRecordModel();
+export default BillingRecord;

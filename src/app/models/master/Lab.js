@@ -92,7 +92,7 @@ export const LabSchema = new mongoose.Schema(
     },
     enabledModules: {
       type: [String],
-      default: ["dashboard", "patients", "doctors", "tests", "reports"],
+      default: ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports"],
     },
     adminAccess: {
       email: {

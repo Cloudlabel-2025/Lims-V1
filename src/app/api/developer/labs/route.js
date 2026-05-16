@@ -7,7 +7,7 @@ import { getDoctorModel } from "@/app/models/doctor";
 import { getLabModel } from "@/app/models/master/Lab";
 import { getPatientModel } from "@/app/models/patient";
 import { getRoleTemplateModel } from "@/app/models/master/RoleTemplate";
-import { getLabOrderModel } from "@/app/models/tenant/LabOrder";
+import { getBillingRecordModel } from "@/app/models/tenant/BillingRecord";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
 import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
@@ -104,7 +104,7 @@ async function initializeTenantCollections(tenantConnection) {
     getTestReportModel(tenantConnection).init(),
     getUserModel(tenantConnection).init(),
     getPatientModel(tenantConnection).init(),
-    getLabOrderModel(tenantConnection).init(),
+    getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
     getSampleModel(tenantConnection).init(),
     getVisitModel(tenantConnection).init(),

@@ -11,7 +11,7 @@ const loginHighlightOptions = [
   "Patient Registration & Tracking",
   "Doctor & Referral Management",
   "Lab Test Definitions",
-  "Lab Orders & Billing Queue",
+  "Billing Queue",
   "Sample Collection Workflow",
   "Report Generation",
   "Billing & Payments",
@@ -526,3 +526,4 @@ export default function DeveloperEditLabPage({ params }) {
     </section>
   );
 }
+

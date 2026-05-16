@@ -1,782 +1,919 @@
 {
-  "permissions": [
-    {
-      "name": "View Platform Dashboard",
-      "key": "developer.dashboard.view",
-      "module": "developer-dashboard",
-      "action": "view",
-      "scope": "developer",
-      "category": "developer",
-      "description": "Access the developer platform dashboard.",
-      "sortOrder": 1
-    },
-    {
-      "name": "View Labs",
-      "key": "developer.labs.view",
-      "module": "developer-labs",
-      "action": "view",
-      "scope": "developer",
-      "category": "developer-labs",
-      "description": "View all labs registered on the platform.",
-      "sortOrder": 2
-    },
-    {
-      "name": "Create Labs",
-      "key": "developer.labs.create",
-      "module": "developer-labs",
-      "action": "create",
-      "scope": "developer",
-      "category": "developer-labs",
-      "dependencies": ["developer.labs.view"],
-      "description": "Create new lab tenants and master lab records.",
-      "isDangerous": true,
-      "sortOrder": 3
-    },
-    {
-      "name": "Update Labs",
-      "key": "developer.labs.update",
-      "module": "developer-labs",
-      "action": "update",
-      "scope": "developer",
-      "category": "developer-labs",
-      "dependencies": ["developer.labs.view"],
-      "description": "Update lab profile, branding, connection, and plan details.",
-      "isDangerous": true,
-      "sortOrder": 4
-    },
-    {
-      "name": "Suspend Labs",
-      "key": "developer.labs.suspend",
-      "module": "developer-labs",
-      "action": "suspend",
-      "scope": "developer",
-      "category": "developer-labs",
-      "dependencies": ["developer.labs.view"],
-      "description": "Suspend or reactivate lab tenants.",
-      "isDangerous": true,
-      "sortOrder": 5
-    },
-    {
-      "name": "Manage Subscriptions",
-      "key": "developer.subscriptions.manage",
-      "module": "developer-subscriptions",
-      "action": "manage",
-      "scope": "developer",
-      "category": "developer-billing",
-      "dependencies": ["developer.labs.view"],
-      "description": "Manage lab subscription plans and entitlements.",
-      "isDangerous": true,
-      "sortOrder": 6
-    },
-    {
-      "name": "Manage Permission Catalog",
-      "key": "developer.permissions.manage",
-      "module": "developer-permissions",
-      "action": "manage",
-      "scope": "developer",
-      "category": "developer-rbac",
-      "description": "Manage the master permission catalog.",
-      "isDangerous": true,
-      "sortOrder": 7
-    },
-    {
-      "name": "Manage Role Templates",
-      "key": "developer.roletemplates.manage",
-      "module": "developer-role-templates",
-      "action": "manage",
-      "scope": "developer",
-      "category": "developer-rbac",
-      "description": "Manage master tenant role templates.",
-      "isDangerous": true,
-      "sortOrder": 8
-    },
-    {
-      "name": "Create Initial Tenant Admin",
-      "key": "developer.tenantadmins.create",
-      "module": "developer-tenant-admins",
-      "action": "create",
-      "scope": "developer",
-      "category": "developer-users",
-      "dependencies": ["developer.labs.view"],
-      "description": "Create the first admin user for a tenant lab.",
-      "isDangerous": true,
-      "sortOrder": 9
-    },
-    {
-      "name": "Reset Tenant Admin Access",
-      "key": "developer.tenantadmins.reset",
-      "module": "developer-tenant-admins",
-      "action": "reset",
-      "scope": "developer",
-      "category": "developer-users",
-      "dependencies": ["developer.labs.view"],
-      "description": "Reset access for a tenant admin account.",
-      "isDangerous": true,
-      "sortOrder": 10
-    },
-    {
-      "name": "View Platform Audit Logs",
-      "key": "developer.audit.view",
-      "module": "developer-audit",
-      "action": "view",
-      "scope": "developer",
-      "category": "developer-audit",
-      "description": "View developer and tenant platform audit events.",
-      "sortOrder": 11
-    },
-    {
-      "name": "View Dashboard",
-      "key": "dashboard.view",
-      "module": "dashboard",
-      "action": "view",
-      "category": "core",
-      "description": "Access the main dashboard and summary metrics.",
-      "sortOrder": 10
-    },
-    {
-      "name": "View Patients",
-      "key": "patients.view",
-      "module": "patients",
-      "action": "view",
-      "category": "patient",
-      "description": "Search and view patient records.",
-      "sortOrder": 20
-    },
-    {
-      "name": "Register Patients",
-      "key": "patients.register",
-      "module": "patients",
-      "action": "register",
-      "category": "patient",
-      "dependencies": ["patients.view"],
-      "description": "Create new patient registrations.",
-      "sortOrder": 30
-    },
-    {
-      "name": "Edit Patients",
-      "key": "patients.edit",
-      "module": "patients",
-      "action": "edit",
-      "category": "patient",
-      "dependencies": ["patients.view"],
-      "description": "Update existing patient records.",
-      "sortOrder": 40
-    },
-    {
-      "name": "Delete Patients",
-      "key": "patients.delete",
-      "module": "patients",
-      "action": "delete",
-      "category": "patient",
-      "dependencies": ["patients.view"],
-      "description": "Delete patient records.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 50
-    },
-    {
-      "name": "View Doctors",
-      "key": "doctors.view",
-      "module": "doctors",
-      "action": "view",
-      "category": "doctor",
-      "description": "Search and view doctor records.",
-      "sortOrder": 60
-    },
-    {
-      "name": "Register Doctors",
-      "key": "doctors.register",
-      "module": "doctors",
-      "action": "register",
-      "category": "doctor",
-      "dependencies": ["doctors.view"],
-      "description": "Create doctor records.",
-      "sortOrder": 70
-    },
-    {
-      "name": "Edit Doctors",
-      "key": "doctors.edit",
-      "module": "doctors",
-      "action": "edit",
-      "category": "doctor",
-      "dependencies": ["doctors.view"],
-      "description": "Update doctor records.",
-      "sortOrder": 80
-    },
-    {
-      "name": "Delete Doctors",
-      "key": "doctors.delete",
-      "module": "doctors",
-      "action": "delete",
-      "category": "doctor",
-      "dependencies": ["doctors.view"],
-      "description": "Delete doctor records.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 90
-    },
-    {
-      "name": "View Tests",
-      "key": "tests.view",
-      "module": "tests",
-      "action": "view",
-      "category": "lab",
-      "description": "View test catalog and test orders.",
-      "sortOrder": 100
-    },
-    {
-      "name": "Edit Tests",
-      "key": "tests.edit",
-      "module": "tests",
-      "action": "edit",
-      "category": "lab",
-      "dependencies": ["tests.view"],
-      "description": "Create or update lab test entries.",
-      "sortOrder": 110
-    },
-    {
-      "name": "Delete Tests",
-      "key": "tests.delete",
-      "module": "tests",
-      "action": "delete",
-      "category": "lab",
-      "dependencies": ["tests.view"],
-      "description": "Delete lab test entries.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 115
-    },
-    {
-      "name": "View Orders",
-      "key": "orders.view",
-      "module": "orders",
-      "action": "view",
-      "category": "orders",
-      "description": "View lab test orders.",
-      "sortOrder": 116
-    },
-    {
-      "name": "Create Orders",
-      "key": "orders.create",
-      "module": "orders",
-      "action": "create",
-      "category": "orders",
-      "dependencies": ["orders.view", "patients.view", "tests.view"],
-      "description": "Create lab test orders for patients.",
-      "sortOrder": 117
-    },
-    {
-      "name": "Update Orders",
-      "key": "orders.update",
-      "module": "orders",
-      "action": "update",
-      "category": "orders",
-      "dependencies": ["orders.view"],
-      "description": "Update order details and order workflow status.",
-      "sortOrder": 118
-    },
-    {
-      "name": "Cancel Orders",
-      "key": "orders.cancel",
-      "module": "orders",
-      "action": "cancel",
-      "category": "orders",
-      "dependencies": ["orders.view"],
-      "description": "Cancel lab test orders.",
-      "isDangerous": true,
-      "sortOrder": 119
-    },
-    {
-      "name": "View Samples",
-      "key": "samples.view",
-      "module": "samples",
-      "action": "view",
-      "category": "samples",
-      "description": "View sample collection and processing status.",
-      "sortOrder": 120
-    },
-    {
-      "name": "Collect Samples",
-      "key": "samples.collect",
-      "module": "samples",
-      "action": "collect",
-      "category": "samples",
-      "dependencies": ["samples.view", "orders.view"],
-      "description": "Collect samples and record barcode, collection time, and collector details.",
-      "sortOrder": 121
-    },
-    {
-      "name": "Update Samples",
-      "key": "samples.update",
-      "module": "samples",
-      "action": "update",
-      "category": "samples",
-      "dependencies": ["samples.view"],
-      "description": "Update sample processing status.",
-      "sortOrder": 122
-    },
-    {
-      "name": "Reject Samples",
-      "key": "samples.reject",
-      "module": "samples",
-      "action": "reject",
-      "category": "samples",
-      "dependencies": ["samples.view"],
-      "description": "Reject invalid or unsuitable samples.",
-      "isDangerous": true,
-      "sortOrder": 123
-    },
-    {
-      "name": "View Reports",
-      "key": "reports.view",
-      "module": "reports",
-      "action": "view",
-      "category": "reporting",
-      "description": "View generated patient reports.",
-      "sortOrder": 120
-    },
-    {
-      "name": "Edit Reports",
-      "key": "reports.edit",
-      "module": "reports",
-      "action": "edit",
-      "category": "reporting",
-      "dependencies": ["reports.view"],
-      "description": "Enter, update, and verify report values.",
-      "sortOrder": 130
-    },
-    {
-      "name": "Verify Reports",
-      "key": "reports.verify",
-      "module": "reports",
-      "action": "verify",
-      "category": "reporting",
-      "dependencies": ["reports.view", "reports.edit"],
-      "description": "Verify and approve reports before release.",
-      "isDangerous": true,
-      "sortOrder": 131
-    },
-    {
-      "name": "Release Reports",
-      "key": "reports.release",
-      "module": "reports",
-      "action": "release",
-      "category": "reporting",
-      "dependencies": ["reports.view", "reports.verify"],
-      "description": "Release verified reports to patients or doctors.",
-      "isDangerous": true,
-      "sortOrder": 132
-    },
-    {
-      "name": "Print Reports",
-      "key": "reports.print",
-      "module": "reports",
-      "action": "print",
-      "category": "reporting",
-      "dependencies": ["reports.view"],
-      "description": "Print or download patient reports.",
-      "sortOrder": 133
-    },
-    {
-      "name": "View Billing",
-      "key": "billing.view",
-      "module": "billing",
-      "action": "view",
-      "category": "finance",
-      "description": "View billing records.",
-      "availableForPlans": ["basic", "professional", "enterprise"],
-      "sortOrder": 140
-    },
-    {
-      "name": "Create Billing",
-      "key": "billing.create",
-      "module": "billing",
-      "action": "create",
-      "category": "finance",
-      "dependencies": ["billing.view", "orders.view"],
-      "description": "Create invoices and bills for lab orders.",
-      "availableForPlans": ["basic", "professional", "enterprise"],
-      "sortOrder": 141
-    },
-    {
-      "name": "Collect Payments",
-      "key": "billing.collect",
-      "module": "billing",
-      "action": "collect",
-      "category": "finance",
-      "dependencies": ["billing.view"],
-      "description": "Record payment collections against bills.",
-      "availableForPlans": ["basic", "professional", "enterprise"],
-      "sortOrder": 142
-    },
-    {
-      "name": "Apply Billing Discounts",
-      "key": "billing.discount",
-      "module": "billing",
-      "action": "discount",
-      "category": "finance",
-      "dependencies": ["billing.view"],
-      "description": "Apply discounts or concessions to bills.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 143
-    },
-    {
-      "name": "Process Billing Refunds",
-      "key": "billing.refund",
-      "module": "billing",
-      "action": "refund",
-      "category": "finance",
-      "dependencies": ["billing.view"],
-      "description": "Record refunds for cancelled or adjusted bills.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 144
-    },
-    {
-      "name": "View Accounts",
-      "key": "accounts.view",
-      "module": "accounts",
-      "action": "view",
-      "category": "accounts",
-      "description": "View account summaries, collections, dues, expenses, and balances.",
-      "availableForPlans": ["basic", "professional", "enterprise"],
-      "sortOrder": 145
-    },
-    {
-      "name": "Manage Accounts",
-      "key": "accounts.manage",
-      "module": "accounts",
-      "action": "manage",
-      "category": "accounts",
-      "dependencies": ["accounts.view", "billing.view"],
-      "description": "Manage ledgers, daily closing, expenses, dues, and account adjustments.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 146
-    },
-    {
-      "name": "View Account Reports",
-      "key": "accounts.reports",
-      "module": "accounts",
-      "action": "reports",
-      "category": "accounts",
-      "dependencies": ["accounts.view"],
-      "description": "View collection, revenue, due, expense, and settlement reports.",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 147
-    },
-    {
-      "name": "Close Daily Accounts",
-      "key": "accounts.close",
-      "module": "accounts",
-      "action": "close",
-      "category": "accounts",
-      "dependencies": ["accounts.view", "accounts.manage"],
-      "description": "Close daily cash/accounting sessions.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 148
-    },
-    {
-      "name": "View Analytics",
-      "key": "analytics.view",
-      "module": "analytics",
-      "action": "view",
-      "category": "analytics",
-      "description": "View analytics and business reports.",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 150
-    },
-    {
-      "name": "Manage Users",
-      "key": "users.manage",
-      "module": "users",
-      "action": "manage",
-      "category": "administration",
-      "description": "Create users, assign roles, and manage user status.",
-      "isDangerous": true,
-      "availableForPlans": ["basic", "professional", "enterprise"],
-      "sortOrder": 160
-    },
-    {
-      "name": "Manage Settings",
-      "key": "settings.manage",
-      "module": "settings",
-      "action": "manage",
-      "category": "administration",
-      "description": "Manage tenant-level lab settings.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 170
-    },
-    {
-      "name": "Manage Lab Branding",
-      "key": "settings.branding",
-      "module": "settings",
-      "action": "branding",
-      "category": "administration",
-      "dependencies": ["settings.manage"],
-      "description": "Update the lab logo shown on lab login and dashboard pages.",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 171
-    },
-    {
-      "name": "View Inventory",
-      "key": "inventory.view",
-      "module": "inventory",
-      "action": "view",
-      "category": "inventory",
-      "description": "View reagents, consumables, stock levels, and expiry details.",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 180
-    },
-    {
-      "name": "Manage Inventory",
-      "key": "inventory.manage",
-      "module": "inventory",
-      "action": "manage",
-      "category": "inventory",
-      "dependencies": ["inventory.view"],
-      "description": "Manage stock entries, usage, expiry, and purchase records.",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 181
-    },
-    {
-      "name": "View Quality Control",
-      "key": "quality.view",
-      "module": "quality",
-      "action": "view",
-      "category": "quality",
-      "description": "View QC logs, calibration records, and quality events.",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 190
-    },
-    {
-      "name": "Manage Quality Control",
-      "key": "quality.manage",
-      "module": "quality",
-      "action": "manage",
-      "category": "quality",
-      "dependencies": ["quality.view"],
-      "description": "Manage QC logs, calibration records, and corrective actions.",
-      "isDangerous": true,
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 191
-    }
-  ],
-  "roleTemplates": [
-    {
-      "name": "Admin",
-      "description": "Full tenant administration access.",
-      "permissions": ["*"],
-      "category": "administration",
-      "isDefaultAdmin": true,
-      "sortOrder": 10
-    },
-    {
-      "name": "Lab Manager",
-      "description": "Manages daily lab operations without developer-level platform access.",
-      "permissions": [
-        "dashboard.view",
-        "patients.view",
-        "patients.register",
-        "patients.edit",
-        "doctors.view",
-        "doctors.register",
-        "doctors.edit",
-        "tests.view",
-        "tests.edit",
-        "orders.view",
-        "orders.create",
-        "orders.update",
-        "samples.view",
-        "samples.collect",
-        "samples.update",
-        "samples.reject",
-        "reports.view",
-        "reports.edit",
-        "reports.verify",
-        "reports.release",
-        "reports.print",
-        "billing.view",
-        "billing.create",
-        "billing.collect",
-        "accounts.view",
-        "accounts.reports",
-        "analytics.view",
-        "inventory.view",
-        "quality.view"
-      ],
-      "category": "management",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 15
-    },
-    {
-      "name": "Lab Technician",
-      "description": "Handles tests and report preparation.",
-      "permissions": [
-        "dashboard.view",
-        "orders.view",
-        "samples.view",
-        "samples.update",
-        "tests.view",
-        "tests.edit",
-        "reports.view",
-        "reports.edit"
-      ],
-      "category": "lab",
-      "sortOrder": 20
-    },
-    {
-      "name": "Phlebotomist",
-      "description": "Handles sample collection and sample status updates.",
-      "permissions": [
-        "dashboard.view",
-        "patients.view",
-        "orders.view",
-        "samples.view",
-        "samples.collect",
-        "samples.update",
-        "samples.reject"
-      ],
-      "category": "samples",
-      "sortOrder": 25
-    },
-    {
-      "name": "Report Typist",
-      "description": "Enters report values but cannot verify or release reports.",
-      "permissions": [
-        "dashboard.view",
-        "patients.view",
-        "orders.view",
-        "samples.view",
-        "tests.view",
-        "reports.view",
-        "reports.edit"
-      ],
-      "category": "reporting",
-      "sortOrder": 27
-    },
-    {
-      "name": "Pathologist",
-      "description": "Verifies and releases lab reports.",
-      "permissions": [
-        "dashboard.view",
-        "patients.view",
-        "orders.view",
-        "samples.view",
-        "tests.view",
-        "reports.view",
-        "reports.edit",
-        "reports.verify",
-        "reports.release",
-        "reports.print",
-        "quality.view"
-      ],
-      "category": "reporting",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 28
-    },
-    {
-      "name": "Front Desk Receptionist",
-      "description": "Handles registration, patient lookup, and billing lookup.",
-      "permissions": [
-        "dashboard.view",
-        "patients.view",
-        "patients.register",
-        "patients.edit",
-        "doctors.view",
-        "tests.view",
-        "orders.view",
-        "orders.create",
-        "billing.view",
-        "billing.create",
-        "billing.collect",
-        "reports.view",
-        "reports.print"
-      ],
-      "category": "front-desk",
-      "sortOrder": 30
-    },
-    {
-      "name": "Billing Cashier",
-      "description": "Handles billing, payment collection, dues, and refunds.",
-      "permissions": [
-        "dashboard.view",
-        "patients.view",
-        "orders.view",
-        "billing.view",
-        "billing.create",
-        "billing.collect",
-        "billing.discount",
-        "billing.refund",
-        "accounts.view"
-      ],
-      "category": "finance",
-      "availableForPlans": ["basic", "professional", "enterprise"],
-      "sortOrder": 35
-    },
-    {
-      "name": "Accounts Manager",
-      "description": "Manages ledgers, expenses, dues, daily closing, and account reports.",
-      "permissions": [
-        "dashboard.view",
-        "billing.view",
-        "billing.collect",
-        "billing.discount",
-        "billing.refund",
-        "accounts.view",
-        "accounts.manage",
-        "accounts.reports",
-        "accounts.close",
-        "analytics.view"
-      ],
-      "category": "accounts",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 36
-    },
-    {
-      "name": "Doctor Investor",
-      "description": "Doctor with access to analytics and doctor master data.",
-      "permissions": ["dashboard.view", "analytics.view", "doctors.view"],
-      "category": "doctor",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 40
-    },
-    {
-      "name": "Doctor Regular",
-      "description": "Doctor with patient and report viewing access.",
-      "permissions": ["dashboard.view", "patients.view", "reports.view"],
-      "category": "doctor",
-      "sortOrder": 50
-    },
-    {
-      "name": "Inventory Manager",
-      "description": "Manages reagents, consumables, stock, expiry, and purchase records.",
-      "permissions": [
-        "dashboard.view",
-        "inventory.view",
-        "inventory.manage"
-      ],
-      "category": "inventory",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 60
-    },
-    {
-      "name": "Quality Control",
-      "description": "Manages QC logs, calibration records, and quality checks.",
-      "permissions": [
-        "dashboard.view",
-        "samples.view",
-        "reports.view",
-        "inventory.view",
-        "quality.view",
-        "quality.manage"
-      ],
-      "category": "quality",
-      "availableForPlans": ["professional", "enterprise"],
-      "sortOrder": 70
-    }
-  ]
+    "permissions":  [
+                        {
+                            "name":  "View Platform Dashboard",
+                            "key":  "developer.dashboard.view",
+                            "module":  "developer-dashboard",
+                            "action":  "view",
+                            "scope":  "developer",
+                            "category":  "developer",
+                            "description":  "Access the developer platform dashboard.",
+                            "sortOrder":  1
+                        },
+                        {
+                            "name":  "View Labs",
+                            "key":  "developer.labs.view",
+                            "module":  "developer-labs",
+                            "action":  "view",
+                            "scope":  "developer",
+                            "category":  "developer-labs",
+                            "description":  "View all labs registered on the platform.",
+                            "sortOrder":  2
+                        },
+                        {
+                            "name":  "Create Labs",
+                            "key":  "developer.labs.create",
+                            "module":  "developer-labs",
+                            "action":  "create",
+                            "scope":  "developer",
+                            "category":  "developer-labs",
+                            "dependencies":  [
+                                                 "developer.labs.view"
+                                             ],
+                            "description":  "Create new lab tenants and master lab records.",
+                            "isDangerous":  true,
+                            "sortOrder":  3
+                        },
+                        {
+                            "name":  "Update Labs",
+                            "key":  "developer.labs.update",
+                            "module":  "developer-labs",
+                            "action":  "update",
+                            "scope":  "developer",
+                            "category":  "developer-labs",
+                            "dependencies":  [
+                                                 "developer.labs.view"
+                                             ],
+                            "description":  "Update lab profile, branding, connection, and plan details.",
+                            "isDangerous":  true,
+                            "sortOrder":  4
+                        },
+                        {
+                            "name":  "Suspend Labs",
+                            "key":  "developer.labs.suspend",
+                            "module":  "developer-labs",
+                            "action":  "suspend",
+                            "scope":  "developer",
+                            "category":  "developer-labs",
+                            "dependencies":  [
+                                                 "developer.labs.view"
+                                             ],
+                            "description":  "Suspend or reactivate lab tenants.",
+                            "isDangerous":  true,
+                            "sortOrder":  5
+                        },
+                        {
+                            "name":  "Manage Subscriptions",
+                            "key":  "developer.subscriptions.manage",
+                            "module":  "developer-subscriptions",
+                            "action":  "manage",
+                            "scope":  "developer",
+                            "category":  "developer-billing",
+                            "dependencies":  [
+                                                 "developer.labs.view"
+                                             ],
+                            "description":  "Manage lab subscription plans and entitlements.",
+                            "isDangerous":  true,
+                            "sortOrder":  6
+                        },
+                        {
+                            "name":  "Manage Permission Catalog",
+                            "key":  "developer.permissions.manage",
+                            "module":  "developer-permissions",
+                            "action":  "manage",
+                            "scope":  "developer",
+                            "category":  "developer-rbac",
+                            "description":  "Manage the master permission catalog.",
+                            "isDangerous":  true,
+                            "sortOrder":  7
+                        },
+                        {
+                            "name":  "Manage Role Templates",
+                            "key":  "developer.roletemplates.manage",
+                            "module":  "developer-role-templates",
+                            "action":  "manage",
+                            "scope":  "developer",
+                            "category":  "developer-rbac",
+                            "description":  "Manage master tenant role templates.",
+                            "isDangerous":  true,
+                            "sortOrder":  8
+                        },
+                        {
+                            "name":  "Create Initial Tenant Admin",
+                            "key":  "developer.tenantadmins.create",
+                            "module":  "developer-tenant-admins",
+                            "action":  "create",
+                            "scope":  "developer",
+                            "category":  "developer-users",
+                            "dependencies":  [
+                                                 "developer.labs.view"
+                                             ],
+                            "description":  "Create the first admin user for a tenant lab.",
+                            "isDangerous":  true,
+                            "sortOrder":  9
+                        },
+                        {
+                            "name":  "Reset Tenant Admin Access",
+                            "key":  "developer.tenantadmins.reset",
+                            "module":  "developer-tenant-admins",
+                            "action":  "reset",
+                            "scope":  "developer",
+                            "category":  "developer-users",
+                            "dependencies":  [
+                                                 "developer.labs.view"
+                                             ],
+                            "description":  "Reset access for a tenant admin account.",
+                            "isDangerous":  true,
+                            "sortOrder":  10
+                        },
+                        {
+                            "name":  "View Platform Audit Logs",
+                            "key":  "developer.audit.view",
+                            "module":  "developer-audit",
+                            "action":  "view",
+                            "scope":  "developer",
+                            "category":  "developer-audit",
+                            "description":  "View developer and tenant platform audit events.",
+                            "sortOrder":  11
+                        },
+                        {
+                            "name":  "View Dashboard",
+                            "key":  "dashboard.view",
+                            "module":  "dashboard",
+                            "action":  "view",
+                            "category":  "core",
+                            "description":  "Access the main dashboard and summary metrics.",
+                            "sortOrder":  10
+                        },
+                        {
+                            "name":  "View Patients",
+                            "key":  "patients.view",
+                            "module":  "patients",
+                            "action":  "view",
+                            "category":  "patient",
+                            "description":  "Search and view patient records.",
+                            "sortOrder":  20
+                        },
+                        {
+                            "name":  "Register Patients",
+                            "key":  "patients.register",
+                            "module":  "patients",
+                            "action":  "register",
+                            "category":  "patient",
+                            "dependencies":  [
+                                                 "patients.view"
+                                             ],
+                            "description":  "Create new patient registrations.",
+                            "sortOrder":  30
+                        },
+                        {
+                            "name":  "Edit Patients",
+                            "key":  "patients.edit",
+                            "module":  "patients",
+                            "action":  "edit",
+                            "category":  "patient",
+                            "dependencies":  [
+                                                 "patients.view"
+                                             ],
+                            "description":  "Update existing patient records.",
+                            "sortOrder":  40
+                        },
+                        {
+                            "name":  "Delete Patients",
+                            "key":  "patients.delete",
+                            "module":  "patients",
+                            "action":  "delete",
+                            "category":  "patient",
+                            "dependencies":  [
+                                                 "patients.view"
+                                             ],
+                            "description":  "Delete patient records.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  50
+                        },
+                        {
+                            "name":  "View Doctors",
+                            "key":  "doctors.view",
+                            "module":  "doctors",
+                            "action":  "view",
+                            "category":  "doctor",
+                            "description":  "Search and view doctor records.",
+                            "sortOrder":  60
+                        },
+                        {
+                            "name":  "Register Doctors",
+                            "key":  "doctors.register",
+                            "module":  "doctors",
+                            "action":  "register",
+                            "category":  "doctor",
+                            "dependencies":  [
+                                                 "doctors.view"
+                                             ],
+                            "description":  "Create doctor records.",
+                            "sortOrder":  70
+                        },
+                        {
+                            "name":  "Edit Doctors",
+                            "key":  "doctors.edit",
+                            "module":  "doctors",
+                            "action":  "edit",
+                            "category":  "doctor",
+                            "dependencies":  [
+                                                 "doctors.view"
+                                             ],
+                            "description":  "Update doctor records.",
+                            "sortOrder":  80
+                        },
+                        {
+                            "name":  "Delete Doctors",
+                            "key":  "doctors.delete",
+                            "module":  "doctors",
+                            "action":  "delete",
+                            "category":  "doctor",
+                            "dependencies":  [
+                                                 "doctors.view"
+                                             ],
+                            "description":  "Delete doctor records.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  90
+                        },
+                        {
+                            "name":  "View Tests",
+                            "key":  "tests.view",
+                            "module":  "tests",
+                            "action":  "view",
+                            "category":  "lab",
+                            "description":  "View the test catalog used for billing investigations.",
+                            "sortOrder":  100
+                        },
+                        {
+                            "name":  "Edit Tests",
+                            "key":  "tests.edit",
+                            "module":  "tests",
+                            "action":  "edit",
+                            "category":  "lab",
+                            "dependencies":  [
+                                                 "tests.view"
+                                             ],
+                            "description":  "Create or update lab test entries.",
+                            "sortOrder":  110
+                        },
+                        {
+                            "name":  "Delete Tests",
+                            "key":  "tests.delete",
+                            "module":  "tests",
+                            "action":  "delete",
+                            "category":  "lab",
+                            "dependencies":  [
+                                                 "tests.view"
+                                             ],
+                            "description":  "Delete lab test entries.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  115
+                        },
+                        {
+                            "name":  "View Billing",
+                            "key":  "billing.view",
+                            "module":  "billing",
+                            "action":  "view",
+                            "category":  "billing",
+                            "description":  "View lab billing records and payment status.",
+                            "sortOrder":  116
+                        },
+                        {
+                            "name":  "Create Bills",
+                            "key":  "billing.create",
+                            "module":  "billing",
+                            "action":  "create",
+                            "category":  "billing",
+                            "dependencies":  [
+                                                 "billing.view",
+                                                 "patients.view",
+                                                 "tests.view"
+                                             ],
+                            "description":  "Create lab bills for patient investigations.",
+                            "sortOrder":  117
+                        },
+                        {
+                            "name":  "Update Bills",
+                            "key":  "billing.update",
+                            "module":  "billing",
+                            "action":  "update",
+                            "category":  "billing",
+                            "dependencies":  [
+                                                 "billing.view"
+                                             ],
+                            "description":  "Update bill details and billing workflow status.",
+                            "sortOrder":  118
+                        },
+                        {
+                            "name":  "Cancel Bills",
+                            "key":  "billing.cancel",
+                            "module":  "billing",
+                            "action":  "cancel",
+                            "category":  "billing",
+                            "dependencies":  [
+                                                 "billing.view"
+                                             ],
+                            "description":  "Cancel lab bills.",
+                            "isDangerous":  true,
+                            "sortOrder":  119
+                        },
+                        {
+                            "name":  "View Samples",
+                            "key":  "samples.view",
+                            "module":  "samples",
+                            "action":  "view",
+                            "category":  "samples",
+                            "description":  "View sample collection and processing status.",
+                            "sortOrder":  120
+                        },
+                        {
+                            "name":  "Collect Samples",
+                            "key":  "samples.collect",
+                            "module":  "samples",
+                            "action":  "collect",
+                            "category":  "samples",
+                            "dependencies":  [
+                                                 "samples.view",
+                                                 "billing.view"
+                                             ],
+                            "description":  "Collect samples and record barcode, collection time, and collector details.",
+                            "sortOrder":  121
+                        },
+                        {
+                            "name":  "Update Samples",
+                            "key":  "samples.update",
+                            "module":  "samples",
+                            "action":  "update",
+                            "category":  "samples",
+                            "dependencies":  [
+                                                 "samples.view"
+                                             ],
+                            "description":  "Update sample processing status.",
+                            "sortOrder":  122
+                        },
+                        {
+                            "name":  "Reject Samples",
+                            "key":  "samples.reject",
+                            "module":  "samples",
+                            "action":  "reject",
+                            "category":  "samples",
+                            "dependencies":  [
+                                                 "samples.view"
+                                             ],
+                            "description":  "Reject invalid or unsuitable samples.",
+                            "isDangerous":  true,
+                            "sortOrder":  123
+                        },
+                        {
+                            "name":  "View Reports",
+                            "key":  "reports.view",
+                            "module":  "reports",
+                            "action":  "view",
+                            "category":  "reporting",
+                            "description":  "View generated patient reports.",
+                            "sortOrder":  120
+                        },
+                        {
+                            "name":  "Edit Reports",
+                            "key":  "reports.edit",
+                            "module":  "reports",
+                            "action":  "edit",
+                            "category":  "reporting",
+                            "dependencies":  [
+                                                 "reports.view"
+                                             ],
+                            "description":  "Enter, update, and verify report values.",
+                            "sortOrder":  130
+                        },
+                        {
+                            "name":  "Verify Reports",
+                            "key":  "reports.verify",
+                            "module":  "reports",
+                            "action":  "verify",
+                            "category":  "reporting",
+                            "dependencies":  [
+                                                 "reports.view",
+                                                 "reports.edit"
+                                             ],
+                            "description":  "Verify and approve reports before release.",
+                            "isDangerous":  true,
+                            "sortOrder":  131
+                        },
+                        {
+                            "name":  "Release Reports",
+                            "key":  "reports.release",
+                            "module":  "reports",
+                            "action":  "release",
+                            "category":  "reporting",
+                            "dependencies":  [
+                                                 "reports.view",
+                                                 "reports.verify"
+                                             ],
+                            "description":  "Release verified reports to patients or doctors.",
+                            "isDangerous":  true,
+                            "sortOrder":  132
+                        },
+                        {
+                            "name":  "Print Reports",
+                            "key":  "reports.print",
+                            "module":  "reports",
+                            "action":  "print",
+                            "category":  "reporting",
+                            "dependencies":  [
+                                                 "reports.view"
+                                             ],
+                            "description":  "Print or download patient reports.",
+                            "sortOrder":  133
+                        },
+                        {
+                            "name":  "Collect Payments",
+                            "key":  "billing.collect",
+                            "module":  "billing",
+                            "action":  "collect",
+                            "category":  "finance",
+                            "dependencies":  [
+                                                 "billing.view"
+                                             ],
+                            "description":  "Record payment collections against bills.",
+                            "availableForPlans":  [
+                                                      "basic",
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  142
+                        },
+                        {
+                            "name":  "Apply Billing Discounts",
+                            "key":  "billing.discount",
+                            "module":  "billing",
+                            "action":  "discount",
+                            "category":  "finance",
+                            "dependencies":  [
+                                                 "billing.view"
+                                             ],
+                            "description":  "Apply discounts or concessions to bills.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  143
+                        },
+                        {
+                            "name":  "Process Billing Refunds",
+                            "key":  "billing.refund",
+                            "module":  "billing",
+                            "action":  "refund",
+                            "category":  "finance",
+                            "dependencies":  [
+                                                 "billing.view"
+                                             ],
+                            "description":  "Record refunds for cancelled or adjusted bills.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  144
+                        },
+                        {
+                            "name":  "View Accounts",
+                            "key":  "accounts.view",
+                            "module":  "accounts",
+                            "action":  "view",
+                            "category":  "accounts",
+                            "description":  "View account summaries, collections, dues, expenses, and balances.",
+                            "availableForPlans":  [
+                                                      "basic",
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  145
+                        },
+                        {
+                            "name":  "Manage Accounts",
+                            "key":  "accounts.manage",
+                            "module":  "accounts",
+                            "action":  "manage",
+                            "category":  "accounts",
+                            "dependencies":  [
+                                                 "accounts.view",
+                                                 "billing.view"
+                                             ],
+                            "description":  "Manage ledgers, daily closing, expenses, dues, and account adjustments.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  146
+                        },
+                        {
+                            "name":  "View Account Reports",
+                            "key":  "accounts.reports",
+                            "module":  "accounts",
+                            "action":  "reports",
+                            "category":  "accounts",
+                            "dependencies":  [
+                                                 "accounts.view"
+                                             ],
+                            "description":  "View collection, revenue, due, expense, and settlement reports.",
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  147
+                        },
+                        {
+                            "name":  "Close Daily Accounts",
+                            "key":  "accounts.close",
+                            "module":  "accounts",
+                            "action":  "close",
+                            "category":  "accounts",
+                            "dependencies":  [
+                                                 "accounts.view",
+                                                 "accounts.manage"
+                                             ],
+                            "description":  "Close daily cash/accounting sessions.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  148
+                        },
+                        {
+                            "name":  "View Analytics",
+                            "key":  "analytics.view",
+                            "module":  "analytics",
+                            "action":  "view",
+                            "category":  "analytics",
+                            "description":  "View analytics and business reports.",
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  150
+                        },
+                        {
+                            "name":  "Manage Users",
+                            "key":  "users.manage",
+                            "module":  "users",
+                            "action":  "manage",
+                            "category":  "administration",
+                            "description":  "Create users, assign roles, and manage user status.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "basic",
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  160
+                        },
+                        {
+                            "name":  "Manage Settings",
+                            "key":  "settings.manage",
+                            "module":  "settings",
+                            "action":  "manage",
+                            "category":  "administration",
+                            "description":  "Manage tenant-level lab settings.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  170
+                        },
+                        {
+                            "name":  "Manage Lab Branding",
+                            "key":  "settings.branding",
+                            "module":  "settings",
+                            "action":  "branding",
+                            "category":  "administration",
+                            "dependencies":  [
+                                                 "settings.manage"
+                                             ],
+                            "description":  "Update the lab logo shown on lab login and dashboard pages.",
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  171
+                        },
+                        {
+                            "name":  "View Inventory",
+                            "key":  "inventory.view",
+                            "module":  "inventory",
+                            "action":  "view",
+                            "category":  "inventory",
+                            "description":  "View reagents, consumables, stock levels, and expiry details.",
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  180
+                        },
+                        {
+                            "name":  "Manage Inventory",
+                            "key":  "inventory.manage",
+                            "module":  "inventory",
+                            "action":  "manage",
+                            "category":  "inventory",
+                            "dependencies":  [
+                                                 "inventory.view"
+                                             ],
+                            "description":  "Manage stock entries, usage, expiry, and purchase records.",
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  181
+                        },
+                        {
+                            "name":  "View Quality Control",
+                            "key":  "quality.view",
+                            "module":  "quality",
+                            "action":  "view",
+                            "category":  "quality",
+                            "description":  "View QC logs, calibration records, and quality events.",
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  190
+                        },
+                        {
+                            "name":  "Manage Quality Control",
+                            "key":  "quality.manage",
+                            "module":  "quality",
+                            "action":  "manage",
+                            "category":  "quality",
+                            "dependencies":  [
+                                                 "quality.view"
+                                             ],
+                            "description":  "Manage QC logs, calibration records, and corrective actions.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                      "professional",
+                                                      "enterprise"
+                                                  ],
+                            "sortOrder":  191
+                        }
+                    ],
+    "roleTemplates":  [
+                          {
+                              "name":  "Admin",
+                              "description":  "Full tenant administration access.",
+                              "permissions":  [
+                                                  "*"
+                                              ],
+                              "category":  "administration",
+                              "isDefaultAdmin":  true,
+                              "sortOrder":  10
+                          },
+                          {
+                              "name":  "Lab Manager",
+                              "description":  "Manages daily lab operations without developer-level platform access.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "patients.view",
+                                                  "patients.register",
+                                                  "patients.edit",
+                                                  "doctors.view",
+                                                  "doctors.register",
+                                                  "doctors.edit",
+                                                  "tests.view",
+                                                  "tests.edit",
+                                                  "billing.view",
+                                                  "billing.create",
+                                                  "billing.update",
+                                                  "samples.view",
+                                                  "samples.collect",
+                                                  "samples.update",
+                                                  "samples.reject",
+                                                  "reports.view",
+                                                  "reports.edit",
+                                                  "reports.verify",
+                                                  "reports.release",
+                                                  "reports.print",
+                                                  "billing.collect",
+                                                  "accounts.view",
+                                                  "accounts.reports",
+                                                  "analytics.view",
+                                                  "inventory.view",
+                                                  "quality.view"
+                                              ],
+                              "category":  "management",
+                              "availableForPlans":  [
+                                                        "professional",
+                                                        "enterprise"
+                                                    ],
+                              "sortOrder":  15
+                          },
+                          {
+                              "name":  "Lab Technician",
+                              "description":  "Handles tests and report preparation.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "billing.view",
+                                                  "samples.view",
+                                                  "samples.update",
+                                                  "tests.view",
+                                                  "tests.edit",
+                                                  "reports.view",
+                                                  "reports.edit"
+                                              ],
+                              "category":  "lab",
+                              "sortOrder":  20
+                          },
+                          {
+                              "name":  "Phlebotomist",
+                              "description":  "Handles sample collection and sample status updates.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "patients.view",
+                                                  "billing.view",
+                                                  "samples.view",
+                                                  "samples.collect",
+                                                  "samples.update",
+                                                  "samples.reject"
+                                              ],
+                              "category":  "samples",
+                              "sortOrder":  25
+                          },
+                          {
+                              "name":  "Report Typist",
+                              "description":  "Enters report values but cannot verify or release reports.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "patients.view",
+                                                  "billing.view",
+                                                  "samples.view",
+                                                  "tests.view",
+                                                  "reports.view",
+                                                  "reports.edit"
+                                              ],
+                              "category":  "reporting",
+                              "sortOrder":  27
+                          },
+                          {
+                              "name":  "Pathologist",
+                              "description":  "Verifies and releases lab reports.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "patients.view",
+                                                  "billing.view",
+                                                  "samples.view",
+                                                  "tests.view",
+                                                  "reports.view",
+                                                  "reports.edit",
+                                                  "reports.verify",
+                                                  "reports.release",
+                                                  "reports.print",
+                                                  "quality.view"
+                                              ],
+                              "category":  "reporting",
+                              "availableForPlans":  [
+                                                        "professional",
+                                                        "enterprise"
+                                                    ],
+                              "sortOrder":  28
+                          },
+                          {
+                              "name":  "Front Desk Receptionist",
+                              "description":  "Handles registration, patient lookup, and billing lookup.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "patients.view",
+                                                  "patients.register",
+                                                  "patients.edit",
+                                                  "doctors.view",
+                                                  "tests.view",
+                                                  "billing.view",
+                                                  "billing.create",
+                                                  "billing.collect",
+                                                  "reports.view",
+                                                  "reports.print"
+                                              ],
+                              "category":  "front-desk",
+                              "sortOrder":  30
+                          },
+                          {
+                              "name":  "Billing Cashier",
+                              "description":  "Handles billing, payment collection, dues, and refunds.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "patients.view",
+                                                  "billing.view",
+                                                  "billing.create",
+                                                  "billing.collect",
+                                                  "billing.discount",
+                                                  "billing.refund",
+                                                  "accounts.view"
+                                              ],
+                              "category":  "finance",
+                              "availableForPlans":  [
+                                                        "basic",
+                                                        "professional",
+                                                        "enterprise"
+                                                    ],
+                              "sortOrder":  35
+                          },
+                          {
+                              "name":  "Accounts Manager",
+                              "description":  "Manages ledgers, expenses, dues, daily closing, and account reports.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "billing.view",
+                                                  "billing.collect",
+                                                  "billing.discount",
+                                                  "billing.refund",
+                                                  "accounts.view",
+                                                  "accounts.manage",
+                                                  "accounts.reports",
+                                                  "accounts.close",
+                                                  "analytics.view"
+                                              ],
+                              "category":  "accounts",
+                              "availableForPlans":  [
+                                                        "professional",
+                                                        "enterprise"
+                                                    ],
+                              "sortOrder":  36
+                          },
+                          {
+                              "name":  "Doctor Investor",
+                              "description":  "Doctor with access to analytics and doctor master data.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "analytics.view",
+                                                  "doctors.view"
+                                              ],
+                              "category":  "doctor",
+                              "availableForPlans":  [
+                                                        "professional",
+                                                        "enterprise"
+                                                    ],
+                              "sortOrder":  40
+                          },
+                          {
+                              "name":  "Doctor Regular",
+                              "description":  "Doctor with patient and report viewing access.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "patients.view",
+                                                  "reports.view"
+                                              ],
+                              "category":  "doctor",
+                              "sortOrder":  50
+                          },
+                          {
+                              "name":  "Inventory Manager",
+                              "description":  "Manages reagents, consumables, stock, expiry, and purchase records.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "inventory.view",
+                                                  "inventory.manage"
+                                              ],
+                              "category":  "inventory",
+                              "availableForPlans":  [
+                                                        "professional",
+                                                        "enterprise"
+                                                    ],
+                              "sortOrder":  60
+                          },
+                          {
+                              "name":  "Quality Control",
+                              "description":  "Manages QC logs, calibration records, and quality checks.",
+                              "permissions":  [
+                                                  "dashboard.view",
+                                                  "samples.view",
+                                                  "reports.view",
+                                                  "inventory.view",
+                                                  "quality.view",
+                                                  "quality.manage"
+                                              ],
+                              "category":  "quality",
+                              "availableForPlans":  [
+                                                        "professional",
+                                                        "enterprise"
+                                                    ],
+                              "sortOrder":  70
+                          }
+                      ]
 }
+

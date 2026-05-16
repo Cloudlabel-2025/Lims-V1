@@ -8,7 +8,7 @@ import { getLabModel } from "../src/app/models/master/Lab.js";
 import { getRoleTemplateModel } from "../src/app/models/master/RoleTemplate.js";
 import { getPatientModel } from "../src/app/models/patient.js";
 import { getVisitModel } from "../src/app/models/visit.js";
-import { getLabOrderModel } from "../src/app/models/tenant/LabOrder.js";
+import { getBillingRecordModel } from "../src/app/models/tenant/BillingRecord.js";
 import { getRoleModel } from "../src/app/models/tenant/Role.js";
 import { getSampleModel } from "../src/app/models/tenant/Sample.js";
 import { getTestCategoryModel } from "../src/app/models/tenant/TestCategory.js";
@@ -97,7 +97,7 @@ async function initializeTenantCollections(tenantConnection) {
     getTestReportModel(tenantConnection).init(),
     getUserModel(tenantConnection).init(),
     getPatientModel(tenantConnection).init(),
-    getLabOrderModel(tenantConnection).init(),
+    getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
     getSampleModel(tenantConnection).init(),
     getVisitModel(tenantConnection).init(),

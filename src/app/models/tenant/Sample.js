@@ -38,13 +38,13 @@ export const SampleSchema = new mongoose.Schema(
       sparse: true,
       trim: true,
     },
-    order: {
+    billingRecord: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "LabOrder",
+      ref: "BillingRecord",
       required: true,
       index: true,
     },
-    orderItemId: {
+    billingItemId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
       index: true,

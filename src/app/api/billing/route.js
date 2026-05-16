@@ -7,10 +7,10 @@ function clean(value) {
 
 export async function GET(req) {
   try {
-    const auth = requireTenantSession(req, "orders.view");
+    const auth = requireTenantSession(req, "billing.view");
     if (auth.error) return auth.error;
 
-    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "orders.view");
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "billing.view");
     if (moduleAuth.error) return moduleAuth.error;
 
     const { searchParams } = new URL(req.url);
@@ -18,29 +18,29 @@ export async function GET(req) {
     const query = {};
     if (status && status !== "all") query.status = status;
 
-    const { LabOrder } = await getTenantModels(auth.tenantId);
-    const orders = await LabOrder.find(query)
+    const { BillingRecord } = await getTenantModels(auth.tenantId);
+    const billingRecords = await BillingRecord.find(query)
       .populate("patient", "name patientId age gender phone")
       .populate("referralDoctor", "name doctorId commission pendingPayout")
       .sort({ createdAt: -1 })
       .limit(100);
 
-    return Response.json({ orders });
+    return Response.json({ billingRecords });
   } catch (error) {
-    return Response.json({ error: "Unable to load orders", details: error.message }, { status: 500 });
+    return Response.json({ error: "Unable to load billing records", details: error.message }, { status: 500 });
   }
 }
 
 export async function POST(req) {
-  let order = null;
-  let LabOrderModel = null;
+  let billingRecord = null;
+  let BillingRecordModel = null;
   let SampleModel = null;
 
   try {
-    const auth = requireTenantSession(req, "orders.create");
+    const auth = requireTenantSession(req, "billing.create");
     if (auth.error) return auth.error;
 
-    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "orders.view");
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "billing.view");
     if (moduleAuth.error) return moduleAuth.error;
 
     const body = await req.json();
@@ -52,15 +52,15 @@ export async function POST(req) {
       return Response.json({ error: "At least one test is required" }, { status: 400 });
     }
 
-    const { Patient, TestDefinition, LabOrder, Sample, Doctor, TestPackage } = await getTenantModels(auth.tenantId);
-    LabOrderModel = LabOrder;
+    const { Patient, TestDefinition, BillingRecord, Sample, Doctor, TestPackage } = await getTenantModels(auth.tenantId);
+    BillingRecordModel = BillingRecord;
     SampleModel = Sample;
     const patient = await Patient.findById(patientId);
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
 
     const doctor = patient.refDoctorName ? await Doctor.findOne({ name: patient.refDoctorName }) : null;
 
-    const orderItems = [];
+    const billingItems = [];
     let totalAmount = 0;
 
     for (const itemKey of testIds) {
@@ -70,7 +70,7 @@ export async function POST(req) {
         if (test) {
           const price = Number(test.price) || 0;
           totalAmount += price;
-          orderItems.push({
+          billingItems.push({
             testDefinition: test._id,
             testSnapshot: {
               testId: test.testId,
@@ -95,8 +95,8 @@ export async function POST(req) {
           totalAmount += price;
           if (pkg.tests) {
             for (const test of pkg.tests) {
-              if (!orderItems.find(item => item.testDefinition.toString() === test._id.toString())) {
-                orderItems.push({
+              if (!billingItems.find(item => item.testDefinition.toString() === test._id.toString())) {
+                billingItems.push({
                   testDefinition: test._id,
                   testSnapshot: {
                     testId: test.testId,
@@ -115,16 +115,16 @@ export async function POST(req) {
       }
     }
 
-    if (orderItems.length === 0) {
+    if (billingItems.length === 0) {
       return Response.json({ error: "No valid tests selected" }, { status: 400 });
     }
 
     const commissionRate = doctor?.commission || 0;
     const commissionAmount = (totalAmount * commissionRate) / 100;
 
-    order = await LabOrder.create({
+    billingRecord = await BillingRecord.create({
       patient: patient._id,
-      items: orderItems,
+      items: billingItems,
       referralDoctor: doctor?._id,
       totalAmount,
       commissionAmount,
@@ -136,10 +136,10 @@ export async function POST(req) {
     });
 
     const samples = await Promise.all(
-      order.items.map((item) =>
+      billingRecord.items.map((item) =>
         Sample.create({
-          order: order._id,
-          orderItemId: item._id,
+          billingRecord: billingRecord._id,
+          billingItemId: item._id,
           patient: patient._id,
           testDefinition: item.testDefinition,
           testSnapshot: item.testSnapshot,
@@ -147,17 +147,17 @@ export async function POST(req) {
       )
     );
 
-    await order.populate("patient", "name patientId age gender phone");
+    await billingRecord.populate("patient", "name patientId age gender phone");
 
-    return Response.json({ order, samples }, { status: 201 });
+    return Response.json({ billingRecord, samples }, { status: 201 });
   } catch (error) {
-    if (order?._id) {
+    if (billingRecord?._id) {
       await Promise.all([
-        LabOrderModel?.deleteOne({ _id: order._id }).catch(() => {}),
-        SampleModel?.deleteMany({ order: order._id }).catch(() => {}),
+        BillingRecordModel?.deleteOne({ _id: billingRecord._id }).catch(() => {}),
+        SampleModel?.deleteMany({ billingRecord: billingRecord._id }).catch(() => {}),
       ]);
     }
 
-    return Response.json({ error: "Unable to create order", details: error.message }, { status: 500 });
+    return Response.json({ error: "Unable to create billing record", details: error.message }, { status: 500 });
   }
 }

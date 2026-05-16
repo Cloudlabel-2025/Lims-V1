@@ -5074,13 +5074,13 @@ body {
   font-size: 13px;
 }
 
-.order-test-grid {
+.billing-test-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.order-test-option {
+.billing-test-option {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -5092,40 +5092,40 @@ body {
   transition: all 0.2s;
 }
 
-.order-test-option.selected {
+.billing-test-option.selected {
   border-color: var(--primary);
   background: var(--primary-50);
 }
 
-.order-test-option input {
+.billing-test-option input {
   width: 16px;
   height: 16px;
   accent-color: var(--primary);
 }
 
-.order-test-option strong,
-.order-test-option small {
+.billing-test-option strong,
+.billing-test-option small {
   display: block;
 }
 
-.order-test-option strong {
+.billing-test-option strong {
   color: var(--text-primary);
   font-size: 13px;
 }
 
-.order-test-option small {
+.billing-test-option small {
   color: var(--text-secondary);
   font-size: 11px;
 }
 
-.order-test-option em {
+.billing-test-option em {
   color: var(--primary);
   font-style: normal;
   font-weight: 800;
   font-size: 13px;
 }
 
-.order-total-row {
+.billing-total-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5137,7 +5137,7 @@ body {
   font-size: 13px;
 }
 
-.order-total-row strong {
+.billing-total-row strong {
   color: var(--text-primary);
   font-size: 18px;
 }
@@ -5271,7 +5271,7 @@ body {
   .module-grid,
   .module-form-grid,
   .report-patient-grid,
-  .order-test-grid,
+  .billing-test-grid,
   .sample-toolbar {
     grid-template-columns: 1fr;
   }
@@ -5291,4 +5291,5 @@ body {
     flex-direction: column;
   }
 }
+
 

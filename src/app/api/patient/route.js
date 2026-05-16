@@ -12,7 +12,7 @@ export async function POST(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "patients.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Patient, LabOrder, TestDefinition, TestPackage, Doctor } = await getTenantModels(tenantId);
+    const { Patient, BillingRecord, TestDefinition, TestPackage, Doctor } = await getTenantModels(tenantId);
     const body = await req.json();
 
     const { name, dob, age, gender, phone, receivedTime, address, selectedTests, force } = body;
@@ -88,7 +88,7 @@ export async function POST(req) {
       refDoctorName: body.refDoctorName || undefined,
     });
 
-    // 🔬 Create Lab Order if tests selected
+    // 🔬 Create billing record if tests selected
     if (selectedTests && selectedTests.length > 0) {
       const orderItems = [];
       let totalAmount = 0;
@@ -149,7 +149,7 @@ export async function POST(req) {
         const commissionRate = doctor?.commission || 0;
         const commissionAmount = (totalAmount * commissionRate) / 100;
 
-        await LabOrder.create({
+        await BillingRecord.create({
           patient: patient._id,
           items: orderItems,
           referralDoctor: doctor?._id,
@@ -229,3 +229,4 @@ export async function GET(req) {
     );
   }
 }
+

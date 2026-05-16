@@ -116,7 +116,7 @@ export default function SamplesPage() {
               <span>Sample</span>
               <span>Patient</span>
               <span>Test</span>
-              <span>Order</span>
+              <span>Bill</span>
               <span>Status</span>
               {canActOnSamples && <span>Actions</span>}
             </div>
@@ -128,7 +128,7 @@ export default function SamplesPage() {
                 </span>
                 <span>{sample.patient?.name}<small>{sample.patient?.patientId}</small></span>
                 <span>{sample.testSnapshot?.name}<small>{sample.testSnapshot?.sampleType || "-"}</small></span>
-                <span>{sample.order?.orderId}<small>{sample.order?.priority}</small></span>
+                <span>{sample.billingRecord?.billId}<small>{sample.billingRecord?.priority}</small></span>
                 <span><em>{sample.status}</em></span>
                 {canActOnSamples && (
                   <span className="sample-actions">

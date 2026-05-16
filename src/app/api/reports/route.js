@@ -53,7 +53,7 @@ export async function POST(req) {
     let patientId = clean(body.patient);
     let testDefinitionId = clean(body.testDefinition);
 
-    const { Patient, TestDefinition, TestReport, Sample, LabOrder } = await getTenantModels(auth.tenantId);
+    const { Patient, TestDefinition, TestReport, Sample, BillingRecord } = await getTenantModels(auth.tenantId);
     let sample = null;
 
     if (sampleId) {
@@ -132,14 +132,14 @@ export async function POST(req) {
       sample.status = "reported";
       await sample.save();
 
-      const order = await LabOrder.findById(sample.order);
-      if (order) {
-        const item = order.items.id(sample.orderItemId);
+      const billingRecord = await BillingRecord.findById(sample.billingRecord);
+      if (billingRecord) {
+        const item = billingRecord.items.id(sample.billingItemId);
         if (item) item.status = "reported";
-        order.status = order.items.every((orderItem) => orderItem.status === "reported")
+        billingRecord.status = billingRecord.items.every((billingItem) => billingItem.status === "reported")
           ? "completed"
           : "in-progress";
-        await order.save();
+        await billingRecord.save();
       }
     }
 
