@@ -1,12 +1,25 @@
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
+function debugRequestLog(message, details = {}) {
+  if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
+  const detailText = Object.entries(details)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  console.log(`[request:dashboard-stats] ${message}${detailText ? ` ${detailText}` : ""}`);
+}
+
 export async function GET(req) {
   try {
+    debugRequestLog("start", {
+      host: req.headers.get("host"),
+    });
     const auth = requireTenantSession(req, "dashboard.view");
     if (auth.error) return auth.error;
 
     const { tenantId } = auth;
+    debugRequestLog("tenant-auth-ok", { tenantId });
     const moduleAuth = await requireEnabledTenantModule(tenantId, "dashboard.view");
     if (moduleAuth.error) return moduleAuth.error;
 
@@ -31,6 +44,7 @@ export async function GET(req) {
         : Promise.resolve(null),
       canViewPatients
         ? Patient.find({}).sort({ createdAt: -1 }).limit(5).select("name patientId age gender createdAt")
+            .lean()
         : Promise.resolve([]),
       canViewDoctors ? Doctor.countDocuments({}) : Promise.resolve(null),
       canViewReports
@@ -39,6 +53,12 @@ export async function GET(req) {
       canViewReports ? TestReport.countDocuments({ status: "draft" }) : Promise.resolve(null),
     ]);
 
+    debugRequestLog("ok", {
+      tenantId,
+      canViewPatients,
+      canViewDoctors,
+      canViewReports,
+    });
     return Response.json({
       totalPatients,
       totalDoctors,

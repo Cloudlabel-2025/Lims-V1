@@ -76,6 +76,7 @@ export const TestPackageSchema = new mongoose.Schema(
 );
 
 TestPackageSchema.index({ name: 1 }, { unique: true });
+TestPackageSchema.index({ status: 1, name: 1 });
 
 TestPackageSchema.pre("save", async function generatePackageId() {
   if (this.packageId) return;
@@ -88,10 +89,7 @@ TestPackageSchema.pre("save", async function generatePackageId() {
 });
 
 export function getTestPackageModel(connection = mongoose) {
-  if (connection.models.TestPackage) {
-    delete connection.models.TestPackage;
-  }
-  return connection.model("TestPackage", TestPackageSchema);
+  return connection.models.TestPackage || connection.model("TestPackage", TestPackageSchema);
 }
 
 const TestPackage = getTestPackageModel();

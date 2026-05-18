@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { canAccessPath, getFirstAllowedHref } from "@/app/lib/client-rbac";
 import { applyTheme } from "@/app/components/ThemeProvider";
+import { TenantShellProvider } from "@/app/lib/use-current-user";
 
 function isCurrentTenantHost(tenantId) {
   if (typeof window === "undefined" || !tenantId) return false;
@@ -34,6 +35,57 @@ function buildTenantLoginFallback() {
   return `/?${params.toString()}`;
 }
 
+const shellCache = {
+  key: "",
+  value: null,
+  expiresAt: 0,
+  promise: null,
+};
+
+function getShellCacheKey() {
+  if (typeof window === "undefined") return "";
+  return window.location.origin;
+}
+
+async function loadTenantShellData() {
+  const cacheKey = getShellCacheKey();
+  const now = Date.now();
+
+  if (shellCache.key === cacheKey && shellCache.value && shellCache.expiresAt > now) {
+    return shellCache.value;
+  }
+
+  if (shellCache.key === cacheKey && shellCache.promise) {
+    return shellCache.promise;
+  }
+
+  shellCache.key = cacheKey;
+  shellCache.promise = (async () => {
+    const response = await fetch("/api/auth/me", { credentials: "include" });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Not authenticated");
+    }
+
+    const themeResponse = await fetch("/api/theme", { credentials: "include" });
+    const themeData = await themeResponse.json();
+
+    const value = {
+      user: data.user,
+      theme: themeResponse.ok ? themeData.theme : null,
+    };
+
+    shellCache.value = value;
+    shellCache.expiresAt = Date.now() + 15_000;
+    return value;
+  })().finally(() => {
+    shellCache.promise = null;
+  });
+
+  return shellCache.promise;
+}
+
 export default function MainLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -47,20 +99,10 @@ export default function MainLayout({ children }) {
 
     async function loadSession() {
       try {
-        const response = await fetch("/api/auth/me", { credentials: "include" });
-        const data = await response.json();
-
+        const data = await loadTenantShellData();
         if (!cancelled) {
-          if (response.ok) {
-            setUser(data.user);
-            const themeResponse = await fetch("/api/theme", { credentials: "include" });
-            if (themeResponse.ok) {
-              const themeData = await themeResponse.json();
-              if (!cancelled) setTheme(themeData.theme);
-            }
-          } else {
-            router.replace(buildTenantLoginFallback());
-          }
+          setUser(data.user);
+          setTheme(data.theme);
         }
       } catch {
         if (!cancelled) router.replace(buildTenantLoginFallback());
@@ -99,40 +141,53 @@ export default function MainLayout({ children }) {
   const handleLogout = async () => {
     const response = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     const data = await response.json().catch(() => ({}));
-    router.push(data.redirectUrl || buildTenantLoginFallback());
-    router.refresh();
+    shellCache.value = null;
+    shellCache.expiresAt = 0;
+    shellCache.promise = null;
+    router.replace(data.redirectUrl || buildTenantLoginFallback());
   };
 
+  const shellContext = useMemo(
+    () => ({
+      user,
+      theme,
+      tenantId: user?.tenantId || theme?.tenantId || null,
+      setTheme,
+    }),
+    [theme, user]
+  );
   if (loading) return <div style={{ minHeight: "100vh", background: "#f1f5f9" }} />;
 
   const hasPageAccess = canAccessPath(user, theme, pathname);
 
   return (
-    <div className="dash-layout">
-      <Sidebar 
-        collapsed={collapsed} 
-        onLogout={handleLogout} 
-        theme={theme}
-        user={user}
-      />
-      <div className="dash-main">
-        <Topbar 
-          onToggleSidebar={() => setCollapsed(!collapsed)} 
+    <TenantShellProvider value={shellContext}>
+      <div className="dash-layout">
+        <Sidebar
+          collapsed={collapsed}
+          onLogout={handleLogout}
+          theme={theme}
           user={user}
         />
-        <div className="dash-content">
-          {hasPageAccess ? (
-            children
-          ) : (
-            <section className="dash-card">
-              <div className="dash-card-header">
-                <h3>Access denied</h3>
-              </div>
-              <p>Your role does not have permission to view this page.</p>
-            </section>
-          )}
+        <div className="dash-main">
+          <Topbar
+            onToggleSidebar={() => setCollapsed(!collapsed)}
+            user={user}
+          />
+          <div className="dash-content">
+            {hasPageAccess ? (
+              children
+            ) : (
+              <section className="dash-card">
+                <div className="dash-card-header">
+                  <h3>Access denied</h3>
+                </div>
+                <p>Your role does not have permission to view this page.</p>
+              </section>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </TenantShellProvider>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import { hasPermission } from "@/app/lib/client-rbac";
-import { useCurrentUser } from "@/app/lib/use-current-user";
+import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
 
 export default function SamplesPage() {
   const user = useCurrentUser();
@@ -23,8 +23,7 @@ export default function SamplesPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/samples?status=${nextStatus}`, { credentials: "include" });
-      const data = await response.json();
+      const { response, data } = await cachedJsonFetch(`/api/samples?status=${nextStatus}`, { ttl: 10_000 });
       if (!response.ok) throw new Error(data.error || "Unable to load samples");
       setSamples(data.samples || []);
     } catch (err) {
@@ -55,6 +54,10 @@ export default function SamplesPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || data.details || "Unable to update sample");
 
+      clearCachedApi(`/api/samples?status=${status}`);
+      clearCachedApi("/api/samples?status=all");
+      clearCachedApi("/api/reports");
+      clearCachedApi("/api/dashboard/stats");
       setSamples((current) =>
         current.map((sample) => (sample._id === sampleId ? data.sample : sample))
       );

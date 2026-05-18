@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
-import connectMasterDB from "@/app/lib/master-db";
-import { getLabModel } from "@/app/models/master/Lab";
 import { getSessionFromRequest, requireTenantSession } from "@/app/lib/auth";
 import { getTenantIdFromRequest } from "@/app/lib/tenant-resolver";
 import { defaultLabModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, getTenantConfig } from "@/app/lib/tenant-cache";
+
+function debugRequestLog(message, details = {}) {
+  if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
+  const detailText = Object.entries(details)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  console.log(`[request:theme] ${message}${detailText ? ` ${detailText}` : ""}`);
+}
 
 const defaultTheme = {
   labName: "Uthiram LIMS",
@@ -23,6 +30,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const session = getSessionFromRequest(req);
     let tenantId = session?.userType === "tenant" ? session.tenantId : null;
+    const source = tenantId ? "session" : "request";
 
     if (!tenantId) {
       try {
@@ -32,12 +40,20 @@ export async function GET(req) {
       }
     }
 
+    debugRequestLog("start", {
+      tenantId,
+      source,
+      host: req.headers.get("host"),
+    });
+
     if (!tenantId) {
+      debugRequestLog("default-no-tenant");
       return NextResponse.json({ theme: defaultTheme });
     }
 
     const lab = await getTenantConfig(tenantId);
     if (!lab) {
+      debugRequestLog("default-missing-lab", { tenantId });
       return NextResponse.json({ theme: defaultTheme });
     }
 
@@ -49,6 +65,10 @@ export async function GET(req) {
       return NextResponse.json({ error: "Tenant is not active" }, { status: 403 });
     }
 
+    debugRequestLog("ok", {
+      tenantId: lab.tenantId,
+      status: lab.status,
+    });
     return NextResponse.json({
       theme: {
         labName: lab.name,
@@ -100,6 +120,10 @@ export async function PATCH(req) {
     if (auth.error) return auth.error;
 
     const body = await req.json();
+    const [{ default: connectMasterDB }, { getLabModel }] = await Promise.all([
+      import("@/app/lib/master-db"),
+      import("@/app/models/master/Lab"),
+    ]);
     const masterConnection = await connectMasterDB();
     const Lab = getLabModel(masterConnection);
     const lab = await Lab.findOne({ tenantId: auth.tenantId });

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import { cachedJsonFetch } from "@/app/lib/use-current-user";
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -23,8 +24,7 @@ export default function DeveloperDashboardPage() {
 
     async function loadLabs() {
       try {
-        const response = await fetch("/api/developer/labs", { credentials: "include" });
-        const data = await response.json();
+        const { response, data } = await cachedJsonFetch("/api/developer/labs", { ttl: 15_000 });
 
         if (!response.ok) {
           throw new Error(data.error || "Unable to load developer dashboard");

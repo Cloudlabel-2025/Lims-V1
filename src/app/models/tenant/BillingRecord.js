@@ -117,6 +117,10 @@ export const BillingRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+BillingRecordSchema.index({ createdAt: -1 });
+BillingRecordSchema.index({ billingStatus: 1, createdAt: -1 });
+BillingRecordSchema.index({ status: 1, createdAt: -1 });
+
 BillingRecordSchema.pre("save", async function generateBillId() {
   if (this.billId) return;
 

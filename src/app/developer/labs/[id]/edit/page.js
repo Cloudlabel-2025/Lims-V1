@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { availableLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
 import PasswordField from "@/app/components/PasswordField";
+import { clearCachedApi } from "@/app/lib/use-current-user";
 
 const loginHighlightOptions = [
   "Patient Registration & Tracking",
@@ -90,7 +90,6 @@ function validateForm(form) {
 
 export default function DeveloperEditLabPage({ params }) {
   const { id } = use(params);
-  const router = useRouter();
   const [form, setForm] = useState(emptyForm);
   const [customHighlight, setCustomHighlight] = useState("");
   const [loading, setLoading] = useState(true);
@@ -268,8 +267,10 @@ export default function DeveloperEditLabPage({ params }) {
         adminPassword: "",
         adminConfirmPassword: "",
       }));
+      clearCachedApi("/api/developer/labs");
+      clearCachedApi(`/api/developer/labs/${encodeURIComponent(id)}`);
+      clearCachedApi(`/api/developer/labs/${data.lab.tenantId}/access`);
       setSuccess("Lab updated successfully.");
-      router.refresh();
     } catch (err) {
       setError(err.message);
     } finally {

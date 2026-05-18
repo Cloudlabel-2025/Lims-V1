@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
 import PasswordField from "@/app/components/PasswordField";
+import { clearCachedApi } from "@/app/lib/use-current-user";
 
 const defaultForm = {
   name: "",
@@ -277,6 +278,7 @@ export default function DeveloperCreateLabPage() {
         throw new Error(data.error || data.details || "Unable to create lab");
       }
 
+      clearCachedApi("/api/developer/labs");
       setCreatedLab(data);
       setForm(defaultForm);
       setLogoFile(null);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import { applyCmsTheme } from "@/app/components/ThemeProvider";
 
 const sections = [
   {
@@ -49,6 +50,10 @@ export default function DeveloperLayout({ children }) {
   const pageTitle = useMemo(() => getPageTitle(pathname), [pathname]);
 
   useEffect(() => {
+    applyCmsTheme();
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadDeveloperSession() {
@@ -78,8 +83,7 @@ export default function DeveloperLayout({ children }) {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    router.push("/");
-    router.refresh();
+    router.replace("/");
   }
 
   if (loading) return <main className="developer-page">Loading developer access...</main>;

@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 
+function debugRequestLog(message, details = {}) {
+  if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
+  const detailText = Object.entries(details)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  console.log(`[request:internal-tenant] ${message}${detailText ? ` ${detailText}` : ""}`);
+}
+
 function getTenantLookupSecret() {
   if (process.env.TENANT_LOOKUP_SECRET) return process.env.TENANT_LOOKUP_SECRET;
   if (process.env.NODE_ENV !== "production") return "dev-tenant-lookup-secret";
@@ -24,15 +33,18 @@ export async function GET(req) {
   const receivedSecret = req.headers.get("x-tenant-secret");
 
   if (!expectedSecret || receivedSecret !== expectedSecret) {
+    debugRequestLog("unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const { searchParams } = new URL(req.url);
     const subdomain = normalizeTenantId(searchParams.get("subdomain"));
+    debugRequestLog("start", { subdomain });
     const tenant = await getTenantConfig(subdomain);
 
     if (!tenant) {
+      debugRequestLog("not-found", { subdomain });
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
@@ -50,8 +62,13 @@ export async function GET(req) {
       );
     }
 
+    debugRequestLog("ok", {
+      subdomain,
+      status: tenant.status,
+    });
     return NextResponse.json({ tenant: publicTenantPayload(tenant) });
   } catch {
+    debugRequestLog("invalid");
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
 }

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { applyCmsTheme, buildThemeVariables } from "@/app/components/ThemeProvider";
 
 const developerLoginFeatures = [
   "Tenant Lab Onboarding",
@@ -45,13 +46,14 @@ export default function LoginPage({
     : developerLoginFeatures;
   const loginThemeStyle =
     isTenantLogin && theme
-      ? {
-          "--primary": theme.primaryColor || "#0d9488",
-          "--primary-light": theme.accentColor || theme.primaryColor || "#14b8a6",
-          "--primary-dark": theme.secondaryColor || theme.primaryColor || "#0f766e",
-          "--login-accent": theme.accentColor || "#f59e0b",
-        }
+      ? buildThemeVariables(theme)
       : undefined;
+
+  useEffect(() => {
+    if (!isTenantLogin) {
+      applyCmsTheme();
+    }
+  }, [isTenantLogin]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,7 +117,6 @@ export default function LoginPage({
 
       if (onLogin) onLogin(data.user);
       router.push(userType === "developer" ? "/developer/dashboard" : data.redirectUrl || "/dashboard");
-      router.refresh();
     } catch {
       setError("Login failed. Please try again.");
     } finally {

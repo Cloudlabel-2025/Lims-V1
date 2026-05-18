@@ -14,7 +14,10 @@ export async function GET(req) {
     if (moduleAuth.error) return moduleAuth.error;
 
     const { TestCategory } = await getTenantModels(auth.tenantId);
-    const categories = await TestCategory.find({}).sort({ name: 1 });
+    const categories = await TestCategory.find({})
+      .select("categoryId name description status createdAt updatedAt")
+      .sort({ name: 1 })
+      .lean();
 
     return Response.json({ categories });
   } catch (error) {

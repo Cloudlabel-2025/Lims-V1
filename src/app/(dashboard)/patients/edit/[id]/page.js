@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import SearchableSelect from "@/app/components/SearchableSelect";
 import { calculateAge } from "@/app/utils/patient-helpers";
+import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
 export default function EditPatient({ params }) {
   const resolvedParams = use(params);
@@ -21,11 +22,8 @@ export default function EditPatient({ params }) {
 
   useEffect(() => {
     async function fetchPatient() {
-      console.log("EditPage: Fetching patient with ID:", id);
       try {
-        const res = await fetch(`/api/patient/${id}`);
-        const data = await res.json();
-        console.log("EditPage: API Response:", data);
+        const { response: res, data } = await cachedJsonFetch(`/api/patient/${id}`, { ttl: 10_000 });
         if (res.ok) {
           // Format dates for input[type="date"] and datetime-local
           const formattedData = {
@@ -49,8 +47,7 @@ export default function EditPatient({ params }) {
 
     async function fetchDoctors() {
       try {
-        const res = await fetch("/api/doctor");
-        const data = await res.json();
+        const { response: res, data } = await cachedJsonFetch("/api/doctor", { ttl: 15_000 });
         if (res.ok) setDoctors(data);
       } catch (err) {
         console.error("Failed to fetch doctors:", err);
@@ -113,6 +110,11 @@ export default function EditPatient({ params }) {
       });
       const data = await res.json();
       if (res.ok) {
+        clearCachedApi("/api/patient");
+        clearCachedApi(`/api/patient/${id}`);
+        clearCachedApi("/api/billing");
+        clearCachedApi("/api/samples?status=all");
+        clearCachedApi("/api/reports");
         setStatus({ type: "success", message: "Patient updated successfully!" });
         setTimeout(() => router.push("/patients"), 1500);
       } else {

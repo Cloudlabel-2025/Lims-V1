@@ -1,5 +1,3 @@
-import connectMasterDB from "@/app/lib/master-db";
-import { getLabModel } from "@/app/models/master/Lab";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 
 const tenantConfigCache = globalThis.tenantConfigCache || new Map();
@@ -91,6 +89,10 @@ export function warmTenantConfigCache(tenant) {
 async function loadTenantConfigFromDb(tenantId, { includeSecret = false } = {}) {
   const normalizedTenantId = normalizeTenantId(tenantId);
 
+  const [{ default: connectMasterDB }, { getLabModel }] = await Promise.all([
+    import("@/app/lib/master-db"),
+    import("@/app/models/master/Lab"),
+  ]);
   const masterConnection = await connectMasterDB();
   const Lab = getLabModel(masterConnection);
   const query = Lab.findOne({ tenantId: normalizedTenantId }).select(

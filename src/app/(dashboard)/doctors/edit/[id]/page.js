@@ -2,6 +2,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
 export default function EditDoctor({ params }) {
   const resolvedParams = use(params);
@@ -18,9 +19,8 @@ export default function EditDoctor({ params }) {
   useEffect(() => {
     async function fetchDoctor() {
       try {
-        const res = await fetch(`/api/doctor/${id}`);
-        const data = await res.json();
-        if (res.ok) {
+        const { response, data } = await cachedJsonFetch(`/api/doctor/${id}`, { ttl: 10_000 });
+        if (response.ok) {
           setForm(data);
         } else {
           setStatus({ type: "danger", message: data.error || "Failed to load doctor data." });
@@ -95,6 +95,8 @@ export default function EditDoctor({ params }) {
       });
       const data = await res.json();
       if (res.ok) {
+        clearCachedApi("/api/doctor");
+        clearCachedApi(`/api/doctor/${id}`);
         setStatus({ type: "success", message: "Doctor profile updated successfully!" });
         setTimeout(() => router.push("/doctors"), 1500);
       } else {

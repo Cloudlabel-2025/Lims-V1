@@ -1,10 +1,20 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import SearchableSelect from "@/app/components/SearchableSelect";
-import MultiSelect from "@/app/components/MultiSelect";
 import { getISTNow, getEmptyForm, calculateAge } from "@/app/utils/patient-helpers";
+import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
+
+const SearchableSelect = dynamic(() => import("@/app/components/SearchableSelect"), {
+  ssr: false,
+  loading: () => <div className="lims-input">Loading options...</div>,
+});
+
+const MultiSelect = dynamic(() => import("@/app/components/MultiSelect"), {
+  ssr: false,
+  loading: () => <div className="lims-input">Loading options...</div>,
+});
 
 export default function PatientRegistration() {
   const router = useRouter();
@@ -43,20 +53,14 @@ export default function PatientRegistration() {
     async function fetchData() {
       try {
         const [docRes, testRes, pkgRes] = await Promise.all([
-          fetch("/api/doctor"),
-          fetch("/api/tests/definitions"),
-          fetch("/api/tests/packages")
-        ]);
-        
-        const [docData, testData, pkgData] = await Promise.all([
-          docRes.json(),
-          testRes.json(),
-          pkgRes.json()
+          cachedJsonFetch("/api/doctor", { ttl: 15_000 }),
+          cachedJsonFetch("/api/tests/definitions", { ttl: 30_000 }),
+          cachedJsonFetch("/api/tests/packages", { ttl: 30_000 })
         ]);
 
-        if (docRes.ok) setDoctors(docData);
-        if (testRes.ok) setAvailableTests(testData.tests || []);
-        if (pkgRes.ok) setAvailablePackages(pkgData.packages || []);
+        if (docRes.response.ok) setDoctors(docRes.data);
+        if (testRes.response.ok) setAvailableTests(testRes.data.tests || []);
+        if (pkgRes.response.ok) setAvailablePackages(pkgRes.data.packages || []);
       } catch (err) {
         console.error("Failed to fetch registration data:", err);
       }
@@ -176,6 +180,10 @@ export default function PatientRegistration() {
       });
       const data = await res.json();
       if (res.ok) {
+        clearCachedApi("/api/patient");
+        clearCachedApi("/api/billing");
+        clearCachedApi("/api/samples?status=all");
+        clearCachedApi("/api/dashboard/stats");
         setStatus({ 
           type: "success", 
           message: `Patient registered successfully — ID: ${data.patientId}. A pending bill has been generated in the Billing Center.`
@@ -362,7 +370,7 @@ export default function PatientRegistration() {
         }}>
           <div>
             <span style={{ fontSize: "13px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Total Bill Amount</span>
-            <strong style={{ fontSize: "24px", color: "var(--primary)" }}>₹{selectedTotal}</strong>
+            <strong style={{ fontSize: "24px", color: "var(--brand-action, var(--primary))" }}>₹{selectedTotal}</strong>
           </div>
           <div style={{ color: "var(--text-secondary)", fontSize: "14px", fontWeight: "600" }}>
             {form.selectedTests?.length || 0} Investigations Selected
@@ -379,7 +387,7 @@ export default function PatientRegistration() {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header"><div className="modal-icon-warning">!</div><h4>Duplicate Contact Number</h4></div>
-            <p>The number <strong>{pendingPayload?.phone}</strong> is registered to: <br /><strong style={{ fontSize: '18px', color: 'var(--primary-dark)', display: 'block', margin: '8px 0' }}>{duplicatePatient?.name} ({duplicatePatient?.patientId})</strong>Proceed anyway?</p>
+            <p>The number <strong>{pendingPayload?.phone}</strong> is registered to: <br /><strong style={{ fontSize: '18px', color: 'var(--brand-action, var(--primary))', display: 'block', margin: '8px 0' }}>{duplicatePatient?.name} ({duplicatePatient?.patientId})</strong>Proceed anyway?</p>
             <div className="modal-actions">
               <button className="btn-modal-cancel" onClick={() => setDuplicateWarning(false)}>Cancel</button>
               <button className="btn-modal-confirm" onClick={async () => {
@@ -387,7 +395,7 @@ export default function PatientRegistration() {
                 try {
                   const res = await fetch("/api/patient", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...pendingPayload, force: true }) });
                   const data = await res.json();
-                  if (res.ok) { setStatus({ type: "success", message: `Registered: ${data.patientId}` }); setForm(getEmptyForm()); setHasRefDoctor(false); }
+                  if (res.ok) { clearCachedApi("/api/patient"); clearCachedApi("/api/billing"); clearCachedApi("/api/samples?status=all"); clearCachedApi("/api/dashboard/stats"); setStatus({ type: "success", message: `Registered: ${data.patientId}` }); setForm(getEmptyForm()); setHasRefDoctor(false); }
                   else setStatus({ type: "danger", message: data.error || "Failed" });
                 } catch { setStatus({ type: "danger", message: "Network error" }); }
                 finally { setLoading(false); }

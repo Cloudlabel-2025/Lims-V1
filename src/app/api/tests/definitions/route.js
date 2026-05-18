@@ -74,8 +74,10 @@ export async function GET(req) {
     const { TestDefinition } = await getTenantModels(auth.tenantId);
     const tests = await TestDefinition.find(query)
       .populate("category", "name categoryId")
+      .select("testId name code category sampleType price parameters status createdAt updatedAt")
       .sort({ updatedAt: -1 })
-      .limit(100);
+      .limit(100)
+      .lean();
 
     return Response.json({ tests });
   } catch (error) {

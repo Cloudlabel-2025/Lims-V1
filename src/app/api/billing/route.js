@@ -22,8 +22,10 @@ export async function GET(req) {
     const billingRecords = await BillingRecord.find(query)
       .populate("patient", "name patientId age gender phone")
       .populate("referralDoctor", "name doctorId commission pendingPayout")
+      .select("billId patient items priority status notes referralDoctor totalAmount commissionAmount paymentBreakdown billingStatus createdBy createdAt updatedAt")
       .sort({ createdAt: -1 })
-      .limit(100);
+      .limit(100)
+      .lean();
 
     return Response.json({ billingRecords });
   } catch (error) {
@@ -55,21 +57,51 @@ export async function POST(req) {
     const { Patient, TestDefinition, BillingRecord, Sample, Doctor, TestPackage } = await getTenantModels(auth.tenantId);
     BillingRecordModel = BillingRecord;
     SampleModel = Sample;
-    const patient = await Patient.findById(patientId);
+    const patient = await Patient.findById(patientId).select("name patientId age gender phone refDoctorName").lean();
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
 
-    const doctor = patient.refDoctorName ? await Doctor.findOne({ name: patient.refDoctorName }) : null;
+    const doctor = patient.refDoctorName
+      ? await Doctor.findOne({ name: patient.refDoctorName }).select("_id commission").lean()
+      : null;
 
     const billingItems = [];
     let totalAmount = 0;
+    const testObjectIds = testIds
+      .filter((itemKey) => itemKey.startsWith("test_"))
+      .map((itemKey) => itemKey.replace("test_", ""));
+    const packageObjectIds = testIds
+      .filter((itemKey) => itemKey.startsWith("pkg_"))
+      .map((itemKey) => itemKey.replace("pkg_", ""));
+    const [selectedTests, selectedPackages] = await Promise.all([
+      testObjectIds.length
+        ? TestDefinition.find({ _id: { $in: testObjectIds } })
+            .populate("category", "name")
+            .select("testId name code category sampleType price")
+            .lean()
+        : Promise.resolve([]),
+      packageObjectIds.length
+        ? TestPackage.find({ _id: { $in: packageObjectIds } })
+            .populate({
+              path: "tests",
+              select: "testId name code category sampleType price",
+              populate: { path: "category", select: "name" },
+            })
+            .select("price tests")
+            .lean()
+        : Promise.resolve([]),
+    ]);
+    const selectedTestMap = new Map(selectedTests.map((test) => [String(test._id), test]));
+    const selectedPackageMap = new Map(selectedPackages.map((pkg) => [String(pkg._id), pkg]));
+    const addedTestIds = new Set();
 
     for (const itemKey of testIds) {
       if (itemKey.startsWith("test_")) {
         const testId = itemKey.replace("test_", "");
-        const test = await TestDefinition.findById(testId).populate("category");
+        const test = selectedTestMap.get(testId);
         if (test) {
           const price = Number(test.price) || 0;
           totalAmount += price;
+          addedTestIds.add(String(test._id));
           billingItems.push({
             testDefinition: test._id,
             testSnapshot: {
@@ -85,17 +117,16 @@ export async function POST(req) {
         }
       } else if (itemKey.startsWith("pkg_")) {
         const pkgId = itemKey.replace("pkg_", "");
-        const pkg = await TestPackage.findById(pkgId).populate({
-          path: "tests",
-          populate: { path: "category" }
-        });
+        const pkg = selectedPackageMap.get(pkgId);
         
         if (pkg) {
           const price = Number(pkg.price) || 0;
           totalAmount += price;
           if (pkg.tests) {
             for (const test of pkg.tests) {
-              if (!billingItems.find(item => item.testDefinition.toString() === test._id.toString())) {
+              const testId = String(test._id);
+              if (!addedTestIds.has(testId)) {
+                addedTestIds.add(testId);
                 billingItems.push({
                   testDefinition: test._id,
                   testSnapshot: {

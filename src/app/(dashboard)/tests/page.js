@@ -1,10 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
-import MultiSelect from "@/app/components/MultiSelect";
 import { hasPermission } from "@/app/lib/client-rbac";
-import { useCurrentUser } from "@/app/lib/use-current-user";
+import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
+
+const PackagesTab = dynamic(() => import("./PackagesTab"), {
+  ssr: false,
+  loading: () => <div className="module-panel">Loading packages...</div>,
+});
+const CategoriesTab = dynamic(() => import("./CategoriesTab"), {
+  ssr: false,
+  loading: () => <div className="module-panel">Loading categories...</div>,
+});
 
 const blankParameter = {
   name: "",
@@ -70,6 +79,18 @@ export default function TestsPage() {
       return acc + (Number(test?.price) || 0);
     }, 0);
   }, [packageForm.tests, tests]);
+  const packageTestOptions = useMemo(
+    () => tests.map((test) => ({ value: test._id, label: test.name, sublabel: test.category?.name || "No Category" })),
+    [tests]
+  );
+  const categoryUsageCounts = useMemo(() => {
+    const counts = new Map();
+    tests.forEach((test) => {
+      const categoryId = test.category?._id || test.category;
+      if (categoryId) counts.set(categoryId, (counts.get(categoryId) || 0) + 1);
+    });
+    return counts;
+  }, [tests]);
 
   const canEditTests = hasPermission(user, "tests.edit");
 
@@ -78,19 +99,17 @@ export default function TestsPage() {
     setError("");
     try {
       const [categoryResponse, testResponse, packageResponse] = await Promise.all([
-        fetch("/api/tests/categories", { credentials: "include" }),
-        fetch("/api/tests/definitions", { credentials: "include" }),
-        fetch("/api/tests/packages", { credentials: "include" }),
+        cachedJsonFetch("/api/tests/categories", { ttl: 30_000 }),
+        cachedJsonFetch("/api/tests/definitions", { ttl: 30_000 }),
+        cachedJsonFetch("/api/tests/packages", { ttl: 30_000 }),
       ]);
-      const [categoryData, testData, packageData] = await Promise.all([
-        categoryResponse.json(),
-        testResponse.json(),
-        packageResponse.json(),
-      ]);
+      const categoryData = categoryResponse.data;
+      const testData = testResponse.data;
+      const packageData = packageResponse.data;
 
-      if (!categoryResponse.ok) throw new Error(categoryData.error || "Unable to load categories");
-      if (!testResponse.ok) throw new Error(testData.error || "Unable to load tests");
-      if (!packageResponse.ok) throw new Error(packageData.error || "Unable to load packages");
+      if (!categoryResponse.response.ok) throw new Error(categoryData.error || "Unable to load categories");
+      if (!testResponse.response.ok) throw new Error(testData.error || "Unable to load tests");
+      if (!packageResponse.response.ok) throw new Error(packageData.error || "Unable to load packages");
 
       setCategories(categoryData.categories || []);
       setTests(testData.tests || []);
@@ -157,6 +176,7 @@ export default function TestsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to create category");
 
+      clearCachedApi("/api/tests/categories");
       setCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
       setForm((current) => ({ ...current, category: data.category._id }));
       setCategoryName("");
@@ -183,6 +203,8 @@ export default function TestsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || data.details || "Unable to save test");
 
+      clearCachedApi("/api/tests/definitions");
+      clearCachedApi("/api/tests/definitions?status=active");
       setTests((current) => {
         const existing = current.some((test) => test._id === data.test._id);
         return existing
@@ -215,6 +237,7 @@ export default function TestsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || data.details || "Unable to save package");
 
+      clearCachedApi("/api/tests/packages");
       setPackages((current) => {
         const existing = current.some((pkg) => pkg._id === data.package._id);
         return existing
@@ -309,8 +332,8 @@ export default function TestsPage() {
             padding: "12px 4px", 
             background: "none", 
             border: "none", 
-            borderBottom: activeTab === "tests" ? "2.5px solid var(--primary)" : "2.5px solid transparent",
-            color: activeTab === "tests" ? "var(--primary)" : "var(--text-muted)",
+            borderBottom: activeTab === "tests" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
+            color: activeTab === "tests" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
             fontWeight: activeTab === "tests" ? "700" : "500",
             fontSize: "14px",
             cursor: "pointer",
@@ -325,8 +348,8 @@ export default function TestsPage() {
             padding: "12px 4px", 
             background: "none", 
             border: "none", 
-            borderBottom: activeTab === "packages" ? "2.5px solid var(--primary)" : "2.5px solid transparent",
-            color: activeTab === "packages" ? "var(--primary)" : "var(--text-muted)",
+            borderBottom: activeTab === "packages" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
+            color: activeTab === "packages" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
             fontWeight: activeTab === "packages" ? "700" : "500",
             fontSize: "14px",
             cursor: "pointer",
@@ -341,8 +364,8 @@ export default function TestsPage() {
             padding: "12px 4px", 
             background: "none", 
             border: "none", 
-            borderBottom: activeTab === "categories" ? "2.5px solid var(--primary)" : "2.5px solid transparent",
-            color: activeTab === "categories" ? "var(--primary)" : "var(--text-muted)",
+            borderBottom: activeTab === "categories" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
+            color: activeTab === "categories" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
             fontWeight: activeTab === "categories" ? "700" : "500",
             fontSize: "14px",
             cursor: "pointer",
@@ -546,170 +569,32 @@ export default function TestsPage() {
       )}
 
       {activeTab === "packages" && (
-        <div className="module-grid">
-          {canEditTests && (
-            <section className="module-panel">
-              <div className="module-panel-header">
-                <h2>{editingPackageId ? "Edit Package" : "Create Package"}</h2>
-                <p>Bundle multiple tests together.</p>
-              </div>
-
-              <form onSubmit={savePackage} className="module-form">
-                <div className="module-form-grid">
-                  <label>
-                    Package Name
-                    <input 
-                      value={packageForm.name} 
-                      onChange={(e) => setPackageForm(p => ({ ...p, name: e.target.value }))} 
-                      placeholder="Executive Health Checkup" 
-                      required 
-                    />
-                  </label>
-                  <label>
-                    Code
-                    <input 
-                      value={packageForm.code} 
-                      onChange={(e) => setPackageForm(p => ({ ...p, code: e.target.value }))} 
-                      placeholder="PKG-EXEC" 
-                    />
-                  </label>
-                  <label className="full-width">
-                    Description
-                    <textarea 
-                      value={packageForm.description} 
-                      onChange={(e) => setPackageForm(p => ({ ...p, description: e.target.value }))} 
-                      placeholder="Comprehensive health screening including major vital tests..." 
-                      style={{ width: "100%", height: "80px", padding: "10px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border)", fontSize: "13.5px" }}
-                    />
-                  </label>
-                  <label>
-                    Package Price (₹)
-                    <div style={{ position: "relative" }}>
-                      <input 
-                        type="number" 
-                        value={packageForm.price} 
-                        onChange={(e) => setPackageForm(p => ({ ...p, price: e.target.value }))} 
-                        placeholder="0" 
-                        required 
-                        className="lims-input"
-                      />
-                      {packageForm.tests.length > 0 && (
-                        <div style={{ 
-                          position: "absolute", 
-                          right: "12px", 
-                          top: "50%", 
-                          transform: "translateY(-50%)", 
-                          fontSize: "11px", 
-                          color: "var(--text-muted)",
-                          pointerEvents: "none"
-                        }}>
-                          Individual Sum: ₹{selectedTestsTotal}
-                        </div>
-                      )}
-                    </div>
-                  </label>
-                  <label>
-                    Status
-                    <select 
-                      value={packageForm.status} 
-                      onChange={(e) => setPackageForm(p => ({ ...p, status: e.target.value }))}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </label>
-                  <label className="full-width">
-                    Select Tests
-                    <MultiSelect 
-                      options={tests.map(t => ({ value: t._id, label: t.name, sublabel: t.category?.name || "No Category" }))}
-                      value={packageForm.tests}
-                      onChange={(e) => setPackageForm(p => ({ ...p, tests: e.target.value }))}
-                      placeholder="Search and add tests..."
-                    />
-                  </label>
-                </div>
-
-                <button type="submit" className="dash-btn-primary module-save" disabled={!canSavePackage || saving} style={{ marginTop: "24px" }}>
-                  {saving ? "Saving..." : editingPackageId ? "Update Package" : "Create Package"}
-                </button>
-              </form>
-            </section>
-          )}
-
-          <aside className="module-panel">
-            <div className="module-panel-header">
-              <h2>Defined Packages</h2>
-              <p>{packages.length} packages configured</p>
-            </div>
-            <div className="test-card-list">
-              {packages.map((pkg) => (
-                <article
-                  key={pkg._id}
-                  className={`test-card ${editingPackageId === pkg._id ? 'active' : ''}`}
-                  onClick={() => {
-                    if (canEditTests) editPackage(pkg);
-                  }}
-                >
-                  <div>
-                    <h3>{pkg.name}</h3>
-                    <span>{pkg.tests?.length || 0} tests included · ₹{pkg.price}</span>
-                  </div>
-                  <strong>{pkg.status}</strong>
-                </article>
-              ))}
-            </div>
-          </aside>
-        </div>
+        <PackagesTab
+          canEditTests={canEditTests}
+          packageForm={packageForm}
+          setPackageForm={setPackageForm}
+          savePackage={savePackage}
+          canSavePackage={canSavePackage}
+          saving={saving}
+          editingPackageId={editingPackageId}
+          selectedTestsTotal={selectedTestsTotal}
+          packageTestOptions={packageTestOptions}
+          packages={packages}
+          editPackage={editPackage}
+        />
       )}
 
       {activeTab === "categories" && (
-        <div className="module-grid">
-          {canEditTests && (
-            <section className="module-panel">
-              <div className="module-panel-header">
-                <h2>{editingCategoryId ? "Edit Category" : "Create Category"}</h2>
-                <p>Manage test departments.</p>
-              </div>
-
-              <form onSubmit={createCategory} className="module-form">
-                <div className="module-form-grid">
-                  <label>
-                    Category Name
-                    <input 
-                      value={categoryName} 
-                      onChange={(e) => setCategoryName(e.target.value)} 
-                      placeholder="Hematology" 
-                      required 
-                    />
-                  </label>
-                </div>
-                <button type="submit" className="dash-btn-primary module-save" disabled={!categoryName || saving} style={{ marginTop: "24px" }}>
-                  {saving ? "Saving..." : editingCategoryId ? "Update Category" : "Create Category"}
-                </button>
-              </form>
-            </section>
-          )}
-
-          <aside className="module-panel">
-            <div className="module-panel-header">
-              <h2>Department Categories</h2>
-              <p>{categories.length} categories available</p>
-            </div>
-            <div className="test-card-list">
-              {categories.map((cat) => (
-                <article
-                  key={cat._id}
-                  className={`test-card ${editingCategoryId === cat._id ? 'active' : ''}`}
-                >
-                  <div>
-                    <h3>{cat.name}</h3>
-                    <span>Used in {tests.filter(t => t.category?._id === cat._id || t.category === cat._id).length} tests</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </aside>
-        </div>
+        <CategoriesTab
+          canEditTests={canEditTests}
+          editingCategoryId={editingCategoryId}
+          createCategory={createCategory}
+          categoryName={categoryName}
+          setCategoryName={setCategoryName}
+          saving={saving}
+          categories={categories}
+          categoryUsageCounts={categoryUsageCounts}
+        />
       )}
     </div>
   );

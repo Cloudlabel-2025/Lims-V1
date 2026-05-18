@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { hasPermission } from "@/app/lib/client-rbac";
-import { useCurrentUser } from "@/app/lib/use-current-user";
+import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
 
 /* ── Helpers ── */
 const getInitials = (name) => {
@@ -49,8 +49,7 @@ export default function DoctorList() {
   const fetchAllDoctors = useCallback(async () => {
     setListLoading(true);
     try {
-      const res = await fetch("/api/doctor");
-      const data = await res.json();
+      const { data } = await cachedJsonFetch("/api/doctor", { ttl: 15_000 });
       setAllDoctors(Array.isArray(data) ? data : []);
     } catch {
       setAllDoctors([]);
@@ -67,8 +66,7 @@ export default function DoctorList() {
   const doSearch = useCallback(async (query) => {
     setListLoading(true);
     try {
-      const res = await fetch(`/api/doctor?search=${encodeURIComponent(query)}`);
-      const data = await res.json();
+      const { data } = await cachedJsonFetch(`/api/doctor?search=${encodeURIComponent(query)}`, { ttl: 5_000 });
       setAllDoctors(Array.isArray(data) ? data : []);
     } catch {
       setAllDoctors([]);
@@ -116,6 +114,7 @@ export default function DoctorList() {
       const res = await fetch(`/api/doctor/${deleteModal.doctor._id}`, { method: "DELETE" });
       const data = await res.json();
       if (res.ok) {
+        clearCachedApi("/api/doctor");
         setAllDoctors((prev) => prev.filter((d) => d._id !== deleteModal.doctor._id));
         if (selectedDoctor?._id === deleteModal.doctor._id) {
           closeSidebar();
@@ -144,6 +143,7 @@ export default function DoctorList() {
       });
       const data = await res.json();
       if (res.ok) {
+        clearCachedApi("/api/doctor");
         setAllDoctors(prev => prev.map(d => d._id === selectedDoctor._id ? { ...d, pendingPayout: 0 } : d));
         setSelectedDoctor(prev => ({ ...prev, pendingPayout: 0 }));
       } else {
@@ -313,7 +313,7 @@ export default function DoctorList() {
                 borderRadius: '8px',
                 border: 'none',
                 background: viewType === 'grid' ? '#fff' : 'transparent',
-                color: viewType === 'grid' ? 'var(--primary)' : 'var(--text-muted)',
+                color: viewType === 'grid' ? 'var(--brand-action, var(--primary))' : 'var(--text-muted)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -333,7 +333,7 @@ export default function DoctorList() {
                 borderRadius: '8px',
                 border: 'none',
                 background: viewType === 'list' ? '#fff' : 'transparent',
-                color: viewType === 'list' ? 'var(--primary)' : 'var(--text-muted)',
+                color: viewType === 'list' ? 'var(--brand-action, var(--primary))' : 'var(--text-muted)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -377,7 +377,7 @@ export default function DoctorList() {
       <div className="doctor-list-container" style={{ marginTop: "24px" }}>
         <div className="patient-list-header" style={{ marginBottom: "16px" }}>
           <span className="patient-list-count">{listLoading ? "Loading..." : `${allDoctors.length} doctors`}</span>
-          <button className="btn-refresh" onClick={fetchAllDoctors} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--primary)', fontWeight: '600', fontSize: '13px' }}>
+          <button className="btn-refresh" onClick={fetchAllDoctors} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--brand-action, var(--primary))', fontWeight: '600', fontSize: '13px' }}>
             <div style={{ transform: listLoading ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s' }}>{Icons.logo}</div> Refresh
           </button>
         </div>
@@ -388,16 +388,16 @@ export default function DoctorList() {
               {allDoctors.map((doc) => {
                 const statusStyle = getStatusStyle(doc.status);
                 return (
-                  <div key={doc._id} className={`form-card ${selectedDoctor?._id === doc._id ? "selected" : ""}`} onClick={() => handleSelectDoctor(doc)} style={{ padding: "20px", marginBottom: "0", cursor: "pointer", position: "relative", border: selectedDoctor?._id === doc._id ? "2px solid var(--primary)" : "1.5px solid var(--border)" }}>
+                  <div key={doc._id} className={`form-card ${selectedDoctor?._id === doc._id ? "selected" : ""}`} onClick={() => handleSelectDoctor(doc)} style={{ padding: "20px", marginBottom: "0", cursor: "pointer", position: "relative", border: selectedDoctor?._id === doc._id ? "2px solid var(--brand-action, var(--primary))" : "1.5px solid var(--border)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
                       <div className="patient-photo-card" style={{ width: "60px", height: "60px", margin: "0", background: "var(--primary-50)" }}>
-                        <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--primary)" }}>
+                        <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--brand-action, var(--primary))" }}>
                           {getInitials(doc.name)}
                         </div>
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>{doc.name}</div>
-                        <div style={{ fontSize: "12px", color: "var(--primary)", fontWeight: "600" }}>{doc.doctorId}</div>
+                        <div style={{ fontSize: "12px", color: "var(--brand-action, var(--primary))", fontWeight: "600" }}>{doc.doctorId}</div>
                       </div>
                     </div>
                     <div style={{ marginTop: "15px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -425,12 +425,12 @@ export default function DoctorList() {
                       <span>Clinic: {doc.clinicName || "Private"}</span>
                       {(canEditDoctors || canDeleteDoctors || selectedDoctor?._id === doc._id) && (
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        {selectedDoctor?._id === doc._id && <span style={{ color: "var(--primary)", fontWeight: "700" }}>SELECTED</span>}
+                        {selectedDoctor?._id === doc._id && <span style={{ color: "var(--brand-action, var(--primary))", fontWeight: "700" }}>SELECTED</span>}
                         {canEditDoctors && (
                         <button 
                           title="Edit"
                           style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary)"; e.currentTarget.style.background = "var(--primary-50)"; }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--brand-action, var(--primary))"; e.currentTarget.style.background = "var(--primary-50)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
                           onClick={(e) => { e.stopPropagation(); router.push(`/doctors/edit/${doc._id}`); }}
                         >
@@ -494,7 +494,7 @@ export default function DoctorList() {
                               justifyContent: "center",
                               fontSize: "13px",
                               fontWeight: "700",
-                              color: "var(--primary)"
+                              color: "var(--brand-action, var(--primary))"
                             }}>
                               {getInitials(doc.name)}
                             </div>
@@ -527,7 +527,7 @@ export default function DoctorList() {
                             <button 
                               title="Edit"
                               style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
-                              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary)"; e.currentTarget.style.background = "var(--primary-50)"; }}
+                              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--brand-action, var(--primary))"; e.currentTarget.style.background = "var(--primary-50)"; }}
                               onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
                               onClick={(e) => { e.stopPropagation(); router.push(`/doctors/edit/${doc._id}`); }}
                             >

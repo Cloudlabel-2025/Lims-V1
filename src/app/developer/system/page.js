@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
+import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
 function groupBy(items, key) {
   return items.reduce((groups, item) => {
@@ -104,8 +105,7 @@ export default function DeveloperSystemPage() {
 
     async function loadLabs() {
       try {
-        const response = await fetch("/api/developer/labs", { credentials: "include" });
-        const data = await response.json();
+        const { response, data } = await cachedJsonFetch("/api/developer/labs", { ttl: 15_000 });
 
         if (!response.ok) {
           throw new Error(data.error || "Unable to load labs");
@@ -140,10 +140,7 @@ export default function DeveloperSystemPage() {
       setSuccess("");
 
       try {
-        const response = await fetch(`/api/developer/labs/${selectedTenantId}/access`, {
-          credentials: "include",
-        });
-        const data = await response.json();
+        const { response, data } = await cachedJsonFetch(`/api/developer/labs/${selectedTenantId}/access`, { ttl: 10_000 });
 
         if (!response.ok) {
           throw new Error(data.error || data.details || "Unable to load lab access");
@@ -265,6 +262,8 @@ export default function DeveloperSystemPage() {
         enabledModules: data.lab.enabledModules,
         adminPermissions: data.adminRole.permissions,
       };
+      clearCachedApi("/api/developer/labs");
+      clearCachedApi(`/api/developer/labs/${selectedTenantId}/access`);
       setSavedAccess(nextSavedAccess);
       setDraftAccess(nextSavedAccess);
       setLabs((current) =>

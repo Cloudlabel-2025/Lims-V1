@@ -1,11 +1,38 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Icons } from "@/app/components/Icons";
-import PasswordField from "@/app/components/PasswordField";
+import dynamic from "next/dynamic";
+import { cachedJsonFetch, clearCachedApi, useTenantShell } from "@/app/lib/use-current-user";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { defaultLabModules } from "@/app/lib/modules";
 import { hasPermission } from "@/app/lib/client-rbac";
+
+const RoleManager = dynamic(() => import("./RoleManager"), {
+  ssr: false,
+  loading: () => (
+    <section className="settings-panel">
+      <p className="developer-empty">Loading roles...</p>
+    </section>
+  ),
+});
+
+const PermissionMatrix = dynamic(() => import("./PermissionMatrix"), {
+  ssr: false,
+  loading: () => (
+    <section className="settings-panel">
+      <p className="developer-empty">Loading permissions...</p>
+    </section>
+  ),
+});
+
+const UserManager = dynamic(() => import("./UserManager"), {
+  ssr: false,
+  loading: () => (
+    <section className="settings-panel">
+      <p className="developer-empty">Loading users...</p>
+    </section>
+  ),
+});
 
 function groupByModule(permissions) {
   return permissions.reduce((groups, permission) => {
@@ -41,8 +68,7 @@ function clampRoleIndex(nextRoles, preferredIndex) {
 }
 
 export default function LabAdminSettingsPage() {
-  const [theme, setTheme] = useState(null);
-  const [user, setUser] = useState(null);
+  const { theme, user } = useTenantShell();
   const [activeRoleIndex, setActiveRoleIndex] = useState(0);
   const [roles, setRoles] = useState([]);
   const [savedRoles, setSavedRoles] = useState([]);
@@ -68,46 +94,32 @@ export default function LabAdminSettingsPage() {
     async function loadSettings() {
       try {
         setSettingsError("");
-        const sessionResponse = await fetch("/api/auth/me", { credentials: "include" });
-        const sessionData = await sessionResponse.json();
-        if (!sessionResponse.ok) {
-          throw new Error(sessionData.error || "Unable to load session");
-        }
+        if (!user) return;
 
-        const sessionUser = sessionData.user;
-        const canManageRoles = hasPermission(sessionUser, "settings.manage");
-        const canManageUsers = hasPermission(sessionUser, "users.manage");
+        const canManageRoles = hasPermission(user, "settings.manage");
+        const canManageUsers = hasPermission(user, "users.manage");
 
-        const [themeResponse, roleResponse, userResponse] = await Promise.all([
-          fetch("/api/theme", { credentials: "include" }),
+        const [roleResponse, userResponse] = await Promise.all([
           canManageRoles || canManageUsers
-            ? fetch("/api/settings/roles", { credentials: "include" })
+            ? cachedJsonFetch("/api/settings/roles", { ttl: 10_000 })
             : Promise.resolve(null),
           canManageUsers
-            ? fetch("/api/settings/users", { credentials: "include" })
+            ? cachedJsonFetch("/api/settings/users", { ttl: 10_000 })
             : Promise.resolve(null),
         ]);
-        const [themeData, roleData, userData] = await Promise.all([
-          themeResponse.json(),
-          roleResponse ? roleResponse.json() : Promise.resolve({ roles: [] }),
-          userResponse ? userResponse.json() : Promise.resolve({ users: [] }),
-        ]);
+        const roleData = roleResponse ? roleResponse.data : { roles: [] };
+        const userData = userResponse ? userResponse.data : { users: [] };
 
-        if (!cancelled && themeResponse.ok) {
-          setTheme(themeData.theme);
-        }
-
-        if (roleResponse && !roleResponse.ok) {
+        if (roleResponse && !roleResponse.response.ok) {
           throw new Error(roleData.error || roleData.details || "Unable to load roles");
         }
 
-        if (userResponse && !userResponse.ok) {
+        if (userResponse && !userResponse.response.ok) {
           throw new Error(userData.error || userData.details || "Unable to load users");
         }
 
         if (!cancelled) {
           const loadedRoles = roleData.roles || [];
-          setUser(sessionUser);
           setRoles(loadedRoles);
           setSavedRoles(loadedRoles);
           setUsers(userData.users || []);
@@ -118,7 +130,6 @@ export default function LabAdminSettingsPage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setTheme(null);
           setSettingsError(err.message);
         }
       } finally {
@@ -131,7 +142,7 @@ export default function LabAdminSettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   const enabledModules = theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules;
   const canManageRoles = hasPermission(user, "settings.manage");
@@ -148,9 +159,14 @@ export default function LabAdminSettingsPage() {
   );
   const permissionsByModule = useMemo(() => groupByModule(labPermissions), [labPermissions]);
   const activeRole = roles[activeRoleIndex] || roles[0];
-  const activePermissions = activeRole?.permissions?.includes("*")
-    ? labPermissions.map((permission) => permission.key)
-    : activeRole?.permissions || [];
+  const activePermissions = useMemo(
+    () =>
+      activeRole?.permissions?.includes("*")
+        ? labPermissions.map((permission) => permission.key)
+        : activeRole?.permissions || [],
+    [activeRole, labPermissions]
+  );
+  const activePermissionSet = useMemo(() => new Set(activePermissions), [activePermissions]);
   const rolesDirty = !sameRoleConfiguration(roles, savedRoles);
   const newUserErrors = useMemo(() => {
     const errors = {};
@@ -251,6 +267,8 @@ export default function LabAdminSettingsPage() {
       }
 
       const nextRoles = data.roles || [];
+      clearCachedApi("/api/settings/roles");
+      clearCachedApi("/api/settings/users");
       setRoles(nextRoles);
       setSavedRoles(nextRoles);
       setActiveRoleIndex((current) => clampRoleIndex(nextRoles, Math.max(0, current - (current >= index ? 1 : 0))));
@@ -292,6 +310,7 @@ export default function LabAdminSettingsPage() {
       }
 
       const nextRoles = data.roles || [];
+      clearCachedApi("/api/settings/roles");
       setRoles(nextRoles);
       setSavedRoles(nextRoles);
       setActiveRoleIndex(0);
@@ -327,6 +346,7 @@ export default function LabAdminSettingsPage() {
         throw new Error(data.error || data.details || "Unable to create user");
       }
 
+      clearCachedApi("/api/settings/users");
       setUsers((current) => [data.user, ...current]);
       setUserMessage(`User created. Login User ID: ${data.user.userId}`);
       setNewUser({
@@ -375,198 +395,57 @@ export default function LabAdminSettingsPage() {
       {loadingSettings ? (
         <p className="developer-empty">Loading settings...</p>
       ) : (
-      <>
-      {canManageRoles && (
-      <section className="settings-panel">
-          <div className="settings-panel-header">
-            <h2>Lab Roles</h2>
-            <p>Create roles inside this lab and assign only allowed permissions.</p>
-          </div>
-
-          <div className="settings-role-list">
-            {roles.map((role, index) => (
-              <div className="settings-role-row" key={role.id || role.name}>
-                <button
-                  type="button"
-                  className={activeRoleIndex === index ? "active" : ""}
-                  onClick={() => setActiveRoleIndex(index)}
-                >
-                  <strong>{role.name}</strong>
-                  <span>{role.permissions.includes("*") ? "All permissions" : `${role.permissions.length} permissions`}</span>
-                </button>
-                {!role.isDefaultAdmin && !role.isSystemRole && (
-                  <button
-                    type="button"
-                    className="settings-role-delete"
-                    onClick={() => deleteRole(role, index)}
-                    disabled={roleSaving}
-                  >
-                    {Icons.trash || "Delete"} Delete
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="settings-inline-form">
-            <input
-              value={newRoleName}
-              onChange={(event) => setNewRoleName(event.target.value)}
-              placeholder="Create role, e.g. Billing Cashier"
+        <>
+          {canManageRoles && (
+            <RoleManager
+              roles={roles}
+              activeRoleIndex={activeRoleIndex}
+              setActiveRoleIndex={setActiveRoleIndex}
+              newRoleName={newRoleName}
+              setNewRoleName={setNewRoleName}
+              addRole={addRole}
+              deleteRole={deleteRole}
+              roleSaving={roleSaving}
+              rolesDirty={rolesDirty}
+              cancelRoleChanges={cancelRoleChanges}
+              saveRoleConfiguration={saveRoleConfiguration}
             />
-            <button type="button" onClick={addRole}>
-              {Icons.plus} Add Roles
-            </button>
-          </div>
-          <div className="developer-config-actions">
-            <button type="button" className="developer-secondary-link" onClick={cancelRoleChanges} disabled={!rolesDirty || roleSaving}>
-              Cancel
-            </button>
-            <button type="button" className="developer-primary-link" onClick={saveRoleConfiguration} disabled={!rolesDirty || roleSaving}>
-              {roleSaving ? "Saving..." : "Save Role Configuration"}
-            </button>
-          </div>
-      </section>
-      )}
+          )}
 
-      {canManageRoles && (
-      <section className="settings-panel">
-        <div className="settings-panel-header">
-          <h2>Permission Mapping For {activeRole?.name || "New Role"}</h2>
-          <p>Checkbox selection is limited to modules enabled by the developer for this lab.</p>
-        </div>
+          {canManageRoles && (
+            <PermissionMatrix
+              activeRole={activeRole}
+              roles={roles}
+              permissionsByModule={permissionsByModule}
+              activePermissionSet={activePermissionSet}
+              toggleRolePermission={toggleRolePermission}
+              rolesDirty={rolesDirty}
+              roleSaving={roleSaving}
+              cancelRoleChanges={cancelRoleChanges}
+              saveRoleConfiguration={saveRoleConfiguration}
+            />
+          )}
 
-        {roles.length === 0 ? (
-          <p className="developer-empty">Create a role first, then choose permissions for it.</p>
-        ) : (
-          <>
-          <div className="permission-matrix">
-          {Object.entries(permissionsByModule).map(([moduleId, permissions]) => (
-            <article className="permission-group" key={moduleId}>
-              <div className="permission-group-header">
-                <strong>{moduleId}</strong>
-                <span>{permissions.length} permissions</span>
-              </div>
-              {permissions.map((permission) => (
-                <label className="permission-checkbox" key={permission.key}>
-                  <input
-                    type="checkbox"
-                    checked={activePermissions.includes(permission.key)}
-                    onChange={() => toggleRolePermission(permission.key)}
-                  />
-                  <span>
-                    <strong>{permission.name}</strong>
-                    <small>{permission.key}</small>
-                  </span>
-                </label>
-              ))}
-            </article>
-          ))}
-          </div>
-          <div className="developer-config-actions">
-            <button type="button" className="developer-secondary-link" onClick={cancelRoleChanges} disabled={!rolesDirty || roleSaving}>
-              Cancel
-            </button>
-            <button type="button" className="developer-primary-link" onClick={saveRoleConfiguration} disabled={!rolesDirty || roleSaving}>
-              {roleSaving ? "Saving..." : "Save Role Configuration"}
-            </button>
-          </div>
-          </>
-        )}
-      </section>
-      )}
+          {canManageUsers && (
+            <UserManager
+              newUser={newUser}
+              setNewUser={setNewUser}
+              newUserErrors={newUserErrors}
+              roles={roles}
+              createUser={createUser}
+              userSaving={userSaving}
+              rolesDirty={rolesDirty}
+              canCreateUser={canCreateUser}
+              users={users}
+            />
+          )}
 
-      {canManageUsers && (
-      <section className="settings-panel">
-        <div className="settings-panel-header">
-          <h2>User Assignment</h2>
-          <p>Create lab users and assign one role for this lab.</p>
-        </div>
-        <div className="settings-form-grid">
-          <label>
-            User Name
-            <input
-              value={newUser.name}
-              onChange={(event) => setNewUser((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Anita Kumar"
-            />
-          </label>
-          <label>
-            Login Email
-            <input
-              type="email"
-              name="lab-settings-new-user-email"
-              value={newUser.email}
-              onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))}
-              placeholder="anita@lab.com"
-              autoComplete="section-lab-settings-new-user username"
-            />
-          </label>
-          <label>
-            Password
-            <PasswordField
-              name="lab-settings-new-user-password"
-              value={newUser.password}
-              onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
-              placeholder="Minimum 8 characters"
-              autoComplete="section-lab-settings-new-user new-password"
-              invalid={Boolean(newUserErrors.password)}
-              toggleLabel="user password"
-            />
-            {newUserErrors.password && <em>{newUserErrors.password}</em>}
-          </label>
-          <label>
-            Confirm Password
-            <PasswordField
-              name="lab-settings-new-user-confirm-password"
-              value={newUser.confirmPassword}
-              onChange={(event) => setNewUser((current) => ({ ...current, confirmPassword: event.target.value }))}
-              placeholder="Repeat password"
-              autoComplete="section-lab-settings-new-user new-password"
-              invalid={Boolean(newUserErrors.confirmPassword)}
-              toggleLabel="confirm user password"
-            />
-            {newUserErrors.confirmPassword && <em>{newUserErrors.confirmPassword}</em>}
-          </label>
-          <label>
-            Role
-            <select
-              value={newUser.roleId}
-              onChange={(event) => setNewUser((current) => ({ ...current, roleId: event.target.value }))}
-            >
-              {roles.map((role) => (
-                <option key={role.id || role.name} value={role.id}>
-                  {role.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="developer-config-actions">
-          <button type="button" className="developer-primary-link" onClick={createUser} disabled={userSaving || rolesDirty || !canCreateUser}>
-            {userSaving ? "Creating..." : "Create Lab User"}
-          </button>
-        </div>
-        {rolesDirty && <p className="developer-empty">Save role configuration before creating users.</p>}
-        {users.length > 0 && (
-          <div className="settings-role-list">
-            {users.map((user) => (
-              <button type="button" key={user.id}>
-                <strong>{user.userId}</strong>
-                <span>{user.email} - {user.role?.name || "No role"}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-      )}
-
-      {!canManageRoles && !canManageUsers && (
-        <section className="settings-panel">
-          <p className="developer-empty">Your role does not have permission to manage settings or users.</p>
-        </section>
-      )}
-      </>
+          {!canManageRoles && !canManageUsers && (
+            <section className="settings-panel">
+              <p className="developer-empty">Your role does not have permission to manage settings or users.</p>
+            </section>
+          )}
+        </>
       )}
 
     </section>

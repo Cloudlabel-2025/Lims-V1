@@ -32,8 +32,10 @@ export async function GET(req) {
     const { TestPackage } = await getTenantModels(auth.tenantId);
     const packages = await TestPackage.find(query)
       .populate("tests", "name code price")
+      .select("packageId name code description price tests status createdAt updatedAt")
       .sort({ name: 1 })
-      .limit(50);
+      .limit(50)
+      .lean();
 
     return Response.json({ packages });
   } catch (error) {

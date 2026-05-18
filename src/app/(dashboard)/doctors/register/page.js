@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { clearCachedApi } from "@/app/lib/use-current-user";
 
 const EMPTY_FORM = {
   name: "",
@@ -87,6 +88,8 @@ export default function DoctorRegistration() {
 
       // Duplicate phone warning from API
       if (res.status === 201) {
+        clearCachedApi("/api/doctor");
+        clearCachedApi("/api/dashboard/stats");
         setStatus({ type: "success", message: `Doctor registered successfully — ID: ${data.doctorId}` });
         setForm(EMPTY_FORM);
         setShowErrors(false);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { defaultLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
+import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
 function getLocalLabLoginUrl(tenantId) {
   if (typeof window === "undefined") return "";
@@ -40,8 +41,7 @@ export default function DeveloperLabsListPage() {
 
     async function loadLabs() {
       try {
-        const response = await fetch("/api/developer/labs", { credentials: "include" });
-        const data = await response.json();
+        const { response, data } = await cachedJsonFetch("/api/developer/labs", { ttl: 15_000 });
 
         if (!response.ok) {
           throw new Error(data.error || "Unable to load labs");
@@ -106,6 +106,7 @@ export default function DeveloperLabsListPage() {
         throw new Error(data.error || data.details || "Unable to delete lab");
       }
 
+      clearCachedApi("/api/developer/labs");
       setLabs((current) => current.filter((item) => item.id !== lab.id));
     } catch (err) {
       setError(err.message);

@@ -1,10 +1,23 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import { hasPermission } from "@/app/lib/client-rbac";
-import { useCurrentUser } from "@/app/lib/use-current-user";
-import MultiSelect from "@/app/components/MultiSelect";
+import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
+
+const CreateBillTab = dynamic(() => import("./CreateBillTab"), {
+  ssr: false,
+  loading: () => <div className="module-panel">Loading bill form...</div>,
+});
+const BillingHistoryTab = dynamic(() => import("./BillingHistoryTab"), {
+  ssr: false,
+  loading: () => <div className="module-panel">Loading billing history...</div>,
+});
+const SettlementModal = dynamic(() => import("./SettlementModal"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function BillingPage() {
   const user = useCurrentUser();
@@ -45,6 +58,13 @@ export default function BillingPage() {
     });
     return total;
   }, [tests, packages, selectedTests]);
+  const investigationOptions = useMemo(
+    () => [
+      ...packages.map((pkg) => ({ value: `pkg_${pkg._id}`, label: pkg.name, sublabel: `Package · ₹${pkg.price}` })),
+      ...tests.map((test) => ({ value: `test_${test._id}`, label: test.name, sublabel: `${test.category?.name} · ₹${test.price}` })),
+    ],
+    [packages, tests]
+  );
 
   const canCreateBilling = hasPermission(user, "billing.create");
 
@@ -53,18 +73,21 @@ export default function BillingPage() {
     setError("");
     try {
       const [patientRes, testRes, pkgRes, billingRes] = await Promise.all([
-        fetch("/api/patient", { credentials: "include" }),
-        fetch("/api/tests/definitions?status=active", { credentials: "include" }),
-        fetch("/api/tests/packages", { credentials: "include" }),
-        fetch("/api/billing", { credentials: "include" }),
+        cachedJsonFetch("/api/patient", { ttl: 15_000 }),
+        cachedJsonFetch("/api/tests/definitions?status=active", { ttl: 30_000 }),
+        cachedJsonFetch("/api/tests/packages", { ttl: 30_000 }),
+        cachedJsonFetch("/api/billing", { ttl: 10_000 }),
       ]);
-      
-      const [patientData, testData, pkgData, billingData] = await Promise.all([
-        patientRes.json(),
-        testRes.json(),
-        pkgRes.json(),
-        billingRes.json(),
-      ]);
+
+      const patientData = patientRes.data;
+      const testData = testRes.data;
+      const pkgData = pkgRes.data;
+      const billingData = billingRes.data;
+
+      if (!patientRes.response.ok) throw new Error(patientData.error || "Unable to load patients");
+      if (!testRes.response.ok) throw new Error(testData.error || "Unable to load tests");
+      if (!pkgRes.response.ok) throw new Error(pkgData.error || "Unable to load packages");
+      if (!billingRes.response.ok) throw new Error(billingData.error || "Unable to load billing records");
 
       setPatients(Array.isArray(patientData) ? patientData : []);
       setTests(testData.tests || []);
@@ -95,6 +118,9 @@ export default function BillingPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to create bill");
 
+      clearCachedApi("/api/billing");
+      clearCachedApi("/api/dashboard/stats");
+      clearCachedApi("/api/samples?status=all");
       setBillingRecords((current) => [data.billingRecord, ...current]);
       setPatient("");
       setSelectedTests([]);
@@ -160,6 +186,10 @@ export default function BillingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to close bill");
 
+      clearCachedApi("/api/billing");
+      clearCachedApi("/api/dashboard/stats");
+      clearCachedApi("/api/samples?status=all");
+      clearCachedApi("/api/reports");
       setBillingRecords((current) =>
         current.map((billingRecord) =>
           billingRecord._id === selectedBillingRecord._id
@@ -174,6 +204,21 @@ export default function BillingPage() {
       setClosing(false);
     }
   };
+
+  const closeSettlementModal = useCallback(() => {
+    setShowCloseModal(false);
+  }, []);
+
+  const updateSettlementPayment = useCallback((key, value) => {
+    setPayment((current) => ({ ...current, [key]: value }));
+  }, []);
+
+  const updateSettlementResult = useCallback((billingItemId, parameterKey, value) => {
+    setResults((current) => ({
+      ...current,
+      [billingItemId]: { ...current[billingItemId], [parameterKey]: value },
+    }));
+  }, []);
 
   if (loading) return <div className="module-page">Loading...</div>;
 
@@ -210,8 +255,8 @@ export default function BillingPage() {
               padding: "12px 4px", 
               background: "none", 
               border: "none", 
-              borderBottom: activeTab === tab.id ? "2px solid var(--primary)" : "2px solid transparent",
-              color: activeTab === tab.id ? "var(--primary)" : "var(--text-muted)",
+              borderBottom: activeTab === tab.id ? "2px solid var(--brand-action, var(--primary))" : "2px solid transparent",
+              color: activeTab === tab.id ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
               fontWeight: activeTab === tab.id ? "700" : "500",
               cursor: "pointer",
               display: "flex",
@@ -298,10 +343,10 @@ export default function BillingPage() {
                           border: "1px solid var(--primary-100)"
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ color: "var(--primary-700)", fontWeight: "500" }}>Referral Commission</span>
-                            <span style={{ color: "var(--primary-700)", fontWeight: "700" }}>₹{billingRecord.commissionAmount}</span>
+                            <span style={{ color: "var(--brand-action, var(--primary))", fontWeight: "500" }}>Referral Commission</span>
+                            <span style={{ color: "var(--brand-action, var(--primary))", fontWeight: "700" }}>₹{billingRecord.commissionAmount}</span>
                           </div>
-                          <div style={{ fontSize: "10px", color: "var(--primary-600)", marginTop: "2px" }}>
+                          <div style={{ fontSize: "10px", color: "var(--brand-action, var(--primary))", marginTop: "2px" }}>
                             Payable to Dr. {billingRecord.referralDoctor?.name}
                           </div>
                         </div>
@@ -309,7 +354,7 @@ export default function BillingPage() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <small style={{ color: "var(--text-muted)", display: "block" }}>Total Amount</small>
-                          <strong style={{ fontSize: "18px", color: "var(--primary-dark)" }}>₹{billingRecord.totalAmount || 0}</strong>
+                          <strong style={{ fontSize: "18px", color: "var(--brand-action, var(--primary))" }}>₹{billingRecord.totalAmount || 0}</strong>
                         </div>
                         <button 
                           className="dash-btn-primary" 
@@ -330,292 +375,38 @@ export default function BillingPage() {
       )}
 
       {activeTab === "create" && (
-        <div className="module-grid">
-          <section className="module-panel">
-            <div className="module-panel-header">
-              <h2>New Investigation Bill</h2>
-              <p>Register tests for existing patients.</p>
-            </div>
-            <form className="module-form" onSubmit={createBill}>
-              <div className="module-form-grid">
-                <label>
-                  Select Patient <span className="required">*</span>
-                  <select className="lims-select" value={patient} onChange={(e) => setPatient(e.target.value)} required>
-                    <option value="">Choose patient...</option>
-                    {patients.map((item) => (
-                      <option key={item._id} value={item._id}>{item.name} ({item.patientId})</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Priority
-                  <select className="lims-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                    <option value="routine">Routine</option>
-                    <option value="urgent">Urgent (STAT)</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="module-full-label">
-                Select Investigations <span className="required">*</span>
-                <MultiSelect 
-                  name="selectedTests"
-                  placeholder="Search tests or packages..."
-                  options={[
-                    ...packages.map(p => ({ value: `pkg_${p._id}`, label: p.name, sublabel: `Package · ₹${p.price}` })),
-                    ...tests.map(t => ({ value: `test_${t._id}`, label: t.name, sublabel: `${t.category?.name} · ₹${t.price}` }))
-                  ]}
-                  value={selectedTests}
-                  onChange={(e) => setSelectedTests(e.target.value)}
-                />
-              </label>
-
-              <label className="module-full-label">
-                Notes
-                <textarea className="lims-input" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Clinical notes or billing remarks..." />
-              </label>
-
-              <div style={{ 
-                background: "var(--surface)", 
-                padding: "20px", 
-                borderRadius: "var(--radius-md)", 
-                marginBottom: "20px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center"
-              }}>
-                <div>
-                  <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Total Payable</span>
-                  <strong style={{ fontSize: "24px", color: "var(--primary)" }}>₹{selectedTotal}</strong>
-                </div>
-                <button type="submit" className="dash-btn-primary" disabled={!patient || selectedTests.length === 0 || saving}>
-                  {saving ? "Processing..." : "Generate Bill"}
-                </button>
-              </div>
-            </form>
-          </section>
-          
-          <aside className="module-panel">
-             <div className="module-panel-header">
-               <h2>Recently Created</h2>
-               <p>Quick view of latest bills</p>
-             </div>
-             <div className="test-card-list">
-               {billingRecords.slice(0, 5).map((billingRecord) => (
-                 <article key={billingRecord._id} className="test-card">
-                   <div>
-                     <h3>{billingRecord.patient?.name}</h3>
-                     <span>{billingRecord.billId} · ₹{billingRecord.totalAmount}</span>
-                   </div>
-                   <strong className={billingRecord.billingStatus}>{billingRecord.billingStatus}</strong>
-                 </article>
-               ))}
-             </div>
-          </aside>
-        </div>
+        <CreateBillTab
+          patients={patients}
+          patient={patient}
+          setPatient={setPatient}
+          priority={priority}
+          setPriority={setPriority}
+          selectedTests={selectedTests}
+          setSelectedTests={setSelectedTests}
+          investigationOptions={investigationOptions}
+          notes={notes}
+          setNotes={setNotes}
+          selectedTotal={selectedTotal}
+          saving={saving}
+          createBill={createBill}
+          billingRecords={billingRecords}
+        />
       )}
 
-      {activeTab === "history" && (
-        <div className="form-card" style={{ padding: "0", overflow: "hidden" }}>
-          <div className="form-card-header">
-            <h6 style={{ margin: 0 }}>Billing History</h6>
-            <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>All laboratory bills and payment statuses.</p>
-          </div>
-          <div className="lims-table-container">
-            <table className="lims-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill ID</th>
-                  <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Patient Details</th>
-                  <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Date</th>
-                  <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Investigation(s)</th>
-                  <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill Amount</th>
-                  <th style={{ padding: "14px 20px", textAlign: "center", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {billingRecords.map((billingRecord) => (
-                  <tr key={billingRecord._id} style={{ borderBottom: "1px solid var(--border-light)", transition: "background 0.2s" }}>
-                    <td style={{ padding: "14px 20px" }}>
-                      <span style={{ fontWeight: "700", color: "var(--primary)", fontSize: "13px" }}>{billingRecord.billId}</span>
-                    </td>
-                    <td style={{ padding: "14px 20px" }}>
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "14px" }}>{billingRecord.patient?.name || "N/A"}</span>
-                        <small style={{ color: "var(--text-muted)", fontSize: "11px" }}>ID: {billingRecord.patient?.patientId || "—"}</small>
-                      </div>
-                    </td>
-                    <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
-                      {new Date(billingRecord.createdAt).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
-                      <span style={{ background: "var(--border-light)", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "600" }}>
-                        {billingRecord.items?.length || 0} Tests
-                      </span>
-                    </td>
-                    <td style={{ padding: "14px 20px" }}>
-                      <strong style={{ color: "var(--text-primary)", fontSize: "14px" }}>₹{billingRecord.totalAmount || 0}</strong>
-                    </td>
-                    <td style={{ padding: "14px 20px", textAlign: "center" }}>
-                      <span style={{ 
-                        display: "inline-block",
-                        padding: "4px 10px", 
-                        borderRadius: "6px", 
-                        fontSize: "11px", 
-                        fontWeight: "700",
-                        background: billingRecord.billingStatus === "paid" ? "var(--success-50)" : "var(--warning-50)",
-                        color: billingRecord.billingStatus === "paid" ? "var(--success-700)" : "var(--warning-700)",
-                        textTransform: "uppercase"
-                      }}>
-                        {billingRecord.billingStatus}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {activeTab === "history" && <BillingHistoryTab billingRecords={billingRecords} />}
+      {showCloseModal && selectedBillingRecord && (
+        <SettlementModal
+          billingRecord={selectedBillingRecord}
+          closing={closing}
+          payment={payment}
+          results={results}
+          testDetails={testDetails}
+          onClose={closeSettlementModal}
+          onPaymentChange={updateSettlementPayment}
+          onResultChange={updateSettlementResult}
+          onSubmit={handleCloseBill}
+        />
       )}
-      {showCloseModal && selectedBillingRecord && (() => {
-        const netPayable = selectedBillingRecord.totalAmount || 0;
-        const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
-        const remaining = netPayable - totalPaid;
-        return (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: "820px", textAlign: "left", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
-
-            {/* Header */}
-            <div style={{ padding: "24px 28px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h4 style={{ margin: 0, fontSize: "18px" }}>Finalize Settlement</h4>
-                <p style={{ margin: "4px 0 0", fontSize: "13px", color: "var(--text-muted)" }}>{selectedBillingRecord.billId} · {selectedBillingRecord.patient?.name} · {selectedBillingRecord.items?.length || 0} investigations</p>
-              </div>
-              <button onClick={() => setShowCloseModal(false)} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", transition: "all var(--duration-fast)" }}>{Icons.close}</button>
-            </div>
-
-            <div style={{ padding: "24px 28px", maxHeight: "70vh", overflowY: "auto" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-
-                {/* ── LEFT: Payment ── */}
-                <div>
-                  <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "14px" }}>Payment Breakdown</div>
-
-                  {/* Bill Summary */}
-                  <div style={{ background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: "var(--radius-md)", padding: "16px", marginBottom: "18px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "14px" }}>
-                      <span style={{ fontWeight: "700", color: "var(--text-primary)" }}>Total Amount</span>
-                      <span style={{ fontWeight: "800", fontSize: "20px", color: "var(--primary-dark)" }}>₹{netPayable}</span>
-                    </div>
-                    {selectedBillingRecord.commissionAmount > 0 && (
-                      <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--primary-200)", fontSize: "11px", color: "var(--primary-700)" }}>
-                        Includes internal commission of <strong>₹{selectedBillingRecord.commissionAmount}</strong> for Dr. {selectedBillingRecord.referralDoctor?.name}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Split Payments */}
-                  <div style={{ display: "grid", gap: "10px" }}>
-                    {[
-                      { key: "cash", label: "Cash" },
-                      { key: "card", label: "Card" },
-                      { key: "online", label: "UPI / Online" },
-                    ].map(m => (
-                      <label key={m.key} className="lims-label" style={{ margin: 0 }}>
-                        <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>{m.label}</span>
-                        <input 
-                          type="number" 
-                          className="lims-input" 
-                          style={{ height: "38px", fontWeight: "600" }}
-                          value={payment[m.key]} 
-                          onChange={(e) => setPayment(p => ({ ...p, [m.key]: Number(e.target.value) }))} 
-                        />
-                      </label>
-                    ))}
-                  </div>
-
-                  {/* Balance Status */}
-                  <div style={{ 
-                    marginTop: "12px", 
-                    padding: "10px 14px", 
-                    borderRadius: "var(--radius-sm)", 
-                    background: remaining === 0 ? "var(--primary-50)" : "#fffbeb",
-                    border: `1px solid ${remaining === 0 ? "var(--primary-200)" : "#fde68a"}`,
-                    display: "flex", 
-                    justifyContent: "space-between", 
-                    alignItems: "center",
-                    fontSize: "12px",
-                    fontWeight: "600"
-                  }}>
-                    <span style={{ color: remaining === 0 ? "var(--primary-dark)" : "#d97706" }}>
-                      {remaining === 0 ? "✓ Fully settled" : remaining > 0 ? "Balance due" : "Overpaid"}
-                    </span>
-                    {remaining !== 0 && <span style={{ color: remaining > 0 ? "#d97706" : "#dc2626" }}>₹{Math.abs(remaining)}</span>}
-                  </div>
-                </div>
-
-                {/* ── RIGHT: Test Results ── */}
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Test Results</span>
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)", background: "var(--surface)", padding: "2px 8px", borderRadius: "var(--radius-sm)" }}>Optional</span>
-                  </div>
-
-                  <div style={{ maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}>
-                    {(selectedBillingRecord.items || []).map((item) => (
-                      <div key={item._id} style={{ marginBottom: "14px", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
-                        <div style={{ padding: "10px 14px", background: "var(--surface)", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)" }}>
-                          <span style={{ fontWeight: "700", fontSize: "12px", color: "var(--text-primary)" }}>{item.testSnapshot?.name}</span>
-                          <span style={{ fontSize: "11px", fontWeight: "600", color: item.testSnapshot?.price > 0 ? "var(--primary)" : "var(--text-muted)" }}>
-                            {item.testSnapshot?.price > 0 ? `₹${item.testSnapshot.price}` : "Included"}
-                          </span>
-                        </div>
-                        <div style={{ padding: "10px 14px", display: "grid", gap: "8px" }}>
-                          {(testDetails[item.testDefinition] || []).map((param) => (
-                            <div key={param.key} style={{ display: "grid", gridTemplateColumns: "1fr 100px", alignItems: "center", gap: "8px" }}>
-                              <div>
-                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: "500" }}>{param.name} <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>({param.unit})</span></div>
-                                {(param.normalMin != null || param.normalMax != null) && (
-                                  <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{param.normalMin ?? "—"} – {param.normalMax ?? "—"}</div>
-                                )}
-                              </div>
-                              <input 
-                                type="text" 
-                                className="lims-input" 
-                                style={{ height: "30px", fontSize: "12px", fontWeight: "600", textAlign: "center", padding: "0 8px" }}
-                                placeholder="—"
-                                value={results[item._id]?.[param.key] || ""}
-                                onChange={(e) => setResults(prev => ({
-                                  ...prev,
-                                  [item._id]: { ...prev[item._id], [param.key]: e.target.value }
-                                }))}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div style={{ padding: "16px 28px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px" }}>
-              <button className="btn-modal-cancel" onClick={() => setShowCloseModal(false)}>Cancel</button>
-              <button 
-                className="btn-modal-confirm" 
-                onClick={handleCloseBill}
-                disabled={closing}
-                style={closing ? { opacity: 0.6, cursor: "not-allowed" } : {}}
-              >
-                {closing ? "Processing..." : `Complete Settlement · ₹${totalPaid}`}
-              </button>
-            </div>
-          </div>
-        </div>
-        );
-      })()}
     </div>
   );
 }

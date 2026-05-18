@@ -57,7 +57,7 @@ export default function MultiSelect({
           gap: "6px", 
           cursor: "text",
           alignItems: "center",
-          borderColor: isOpen ? "var(--primary)" : (error ? "var(--error)" : "var(--border)"),
+          borderColor: isOpen ? "var(--brand-action, var(--primary))" : (error ? "var(--error)" : "var(--border)"),
           backgroundColor: "#fff",
           transition: "all 0.15s ease",
           boxShadow: isOpen ? "0 0 0 3px var(--primary-50)" : "none"
@@ -168,7 +168,7 @@ export default function MultiSelect({
                     <div style={{ fontWeight: "600", fontSize: "13px", color: "var(--text)" }}>{option.label}</div>
                     {option.sublabel && <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px", fontWeight: "500", textTransform: "uppercase", letterSpacing: "0.2px" }}>{option.sublabel}</div>}
                   </div>
-                  <div style={{ color: "var(--primary)", opacity: 0.5 }}>
+                  <div style={{ color: "var(--brand-action, var(--primary))", opacity: 0.5 }}>
                     {Icons.plus}
                   </div>
                 </div>

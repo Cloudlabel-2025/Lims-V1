@@ -93,6 +93,10 @@ export const TestReportSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+TestReportSchema.index({ createdAt: -1 });
+TestReportSchema.index({ status: 1, createdAt: -1 });
+TestReportSchema.index({ patient: 1, createdAt: -1 });
+
 TestReportSchema.pre("save", async function generateReportId() {
   if (this.reportId) return;
 

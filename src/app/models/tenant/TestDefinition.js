@@ -129,6 +129,7 @@ export const TestDefinitionSchema = new mongoose.Schema(
 );
 
 TestDefinitionSchema.index({ name: 1, category: 1 }, { unique: true });
+TestDefinitionSchema.index({ status: 1, updatedAt: -1 });
 
 TestDefinitionSchema.pre("validate", function normalizeParameters() {
   const seen = new Set();
@@ -165,10 +166,7 @@ TestDefinitionSchema.pre("save", async function generateTestId() {
 });
 
 export function getTestDefinitionModel(connection = mongoose) {
-  if (connection.models.TestDefinition) {
-    delete connection.models.TestDefinition;
-  }
-  return connection.model("TestDefinition", TestDefinitionSchema);
+  return connection.models.TestDefinition || connection.model("TestDefinition", TestDefinitionSchema);
 }
 
 const TestDefinition = getTestDefinitionModel();
