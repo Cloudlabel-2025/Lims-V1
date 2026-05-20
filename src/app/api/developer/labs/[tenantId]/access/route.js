@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectMasterDB from "@/app/lib/master-db";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import { getLabModel } from "@/app/models/master/Lab";
-import { getTenantModels } from "@/app/lib/tenant-db";
+import { getRoleModel } from "@/app/models/tenant/Role";
 import { clearTenantConfigCache } from "@/app/lib/tenant-cache";
 import { normalizeEnabledModules } from "@/app/lib/modules";
 import rbacConfig from "@/app/lib/rbac-config.json";
@@ -30,11 +31,32 @@ function normalizePermissionKeys(permissionKeys, enabledModules) {
 async function getLab(tenantId) {
   const masterConnection = await connectMasterDB();
   const Lab = getLabModel(masterConnection);
-  return Lab.findOne({ tenantId }).select("name tenantId status subscriptionPlan enabledModules");
+  return Lab.findOne({ tenantId }).select(
+    "name tenantId status subscriptionPlan enabledModules dbName +dbConnectionString"
+  );
 }
 
-async function getDefaultAdminRole(tenantId) {
-  const { Role } = await getTenantModels(tenantId);
+async function connectLabRoleModel(lab) {
+  if (!lab.dbName || !lab.dbConnectionString) {
+    throw new Error(`Tenant database is not configured for tenantId: ${lab.tenantId}`);
+  }
+
+  const connection = await mongoose
+    .createConnection(lab.dbConnectionString, {
+      bufferCommands: false,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      dbName: lab.dbName,
+    })
+    .asPromise();
+
+  return {
+    connection,
+    Role: getRoleModel(connection),
+  };
+}
+
+async function getDefaultAdminRole(Role) {
   const defaultAdminRole = await Role.findOne({ isDefaultAdmin: true });
   return defaultAdminRole || Role.findOne({ name: "Admin" });
 }
@@ -48,7 +70,13 @@ export async function GET(req, { params }) {
     const lab = await getLab(tenantId);
     if (!lab) return NextResponse.json({ error: "Lab not found" }, { status: 404 });
 
-    const adminRole = await getDefaultAdminRole(lab.tenantId);
+    const { connection, Role } = await connectLabRoleModel(lab);
+    let adminRole;
+    try {
+      adminRole = await getDefaultAdminRole(Role);
+    } finally {
+      await connection.close();
+    }
 
     return NextResponse.json({
       lab: {
@@ -67,6 +95,7 @@ export async function GET(req, { params }) {
         : null,
     });
   } catch (error) {
+    console.error("GET /api/developer/labs/[tenantId]/access error:", error);
     return NextResponse.json(
       { error: "Unable to load lab access", details: error.message },
       { status: 500 }
@@ -87,34 +116,43 @@ export async function PATCH(req, { params }) {
     const lab = await getLab(tenantId);
     if (!lab) return NextResponse.json({ error: "Lab not found" }, { status: 404 });
 
-    lab.enabledModules = enabledModules;
-    await lab.save();
-    clearTenantConfigCache(lab.tenantId);
+    const { connection, Role } = await connectLabRoleModel(lab);
+    try {
+      const adminRole = await getDefaultAdminRole(Role);
+      if (!adminRole) {
+        return NextResponse.json({ error: "Default lab admin role not found" }, { status: 404 });
+      }
 
-    const adminRole = await getDefaultAdminRole(lab.tenantId);
-    if (!adminRole) {
-      return NextResponse.json({ error: "Default lab admin role not found" }, { status: 404 });
+      adminRole.permissions = adminPermissions;
+      adminRole.isDefaultAdmin = true;
+      await adminRole.save();
+
+      await lab.constructor.updateOne(
+        { _id: lab._id },
+        { $set: { enabledModules } },
+        { runValidators: true }
+      );
+      clearTenantConfigCache(lab.tenantId);
+
+      return NextResponse.json({
+        lab: {
+          name: lab.name,
+          tenantId: lab.tenantId,
+          status: lab.status,
+          subscriptionPlan: lab.subscriptionPlan,
+          enabledModules,
+        },
+        adminRole: {
+          id: adminRole._id,
+          name: adminRole.name,
+          permissions: adminRole.permissions,
+        },
+      });
+    } finally {
+      await connection.close();
     }
-
-    adminRole.permissions = adminPermissions;
-    adminRole.isDefaultAdmin = true;
-    await adminRole.save();
-
-    return NextResponse.json({
-      lab: {
-        name: lab.name,
-        tenantId: lab.tenantId,
-        status: lab.status,
-        subscriptionPlan: lab.subscriptionPlan,
-        enabledModules,
-      },
-      adminRole: {
-        id: adminRole._id,
-        name: adminRole.name,
-        permissions: adminRole.permissions,
-      },
-    });
   } catch (error) {
+    console.error("PATCH /api/developer/labs/[tenantId]/access error:", error);
     return NextResponse.json(
       { error: "Unable to save lab access", details: error.message },
       { status: 500 }
