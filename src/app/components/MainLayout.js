@@ -90,6 +90,7 @@ export default function MainLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -165,13 +166,21 @@ export default function MainLayout({ children }) {
       <div className="dash-layout">
         <Sidebar
           collapsed={collapsed}
+          mobileOpen={mobileOpen}
+          setMobileOpen={setMobileOpen}
           onLogout={handleLogout}
           theme={theme}
           user={user}
         />
         <div className="dash-main">
           <Topbar
-            onToggleSidebar={() => setCollapsed(!collapsed)}
+            onToggleSidebar={() => {
+              if (window.innerWidth <= 768) {
+                setMobileOpen(!mobileOpen);
+              } else {
+                setCollapsed(!collapsed);
+              }
+            }}
             user={user}
           />
           <div className="dash-content">

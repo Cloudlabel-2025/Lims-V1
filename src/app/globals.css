@@ -2936,9 +2936,8 @@ body {
     transition: left 0.3s ease;
   }
 
-  .dash-sidebar.collapsed {
-    width: 240px;
-    left: -240px;
+  .dash-sidebar.mobile-open {
+    left: 0;
   }
 
   .dash-content {

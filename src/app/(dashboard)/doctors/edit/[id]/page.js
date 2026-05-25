@@ -319,7 +319,7 @@ export default function EditDoctor({ params }) {
                   value={form.doctorType} 
                   onChange={handleChange}
                 >
-                  <option value="Regular">Regular</option>
+                  <option value="Non-Investor">Non-Investor</option>
                   <option value="Investor">Investor</option>
                 </select>
               </div>

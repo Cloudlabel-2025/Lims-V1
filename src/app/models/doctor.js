@@ -83,8 +83,8 @@ const doctorSchema = new mongoose.Schema({
     },
     doctorType: {
         type: String,
-        enum: ["Regular", "Investor"],
-        default: "Regular"
+        enum: ["Non-Investor", "Investor"],
+        default: "Non-Investor"
     },
     status: {
         type: String,

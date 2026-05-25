@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { getAllowedNavItems, hasAnyPermission } from "@/app/lib/client-rbac";
 
-export default function Sidebar({ collapsed, onLogout, theme, user }) {
+export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout, theme, user }) {
   const pathname = usePathname();
   const labName = theme?.labName || "Uthiram LIMS";
   const [title, subtitle = "LIMS"] = labName.split(/\s+/, 2);
@@ -32,7 +32,14 @@ export default function Sidebar({ collapsed, onLogout, theme, user }) {
   };
 
   return (
-    <aside className={`dash-sidebar ${collapsed ? "collapsed" : ""}`}>
+    <>
+      {mobileOpen && (
+        <div 
+          className="sidebar-overlay open" 
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+      <aside className={`dash-sidebar ${collapsed ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
       {/* Logo */}
       <div className="dash-sidebar-logo">
         <div className="dash-logo-icon">{Icons.logo}</div>
@@ -52,6 +59,7 @@ export default function Sidebar({ collapsed, onLogout, theme, user }) {
             key={item.id}
             href={item.href}
             className={`dash-nav-item ${isActive(item.href) ? "active" : ""}`}
+            onClick={() => setMobileOpen && setMobileOpen(false)}
           >
             <span className="dash-nav-icon">{item.icon}</span>
             {!collapsed && <span className="dash-nav-label">{item.label}</span>}
@@ -67,6 +75,7 @@ export default function Sidebar({ collapsed, onLogout, theme, user }) {
             <Link
               href="/settings"
               className={`dash-nav-item ${pathname === "/settings" ? "active" : ""}`}
+              onClick={() => setMobileOpen && setMobileOpen(false)}
             >
               <span className="dash-nav-icon">{Icons.settings}</span>
               {!collapsed && <span className="dash-nav-label">Settings</span>}
@@ -83,5 +92,6 @@ export default function Sidebar({ collapsed, onLogout, theme, user }) {
         </button>
       </div>
     </aside>
+    </>
   );
 }

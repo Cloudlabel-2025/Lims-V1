@@ -16,7 +16,7 @@ const EMPTY_FORM = {
   location: "",
   clinicAddress: "",
   commission: "0",
-  doctorType: "Regular",
+  doctorType: "Non-Investor",
   status: "Active",
 };
 
@@ -345,8 +345,8 @@ export default function DoctorRegistration() {
                   value={form.doctorType} 
                   onChange={handleChange}
                 >
-                  <option value="Regular">Regular</option>
-                  <option value="Investor">Investors</option>
+                  <option value="Non-Investor">Non-Investor</option>
+                  <option value="Investor">Investor</option>
                 </select>
               </div>
               <div className="col-md-4">
