@@ -1,3 +1,4 @@
+import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectMasterDB from "@/app/lib/master-db";
@@ -28,10 +29,19 @@ function normalizePermissionKeys(permissionKeys, enabledModules) {
   );
 }
 
+function cleanString(value) {
+  return String(value || "").trim();
+}
+
 async function getLab(tenantId) {
+  const labId = cleanString(tenantId);
   const masterConnection = await connectMasterDB();
   const Lab = getLabModel(masterConnection);
-  return Lab.findOne({ tenantId }).select(
+  const query = mongoose.Types.ObjectId.isValid(labId)
+    ? { _id: labId }
+    : { tenantId: labId.toLowerCase() };
+
+  return Lab.findOne(query).select(
     "name tenantId status subscriptionPlan enabledModules dbName +dbConnectionString"
   );
 }
@@ -96,10 +106,7 @@ export async function GET(req, { params }) {
     });
   } catch (error) {
     console.error("GET /api/developer/labs/[tenantId]/access error:", error);
-    return NextResponse.json(
-      { error: "Unable to load lab access", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to load lab access", error, 500);
   }
 }
 
@@ -153,9 +160,6 @@ export async function PATCH(req, { params }) {
     }
   } catch (error) {
     console.error("PATCH /api/developer/labs/[tenantId]/access error:", error);
-    return NextResponse.json(
-      { error: "Unable to save lab access", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to save lab access", error, 500);
   }
 }

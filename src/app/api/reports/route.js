@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -38,7 +39,7 @@ export async function GET(req) {
 
     return Response.json({ reports });
   } catch (error) {
-    return Response.json({ error: "Unable to load reports", details: error.message }, { status: 500 });
+    return jsonError("Unable to load reports", error, 500);
   }
 }
 
@@ -149,6 +150,6 @@ export async function POST(req) {
 
     return Response.json({ report }, { status: 201 });
   } catch (error) {
-    return Response.json({ error: "Unable to create report", details: error.message }, { status: 500 });
+    return jsonError("Unable to create report", error, 500);
   }
 }

@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -29,7 +30,7 @@ export async function GET(req) {
 
     return Response.json({ billingRecords });
   } catch (error) {
-    return Response.json({ error: "Unable to load billing records", details: error.message }, { status: 500 });
+    return jsonError("Unable to load billing records", error, 500);
   }
 }
 
@@ -189,6 +190,6 @@ export async function POST(req) {
       ]);
     }
 
-    return Response.json({ error: "Unable to create billing record", details: error.message }, { status: 500 });
+    return jsonError("Unable to create billing record", error, 500);
   }
 }

@@ -16,6 +16,31 @@ function base64UrlDecode(value) {
   return Buffer.from(padded, "base64").toString("utf8");
 }
 
+function isBase64UrlPart(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]+$/.test(value);
+}
+
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function isValidSessionPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  if (!["tenant", "developer"].includes(payload.userType)) return false;
+  if (!payload.userId || typeof payload.userId !== "string") return false;
+  if (!payload.email || typeof payload.email !== "string") return false;
+
+  if (payload.userType === "tenant" && !payload.tenantId) return false;
+  if (payload.exp !== undefined && !Number.isFinite(payload.exp)) return false;
+  if (payload.iat !== undefined && !Number.isFinite(payload.iat)) return false;
+
+  return true;
+}
+
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret.length < 24) {
@@ -43,12 +68,20 @@ export function createSessionToken(payload, expiresInSeconds = 60 * 60 * 8) {
 }
 
 export function verifySessionToken(token) {
-  if (!token) return null;
+  if (!token || typeof token !== "string") return null;
 
   const parts = token.split(".");
   if (parts.length !== 3) return null;
 
   const [encodedHeader, encodedBody, signature] = parts;
+  if (
+    !isBase64UrlPart(encodedHeader) ||
+    !isBase64UrlPart(encodedBody) ||
+    !isBase64UrlPart(signature)
+  ) {
+    return null;
+  }
+
   const data = `${encodedHeader}.${encodedBody}`;
   const expectedSignature = crypto
     .createHmac("sha256", getJwtSecret())
@@ -65,7 +98,16 @@ export function verifySessionToken(token) {
     return null;
   }
 
-  const payload = JSON.parse(base64UrlDecode(encodedBody));
+  const header = safeJsonParse(base64UrlDecode(encodedHeader));
+  if (header?.alg !== "HS256" || header?.typ !== "JWT") {
+    return null;
+  }
+
+  const payload = safeJsonParse(base64UrlDecode(encodedBody));
+  if (!isValidSessionPayload(payload)) {
+    return null;
+  }
+
   if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
     return null;
   }

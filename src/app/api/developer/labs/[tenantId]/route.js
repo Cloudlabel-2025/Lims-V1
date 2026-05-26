@@ -1,3 +1,4 @@
+import { nextJsonError } from "@/app/lib/api-response";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
@@ -144,10 +145,7 @@ export async function GET(req, context) {
 
     return NextResponse.json({ lab: serializeLab(lab, req) });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Unable to load lab", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to load lab", error, 500);
   }
 }
 
@@ -297,10 +295,7 @@ export async function PATCH(req, context) {
     return NextResponse.json({ lab: serializeLab(lab, req) });
   } catch (error) {
     if (error?.code === 11000) {
-      return NextResponse.json(
-        { error: "A lab or admin user already uses this value", details: error.message },
-        { status: 409 }
-      );
+      return nextJsonError("A lab or admin user already uses this value", error, 409);
     }
 
     if (error?.name === "ValidationError") {
@@ -309,16 +304,10 @@ export async function PATCH(req, context) {
         .filter(Boolean)
         .join("; ");
 
-      return NextResponse.json(
-        { error: details || "Invalid lab update", details: error.message },
-        { status: 400 }
-      );
+      return nextJsonError(details || "Invalid lab update", error, 400);
     }
 
-    return NextResponse.json(
-      { error: "Unable to update lab", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to update lab", error, 500);
   }
 }
 
@@ -338,9 +327,6 @@ export async function DELETE(req, context) {
 
     return NextResponse.json({ ok: true, tenantId });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Unable to delete lab", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to delete lab", error, 500);
   }
 }

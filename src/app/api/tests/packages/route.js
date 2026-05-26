@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -39,7 +40,7 @@ export async function GET(req) {
 
     return Response.json({ packages });
   } catch (error) {
-    return Response.json({ error: "Unable to load packages", details: error.message }, { status: 500 });
+    return jsonError("Unable to load packages", error, 500);
   }
 }
 
@@ -77,6 +78,6 @@ export async function POST(req) {
       return Response.json({ error: "A package with this name/code already exists" }, { status: 409 });
     }
 
-    return Response.json({ error: "Unable to create package", details: error.message }, { status: 500 });
+    return jsonError("Unable to create package", error, 500);
   }
 }

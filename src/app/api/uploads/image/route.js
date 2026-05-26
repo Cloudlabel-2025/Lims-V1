@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { nextJsonError } from "@/app/lib/api-response";
 import { hasPermission, requireAnySession } from "@/app/lib/auth";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { uploadImageToCloudinary } from "@/app/lib/cloudinary";
@@ -68,9 +69,6 @@ export async function POST(req) {
   } catch (error) {
     console.error("POST /api/uploads/image error:", error.message);
 
-    return NextResponse.json(
-      { error: error.message || "Image upload failed" },
-      { status: 400 }
-    );
+    return nextJsonError("Image upload failed", error, 400);
   }
 }

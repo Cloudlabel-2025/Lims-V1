@@ -355,7 +355,7 @@ export default function DeveloperCreateLabPage() {
               className={formErrors.name ? "invalid" : ""}
               value={form.name}
               onChange={(e) => updateField("name", e.target.value)}
-              placeholder="Cloud Diagnostics"
+              placeholder="Enter lab name"
               required
             />
             {formErrors.name && <em>{formErrors.name}</em>}
@@ -366,7 +366,7 @@ export default function DeveloperCreateLabPage() {
               className={formErrors.tenantId ? "invalid" : ""}
               value={form.tenantId}
               onChange={(e) => updateField("tenantId", slugifyTenantId(e.target.value))}
-              placeholder="cloud-diagnostics"
+              placeholder="Enter tenant ID"
               required
             />
             {formErrors.tenantId && <em>{formErrors.tenantId}</em>}
@@ -391,7 +391,7 @@ export default function DeveloperCreateLabPage() {
               maxLength={10}
               value={form.contactPhone}
               onChange={(e) => updateField("contactPhone", e.target.value.replace(/\D/g, ""))}
-              placeholder="9876543210"
+              placeholder="Enter mobile number"
             />
             {formErrors.contactPhone && <em>{formErrors.contactPhone}</em>}
           </label>
@@ -403,7 +403,7 @@ export default function DeveloperCreateLabPage() {
               name="developer-create-lab-contact-email"
               value={form.contactEmail}
               onChange={(e) => updateField("contactEmail", e.target.value)}
-              placeholder="contact@lab.com"
+              placeholder="Enter email"
               autoComplete="section-developer-create-lab email"
             />
             {formErrors.contactEmail && <em>{formErrors.contactEmail}</em>}
@@ -436,7 +436,7 @@ export default function DeveloperCreateLabPage() {
               name="developer-create-lab-admin-email"
               value={form.adminEmail}
               onChange={(e) => updateField("adminEmail", e.target.value)}
-              placeholder="admin@lab.com"
+              placeholder="Enter admin email"
               autoComplete="section-developer-create-lab username"
               required
             />
@@ -491,7 +491,7 @@ export default function DeveloperCreateLabPage() {
               <input
                 value={form.logoAltText}
                 onChange={(e) => updateField("logoAltText", e.target.value)}
-                placeholder={`${form.name || "Lab"} logo`}
+                placeholder="Enter logo alt text"
                 maxLength={120}
               />
             </label>
@@ -574,7 +574,7 @@ export default function DeveloperCreateLabPage() {
             <input
               value={customHighlight}
               onChange={(e) => setCustomHighlight(e.target.value)}
-              placeholder="Add custom login highlight"
+              placeholder="Enter login highlight"
               maxLength={80}
             />
             <button type="button" onClick={addCustomHighlight}>

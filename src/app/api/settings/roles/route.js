@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { hasPermission, requireTenantSession } from "@/app/lib/auth";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { getTenantModels } from "@/app/lib/tenant-db";
@@ -91,10 +92,7 @@ export async function GET(req) {
       })),
     });
   } catch (error) {
-    return Response.json(
-      { error: "Unable to load roles", details: error.message },
-      { status: 500 }
-    );
+    return jsonError("Unable to load roles", error, 500);
   }
 }
 
@@ -151,10 +149,7 @@ export async function PATCH(req) {
       return Response.json({ error: "Role name already exists" }, { status: 409 });
     }
 
-    return Response.json(
-      { error: "Unable to save roles", details: error.message },
-      { status: 500 }
-    );
+    return jsonError("Unable to save roles", error, 500);
   }
 }
 
@@ -200,9 +195,6 @@ export async function DELETE(req) {
 
     return Response.json({ roles: dedupeRolesByName(roles).map(serializeRole) });
   } catch (error) {
-    return Response.json(
-      { error: "Unable to delete role", details: error.message },
-      { status: 500 }
-    );
+    return jsonError("Unable to delete role", error, 500);
   }
 }

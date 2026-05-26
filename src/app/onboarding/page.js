@@ -186,7 +186,7 @@ export default function TenantOnboardingPage() {
             <input
               value={labName}
               onChange={(event) => setLabName(event.target.value)}
-              placeholder="Cloud Diagnostics"
+              placeholder="Enter lab name"
               required
             />
           </label>
@@ -199,7 +199,7 @@ export default function TenantOnboardingPage() {
                 setSubdomainTouched(true);
                 setSubdomain(slugifySubdomain(event.target.value));
               }}
-              placeholder="cloud-diagnostics"
+              placeholder="Enter subdomain"
               required
             />
           </label>

@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -21,7 +22,7 @@ export async function GET(req) {
 
     return Response.json({ categories });
   } catch (error) {
-    return Response.json({ error: "Unable to load categories", details: error.message }, { status: 500 });
+    return jsonError("Unable to load categories", error, 500);
   }
 }
 
@@ -53,6 +54,6 @@ export async function POST(req) {
       return Response.json({ error: "Category already exists" }, { status: 409 });
     }
 
-    return Response.json({ error: "Unable to create category", details: error.message }, { status: 500 });
+    return jsonError("Unable to create category", error, 500);
   }
 }

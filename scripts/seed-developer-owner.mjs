@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import mongoose from "mongoose";
-import { hashPassword } from "../src/app/lib/password.js";
+import { hashPassword, validatePasswordPolicy } from "../src/app/lib/password.js";
 import { getDeveloperUserModel } from "../src/app/models/master/DeveloperUser.js";
 
 const rootDir = process.cwd();
@@ -43,6 +43,11 @@ async function main() {
   const password = requiredEnv("DEVELOPER_OWNER_PASSWORD");
   const firstName = process.env.DEVELOPER_OWNER_FIRST_NAME?.trim() || "System";
   const lastName = process.env.DEVELOPER_OWNER_LAST_NAME?.trim() || "Owner";
+  const passwordPolicy = validatePasswordPolicy(password);
+
+  if (!passwordPolicy.valid) {
+    throw new Error(passwordPolicy.errors.join("; "));
+  }
 
   const connection = await mongoose
     .createConnection(masterUri, {

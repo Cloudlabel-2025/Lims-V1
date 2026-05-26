@@ -16,7 +16,7 @@ export default function Topbar({ onToggleSidebar, user }) {
         <span className="dash-search-icon">{Icons.search}</span>
         <input
           type="text"
-          placeholder="Search patients, tests, reports..."
+          placeholder="Search records"
           className="dash-search-input"
           id="dashboard-search"
         />

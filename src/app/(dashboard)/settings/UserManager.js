@@ -25,7 +25,7 @@ export default function UserManager({
           <input
             value={newUser.name}
             onChange={(event) => setNewUser((current) => ({ ...current, name: event.target.value }))}
-            placeholder="Anita Kumar"
+            placeholder="Enter name"
           />
         </label>
         <label>
@@ -35,7 +35,7 @@ export default function UserManager({
             name="lab-settings-new-user-email"
             value={newUser.email}
             onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))}
-            placeholder="anita@lab.com"
+            placeholder="Enter email"
             autoComplete="section-lab-settings-new-user username"
           />
         </label>
@@ -45,7 +45,7 @@ export default function UserManager({
             name="lab-settings-new-user-password"
             value={newUser.password}
             onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
-            placeholder="Minimum 8 characters"
+            placeholder="Enter password"
             autoComplete="section-lab-settings-new-user new-password"
             invalid={Boolean(newUserErrors.password)}
             toggleLabel="user password"
@@ -58,7 +58,7 @@ export default function UserManager({
             name="lab-settings-new-user-confirm-password"
             value={newUser.confirmPassword}
             onChange={(event) => setNewUser((current) => ({ ...current, confirmPassword: event.target.value }))}
-            placeholder="Repeat password"
+            placeholder="Enter confirm password"
             autoComplete="section-lab-settings-new-user new-password"
             invalid={Boolean(newUserErrors.confirmPassword)}
             toggleLabel="confirm user password"

@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -76,6 +77,6 @@ export async function PUT(req, { params }) {
 
     return Response.json({ sample });
   } catch (error) {
-    return Response.json({ error: "Unable to update sample", details: error.message }, { status: 500 });
+    return jsonError("Unable to update sample", error, 500);
   }
 }

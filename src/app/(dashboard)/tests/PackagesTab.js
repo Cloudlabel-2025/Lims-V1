@@ -36,7 +36,7 @@ export default function PackagesTab({
                 <input
                   value={packageForm.name}
                   onChange={(e) => setPackageForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Executive Health Checkup"
+                  placeholder="Enter package name"
                   required
                 />
               </label>
@@ -45,7 +45,7 @@ export default function PackagesTab({
                 <input
                   value={packageForm.code}
                   onChange={(e) => setPackageForm((p) => ({ ...p, code: e.target.value }))}
-                  placeholder="PKG-EXEC"
+                  placeholder="Enter package code"
                 />
               </label>
               <label className="full-width">
@@ -53,7 +53,7 @@ export default function PackagesTab({
                 <textarea
                   value={packageForm.description}
                   onChange={(e) => setPackageForm((p) => ({ ...p, description: e.target.value }))}
-                  placeholder="Comprehensive health screening including major vital tests..."
+                  placeholder="Enter description"
                   style={{ width: "100%", height: "80px", padding: "10px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border)", fontSize: "13.5px" }}
                 />
               </label>
@@ -64,7 +64,7 @@ export default function PackagesTab({
                     type="number"
                     value={packageForm.price}
                     onChange={(e) => setPackageForm((p) => ({ ...p, price: e.target.value }))}
-                    placeholder="0"
+                    placeholder="Enter price"
                     required
                     className="lims-input"
                   />
@@ -99,7 +99,7 @@ export default function PackagesTab({
                   options={packageTestOptions}
                   value={packageForm.tests}
                   onChange={(e) => setPackageForm((p) => ({ ...p, tests: e.target.value }))}
-                  placeholder="Search and add tests..."
+                  placeholder="Search tests"
                 />
               </label>
             </div>

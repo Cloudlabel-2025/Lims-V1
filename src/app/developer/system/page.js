@@ -60,10 +60,6 @@ export default function DeveloperSystemPage() {
     () => groupBy(developerPermissions, "category"),
     [developerPermissions]
   );
-  const [developerRole, setDeveloperRole] = useState({
-    name: "Platform Owner",
-    permissions: developerPermissions.map((permission) => permission.key),
-  });
   const [labs, setLabs] = useState([]);
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const [savedAccess, setSavedAccess] = useState(null);
@@ -182,13 +178,6 @@ export default function DeveloperSystemPage() {
       cancelled = true;
     };
   }, [selectedTenantId, labPermissions]);
-
-  function toggleDeveloperPermission(permissionKey) {
-    setDeveloperRole((current) => ({
-      ...current,
-      permissions: toggleSetValue(current.permissions, permissionKey),
-    }));
-  }
 
   function toggleLabModule(moduleId) {
     setDraftAccess((current) => {
@@ -421,21 +410,16 @@ export default function DeveloperSystemPage() {
       <section className="developer-panel developer-config-section">
         <div className="developer-panel-header">
           <h2>Developer RBAC</h2>
-          <p>Create developer control-panel roles and map global developer permissions.</p>
+          <p>Developer control-panel permissions are code-defined and change only during development.</p>
         </div>
         <div className="developer-form-grid">
           <label>
             Role Name
-            <input
-              value={developerRole.name}
-              onChange={(event) =>
-                setDeveloperRole((current) => ({ ...current, name: event.target.value }))
-              }
-            />
+            <input value="Platform Owner" readOnly />
           </label>
           <label>
             Access Scope
-            <select defaultValue="developer">
+            <select value="developer" disabled>
               <option value="developer">Developer Control Panel</option>
             </select>
           </label>
@@ -452,8 +436,9 @@ export default function DeveloperSystemPage() {
                 <label className="permission-checkbox" key={permission.key}>
                   <input
                     type="checkbox"
-                    checked={developerRole.permissions.includes(permission.key)}
-                    onChange={() => toggleDeveloperPermission(permission.key)}
+                    checked
+                    disabled
+                    readOnly
                   />
                   <span>
                     <strong>{permission.name}</strong>
@@ -466,30 +451,6 @@ export default function DeveloperSystemPage() {
         </div>
       </section>
 
-      <section className="developer-panel developer-config-section">
-        <div className="developer-panel-header">
-          <h2>Permission Catalog Reference</h2>
-          <p>Master permission mapping used by developer and lab configuration screens.</p>
-        </div>
-        <div className="developer-module-catalog">
-          {availableLabModules.map((moduleConfig) => {
-            const permissions = labPermissions.filter(
-              (permission) => permission.module === moduleConfig.id
-            );
-            return (
-              <article key={moduleConfig.id}>
-                <strong>{moduleConfig.label}</strong>
-                <span>{moduleConfig.id}</span>
-                <small>
-                  {permissions.map((permission) => permission.key).join(", ") ||
-                    "No mapped permissions yet"}
-                </small>
-                {defaultLabModules.includes(moduleConfig.id) && <em>Default</em>}
-              </article>
-            );
-          })}
-        </div>
-      </section>
     </section>
   );
 }
