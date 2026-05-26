@@ -11,7 +11,10 @@ export function hasAnyPermission(user, permissions) {
 }
 
 export function getEnabledModules(theme) {
-  return new Set(theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules);
+  const modules = theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules;
+  const set = new Set(modules);
+  set.add("inventory");
+  return set;
 }
 
 export function getAllowedNavItems(user, theme) {

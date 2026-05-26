@@ -67,7 +67,7 @@ export const availableLabModules = [
   },
 ];
 
-export const defaultLabModules = ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports"];
+export const defaultLabModules = ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports", "inventory"];
 
 export function normalizeEnabledModules(value) {
   const allowed = new Set(availableLabModules.map((module) => module.id));
