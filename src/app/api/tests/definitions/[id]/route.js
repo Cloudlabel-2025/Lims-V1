@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -51,7 +52,7 @@ export async function GET(req, { params }) {
 
     return Response.json({ test });
   } catch (error) {
-    return Response.json({ error: "Unable to fetch test", details: error.message }, { status: 500 });
+    return jsonError("Unable to fetch test", error, 500);
   }
 }
 
@@ -98,7 +99,7 @@ export async function PUT(req, { params }) {
       return Response.json({ error: "A test with this name/code already exists" }, { status: 409 });
     }
 
-    return Response.json({ error: "Unable to update test", details: error.message }, { status: 500 });
+    return jsonError("Unable to update test", error, 500);
   }
 }
 
@@ -122,6 +123,6 @@ export async function DELETE(req, { params }) {
 
     return Response.json({ test });
   } catch (error) {
-    return Response.json({ error: "Unable to disable test", details: error.message }, { status: 500 });
+    return jsonError("Unable to disable test", error, 500);
   }
 }

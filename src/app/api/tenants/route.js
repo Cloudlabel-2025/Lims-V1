@@ -1,3 +1,4 @@
+import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import { buildTenantUrl, slugifySubdomain, validateSubdomain } from "@/app/lib/subdomain";
@@ -42,10 +43,13 @@ export async function GET(req) {
       url: buildTenantUrl(suggestion, req.url),
     });
   } catch (error) {
-    return NextResponse.json(
-      { available: false, valid: false, error: error.message },
-      { status: 500 }
-    );
+    const payload = { available: false, valid: false, error: "Unable to check subdomain" };
+
+    if (process.env.NODE_ENV !== "production") {
+      payload.details = error.message;
+    }
+
+    return NextResponse.json(payload, { status: 500 });
   }
 }
 
@@ -95,9 +99,6 @@ export async function POST(req) {
       );
     }
 
-    return NextResponse.json(
-      { error: "Unable to create tenant", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to create tenant", error, 500);
   }
 }

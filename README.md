@@ -42,3 +42,9 @@ On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm.ps1`
 ## Setup Notes
 
 Required environment variables include MongoDB connection settings and session secrets. See the tenant, auth, and onboarding code under `src/app/lib` and `scripts` for the current expected values.
+
+Password reset emails use Resend when configured:
+
+- `RESEND_API_KEY`
+- `RESET_EMAIL_FROM`
+- `PASSWORD_RESET_BASE_URL` optional, for example `https://app.example.com`

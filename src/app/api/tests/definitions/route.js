@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import mongoose from "mongoose";
@@ -81,7 +82,7 @@ export async function GET(req) {
 
     return Response.json({ tests });
   } catch (error) {
-    return Response.json({ error: "Unable to load tests", details: error.message }, { status: 500 });
+    return jsonError("Unable to load tests", error, 500);
   }
 }
 
@@ -126,6 +127,6 @@ export async function POST(req) {
     }
 
     console.error("[TEST_CREATE_ERROR]:", error);
-    return Response.json({ error: "Unable to create test", details: error.message }, { status: 500 });
+    return jsonError("Unable to create test", error, 500);
   }
 }

@@ -4,9 +4,41 @@ import { promisify } from "node:util";
 const scryptAsync = promisify(crypto.scrypt);
 const keyLength = 64;
 
+export function validatePasswordPolicy(password) {
+  const value = String(password || "");
+  const errors = [];
+
+  if (value.length < 8) {
+    errors.push("Password must be at least 8 characters long");
+  }
+
+  if (!/[A-Z]/.test(value)) {
+    errors.push("Password must contain at least one uppercase letter");
+  }
+
+  if (!/[a-z]/.test(value)) {
+    errors.push("Password must contain at least one lowercase letter");
+  }
+
+  if (!/\d/.test(value)) {
+    errors.push("Password must contain at least one number");
+  }
+
+  if (!/[^A-Za-z0-9]/.test(value)) {
+    errors.push("Password must contain at least one special character");
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
 export async function hashPassword(password) {
-  if (!password || password.length < 8) {
-    throw new Error("Password must be at least 8 characters long");
+  const policy = validatePasswordPolicy(password);
+
+  if (!policy.valid) {
+    throw new Error(policy.errors.join("; "));
   }
 
   const salt = crypto.randomBytes(16).toString("hex");

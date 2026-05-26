@@ -1,3 +1,4 @@
+import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import { getSessionFromRequest, requireTenantSession } from "@/app/lib/auth";
 import { getTenantIdFromRequest } from "@/app/lib/tenant-resolver";
@@ -84,10 +85,7 @@ export async function GET(req) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Unable to load theme", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to load theme", error, 500);
   }
 }
 
@@ -168,9 +166,6 @@ export async function PATCH(req) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Unable to update branding", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to update branding", error, 500);
   }
 }

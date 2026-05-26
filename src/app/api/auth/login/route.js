@@ -1,3 +1,4 @@
+import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import connectMasterDB from "@/app/lib/master-db";
 import { createSessionToken, setSessionCookie } from "@/app/lib/session";
@@ -63,10 +64,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
     }
 
-    return NextResponse.json(
-      { error: "Login failed", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Login failed", error, 500);
   }
 }
 

@@ -100,13 +100,13 @@ export default function SamplesPage() {
           {canCollectSamples && (
             <label>
               Collector
-              <input value={collectorName} onChange={(e) => setCollectorName(e.target.value)} placeholder="Collector name" />
+              <input value={collectorName} onChange={(e) => setCollectorName(e.target.value)} placeholder="Enter collector name" />
             </label>
           )}
           {canRejectSamples && (
             <label>
               Rejection Reason
-              <input value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Required for reject" />
+              <input value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Enter rejection reason" />
             </label>
           )}
         </div>

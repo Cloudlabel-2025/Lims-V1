@@ -391,11 +391,11 @@ export default function TestsPage() {
               <div className="module-form-grid">
                 <label>
                   Test Name
-                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Complete Blood Count" required />
+                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required />
                 </label>
                 <label>
                   Code
-                  <input value={form.code} onChange={(e) => updateField("code", e.target.value)} placeholder="CBC" />
+                  <input value={form.code} onChange={(e) => updateField("code", e.target.value)} placeholder="Enter test code" />
                 </label>
                 <label>
                   Category
@@ -408,11 +408,11 @@ export default function TestsPage() {
                 </label>
                 <label>
                   Sample Type
-                  <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Blood / Serum" />
+                  <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Enter sample type" />
                 </label>
                 <label>
                   Price
-                  <input type="number" min="0" value={form.price} onChange={(e) => updateField("price", e.target.value)} placeholder="0" />
+                  <input type="number" min="0" value={form.price} onChange={(e) => updateField("price", e.target.value)} placeholder="Enter price" />
                 </label>
                 <label>
                   Status
@@ -450,7 +450,7 @@ export default function TestsPage() {
                           className="lims-input"
                           value={parameter.name} 
                           onChange={(e) => updateParameter(index, "name", e.target.value)} 
-                          placeholder="Parameter Name (e.g. Hemoglobin)" 
+                          placeholder="Enter parameter name" 
                           required 
                           style={{ width: "100%" }}
                         />
@@ -460,7 +460,7 @@ export default function TestsPage() {
                           className="lims-input"
                           value={parameter.unit} 
                           onChange={(e) => updateParameter(index, "unit", e.target.value)} 
-                          placeholder="Unit (g/dL)" 
+                          placeholder="Enter unit" 
                           style={{ width: "100%" }}
                         />
                       </div>
@@ -510,24 +510,24 @@ export default function TestsPage() {
                       <div className="range-col">
                         <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", marginBottom: "8px", display: "block", letterSpacing: "0.5px" }}>COMMON RANGE</label>
                         <div style={{ display: "flex", gap: "10px" }}>
-                          <input className="lims-input" type="number" step="any" value={parameter.normalMin ?? ""} onChange={(e) => updateParameter(index, "normalMin", e.target.value)} placeholder="Min" style={{ width: "100%", textAlign: "center" }} />
-                          <input className="lims-input" type="number" step="any" value={parameter.normalMax ?? ""} onChange={(e) => updateParameter(index, "normalMax", e.target.value)} placeholder="Max" style={{ width: "100%", textAlign: "center" }} />
+                          <input className="lims-input" type="number" step="any" value={parameter.normalMin ?? ""} onChange={(e) => updateParameter(index, "normalMin", e.target.value)} placeholder="Enter min" style={{ width: "100%", textAlign: "center" }} />
+                          <input className="lims-input" type="number" step="any" value={parameter.normalMax ?? ""} onChange={(e) => updateParameter(index, "normalMax", e.target.value)} placeholder="Enter max" style={{ width: "100%", textAlign: "center" }} />
                         </div>
                       </div>
                       
                       <div className="range-col">
                         <label style={{ fontSize: "11px", fontWeight: "700", color: "#2563eb", marginBottom: "8px", display: "block", letterSpacing: "0.5px" }}>MALE RANGE</label>
                         <div style={{ display: "flex", gap: "10px" }}>
-                          <input className="lims-input" type="number" step="any" value={parameter.maleMin ?? ""} onChange={(e) => updateParameter(index, "maleMin", e.target.value)} placeholder="Min" style={{ width: "100%", textAlign: "center", borderColor: "#bfdbfe" }} />
-                          <input className="lims-input" type="number" step="any" value={parameter.maleMax ?? ""} onChange={(e) => updateParameter(index, "maleMax", e.target.value)} placeholder="Max" style={{ width: "100%", textAlign: "center", borderColor: "#bfdbfe" }} />
+                          <input className="lims-input" type="number" step="any" value={parameter.maleMin ?? ""} onChange={(e) => updateParameter(index, "maleMin", e.target.value)} placeholder="Enter min" style={{ width: "100%", textAlign: "center", borderColor: "#bfdbfe" }} />
+                          <input className="lims-input" type="number" step="any" value={parameter.maleMax ?? ""} onChange={(e) => updateParameter(index, "maleMax", e.target.value)} placeholder="Enter max" style={{ width: "100%", textAlign: "center", borderColor: "#bfdbfe" }} />
                         </div>
                       </div>
 
                       <div className="range-col">
                         <label style={{ fontSize: "11px", fontWeight: "700", color: "#db2777", marginBottom: "8px", display: "block", letterSpacing: "0.5px" }}>FEMALE RANGE</label>
                         <div style={{ display: "flex", gap: "10px" }}>
-                          <input className="lims-input" type="number" step="any" value={parameter.femaleMin ?? ""} onChange={(e) => updateParameter(index, "femaleMin", e.target.value)} placeholder="Min" style={{ width: "100%", textAlign: "center", borderColor: "#fbcfe8" }} />
-                          <input className="lims-input" type="number" step="any" value={parameter.femaleMax ?? ""} onChange={(e) => updateParameter(index, "femaleMax", e.target.value)} placeholder="Max" style={{ width: "100%", textAlign: "center", borderColor: "#fbcfe8" }} />
+                          <input className="lims-input" type="number" step="any" value={parameter.femaleMin ?? ""} onChange={(e) => updateParameter(index, "femaleMin", e.target.value)} placeholder="Enter min" style={{ width: "100%", textAlign: "center", borderColor: "#fbcfe8" }} />
+                          <input className="lims-input" type="number" step="any" value={parameter.femaleMax ?? ""} onChange={(e) => updateParameter(index, "femaleMax", e.target.value)} placeholder="Enter max" style={{ width: "100%", textAlign: "center", borderColor: "#fbcfe8" }} />
                         </div>
                       </div>
                     </div>

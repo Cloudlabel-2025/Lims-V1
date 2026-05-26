@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireTenantSession } from "@/app/lib/auth";
 
@@ -17,7 +18,7 @@ export async function GET(req, { params }) {
     }
     return Response.json(patient);
   } catch (err) {
-    return Response.json({ error: "Fetch failed", details: err.message }, { status: 500 });
+    return jsonError("Fetch failed", err, 500);
   }
 }
 
@@ -62,7 +63,7 @@ export async function PUT(req, { params }) {
       const messages = Object.values(err.errors).map((e) => e.message);
       return Response.json({ error: messages.join("; ") }, { status: 400 });
     }
-    return Response.json({ error: "Update failed", details: err.message }, { status: 500 });
+    return jsonError("Update failed", err, 500);
   }
 }
 
@@ -84,6 +85,6 @@ export async function DELETE(req, { params }) {
     return Response.json({ success: true, deletedPatient: patient.patientId });
   } catch (err) {
     console.error("DELETE /api/patient/[id] error:", err);
-    return Response.json({ error: "Delete failed", details: err.message }, { status: 500 });
+    return jsonError("Delete failed", err, 500);
   }
 }

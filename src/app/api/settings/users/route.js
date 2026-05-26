@@ -1,6 +1,7 @@
+import { jsonError } from "@/app/lib/api-response";
 import { requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { hashPassword } from "@/app/lib/password";
+import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
 
 function clean(value) {
   return String(value || "").trim();
@@ -43,10 +44,7 @@ export async function GET(req) {
 
     return Response.json({ users: users.map(serializeUser) });
   } catch (error) {
-    return Response.json(
-      { error: "Unable to load users", details: error.message },
-      { status: 500 }
-    );
+    return jsonError("Unable to load users", error, 500);
   }
 }
 
@@ -70,9 +68,10 @@ export async function POST(req) {
       return Response.json({ error: "Valid login email is required" }, { status: 400 });
     }
 
-    if (!password || password.length < 8) {
+    const passwordPolicy = validatePasswordPolicy(password);
+    if (!passwordPolicy.valid) {
       return Response.json(
-        { error: "Password must be at least 8 characters" },
+        { error: passwordPolicy.errors.join("; ") },
         { status: 400 }
       );
     }
@@ -108,9 +107,6 @@ export async function POST(req) {
       return Response.json({ error: "A user with this login email already exists" }, { status: 409 });
     }
 
-    return Response.json(
-      { error: "Unable to create user", details: error.message },
-      { status: 500 }
-    );
+    return jsonError("Unable to create user", error, 500);
   }
 }

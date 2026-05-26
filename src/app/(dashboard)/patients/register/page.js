@@ -254,7 +254,7 @@ export default function PatientRegistration() {
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Barcode <span className="optional">(optional)</span></label>
-                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="Scan barcode" value={form.barcode} onChange={handleChange} />
+                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="Enter barcode" value={form.barcode} onChange={handleChange} />
                 {errors.barcode && <div className="lims-error-text">{errors.barcode}</div>}
               </div>
               <div className="col-md-4">
@@ -275,7 +275,7 @@ export default function PatientRegistration() {
               )}
               <div className="col-md-4">
                 <label className="lims-label">UH ID <span className="optional">(optional)</span></label>
-                <input type="number" name="uhId" className={`lims-input ${errors.uhId ? 'invalid' : ''}`} placeholder="14 digits" value={form.uhId} onChange={(e) => e.target.value.length <= 14 && handleChange(e)} />
+                <input type="number" name="uhId" className={`lims-input ${errors.uhId ? 'invalid' : ''}`} placeholder="Enter UH ID" value={form.uhId} onChange={(e) => e.target.value.length <= 14 && handleChange(e)} />
                 {errors.uhId && <div className="lims-error-text">{errors.uhId}</div>}
               </div>
             </div>
@@ -288,12 +288,12 @@ export default function PatientRegistration() {
             <div className="row g-3">
               <div className="col-md-4">
                 <label className="lims-label">Mobile Number <span className="required">*</span></label>
-                <input name="phone" className={`lims-input ${errors.phone ? 'invalid' : ''}`} placeholder="10-digit mobile" maxLength={10} value={form.phone} onChange={handleChange} />
+                <input name="phone" className={`lims-input ${errors.phone ? 'invalid' : ''}`} placeholder="Enter mobile number" maxLength={10} value={form.phone} onChange={handleChange} />
                 {errors.phone && <div className="lims-error-text">{errors.phone}</div>}
               </div>
               <div className="col-md-8">
                 <label className="lims-label">Address <span className="required">*</span></label>
-                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Full address" value={form.address} onChange={handleChange} />
+                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" value={form.address} onChange={handleChange} />
                 {errors.address && <div className="lims-error-text">{errors.address}</div>}
               </div>
             </div>
@@ -317,7 +317,7 @@ export default function PatientRegistration() {
                     options={doctors.map(doc => ({ value: doc.name, label: doc.name, sublabel: doc.doctorId }))}
                     value={form.refDoctorName}
                     onChange={handleChange}
-                    placeholder="Search & Select Doctor"
+                    placeholder="Search doctor"
                     error={!!errors.refDoctorName}
                   />
                   {errors.refDoctorName && <div className="lims-error-text">{errors.refDoctorName}</div>}
@@ -349,7 +349,7 @@ export default function PatientRegistration() {
                   ]}
                   value={form.selectedTests || []}
                   onChange={handleChange}
-                  placeholder="Search for investigations or health packages..."
+                  placeholder="Search tests or packages"
                   error={!!errors.selectedTests}
                 />
                 {errors.selectedTests && <div className="lims-error-text">{errors.selectedTests}</div>}
