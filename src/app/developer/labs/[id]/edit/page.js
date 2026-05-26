@@ -318,13 +318,14 @@ export default function DeveloperEditLabPage({ params }) {
                 className={formErrors.name ? "invalid" : ""}
                 value={form.name}
                 onChange={(event) => updateField("name", event.target.value)}
+                placeholder="Enter lab name"
                 required
               />
               {formErrors.name && <em>{formErrors.name}</em>}
             </label>
             <label>
               Tenant ID
-              <input value={form.tenantId} readOnly />
+              <input value={form.tenantId} placeholder="Enter tenant ID" readOnly />
             </label>
             <label>
               Status
@@ -352,6 +353,7 @@ export default function DeveloperEditLabPage({ params }) {
               <input
                 value={form.contactName}
                 onChange={(event) => updateField("contactName", event.target.value)}
+                placeholder="Enter contact name"
               />
             </label>
             <label>
@@ -364,6 +366,7 @@ export default function DeveloperEditLabPage({ params }) {
                 onChange={(event) =>
                   updateField("contactPhone", event.target.value.replace(/\D/g, ""))
                 }
+                placeholder="Enter mobile number"
               />
               {formErrors.contactPhone && <em>{formErrors.contactPhone}</em>}
             </label>
@@ -375,6 +378,7 @@ export default function DeveloperEditLabPage({ params }) {
                 name="developer-edit-lab-contact-email"
                 value={form.contactEmail}
                 onChange={(event) => updateField("contactEmail", event.target.value)}
+                placeholder="Enter email"
                 autoComplete="section-developer-edit-lab email"
               />
               {formErrors.contactEmail && <em>{formErrors.contactEmail}</em>}
@@ -395,6 +399,7 @@ export default function DeveloperEditLabPage({ params }) {
                   name="developer-edit-lab-admin-email"
                   value={form.adminEmail}
                   onChange={(event) => updateField("adminEmail", event.target.value)}
+                  placeholder="Enter admin email"
                   autoComplete="section-developer-edit-lab username"
                 />
                 {formErrors.adminEmail && <em>{formErrors.adminEmail}</em>}
@@ -407,7 +412,7 @@ export default function DeveloperEditLabPage({ params }) {
                   onChange={(event) => updateField("adminPassword", event.target.value)}
                   invalid={Boolean(formErrors.adminPassword)}
                   autoComplete="section-developer-edit-lab new-password"
-                  placeholder="Leave blank to keep current password"
+                  placeholder="Enter new password"
                   toggleLabel="admin password"
                 />
                 {formErrors.adminPassword && <em>{formErrors.adminPassword}</em>}
@@ -420,7 +425,7 @@ export default function DeveloperEditLabPage({ params }) {
                   onChange={(event) => updateField("adminConfirmPassword", event.target.value)}
                   invalid={Boolean(formErrors.adminConfirmPassword)}
                   autoComplete="section-developer-edit-lab new-password"
-                  placeholder="Repeat new password"
+                  placeholder="Enter confirm password"
                   toggleLabel="confirm admin password"
                 />
                 {formErrors.adminConfirmPassword && <em>{formErrors.adminConfirmPassword}</em>}
@@ -497,7 +502,7 @@ export default function DeveloperEditLabPage({ params }) {
               <input
                 value={customHighlight}
                 onChange={(event) => setCustomHighlight(event.target.value)}
-                placeholder="Add custom login highlight"
+                placeholder="Enter login highlight"
                 maxLength={80}
               />
               <button type="button" onClick={addCustomHighlight}>

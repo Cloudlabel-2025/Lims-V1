@@ -1,8 +1,10 @@
+import { jsonError } from "@/app/lib/api-response";
 import connectMasterDB from "@/app/lib/master-db";
-import { hashPassword, hashResetToken } from "@/app/lib/password";
+import { hashPassword, hashResetToken, validatePasswordPolicy } from "@/app/lib/password";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { getTenantIdFromRequest, normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
+import { getLabModel } from "@/app/models/master/Lab";
 
 function resolveTenantId(req, bodyTenantId) {
   let requestTenantId = null;
@@ -44,9 +46,10 @@ export async function POST(req) {
       );
     }
 
-    if (password.length < 8) {
+    const passwordPolicy = validatePasswordPolicy(password);
+    if (!passwordPolicy.valid) {
       return Response.json(
-        { error: "Password must be at least 8 characters long" },
+        { error: passwordPolicy.errors.join("; ") },
         { status: 400 }
       );
     }
@@ -65,16 +68,17 @@ export async function POST(req) {
       }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
     } else {
       const tenantId = resolveTenantId(req, body.tenantId);
-      if (!tenantId) {
-        return Response.json({ error: "Tenant is required" }, { status: 400 });
-      }
 
-      const { User } = await getTenantModels(tenantId);
-      user = await User.findOne({
-        status: { $in: ["active", "invited"] },
-        passwordResetTokenHash: tokenHash,
-        passwordResetExpiresAt: expiresQuery,
-      }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
+      if (tenantId) {
+        const { User } = await getTenantModels(tenantId);
+        user = await User.findOne({
+          status: { $in: ["active", "invited"] },
+          passwordResetTokenHash: tokenHash,
+          passwordResetExpiresAt: expiresQuery,
+        }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
+      } else {
+        user = await resolveTenantUserByResetToken(tokenHash, expiresQuery);
+      }
     }
 
     if (!user) {
@@ -93,9 +97,36 @@ export async function POST(req) {
       return Response.json({ error: "Tenant mismatch" }, { status: 403 });
     }
 
-    return Response.json(
-      { error: "Unable to reset password", details: error.message },
-      { status: 500 }
-    );
+    return jsonError("Unable to reset password", error, 500);
   }
+}
+
+async function resolveTenantUserByResetToken(tokenHash, expiresQuery) {
+  const masterConnection = await connectMasterDB();
+  const Lab = getLabModel(masterConnection);
+  const labs = await Lab.find({ status: "active" }).select("tenantId").lean();
+  const matches = [];
+
+  for (const lab of labs) {
+    try {
+      const { User } = await getTenantModels(lab.tenantId);
+      const user = await User.findOne({
+        status: { $in: ["active", "invited"] },
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: expiresQuery,
+      }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
+
+      if (user) {
+        matches.push(user);
+      }
+    } catch {
+      // Skip unavailable tenant databases so invalid token handling stays generic.
+    }
+  }
+
+  if (matches.length !== 1) {
+    return null;
+  }
+
+  return matches[0];
 }

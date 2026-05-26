@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -144,9 +145,6 @@ export async function GET(req) {
 
   } catch (err) {
     console.error("GET /api/doctor error:", err);
-    return Response.json(
-      { error: "Fetch failed", details: err.message },
-      { status: 500 }
-    );
+    return jsonError("Fetch failed", err, 500);
   }
 }

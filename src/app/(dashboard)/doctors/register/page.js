@@ -165,7 +165,7 @@ export default function DoctorRegistration() {
                 <input 
                   name="name" 
                   className={`lims-input ${errors.name ? 'invalid' : ''}`} 
-                  placeholder="e.g. Dr. John Doe" 
+                  placeholder="Enter doctor name" 
                   value={form.name} 
                   maxLength={50}
                   onChange={handleChange} 
@@ -216,7 +216,7 @@ export default function DoctorRegistration() {
                 <input 
                   name="degree" 
                   className={`lims-input ${errors.degree ? 'invalid' : ''}`} 
-                  placeholder="e.g. MBBS, MD" 
+                  placeholder="Enter qualification" 
                   value={form.degree} 
                   onChange={handleChange} 
                 />
@@ -228,7 +228,7 @@ export default function DoctorRegistration() {
                   name="experience" 
                   type="number"
                   className={`lims-input ${errors.experience ? 'invalid' : ''}`} 
-                  placeholder="Years of practice" 
+                  placeholder="Enter experience" 
                   value={form.experience} 
                   onChange={handleChange} 
                 />
@@ -250,7 +250,7 @@ export default function DoctorRegistration() {
                 <input 
                   name="phone" 
                   className={`lims-input ${errors.phone ? 'invalid' : ''}`} 
-                  placeholder="10-digit mobile" 
+                  placeholder="Enter mobile number" 
                   maxLength={10} 
                   value={form.phone} 
                   onChange={handleChange} 
@@ -263,7 +263,7 @@ export default function DoctorRegistration() {
                   name="email" 
                   type="email"
                   className={`lims-input ${errors.email ? 'invalid' : ''}`} 
-                  placeholder="doctor@example.com" 
+                  placeholder="Enter email" 
                   value={form.email} 
                   onChange={handleChange} 
                 />
@@ -274,7 +274,7 @@ export default function DoctorRegistration() {
                 <input 
                   name="clinicName" 
                   className={`lims-input ${errors.clinicName ? 'invalid' : ''}`} 
-                  placeholder="Name of primary practice" 
+                  placeholder="Enter clinic or hospital name" 
                   value={form.clinicName} 
                   onChange={handleChange} 
                 />
@@ -285,7 +285,7 @@ export default function DoctorRegistration() {
                 <input 
                   name="location" 
                   className={`lims-input ${errors.location ? 'invalid' : ''}`} 
-                  placeholder="e.g. City or Area" 
+                  placeholder="Enter location" 
                   value={form.location} 
                   onChange={handleChange} 
                 />
@@ -296,7 +296,7 @@ export default function DoctorRegistration() {
                 <input 
                   name="clinicAddress" 
                   className={`lims-input ${errors.clinicAddress ? 'invalid' : ''}`} 
-                  placeholder="Full address of the clinic or hospital" 
+                  placeholder="Enter practice address" 
                   value={form.clinicAddress} 
                   onChange={handleChange} 
                 />
@@ -320,7 +320,7 @@ export default function DoctorRegistration() {
                     name="commission" 
                     type="number"
                     className={`lims-input ${errors.commission ? 'invalid' : ''}`} 
-                    placeholder="0" 
+                    placeholder="Enter commission" 
                     value={form.commission} 
                     max="40"
                     step="0.1"

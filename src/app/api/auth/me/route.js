@@ -1,3 +1,4 @@
+import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import { requireAnySession } from "@/app/lib/auth";
 
@@ -38,9 +39,6 @@ export async function GET(req) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Unable to read session", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to read session", error, 500);
   }
 }

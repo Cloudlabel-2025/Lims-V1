@@ -51,7 +51,7 @@ export default function RoleManager({
         <input
           value={newRoleName}
           onChange={(event) => setNewRoleName(event.target.value)}
-          placeholder="Create role, e.g. Billing Cashier"
+          placeholder="Enter role name"
         />
         <button type="button" onClick={addRole}>
           {Icons.plus} Add Roles

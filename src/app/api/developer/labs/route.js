@@ -1,3 +1,4 @@
+import { nextJsonError } from "@/app/lib/api-response";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
@@ -195,10 +196,7 @@ export async function GET(req) {
       })),
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Unable to load labs", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to load labs", error, 500);
   }
 }
 
@@ -393,10 +391,7 @@ export async function POST(req) {
       await createdLab.deleteOne().catch(() => {});
     }
 
-    return NextResponse.json(
-      { error: "Unable to create lab", details: error.message },
-      { status: 500 }
-    );
+    return nextJsonError("Unable to create lab", error, 500);
   } finally {
     if (tenantConnection) {
       await tenantConnection.close();

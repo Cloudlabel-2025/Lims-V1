@@ -49,6 +49,18 @@ export default function LoginPage({
       ? buildThemeVariables(theme)
       : undefined;
 
+  function openForgotPassword() {
+    const params = new URLSearchParams({
+      userType: isTenantLogin ? "tenant" : "developer",
+    });
+
+    if (isTenantLogin && tenantId.trim()) {
+      params.set("tenantId", tenantId.trim());
+    }
+
+    router.push(`/forgot-password?${params.toString()}`);
+  }
+
   useEffect(() => {
     if (!isTenantLogin) {
       applyCmsTheme();
@@ -233,7 +245,7 @@ export default function LoginPage({
                       name="tenant-login-tenant-id"
                       type="text"
                       className="login-input"
-                      placeholder="uthiram-main"
+                      placeholder="Enter tenant ID"
                       value={tenantId}
                       onChange={(e) => setTenantId(e.target.value)}
                       autoComplete={`${credentialScope} organization`}
@@ -265,7 +277,7 @@ export default function LoginPage({
                     name={isTenantLogin ? "tenant-login-username" : "cms-developer-login-username"}
                     type={isTenantLogin ? "text" : "email"}
                     className="login-input"
-                    placeholder={isTenantLogin ? "USR-000001 or you@lab.com" : "developer@cms.com"}
+                    placeholder={isTenantLogin ? "Enter user ID or email" : "Enter email"}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete={`${credentialScope} username`}
@@ -287,7 +299,7 @@ export default function LoginPage({
                     name={isTenantLogin ? "tenant-login-password" : "cms-developer-login-password"}
                     type={showPassword ? "text" : "password"}
                     className="login-input"
-                    placeholder="Enter your password"
+                    placeholder="Enter password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete={`${credentialScope} current-password`}
@@ -317,7 +329,12 @@ export default function LoginPage({
                   <span className="login-checkbox-custom" />
                   Remember me
                 </label>
-                <button type="button" className="login-forgot" suppressHydrationWarning>
+                <button
+                  type="button"
+                  className="login-forgot"
+                  onClick={openForgotPassword}
+                  suppressHydrationWarning
+                >
                   Forgot password?
                 </button>
               </div>

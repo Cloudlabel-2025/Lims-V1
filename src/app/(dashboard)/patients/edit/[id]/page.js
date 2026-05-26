@@ -162,7 +162,7 @@ export default function EditPatient({ params }) {
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Full Name <span className="required">*</span></label>
-                <input name="name" className={`lims-input ${errors.name ? 'invalid' : ''}`} value={form.name} onChange={handleChange} />
+                <input name="name" className={`lims-input ${errors.name ? 'invalid' : ''}`} placeholder="Enter full name" value={form.name} onChange={handleChange} />
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
               </div>
               <div className="col-md-3">
@@ -198,12 +198,12 @@ export default function EditPatient({ params }) {
 
               <div className="col-md-4">
                 <label className="lims-label">Barcode</label>
-                <input name="barcode" className="lims-input" placeholder="Scan barcode" value={form.barcode || ""} onChange={handleChange} />
+                <input name="barcode" className="lims-input" placeholder="Enter barcode" value={form.barcode || ""} onChange={handleChange} />
               </div>
 
               <div className="col-md-4">
                 <label className="lims-label">UH ID</label>
-                <input type="number" name="uhId" className="lims-input" placeholder="14 digits" value={form.uhId || ""} onChange={(e) => e.target.value.length <= 14 && handleChange(e)} />
+                <input type="number" name="uhId" className="lims-input" placeholder="Enter UH ID" value={form.uhId || ""} onChange={(e) => e.target.value.length <= 14 && handleChange(e)} />
               </div>
             </div>
           </div>
@@ -216,12 +216,12 @@ export default function EditPatient({ params }) {
             <div className="row g-3">
               <div className="col-md-4">
                 <label className="lims-label">Mobile Number <span className="required">*</span></label>
-                <input name="phone" className={`lims-input ${errors.phone ? 'invalid' : ''}`} maxLength={10} value={form.phone} onChange={handleChange} />
+                <input name="phone" className={`lims-input ${errors.phone ? 'invalid' : ''}`} placeholder="Enter mobile number" maxLength={10} value={form.phone} onChange={handleChange} />
                 {errors.phone && <div className="lims-error-text">{errors.phone}</div>}
               </div>
               <div className="col-md-8">
                 <label className="lims-label">Address <span className="required">*</span></label>
-                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} value={form.address} onChange={handleChange} />
+                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" value={form.address} onChange={handleChange} />
                 {errors.address && <div className="lims-error-text">{errors.address}</div>}
               </div>
             </div>
@@ -259,7 +259,7 @@ export default function EditPatient({ params }) {
                     options={doctors.map(doc => ({ value: doc.name, label: doc.name, sublabel: doc.doctorId }))}
                     value={form.refDoctorName || ""}
                     onChange={handleChange}
-                    placeholder="Search & Select Doctor"
+                    placeholder="Search doctor"
                     error={!!errors.refDoctorName}
                   />
                   {errors.refDoctorName && <div className="lims-error-text">{errors.refDoctorName}</div>}

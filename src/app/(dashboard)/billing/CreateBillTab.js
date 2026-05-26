@@ -54,7 +54,7 @@ export default function CreateBillTab({
             Select Investigations <span className="required">*</span>
             <MultiSelect
               name="selectedTests"
-              placeholder="Search tests or packages..."
+              placeholder="Search tests or packages"
               options={investigationOptions}
               value={selectedTests}
               onChange={(e) => setSelectedTests(e.target.value)}
@@ -63,7 +63,7 @@ export default function CreateBillTab({
 
           <label className="module-full-label">
             Notes
-            <textarea className="lims-input" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Clinical notes or billing remarks..." />
+            <textarea className="lims-input" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Enter notes" />
           </label>
 
           <div style={{

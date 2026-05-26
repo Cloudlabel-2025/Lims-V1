@@ -125,7 +125,7 @@ export default function ReportEntryPanel({
 
             <label className="module-full-label">
               Remarks
-              <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} placeholder="Optional report notes" />
+              <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} placeholder="Enter report notes" />
             </label>
           </>
         )}

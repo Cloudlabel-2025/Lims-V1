@@ -1,3 +1,4 @@
+import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -19,6 +20,6 @@ export async function GET(req, { params }) {
 
     return Response.json({ report });
   } catch (error) {
-    return Response.json({ error: "Unable to load report", details: error.message }, { status: 500 });
+    return jsonError("Unable to load report", error, 500);
   }
 }

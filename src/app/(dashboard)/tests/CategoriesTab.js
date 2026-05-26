@@ -26,7 +26,7 @@ export default function CategoriesTab({
                 <input
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder="Hematology"
+                  placeholder="Enter category name"
                   required
                 />
               </label>

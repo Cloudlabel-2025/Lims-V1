@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import mongoose from "mongoose";
-import { hashPassword } from "../src/app/lib/password.js";
+import { hashPassword, validatePasswordPolicy } from "../src/app/lib/password.js";
 import { getDoctorModel } from "../src/app/models/doctor.js";
 import { getLabModel } from "../src/app/models/master/Lab.js";
 import { getRoleTemplateModel } from "../src/app/models/master/RoleTemplate.js";
@@ -116,6 +116,12 @@ async function main() {
   const adminPassword = requiredEnv("LAB_ADMIN_PASSWORD");
   const adminFirstName = optionalEnv("LAB_ADMIN_FIRST_NAME", "Lab");
   const adminLastName = optionalEnv("LAB_ADMIN_LAST_NAME", "Admin");
+  const passwordPolicy = validatePasswordPolicy(adminPassword);
+
+  if (!passwordPolicy.valid) {
+    throw new Error(passwordPolicy.errors.join("; "));
+  }
+
   const enabledModules = normalizeEnabledModules(
     optionalEnv("LAB_ENABLED_MODULES", defaultLabModules.join(",")).split(",").map((module) => module.trim())
   );
