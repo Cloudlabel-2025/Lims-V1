@@ -28,8 +28,8 @@ function SettlementModal({
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: "820px", textAlign: "left", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
-        <div style={{ padding: "24px 28px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="modal-content" style={{ maxWidth: "820px", width: "95%", textAlign: "left", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
+        <div style={{ padding: "20px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           <div>
             <h4 style={{ margin: 0, fontSize: "18px" }}>Finalize Settlement</h4>
             <p style={{ margin: "4px 0 0", fontSize: "13px", color: "var(--text-muted)" }}>
@@ -39,8 +39,8 @@ function SettlementModal({
           <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", transition: "all var(--duration-fast)" }}>{Icons.close}</button>
         </div>
 
-        <div style={{ padding: "24px 28px", maxHeight: "70vh", overflowY: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+        <div style={{ padding: "20px 20px", maxHeight: "70vh", overflowY: "auto" }}>
+          <div className="settlement-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: "24px" }}>
             <div>
               <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "14px" }}>Payment Breakdown</div>
 
@@ -132,7 +132,7 @@ function SettlementModal({
           </div>
         </div>
 
-        <div style={{ padding: "16px 28px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px" }}>
+        <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <button className="btn-modal-cancel" onClick={onClose}>Cancel</button>
           <button
             className="btn-modal-confirm"

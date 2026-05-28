@@ -73,7 +73,9 @@ export default function CreateBillTab({
             marginBottom: "20px",
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center"
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "16px"
           }}>
             <div>
               <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Total Payable</span>

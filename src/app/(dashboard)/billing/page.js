@@ -239,9 +239,11 @@ export default function BillingPage() {
 
       <div className="module-tabs" style={{ 
         display: "flex", 
-        gap: "24px", 
+        gap: "16px", 
         borderBottom: "1px solid var(--border-light)", 
-        marginBottom: "24px" 
+        marginBottom: "24px",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch"
       }}>
         {[
           { id: "pending", label: "Pending Payments", count: pendingBills.length },
@@ -261,7 +263,9 @@ export default function BillingPage() {
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              gap: "8px"
+              gap: "8px",
+              whiteSpace: "nowrap",
+              flexShrink: 0
             }}
           >
             {tab.label}
@@ -282,7 +286,7 @@ export default function BillingPage() {
 
       {activeTab === "pending" && (
         <div className="module-grid" style={{ gridTemplateColumns: "1fr" }}>
-          <div className="test-card-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", gap: "20px" }}>
+          <div className="test-card-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 350px), 1fr))", gap: "20px" }}>
             {pendingBills.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px", color: "var(--text-muted)", gridColumn: "1 / -1" }}>
                 {Icons.checkCircle}
@@ -291,7 +295,7 @@ export default function BillingPage() {
             ) : (
               pendingBills.map((billingRecord) => (
                 <article key={billingRecord._id} className="form-card" style={{ padding: "0", overflow: "hidden" }}>
-                  <div className="form-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="form-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
                     <div>
                       <h6 style={{ marginBottom: "2px" }}>{billingRecord.patient?.name || "Unknown Patient"}</h6>
                       <small style={{ color: "var(--text-muted)" }}>{billingRecord.billId} · {billingRecord.patient?.patientId}</small>
@@ -351,7 +355,7 @@ export default function BillingPage() {
                           </div>
                         </div>
                       )}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
                         <div>
                           <small style={{ color: "var(--text-muted)", display: "block" }}>Total Amount</small>
                           <strong style={{ fontSize: "18px", color: "var(--brand-action, var(--primary))" }}>₹{billingRecord.totalAmount || 0}</strong>

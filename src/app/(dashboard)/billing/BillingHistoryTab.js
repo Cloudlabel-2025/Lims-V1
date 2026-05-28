@@ -2,13 +2,13 @@
 
 export default function BillingHistoryTab({ billingRecords }) {
   return (
-    <div className="form-card" style={{ padding: "0", overflow: "hidden" }}>
+    <div className="form-card" style={{ padding: "0", overflowX: "auto" }}>
       <div className="form-card-header">
         <h6 style={{ margin: 0 }}>Billing History</h6>
         <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>All laboratory bills and payment statuses.</p>
       </div>
-      <div className="lims-table-container">
-        <table className="lims-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="lims-table-container" style={{ overflowX: "auto" }}>
+        <table className="lims-table" style={{ width: "100%", minWidth: "700px", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill ID</th>

@@ -6,7 +6,7 @@ import { formatDate, getInitials } from "@/app/utils/patient-helpers";
 
 function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPatient }) {
   return (
-    <div className="form-card" style={{ padding: "0", overflow: "hidden" }}>
+    <div className="form-card" style={{ padding: "0", overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
         <thead>
           <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>

@@ -11,6 +11,10 @@ import { getTestDefinitionModel } from "@/app/models/tenant/TestDefinition";
 import { getTestPackageModel } from "@/app/models/tenant/TestPackage";
 import { getTestReportModel } from "@/app/models/tenant/TestReport";
 import { getUserModel } from "@/app/models/tenant/User";
+import { getInventoryCategoryModel } from "@/app/models/tenant/InventoryCategory";
+import { getInventoryItemModel } from "@/app/models/tenant/InventoryItem";
+import { getInventoryMovementModel } from "@/app/models/tenant/InventoryMovement";
+import { getInventoryUomModel } from "@/app/models/tenant/InventoryUom";
 
 const tenantDbCache = globalThis.tenantDbCache || new Map();
 
@@ -100,6 +104,10 @@ export async function getTenantModels(tenantId) {
     TestReport: getTestReportModel(connection),
     User: getUserModel(connection),
     Visit: getVisitModel(connection),
+    InventoryCategory: getInventoryCategoryModel(connection),
+    InventoryItem: getInventoryItemModel(connection),
+    InventoryMovement: getInventoryMovementModel(connection),
+    InventoryUom: getInventoryUomModel(connection),
   };
 }
 

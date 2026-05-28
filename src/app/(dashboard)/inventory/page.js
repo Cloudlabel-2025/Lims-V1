@@ -1,0 +1,618 @@
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import { Icons } from "@/app/components/Icons";
+
+const emptyItem = {
+  itemCode: "",
+  name: "",
+  genericName: "",
+  itemType: "reagent",
+  category: "",
+  subCategory: "",
+  baseUom: "",
+  purchaseUom: "",
+  purchaseToBaseFactor: 1,
+  openingQuantityBase: 0,
+  minimumStockBase: 0,
+  reorderLevelBase: 0,
+  maximumStockBase: 0,
+  preferredSupplier: "",
+  manufacturer: "",
+  storageCondition: "",
+  defaultLocation: "",
+  batchNo: "",
+  expiryDate: "",
+  costPerBaseUnit: 0,
+  notes: "",
+};
+
+const emptyMovement = {
+  itemId: "",
+  batchId: "",
+  movementType: "receipt",
+  quantityBase: 0,
+  newBalanceBase: 0,
+  batchNo: "",
+  supplier: "",
+  expiryDate: "",
+  costPerBaseUnit: 0,
+  referenceNo: "",
+  reason: "",
+  toLocation: "",
+};
+
+function Field({ label, children }) {
+  return (
+    <label style={{ display: "grid", gap: "6px", fontSize: "12px", fontWeight: 700, color: "var(--text-secondary)" }}>
+      {label}
+      {children}
+    </label>
+  );
+}
+
+function StatCard({ icon, label, value, tone }) {
+  return (
+    <div className="form-card" style={{ padding: 18, borderRadius: 8, minHeight: 104 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 700 }}>{label}</div>
+          <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: "var(--text-primary)" }}>{value}</div>
+        </div>
+        <div
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 8,
+            display: "grid",
+            placeItems: "center",
+            color: tone || "var(--brand-action, var(--primary))",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Badge({ children, tone = "neutral" }) {
+  const colors = {
+    neutral: ["var(--surface)", "var(--text-secondary)"],
+    good: ["#ecfdf5", "#047857"],
+    warn: ["#fffbeb", "#b45309"],
+    danger: ["#fef2f2", "#b91c1c"],
+    info: ["#eff6ff", "#1d4ed8"],
+  };
+  const [bg, color] = colors[tone] || colors.neutral;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 8px", borderRadius: 6, background: bg, color, fontSize: 12, fontWeight: 700 }}>
+      {children}
+    </span>
+  );
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(value || 0));
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function inputStyle() {
+  return { height: 38, fontSize: 13 };
+}
+
+export default function InventoryPage() {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [inventory, setInventory] = useState({ categories: [], uoms: [], items: [], movements: [], stats: {} });
+  const [categoryForm, setCategoryForm] = useState({ name: "", code: "", parentCategory: "", description: "" });
+  const [uomForm, setUomForm] = useState({ name: "", symbol: "", type: "count", conversionToBase: 1, baseSymbol: "" });
+  const [itemForm, setItemForm] = useState(emptyItem);
+  const [editingItemId, setEditingItemId] = useState("");
+  const [movementForm, setMovementForm] = useState(emptyMovement);
+
+  const parentCategories = inventory.categories.filter((category) => !category.parentCategory);
+  const subCategories = inventory.categories.filter((category) => category.parentCategory);
+  const selectedMovementItem = inventory.items.find((item) => item._id === movementForm.itemId);
+
+  const filteredItems = useMemo(() => {
+    const needle = searchQuery.trim().toLowerCase();
+    if (!needle) return inventory.items;
+    return inventory.items.filter((item) =>
+      [item.name, item.itemCode, item.genericName, item.manufacturer, item.category?.name, item.subCategory?.name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle))
+    );
+  }, [inventory.items, searchQuery]);
+
+  async function loadInventory() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/inventory", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load inventory");
+      setInventory(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadInventory();
+  }, []);
+
+  async function postInventory(payload, success) {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to save inventory");
+      success?.(data);
+      await loadInventory();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveItem(event) {
+    event.preventDefault();
+    if (!editingItemId) {
+      await postInventory({ action: "item", ...itemForm }, () => setItemForm(emptyItem));
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/inventory/${editingItemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(itemForm),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to update item");
+      setEditingItemId("");
+      setItemForm(emptyItem);
+      await loadInventory();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function editItem(item) {
+    setEditingItemId(item._id);
+    setItemForm({
+      ...emptyItem,
+      itemCode: item.itemCode,
+      name: item.name,
+      genericName: item.genericName || "",
+      itemType: item.itemType,
+      category: item.category?._id || "",
+      subCategory: item.subCategory?._id || "",
+      baseUom: item.baseUom?._id || "",
+      purchaseUom: item.purchaseUom?._id || "",
+      purchaseToBaseFactor: item.purchaseToBaseFactor || 1,
+      minimumStockBase: item.minimumStockBase || 0,
+      reorderLevelBase: item.reorderLevelBase || 0,
+      maximumStockBase: item.maximumStockBase || 0,
+      preferredSupplier: item.preferredSupplier || "",
+      manufacturer: item.manufacturer || "",
+      storageCondition: item.storageCondition || "",
+      defaultLocation: item.defaultLocation || "",
+      notes: item.notes || "",
+    });
+    setActiveTab("items");
+  }
+
+  const tabs = [
+    ["dashboard", "Dashboard", Icons.barChart],
+    ["items", "Item Master", Icons.flask],
+    ["categories", "Category", Icons.grid],
+    ["uom", "UOM", Icons.settings],
+    ["stock", "Stock", Icons.activity],
+    ["expiry", "Expiry/Wastage", Icons.alertCircle],
+    ["movements", "Ledger", Icons.list],
+  ];
+
+  return (
+    <div className="patients-page" style={{ paddingBottom: 40 }}>
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div className="page-header-icon" style={{ background: "var(--brand-surface, #e6f0fa)", color: "var(--brand-action, var(--primary))", padding: 12, borderRadius: 8 }}>
+            {Icons.flask}
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: 20, color: "var(--text-main)" }}>Inventory Management</h4>
+            <small style={{ color: "var(--text-muted)" }}>Item master, stock ledger, UOM, expiry and wastage control</small>
+          </div>
+        </div>
+
+        <div style={{ position: "relative", minWidth: 280, flex: "0 1 360px" }}>
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>{Icons.search}</span>
+          <input className="lims-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        {tabs.map(([key, label, icon]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActiveTab(key)}
+            className={activeTab === key ? "btn-lims-primary" : "btn-lims-secondary"}
+            style={{ height: 38, padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 8, fontSize: 13 }}
+          >
+            {icon} {label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="form-card" style={{ padding: 28, borderRadius: 8 }}>Loading inventory...</div>
+      ) : (
+        <>
+          {activeTab === "dashboard" && (
+            <div style={{ display: "grid", gap: 18 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
+                <StatCard icon={Icons.flask} label="Items" value={inventory.stats.totalItems || 0} />
+                <StatCard icon={Icons.activity} label="Stock Units" value={formatNumber(inventory.stats.totalStock)} tone="#047857" />
+                <StatCard icon={Icons.alertCircle} label="Low Stock" value={inventory.stats.lowStock || 0} tone="#b45309" />
+                <StatCard icon={Icons.clock} label="Near Expiry" value={inventory.stats.nearExpiryBatches || 0} tone="#1d4ed8" />
+                <StatCard icon={Icons.trash} label="Expired Batches" value={inventory.stats.expiredBatches || 0} tone="#b91c1c" />
+                <StatCard icon={Icons.list} label="Stock Value" value={`Rs ${formatNumber(inventory.stats.inventoryValue)}`} />
+              </div>
+              <InventoryTable items={filteredItems} onEdit={editItem} />
+            </div>
+          )}
+
+          {activeTab === "items" && (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 420px) 1fr", gap: 18, alignItems: "start" }}>
+              <form className="form-card" onSubmit={saveItem} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                <h5 style={{ margin: 0, fontSize: 16 }}>{editingItemId ? "Edit Item Master" : "Add Item Master"}</h5>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Item Code"><input className="lims-input" required value={itemForm.itemCode} onChange={(e) => setItemForm({ ...itemForm, itemCode: e.target.value })} style={inputStyle()} /></Field>
+                  <Field label="Type">
+                    <select className="lims-input" value={itemForm.itemType} onChange={(e) => setItemForm({ ...itemForm, itemType: e.target.value })} style={inputStyle()}>
+                      {["reagent", "consumable", "chemical", "control", "calibrator", "equipment", "stationery", "other"].map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Item Name"><input className="lims-input" required value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Generic / Alternate Name"><input className="lims-input" value={itemForm.genericName} onChange={(e) => setItemForm({ ...itemForm, genericName: e.target.value })} style={inputStyle()} /></Field>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Category">
+                    <select required className="lims-input" value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} style={inputStyle()}>
+                      <option value="">Select</option>
+                      {parentCategories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Sub Category">
+                    <select className="lims-input" value={itemForm.subCategory} onChange={(e) => setItemForm({ ...itemForm, subCategory: e.target.value })} style={inputStyle()}>
+                      <option value="">None</option>
+                      {subCategories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Base UOM">
+                    <select required className="lims-input" value={itemForm.baseUom} onChange={(e) => setItemForm({ ...itemForm, baseUom: e.target.value })} style={inputStyle()}>
+                      <option value="">Select</option>
+                      {inventory.uoms.map((uom) => <option key={uom._id} value={uom._id}>{uom.symbol} - {uom.name}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Purchase UOM">
+                    <select className="lims-input" value={itemForm.purchaseUom} onChange={(e) => setItemForm({ ...itemForm, purchaseUom: e.target.value })} style={inputStyle()}>
+                      <option value="">Same as base</option>
+                      {inventory.uoms.map((uom) => <option key={uom._id} value={uom._id}>{uom.symbol} - {uom.name}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                  <Field label="Conv. Factor"><input className="lims-input" type="number" min="0" step="0.001" value={itemForm.purchaseToBaseFactor} onChange={(e) => setItemForm({ ...itemForm, purchaseToBaseFactor: e.target.value })} style={inputStyle()} /></Field>
+                  <Field label="Min Stock"><input className="lims-input" type="number" min="0" step="0.001" value={itemForm.minimumStockBase} onChange={(e) => setItemForm({ ...itemForm, minimumStockBase: e.target.value })} style={inputStyle()} /></Field>
+                  <Field label="Reorder"><input className="lims-input" type="number" min="0" step="0.001" value={itemForm.reorderLevelBase} onChange={(e) => setItemForm({ ...itemForm, reorderLevelBase: e.target.value })} style={inputStyle()} /></Field>
+                </div>
+                {!editingItemId && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <Field label="Opening Qty"><input className="lims-input" type="number" min="0" step="0.001" value={itemForm.openingQuantityBase} onChange={(e) => setItemForm({ ...itemForm, openingQuantityBase: e.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Batch No"><input className="lims-input" value={itemForm.batchNo} onChange={(e) => setItemForm({ ...itemForm, batchNo: e.target.value })} style={inputStyle()} /></Field>
+                  </div>
+                )}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Manufacturer"><input className="lims-input" value={itemForm.manufacturer} onChange={(e) => setItemForm({ ...itemForm, manufacturer: e.target.value })} style={inputStyle()} /></Field>
+                  <Field label="Supplier"><input className="lims-input" value={itemForm.preferredSupplier} onChange={(e) => setItemForm({ ...itemForm, preferredSupplier: e.target.value })} style={inputStyle()} /></Field>
+                </div>
+                <Field label="Location"><input className="lims-input" value={itemForm.defaultLocation} onChange={(e) => setItemForm({ ...itemForm, defaultLocation: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Storage Condition"><input className="lims-input" value={itemForm.storageCondition} onChange={(e) => setItemForm({ ...itemForm, storageCondition: e.target.value })} style={inputStyle()} /></Field>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button className="btn-lims-primary" disabled={saving} style={{ height: 38, flex: 1 }}>{saving ? "Saving..." : editingItemId ? "Update Item" : "Create Item"}</button>
+                  {editingItemId && <button type="button" className="btn-lims-secondary" onClick={() => { setEditingItemId(""); setItemForm(emptyItem); }} style={{ height: 38 }}>Cancel</button>}
+                </div>
+              </form>
+              <InventoryTable items={filteredItems} onEdit={editItem} />
+            </div>
+          )}
+
+          {activeTab === "categories" && (
+            <MastersPanel
+              title="Category & Sub Category"
+              form={categoryForm}
+              setForm={setCategoryForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                postInventory({ action: "category", ...categoryForm }, () => setCategoryForm({ name: "", code: "", parentCategory: "", description: "" }));
+              }}
+              saving={saving}
+              fields={<>
+                <Field label="Name"><input required className="lims-input" value={categoryForm.name} onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Code"><input className="lims-input" value={categoryForm.code} onChange={(e) => setCategoryForm({ ...categoryForm, code: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Parent Category">
+                  <select className="lims-input" value={categoryForm.parentCategory} onChange={(e) => setCategoryForm({ ...categoryForm, parentCategory: e.target.value })} style={inputStyle()}>
+                    <option value="">Main category</option>
+                    {parentCategories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Description"><input className="lims-input" value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} style={inputStyle()} /></Field>
+              </>}
+            >
+              <MasterTable headings={["Name", "Code", "Parent", "Status"]} rows={inventory.categories.map((category) => [category.name, category.code || "-", category.parentCategory?.name || "Main", category.status])} />
+            </MastersPanel>
+          )}
+
+          {activeTab === "uom" && (
+            <MastersPanel
+              title="UOM Management & Conversion"
+              form={uomForm}
+              setForm={setUomForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                postInventory({ action: "uom", ...uomForm }, () => setUomForm({ name: "", symbol: "", type: "count", conversionToBase: 1, baseSymbol: "" }));
+              }}
+              saving={saving}
+              fields={<>
+                <Field label="Name"><input required className="lims-input" value={uomForm.name} onChange={(e) => setUomForm({ ...uomForm, name: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Symbol"><input required className="lims-input" value={uomForm.symbol} onChange={(e) => setUomForm({ ...uomForm, symbol: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Type">
+                  <select className="lims-input" value={uomForm.type} onChange={(e) => setUomForm({ ...uomForm, type: e.target.value })} style={inputStyle()}>
+                    {["count", "volume", "weight", "length", "time", "pack", "other"].map((type) => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                </Field>
+                <Field label="Conversion to Base"><input className="lims-input" type="number" min="0" step="0.001" value={uomForm.conversionToBase} onChange={(e) => setUomForm({ ...uomForm, conversionToBase: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Base Symbol"><input className="lims-input" value={uomForm.baseSymbol} onChange={(e) => setUomForm({ ...uomForm, baseSymbol: e.target.value })} style={inputStyle()} /></Field>
+              </>}
+            >
+              <MasterTable headings={["Name", "Symbol", "Type", "Conversion", "Base"]} rows={inventory.uoms.map((uom) => [uom.name, uom.symbol, uom.type, uom.conversionToBase, uom.baseSymbol || uom.symbol])} />
+            </MastersPanel>
+          )}
+
+          {activeTab === "stock" && (
+            <StockPanel
+              form={movementForm}
+              setForm={setMovementForm}
+              item={selectedMovementItem}
+              items={inventory.items}
+              saving={saving}
+              onSubmit={(event) => {
+                event.preventDefault();
+                postInventory({ action: "movement", ...movementForm }, () => setMovementForm(emptyMovement));
+              }}
+            />
+          )}
+
+          {activeTab === "expiry" && (
+            <ExpiryPanel items={filteredItems} onWaste={(item, batch) => {
+              setMovementForm({ ...emptyMovement, itemId: item._id, batchId: batch._id, movementType: "wastage", quantityBase: batch.quantityBase, reason: "Expired/damaged stock wastage" });
+              setActiveTab("stock");
+            }} />
+          )}
+
+          {activeTab === "movements" && <MovementLedger movements={inventory.movements} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+function InventoryTable({ items, onEdit }) {
+  return (
+    <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 880 }}>
+        <thead>
+          <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
+            {["Item", "Category", "Stock", "Min/Reorder", "Expiry", "Location", "Status", "Action"].map((heading) => (
+              <th key={heading} style={{ padding: "12px 14px", textAlign: "left", color: "var(--text-secondary)", fontWeight: 700 }}>{heading}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const low = item.stockOnHandBase <= item.minimumStockBase;
+            const reorder = item.reorderLevelBase && item.stockOnHandBase <= item.reorderLevelBase;
+            const expiryTone = item.expiredBatches ? "danger" : item.nearExpiryBatches ? "warn" : "good";
+            return (
+              <tr key={item._id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+                <td style={{ padding: "12px 14px" }}>
+                  <div style={{ fontWeight: 800, color: "var(--text-primary)" }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{item.itemCode} {item.manufacturer ? `- ${item.manufacturer}` : ""}</div>
+                </td>
+                <td style={{ padding: "12px 14px" }}>
+                  <div>{item.category?.name || "-"}</div>
+                  <small style={{ color: "var(--text-muted)" }}>{item.subCategory?.name || item.itemType}</small>
+                </td>
+                <td style={{ padding: "12px 14px", fontWeight: 800, color: low ? "#b91c1c" : "var(--text-primary)" }}>
+                  {formatNumber(item.stockOnHandBase)} {item.baseUom?.symbol}
+                </td>
+                <td style={{ padding: "12px 14px" }}>{formatNumber(item.minimumStockBase)} / {formatNumber(item.reorderLevelBase)}</td>
+                <td style={{ padding: "12px 14px" }}><Badge tone={expiryTone}>{item.expiredBatches ? "Expired" : item.nearExpiryBatches ? "Near expiry" : formatDate(item.nextExpiryDate)}</Badge></td>
+                <td style={{ padding: "12px 14px" }}>{item.defaultLocation || "-"}</td>
+                <td style={{ padding: "12px 14px" }}><Badge tone={reorder ? "warn" : low ? "danger" : "good"}>{reorder ? "Reorder" : low ? "Low" : "OK"}</Badge></td>
+                <td style={{ padding: "12px 14px" }}><button className="btn-lims-secondary" onClick={() => onEdit(item)} style={{ height: 32, padding: "0 10px" }}>{Icons.edit}</button></td>
+              </tr>
+            );
+          })}
+          {items.length === 0 && (
+            <tr><td colSpan="8" style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No inventory items found.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MastersPanel({ title, fields, onSubmit, saving, children }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 380px) 1fr", gap: 18, alignItems: "start" }}>
+      <form className="form-card" onSubmit={onSubmit} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+        <h5 style={{ margin: 0, fontSize: 16 }}>{title}</h5>
+        {fields}
+        <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Saving..." : "Save Master"}</button>
+      </form>
+      {children}
+    </div>
+  );
+}
+
+function MasterTable({ headings, rows }) {
+  return (
+    <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead><tr style={{ background: "var(--surface)" }}>{headings.map((heading) => <th key={heading} style={{ padding: 12, textAlign: "left" }}>{heading}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((row, index) => <tr key={index} style={{ borderTop: "1px solid var(--border-light)" }}>{row.map((cell, cellIndex) => <td key={cellIndex} style={{ padding: 12 }}>{cell}</td>)}</tr>)}
+          {rows.length === 0 && <tr><td colSpan={headings.length} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No records yet.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StockPanel({ form, setForm, item, items, saving, onSubmit }) {
+  const isAdjustment = form.movementType === "adjustment";
+  const isReceipt = form.movementType === "receipt";
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 440px) 1fr", gap: 18, alignItems: "start" }}>
+      <form className="form-card" onSubmit={onSubmit} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+        <h5 style={{ margin: 0, fontSize: 16 }}>Stock Transaction</h5>
+        <Field label="Item">
+          <select required className="lims-input" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value, batchId: "" })} style={inputStyle()}>
+            <option value="">Select item</option>
+            {items.map((stockItem) => <option key={stockItem._id} value={stockItem._id}>{stockItem.itemCode} - {stockItem.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Transaction">
+          <select className="lims-input" value={form.movementType} onChange={(e) => setForm({ ...form, movementType: e.target.value })} style={inputStyle()}>
+            {["receipt", "issue", "adjustment", "transfer", "wastage", "expiry"].map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </Field>
+        {!isReceipt && (
+          <Field label="Batch">
+            <select className="lims-input" value={form.batchId} onChange={(e) => setForm({ ...form, batchId: e.target.value })} style={inputStyle()}>
+              <option value="">Auto select available batch</option>
+              {(item?.batches || []).filter((batch) => batch.quantityBase > 0).map((batch) => (
+                <option key={batch._id} value={batch._id}>{batch.batchNo || "Batch"} - {formatNumber(batch.quantityBase)} {item?.baseUom?.symbol}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {isReceipt && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Field label="Batch No"><input className="lims-input" value={form.batchNo} onChange={(e) => setForm({ ...form, batchNo: e.target.value })} style={inputStyle()} /></Field>
+            <Field label="Expiry"><input className="lims-input" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} style={inputStyle()} /></Field>
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Field label={isAdjustment ? "Current Batch Balance" : "Quantity"}><input required className="lims-input" type="number" min="0" step="0.001" value={isAdjustment ? form.newBalanceBase : form.quantityBase} onChange={(e) => setForm({ ...form, [isAdjustment ? "newBalanceBase" : "quantityBase"]: e.target.value })} style={inputStyle()} /></Field>
+          <Field label="Cost / Base Unit"><input className="lims-input" type="number" min="0" step="0.01" value={form.costPerBaseUnit} onChange={(e) => setForm({ ...form, costPerBaseUnit: e.target.value })} style={inputStyle()} /></Field>
+        </div>
+        <Field label="Supplier / To Location"><input className="lims-input" value={isReceipt ? form.supplier : form.toLocation} onChange={(e) => setForm({ ...form, [isReceipt ? "supplier" : "toLocation"]: e.target.value })} style={inputStyle()} /></Field>
+        <Field label="Reference No"><input className="lims-input" value={form.referenceNo} onChange={(e) => setForm({ ...form, referenceNo: e.target.value })} style={inputStyle()} /></Field>
+        <Field label="Reason"><input className="lims-input" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} style={inputStyle()} /></Field>
+        <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Posting..." : "Post Transaction"}</button>
+      </form>
+      <div className="form-card" style={{ padding: 20, borderRadius: 8 }}>
+        <h5 style={{ margin: "0 0 12px", fontSize: 16 }}>Batch Balances</h5>
+        {!item ? <p style={{ color: "var(--text-muted)" }}>Select an item to view batches.</p> : (
+          <MasterTable headings={["Batch", "Qty", "Expiry", "Location", "Status"]} rows={(item.batches || []).map((batch) => [batch.batchNo || "-", `${formatNumber(batch.quantityBase)} ${item.baseUom?.symbol || ""}`, formatDate(batch.expiryDate), batch.location || "-", batch.status])} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExpiryPanel({ items, onWaste }) {
+  const batches = items.flatMap((item) => (item.batches || []).map((batch) => ({ item, batch }))).filter(({ batch }) => batch.quantityBase > 0 && batch.expiryDate);
+  const today = new Date();
+  const warning = new Date(today);
+  warning.setDate(warning.getDate() + 30);
+
+  return (
+    <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
+        <thead><tr style={{ background: "var(--surface)" }}>{["Item", "Batch", "Qty", "Expiry", "Risk", "Action"].map((heading) => <th key={heading} style={{ padding: 12, textAlign: "left" }}>{heading}</th>)}</tr></thead>
+        <tbody>
+          {batches.map(({ item, batch }) => {
+            const expiry = new Date(batch.expiryDate);
+            const expired = expiry < today;
+            const near = expiry >= today && expiry <= warning;
+            return (
+              <tr key={`${item._id}-${batch._id}`} style={{ borderTop: "1px solid var(--border-light)" }}>
+                <td style={{ padding: 12 }}><strong>{item.name}</strong><br /><small>{item.itemCode}</small></td>
+                <td style={{ padding: 12 }}>{batch.batchNo || "-"}</td>
+                <td style={{ padding: 12 }}>{formatNumber(batch.quantityBase)} {item.baseUom?.symbol}</td>
+                <td style={{ padding: 12 }}>{formatDate(batch.expiryDate)}</td>
+                <td style={{ padding: 12 }}><Badge tone={expired ? "danger" : near ? "warn" : "good"}>{expired ? "Expired" : near ? "Near expiry" : "Valid"}</Badge></td>
+                <td style={{ padding: 12 }}><button className="btn-lims-secondary" onClick={() => onWaste(item, batch)} style={{ height: 32 }}>Log Wastage</button></td>
+              </tr>
+            );
+          })}
+          {batches.length === 0 && <tr><td colSpan="6" style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No expiry-tracked batches.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MovementLedger({ movements }) {
+  return (
+    <MasterTable
+      headings={["Date", "Item", "Type", "Qty", "Balance", "Reference", "Reason"]}
+      rows={movements.map((movement) => [
+        formatDate(movement.movementDate),
+        movement.item ? `${movement.item.itemCode} - ${movement.item.name}` : "-",
+        movement.movementType,
+        formatNumber(movement.quantityBase),
+        formatNumber(movement.balanceAfterBase),
+        movement.referenceNo || "-",
+        movement.reason || "-",
+      ])}
+    />
+  );
+}

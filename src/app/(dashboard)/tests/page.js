@@ -443,9 +443,10 @@ export default function TestsPage() {
                       display: "flex", 
                       gap: "16px", 
                       marginBottom: "20px", 
-                      alignItems: "center" 
+                      alignItems: "center",
+                      flexWrap: "wrap"
                     }}>
-                      <div style={{ flex: 2 }}>
+                      <div style={{ flex: "1 1 200px" }}>
                         <input 
                           className="lims-input"
                           value={parameter.name} 
@@ -455,7 +456,7 @@ export default function TestsPage() {
                           style={{ width: "100%" }}
                         />
                       </div>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: "1 1 120px" }}>
                         <input 
                           className="lims-input"
                           value={parameter.unit} 
@@ -504,7 +505,7 @@ export default function TestsPage() {
                     
                     <div className="parameter-ranges-grid" style={{ 
                       display: "grid", 
-                      gridTemplateColumns: "1fr 1fr 1fr", 
+                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", 
                       gap: "24px" 
                     }}>
                       <div className="range-col">
