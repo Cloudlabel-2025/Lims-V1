@@ -3,9 +3,8 @@ import connectMasterDB from "@/app/lib/master-db";
 import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { defaultLabModules } from "@/app/lib/modules";
-import { getDoctorModel } from "@/app/models/doctor";
-import { getPatientModel } from "@/app/models/patient";
-import { getVisitModel } from "@/app/models/visit";
+import { getDoctorModel } from "@/app/models/tenant/Doctor";
+import { getPatientModel } from "@/app/models/tenant/Patient";
 import { getLabModel } from "@/app/models/master/Lab";
 import { getRoleTemplateModel } from "@/app/models/master/RoleTemplate";
 import { getAccountModel } from "@/app/models/tenant/Account";
@@ -21,7 +20,6 @@ import { getJournalEntryModel } from "@/app/models/tenant/JournalEntry";
 import { getPaymentReceiptModel } from "@/app/models/tenant/PaymentReceipt";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
-import { getTaxEntryModel } from "@/app/models/tenant/TaxEntry";
 import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
 import { getTestDefinitionModel } from "@/app/models/tenant/TestDefinition";
 import { getTestReportModel } from "@/app/models/tenant/TestReport";
@@ -97,13 +95,11 @@ async function initializeTenantCollections(tenantConnection) {
     getTestCategoryModel(tenantConnection).init(),
     getTestDefinitionModel(tenantConnection).init(),
     getTestReportModel(tenantConnection).init(),
-    getTaxEntryModel(tenantConnection).init(),
     getUserModel(tenantConnection).init(),
     getPatientModel(tenantConnection).init(),
     getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
     getSampleModel(tenantConnection).init(),
-    getVisitModel(tenantConnection).init(),
   ]);
 }
 

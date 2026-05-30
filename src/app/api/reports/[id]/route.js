@@ -54,6 +54,8 @@ export async function PATCH(req, { params }) {
     await report.save();
     await report.populate("patient", "name patientId age gender phone");
 
-    AuditLog.create({ action: "reports." + report.status, userId: auth.session.userId, tenantId: auth.tenantId, resourceType: "TestReport", resourceId: report._id, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});`n`n    return Response.json({ report });`n  } catch (error) {`n    return jsonError("Unable to update report", error, 500);
+    return Response.json({ report });
+  } catch (error) {
+    return jsonError("Unable to update report", error, 500);
   }
 }
