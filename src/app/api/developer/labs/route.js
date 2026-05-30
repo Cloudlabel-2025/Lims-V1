@@ -3,19 +3,29 @@ import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import connectMasterDB from "@/app/lib/master-db";
+import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { hashPassword } from "@/app/lib/password";
-import { getDoctorModel } from "@/app/models/doctor";
+import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { getLabModel } from "@/app/models/master/Lab";
-import { getPatientModel } from "@/app/models/patient";
+import { getPatientModel } from "@/app/models/tenant/Patient";
 import { getRoleTemplateModel } from "@/app/models/master/RoleTemplate";
+import { getAccountModel } from "@/app/models/tenant/Account";
+import { getAuditLogModel } from "@/app/models/tenant/AuditLog";
 import { getBillingRecordModel } from "@/app/models/tenant/BillingRecord";
+import { getCorporateAccountModel } from "@/app/models/tenant/CorporateAccount";
+import { getExpenseEntryModel } from "@/app/models/tenant/ExpenseEntry";
+import { getInventoryCategoryModel } from "@/app/models/tenant/InventoryCategory";
+import { getInventoryItemModel } from "@/app/models/tenant/InventoryItem";
+import { getInventoryMovementModel } from "@/app/models/tenant/InventoryMovement";
+import { getInventoryUomModel } from "@/app/models/tenant/InventoryUom";
+import { getJournalEntryModel } from "@/app/models/tenant/JournalEntry";
+import { getPaymentReceiptModel } from "@/app/models/tenant/PaymentReceipt";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
 import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
 import { getTestDefinitionModel } from "@/app/models/tenant/TestDefinition";
 import { getTestReportModel } from "@/app/models/tenant/TestReport";
 import { getUserModel } from "@/app/models/tenant/User";
-import { getVisitModel } from "@/app/models/visit";
 import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { buildTenantUrl } from "@/app/lib/subdomain";
@@ -99,17 +109,24 @@ function buildLabLoginUrl(req, tenantId) {
 
 async function initializeTenantCollections(tenantConnection) {
   await Promise.all([
+    getAccountModel(tenantConnection).init(),
+    getAuditLogModel(tenantConnection).init(),
+    getCorporateAccountModel(tenantConnection).init(),
+    getExpenseEntryModel(tenantConnection).init(),
+    getInventoryCategoryModel(tenantConnection).init(),
+    getInventoryItemModel(tenantConnection).init(),
+    getInventoryMovementModel(tenantConnection).init(),
+    getInventoryUomModel(tenantConnection).init(),
+    getJournalEntryModel(tenantConnection).init(),
+    getPaymentReceiptModel(tenantConnection).init(),
     getRoleModel(tenantConnection).init(),
     getTestCategoryModel(tenantConnection).init(),
     getTestDefinitionModel(tenantConnection).init(),
-    getTestReportModel(tenantConnection).init(),
-    getUserModel(tenantConnection).init(),
+    getTestReportModel(tenantConnection).init(),    getUserModel(tenantConnection).init(),
     getPatientModel(tenantConnection).init(),
     getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
-    getSampleModel(tenantConnection).init(),
-    getVisitModel(tenantConnection).init(),
-  ]);
+    getSampleModel(tenantConnection).init(),  ]);
 }
 
 async function createTenantRoles(masterConnection, tenantConnection) {
@@ -311,6 +328,7 @@ export async function POST(req) {
 
     await initializeTenantCollections(tenantConnection);
     const adminRole = await createTenantRoles(masterConnection, tenantConnection);
+    await seedSystemChartOfAccounts(tenantConnection, tenantId);
 
     const User = getUserModel(tenantConnection);
     const passwordHash = await hashPassword(adminPassword);

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { cachedJsonFetch } from "@/app/lib/use-current-user";
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 const PatientSidebar = dynamic(() => import("./PatientSidebar"), {
   ssr: false,
@@ -20,6 +22,8 @@ const PatientTable = dynamic(() => import("./PatientTable"), {
 
 export default function PatientList() {
   const router = useRouter();
+  const user = useCurrentUser();
+  const canCreatePatient = hasPermission(user, "patients.register");
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -202,6 +206,7 @@ export default function PatientList() {
             />
           </div>
 
+          {canCreatePatient && (
           <button
             className="btn-lims-primary"
             onClick={() => router.push("/patients/register")}
@@ -209,6 +214,7 @@ export default function PatientList() {
           >
             {Icons.plus} Create New Patient
           </button>
+          )}
         </div>
       </div>
 
@@ -248,9 +254,11 @@ export default function PatientList() {
           <div className="patient-list-empty">
             {Icons.noResults}
             <div className="patient-list-empty-title">No patients yet</div>
+            {canCreatePatient && (
             <button className="btn-lims-primary" onClick={() => router.push("/patients/register")}>
               Register First Patient
             </button>
+            )}
           </div>
         ) : viewState === "grid" ? (
           <PatientGrid

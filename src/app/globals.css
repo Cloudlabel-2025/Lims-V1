@@ -5294,3 +5294,80 @@ body {
 }
 
 
+
+/* ============================================
+   PRINT — Report Print Layout
+   ============================================ */
+@media print {
+  .dash-sidebar,
+  .dash-topbar,
+  .dash-sidebar-toggle,
+  .module-header,
+  .module-grid,
+  .dash-btn-secondary,
+  .btn-lims-primary,
+  .btn-lims-secondary,
+  .module-alert {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .dash-layout {
+    display: block;
+  }
+
+  .dash-main {
+    width: 100%;
+  }
+
+  .dash-content {
+    padding: 0;
+    max-width: 100%;
+  }
+
+  .report-preview {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .report-title-row {
+    margin-bottom: 16px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 12px;
+  }
+
+  .report-title-row h2 {
+    font-size: 20px;
+  }
+
+  .report-patient-grid {
+    grid-template-columns: repeat(4, 1fr);
+    margin-bottom: 16px;
+  }
+
+  .report-result-table {
+    border: 1px solid #ccc;
+  }
+
+  .report-result-head {
+    background: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .report-result-row.low,
+  .report-result-row.high {
+    background: #fff7ed !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .module-panel.report-preview {
+    display: block !important;
+  }
+}

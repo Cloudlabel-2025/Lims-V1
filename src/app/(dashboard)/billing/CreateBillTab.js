@@ -19,10 +19,15 @@ export default function CreateBillTab({
   notes,
   setNotes,
   selectedTotal,
+  discountAmount,
+  setDiscountAmount,
+  taxAmount,
+  setTaxAmount,
   saving,
   createBill,
   billingRecords,
 }) {
+  const netPayable = Math.max(0, selectedTotal - Number(discountAmount || 0) + Number(taxAmount || 0));
   return (
     <div className="module-grid">
       <section className="module-panel">
@@ -66,24 +71,59 @@ export default function CreateBillTab({
             <textarea className="lims-input" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Enter notes" />
           </label>
 
+          <div className="module-form-grid">
+            <label>
+              Discount (₹)
+              <input
+                type="number"
+                className="lims-input"
+                min="0"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                placeholder="0"
+              />
+            </label>
+            <label>
+              Tax (₹)
+              <input
+                type="number"
+                className="lims-input"
+                min="0"
+                value={taxAmount}
+                onChange={(e) => setTaxAmount(e.target.value)}
+                placeholder="0"
+              />
+            </label>
+          </div>
+
           <div style={{
             background: "var(--surface)",
             padding: "20px",
             borderRadius: "var(--radius-md)",
             marginBottom: "20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "16px"
           }}>
-            <div>
-              <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Total Payable</span>
-              <strong style={{ fontSize: "24px", color: "var(--brand-action, var(--primary))" }}>₹{selectedTotal}</strong>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-muted)" }}>
+              <span>Subtotal</span><span>₹{selectedTotal}</span>
             </div>
-            <button type="submit" className="dash-btn-primary" disabled={!patient || selectedTests.length === 0 || saving}>
-              {saving ? "Processing..." : "Generate Bill"}
-            </button>
+            {Number(discountAmount) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--success)" }}>
+                <span>Discount</span><span>− ₹{discountAmount}</span>
+              </div>
+            )}
+            {Number(taxAmount) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-secondary)" }}>
+                <span>Tax</span><span>+ ₹{taxAmount}</span>
+              </div>
+            )}
+            <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "10px", marginTop: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Net Payable</span>
+                <strong style={{ fontSize: "24px", color: "var(--brand-action, var(--primary))" }}>₹{netPayable}</strong>
+              </div>
+              <button type="submit" className="dash-btn-primary" disabled={!patient || selectedTests.length === 0 || saving}>
+                {saving ? "Processing..." : "Generate Bill"}
+              </button>
+            </div>
           </div>
         </form>
       </section>

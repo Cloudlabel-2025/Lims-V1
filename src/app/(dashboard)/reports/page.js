@@ -44,6 +44,8 @@ export default function ReportsPage() {
   );
   const canEditReports = hasPermission(user, "reports.edit");
   const canPrintReports = hasPermission(user, "reports.print");
+  const canVerifyReports = hasPermission(user, "reports.verify");
+  const canReleaseReports = hasPermission(user, "reports.release");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -99,6 +101,11 @@ export default function ReportsPage() {
     }
   }
 
+  function handleReportUpdated(updatedReport) {
+    setReports((current) => current.map((r) => r._id === updatedReport._id ? updatedReport : r));
+    setSelectedReport(updatedReport);
+  }
+
   async function saveReport(event) {
     event.preventDefault();
     setSaving(true);
@@ -147,7 +154,7 @@ export default function ReportsPage() {
           <span>Enter values from test definitions and generate structured reports.</span>
         </div>
         <button className="dash-btn-secondary" type="button" onClick={loadData}>
-          {Icons.logo} Refresh
+          {Icons.refresh} Refresh
         </button>
       </div>
 
@@ -176,10 +183,18 @@ export default function ReportsPage() {
           />
         )}
 
-        <ReportList reports={reports} setSelectedReport={setSelectedReport} />
+        <ReportList reports={reports} setSelectedReport={setSelectedReport} selectedReport={selectedReport} />
       </div>
 
-      {selectedReport && <ReportPreview selectedReport={selectedReport} canPrintReports={canPrintReports} />}
+      {selectedReport && (
+        <ReportPreview
+          selectedReport={selectedReport}
+          canPrintReports={canPrintReports}
+          canVerifyReports={canVerifyReports}
+          canReleaseReports={canReleaseReports}
+          onReportUpdated={handleReportUpdated}
+        />
+      )}
     </div>
   );
 }

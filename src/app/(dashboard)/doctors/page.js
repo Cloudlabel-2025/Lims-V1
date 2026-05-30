@@ -42,6 +42,8 @@ export default function DoctorList() {
   const [deleteModal, setDeleteModal] = useState({ open: false, doctor: null });
   const [deleting, setDeleting] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [payoutConfirm, setPayoutConfirm] = useState(false);
   const canRegisterDoctors = hasPermission(user, "doctors.register");
   const canEditDoctors = hasPermission(user, "doctors.edit");
   const canDeleteDoctors = hasPermission(user, "doctors.delete");
@@ -116,15 +118,13 @@ export default function DoctorList() {
       if (res.ok) {
         clearCachedApi("/api/doctor");
         setAllDoctors((prev) => prev.filter((d) => d._id !== deleteModal.doctor._id));
-        if (selectedDoctor?._id === deleteModal.doctor._id) {
-          closeSidebar();
-        }
+        if (selectedDoctor?._id === deleteModal.doctor._id) closeSidebar();
         closeDeleteModal();
       } else {
-        alert(data.error || "Failed to delete doctor");
+        setActionError(data.error || "Failed to delete doctor");
       }
     } catch {
-      alert("Network error. Please try again.");
+      setActionError("Network error. Please try again.");
     } finally {
       setDeleting(false);
     }
@@ -132,9 +132,10 @@ export default function DoctorList() {
 
   const handlePayout = async () => {
     if (!selectedDoctor || selectedDoctor.pendingPayout <= 0) return;
-    if (!confirm(`Clear pending payout of ₹${selectedDoctor.pendingPayout} for ${selectedDoctor.name}?`)) return;
-
+    if (!payoutConfirm) { setPayoutConfirm(true); return; }
+    setPayoutConfirm(false);
     setPaying(true);
+    setActionError("");
     try {
       const res = await fetch("/api/doctor/payout", {
         method: "POST",
@@ -147,10 +148,10 @@ export default function DoctorList() {
         setAllDoctors(prev => prev.map(d => d._id === selectedDoctor._id ? { ...d, pendingPayout: 0 } : d));
         setSelectedDoctor(prev => ({ ...prev, pendingPayout: 0 }));
       } else {
-        alert(data.error || "Failed to clear payout");
+        setActionError(data.error || "Failed to clear payout");
       }
     } catch {
-      alert("Network error");
+      setActionError("Network error");
     } finally {
       setPaying(false);
     }
@@ -242,14 +243,26 @@ export default function DoctorList() {
 
             {selectedDoctor.pendingPayout > 0 && (
               <div style={{ padding: '0 24px 20px' }}>
-                <button 
-                  className="dash-btn-primary" 
-                  style={{ width: '100%', background: 'var(--success)', border: 'none', height: '42px', gap: '8px' }}
-                  onClick={handlePayout}
-                  disabled={paying}
-                >
-                  {paying ? "Processing..." : `${Icons.checkCircle || "✓"} Clear ₹${selectedDoctor.pendingPayout} Payout`}
-                </button>
+                {payoutConfirm ? (
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "10px", padding: "12px 14px", marginBottom: "8px" }}>
+                    <p style={{ fontSize: "13px", color: "#92400e", margin: "0 0 10px", fontWeight: "600" }}>
+                      Clear ₹{selectedDoctor.pendingPayout} payout for {selectedDoctor.name}?
+                    </p>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => setPayoutConfirm(false)} style={{ flex: 1, height: "34px", border: "1px solid var(--border)", borderRadius: "8px", background: "#fff", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Cancel</button>
+                      <button onClick={handlePayout} disabled={paying} style={{ flex: 1, height: "34px", border: "none", borderRadius: "8px", background: "var(--success)", color: "#fff", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>{paying ? "Processing..." : "Confirm"}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="dash-btn-primary"
+                    style={{ width: '100%', background: 'var(--success)', border: 'none', height: '42px', gap: '8px' }}
+                    onClick={handlePayout}
+                    disabled={paying}
+                  >
+                    Clear ₹{selectedDoctor.pendingPayout} Payout
+                  </button>
+                )}
               </div>
             )}
 
@@ -598,9 +611,12 @@ export default function DoctorList() {
                 Are you sure you want to delete <strong>{deleteModal.doctor?.name}</strong> ({deleteModal.doctor?.doctorId})? This action cannot be undone.
               </p>
             </div>
+            {actionError && (
+              <p style={{ color: "#e11d48", fontSize: "12px", textAlign: "center", marginBottom: "12px", fontWeight: "600" }}>{actionError}</p>
+            )}
             <div style={{ display: "flex", gap: "12px" }}>
-              <button 
-                onClick={closeDeleteModal}
+              <button
+                onClick={() => { closeDeleteModal(); setActionError(""); }}
                 style={{ 
                   flex: 1, height: "42px", border: "1.5px solid var(--border)", 
                   borderRadius: "10px", background: "#fff", color: "var(--text-primary)",

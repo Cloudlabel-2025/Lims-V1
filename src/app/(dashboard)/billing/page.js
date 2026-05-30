@@ -30,6 +30,8 @@ export default function BillingPage() {
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState("routine");
   const [notes, setNotes] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [taxAmount, setTaxAmount] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -113,7 +115,7 @@ export default function BillingPage() {
       const response = await fetch("/api/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient, tests: selectedTests, priority, notes }),
+        body: JSON.stringify({ patient, tests: selectedTests, priority, notes, discountAmount: Number(discountAmount) || 0, taxAmount: Number(taxAmount) || 0 }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to create bill");
@@ -126,6 +128,8 @@ export default function BillingPage() {
       setSelectedTests([]);
       setPriority("routine");
       setNotes("");
+      setDiscountAmount("");
+      setTaxAmount("");
       setActiveTab("pending");
     } catch (err) {
       setError(err.message);
@@ -301,13 +305,13 @@ export default function BillingPage() {
                       <small style={{ color: "var(--text-muted)" }}>{billingRecord.billId} · {billingRecord.patient?.patientId}</small>
                     </div>
                     <span style={{ 
-                      background: "var(--warning-50)", 
-                      color: "var(--warning-700)", 
+                      background: billingRecord.billingStatus === "partial" ? "#fffbeb" : "var(--warning-50)", 
+                      color: billingRecord.billingStatus === "partial" ? "#b45309" : "var(--warning-700)", 
                       padding: "4px 8px", 
                       borderRadius: "6px", 
                       fontSize: "11px", 
                       fontWeight: "700" 
-                    }}>UNPAID</span>
+                    }}>{billingRecord.billingStatus === "partial" ? "PARTIAL" : "UNPAID"}</span>
                   </div>
                   <div className="form-card-body" style={{ padding: "16px" }}>
                     <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -391,6 +395,10 @@ export default function BillingPage() {
           notes={notes}
           setNotes={setNotes}
           selectedTotal={selectedTotal}
+          discountAmount={discountAmount}
+          setDiscountAmount={setDiscountAmount}
+          taxAmount={taxAmount}
+          setTaxAmount={setTaxAmount}
           saving={saving}
           createBill={createBill}
           billingRecords={billingRecords}

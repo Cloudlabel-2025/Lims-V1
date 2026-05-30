@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Icons } from "@/app/components/Icons";
 
 function rangeText(result) {
@@ -11,8 +12,50 @@ function rangeText(result) {
   return "-";
 }
 
-export default function ReportPreview({ selectedReport, canPrintReports }) {
+const statusFlow = {
+  completed: { next: "verify", label: "Verify", permission: "reports.verify", color: "#1d4ed8", bg: "#eff6ff" },
+  verified: { next: "release", label: "Release", permission: "reports.release", color: "#047857", bg: "#ecfdf5" },
+};
+
+const statusBadge = {
+  draft: ["#f1f5f9", "#475569"],
+  completed: ["#eff6ff", "#1d4ed8"],
+  verified: ["#f0fdf4", "#15803d"],
+  released: ["#ecfdf5", "#047857"],
+};
+
+export default function ReportPreview({ selectedReport, canPrintReports, canVerifyReports, canReleaseReports, onReportUpdated }) {
+  const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState("");
+
   if (!selectedReport) return null;
+
+  const flow = statusFlow[selectedReport.status];
+  const canAct =
+    (flow?.next === "verify" && canVerifyReports) ||
+    (flow?.next === "release" && canReleaseReports);
+
+  async function performAction(action) {
+    setUpdating(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/reports/${selectedReport._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to update report");
+      onReportUpdated?.(data.report);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  const [badgeBg, badgeColor] = statusBadge[selectedReport.status] || ["var(--surface)", "var(--text-secondary)"];
 
   return (
     <section className="module-panel report-preview">
@@ -22,12 +65,29 @@ export default function ReportPreview({ selectedReport, canPrintReports }) {
           <h2>{selectedReport.testSnapshot?.name}</h2>
           <span>{selectedReport.reportId}</span>
         </div>
-        {canPrintReports && (
-          <button className="dash-btn-secondary" type="button" onClick={() => window.print()}>
-            {Icons.report} Print
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ background: badgeBg, color: badgeColor, borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 800 }}>
+            {selectedReport.status}
+          </span>
+          {canAct && flow && (
+            <button
+              type="button"
+              disabled={updating}
+              onClick={() => performAction(flow.next)}
+              style={{ height: 36, padding: "0 14px", border: "none", borderRadius: 8, background: flow.bg, color: flow.color, fontWeight: 800, fontSize: 13, cursor: "pointer" }}
+            >
+              {updating ? "..." : flow.label}
+            </button>
+          )}
+          {canPrintReports && (
+            <button className="dash-btn-secondary" type="button" onClick={() => window.print()} style={{ height: 36 }}>
+              {Icons.report} Print
+            </button>
+          )}
+        </div>
       </div>
+
+      {error && <div className="module-alert" style={{ marginTop: 12 }}>{error}</div>}
 
       <div className="report-patient-grid">
         <div>
@@ -40,9 +100,7 @@ export default function ReportPreview({ selectedReport, canPrintReports }) {
         </div>
         <div>
           <span>Age / Gender</span>
-          <strong>
-            {selectedReport.patient?.age} / {selectedReport.patient?.gender}
-          </strong>
+          <strong>{selectedReport.patient?.age} / {selectedReport.patient?.gender}</strong>
         </div>
         <div>
           <span>Sample</span>

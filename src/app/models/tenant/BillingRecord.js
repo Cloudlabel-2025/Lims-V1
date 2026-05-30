@@ -94,6 +94,45 @@ export const BillingRecordSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    subtotalAmount: {
+      type: Number,
+      default: 0,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+    },
+    taxAmount: {
+      type: Number,
+      default: 0,
+    },
+    tenantId: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      index: true,
+    },
+    invoiceStatus: {
+      type: String,
+      enum: ["draft", "confirmed", "paid", "partial", "cancelled"],
+      default: "confirmed",
+      index: true,
+    },
+    invoiceJournalEntryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "JournalEntry",
+    },
+    paymentReceiptIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PaymentReceipt",
+      },
+    ],
+    commissionJournalEntryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "JournalEntry",
+    },
     commissionAmount: {
       type: Number,
       default: 0,
@@ -105,7 +144,7 @@ export const BillingRecordSchema = new mongoose.Schema(
     },
     billingStatus: {
       type: String,
-      enum: ["unpaid", "paid", "cancelled"],
+      enum: ["unpaid", "partial", "paid", "cancelled"],
       default: "unpaid",
       index: true,
     },
@@ -118,6 +157,7 @@ export const BillingRecordSchema = new mongoose.Schema(
 );
 
 BillingRecordSchema.index({ createdAt: -1 });
+BillingRecordSchema.index({ tenantId: 1, createdAt: -1 });
 BillingRecordSchema.index({ billingStatus: 1, createdAt: -1 });
 BillingRecordSchema.index({ status: 1, createdAt: -1 });
 

@@ -101,6 +101,9 @@ export async function POST(req) {
     });
     await user.populate("role", "name");
 
+    const { AuditLog } = await getTenantModels(auth.tenantId);
+    AuditLog.create({ action: "users.create", userId: auth.session.userId, tenantId: auth.tenantId, resourceType: "User", resourceId: user._id, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});
+
     return Response.json({ user: serializeUser(user) }, { status: 201 });
   } catch (error) {
     if (error.code === 11000) {

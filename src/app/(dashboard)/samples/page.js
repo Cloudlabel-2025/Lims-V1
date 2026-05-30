@@ -78,7 +78,7 @@ export default function SamplesPage() {
           <span>Collect, process, reject, and track samples before result entry.</span>
         </div>
         <button className="dash-btn-secondary" type="button" onClick={() => loadSamples()}>
-          {Icons.logo} Refresh
+          {Icons.refresh} Refresh
         </button>
       </div>
 
@@ -113,6 +113,14 @@ export default function SamplesPage() {
 
         {loading ? (
           <p className="developer-empty">Loading samples...</p>
+        ) : samples.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-muted)" }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🧪</div>
+            <p style={{ fontWeight: 600, marginBottom: 4 }}>
+              {status === "all" ? "No samples found" : `No ${status} samples`}
+            </p>
+            <p style={{ fontSize: 12 }}>Samples appear here once bills are created.</p>
+          </div>
         ) : (
           <div className="sample-table">
             <div className="sample-table-head">

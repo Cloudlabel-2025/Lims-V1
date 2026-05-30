@@ -148,6 +148,9 @@ export async function POST(req) {
 
     await report.populate("patient", "name patientId age gender phone");
 
+    const { AuditLog } = await getTenantModels(auth.tenantId);
+    AuditLog.create({ action: "reports.create", userId: auth.session.userId, tenantId: auth.tenantId, resourceType: "TestReport", resourceId: report._id, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});
+
     return Response.json({ report }, { status: 201 });
   } catch (error) {
     return jsonError("Unable to create report", error, 500);

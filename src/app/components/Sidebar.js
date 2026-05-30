@@ -25,6 +25,7 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
   const navItems = getAllowedNavItems(user, theme)
     .map((module) => ({ ...module, icon: iconByModule[module.id] || Icons.settings }));
   const canOpenSettings = hasAnyPermission(user, ["settings.manage", "users.manage"]);
+  const canViewAudit = hasAnyPermission(user, ["settings.manage"]);
 
   const isActive = (href) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -79,7 +80,19 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
             >
               <span className="dash-nav-icon">{Icons.settings}</span>
               {!collapsed && <span className="dash-nav-label">Settings</span>}
+              {pathname === "/settings" && <div className="dash-nav-indicator" />}
             </Link>
+            {canViewAudit && (
+              <Link
+                href="/audit"
+                className={`dash-nav-item ${pathname === "/audit" ? "active" : ""}`}
+                onClick={() => setMobileOpen && setMobileOpen(false)}
+              >
+                <span className="dash-nav-icon">{Icons.list}</span>
+                {!collapsed && <span className="dash-nav-label">Audit Log</span>}
+                {pathname === "/audit" && <div className="dash-nav-indicator" />}
+              </Link>
+            )}
           </>
         )}
       </nav>
