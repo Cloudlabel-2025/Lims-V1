@@ -64,7 +64,7 @@ export const JournalEntrySchema = new mongoose.Schema(
 JournalEntrySchema.index({ tenantId: 1, entryNumber: 1 }, { unique: true });
 JournalEntrySchema.index({ tenantId: 1, sourceType: 1, sourceId: 1 });
 
-JournalEntrySchema.pre("validate", function validateBalancedEntry(next) {
+JournalEntrySchema.pre("validate", function validateBalancedEntry() {
   const totals = (this.lines || []).reduce(
     (sum, line) => ({
       debit: sum.debit + Number(line.debit || 0),
@@ -79,16 +79,12 @@ JournalEntrySchema.pre("validate", function validateBalancedEntry(next) {
   });
 
   if (hasInvalidLine) {
-    next(new Error("Each journal line must contain either debit or credit"));
-    return;
+    throw new Error("Each journal line must contain either debit or credit");
   }
 
   if (Math.round(totals.debit * 100) !== Math.round(totals.credit * 100)) {
-    next(new Error("Journal entry debits and credits must balance"));
-    return;
+    throw new Error("Journal entry debits and credits must balance");
   }
-
-  next();
 });
 
 JournalEntrySchema.pre("save", async function generateEntryNumber() {

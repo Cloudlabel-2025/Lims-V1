@@ -18,7 +18,7 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
     samples: Icons.vial,
     reports: Icons.report,
     analytics: Icons.barChart,
-    accounts: Icons.barChart,
+    accounts: Icons.wallet,
     inventory: Icons.flask,
     quality: Icons.shield,
   };

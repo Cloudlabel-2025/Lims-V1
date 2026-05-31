@@ -1,4 +1,4 @@
-import { getAccountByCode, postJournalEntry } from "@/app/lib/accounting";
+import { getAccountByCode, postJournalEntry, seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireTenantSession } from "@/app/lib/auth";
@@ -54,6 +54,8 @@ export async function POST(req) {
       if (!lockedBillingRecord.tenantId) {
         lockedBillingRecord.tenantId = tenantId;
       }
+
+      await seedSystemChartOfAccounts(connection, tenantId, { session });
 
       const receivableAccount = await getAccountByCode(connection, tenantId, "1100", { session });
 

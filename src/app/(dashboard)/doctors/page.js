@@ -44,6 +44,7 @@ export default function DoctorList() {
   const [paying, setPaying] = useState(false);
   const [actionError, setActionError] = useState("");
   const [payoutConfirm, setPayoutConfirm] = useState(false);
+  const [payoutMethod, setPayoutMethod] = useState("cash");
   const canRegisterDoctors = hasPermission(user, "doctors.register");
   const canEditDoctors = hasPermission(user, "doctors.edit");
   const canDeleteDoctors = hasPermission(user, "doctors.delete");
@@ -132,23 +133,22 @@ export default function DoctorList() {
 
   const handlePayout = async () => {
     if (!selectedDoctor || selectedDoctor.pendingPayout <= 0) return;
-    if (!payoutConfirm) { setPayoutConfirm(true); return; }
-    setPayoutConfirm(false);
     setPaying(true);
     setActionError("");
     try {
       const res = await fetch("/api/doctor/payout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doctorId: selectedDoctor._id })
+        body: JSON.stringify({ doctorId: selectedDoctor._id, paymentMethod: payoutMethod })
       });
       const data = await res.json();
       if (res.ok) {
         clearCachedApi("/api/doctor");
         setAllDoctors(prev => prev.map(d => d._id === selectedDoctor._id ? { ...d, pendingPayout: 0 } : d));
         setSelectedDoctor(prev => ({ ...prev, pendingPayout: 0 }));
+        setPayoutConfirm(false);
       } else {
-        setActionError(data.error || "Failed to clear payout");
+        setActionError(data.error || "Failed to release payout");
       }
     } catch {
       setActionError("Network error");
@@ -241,30 +241,60 @@ export default function DoctorList() {
               <div className="detail-item"><div className="detail-value">{formatDate(selectedDoctor.createdAt)}</div><div className="detail-label">Registered On</div></div>
             </div>
 
-            {selectedDoctor.pendingPayout > 0 && (
-              <div style={{ padding: '0 24px 20px' }}>
-                {payoutConfirm ? (
-                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "10px", padding: "12px 14px", marginBottom: "8px" }}>
-                    <p style={{ fontSize: "13px", color: "#92400e", margin: "0 0 10px", fontWeight: "600" }}>
-                      Clear ₹{selectedDoctor.pendingPayout} payout for {selectedDoctor.name}?
+            <div style={{ padding: '0 24px 20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Payout</div>
+              {selectedDoctor.pendingPayout > 0 ? (
+                payoutConfirm ? (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '14px' }}>
+                    <p style={{ fontSize: '13px', color: '#92400e', margin: '0 0 10px', fontWeight: '600' }}>
+                      Release ₹{selectedDoctor.pendingPayout} to {selectedDoctor.name}?
                     </p>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => setPayoutConfirm(false)} style={{ flex: 1, height: "34px", border: "1px solid var(--border)", borderRadius: "8px", background: "#fff", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Cancel</button>
-                      <button onClick={handlePayout} disabled={paying} style={{ flex: 1, height: "34px", border: "none", borderRadius: "8px", background: "var(--success)", color: "#fff", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>{paying ? "Processing..." : "Confirm"}</button>
+                    <select
+                      value={payoutMethod}
+                      onChange={(e) => setPayoutMethod(e.target.value)}
+                      style={{ width: '100%', height: '36px', marginBottom: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', padding: '0 10px', background: '#fff' }}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="bank">Bank Transfer</option>
+                    </select>
+                    {actionError && <p style={{ color: '#e11d48', fontSize: '12px', margin: '0 0 8px', fontWeight: '600' }}>{actionError}</p>}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => { setPayoutConfirm(false); setActionError(''); }}
+                        style={{ flex: 1, height: '36px', border: '1px solid var(--border)', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handlePayout}
+                        disabled={paying}
+                        style={{ flex: 1, height: '36px', border: 'none', borderRadius: '8px', background: '#10b981', color: '#fff', cursor: paying ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '600', opacity: paying ? 0.7 : 1 }}
+                      >
+                        {paying ? 'Releasing...' : 'Confirm Release'}
+                      </button>
                     </div>
                   </div>
                 ) : (
-                  <button
-                    className="dash-btn-primary"
-                    style={{ width: '100%', background: 'var(--success)', border: 'none', height: '42px', gap: '8px' }}
-                    onClick={handlePayout}
-                    disabled={paying}
-                  >
-                    Clear ₹{selectedDoctor.pendingPayout} Payout
-                  </button>
-                )}
-              </div>
-            )}
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '13px', color: '#7f1d1d', fontWeight: '600' }}>Pending Payout</span>
+                      <span style={{ fontSize: '18px', fontWeight: '800', color: '#dc2626' }}>₹{selectedDoctor.pendingPayout}</span>
+                    </div>
+                    <button
+                      onClick={() => { setPayoutConfirm(true); setActionError(''); }}
+                      style={{ width: '100%', height: '38px', border: 'none', borderRadius: '8px', background: '#10b981', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}
+                    >
+                      Release Payout
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '16px' }}>✓</span>
+                  <span style={{ fontSize: '13px', color: '#065f46', fontWeight: '600' }}>No pending payout</span>
+                </div>
+              )}
+            </div>
 
             {(canEditDoctors || canDeleteDoctors) && (
             <div style={{ padding: '20px 24px', display: 'flex', gap: '12px' }}>
