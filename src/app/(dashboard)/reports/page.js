@@ -67,7 +67,7 @@ export default function ReportsPage() {
       if (sampleResponse && !sampleResponse.response.ok) throw new Error(sampleData.error || "Unable to load samples");
       if (!reportResponse.response.ok) throw new Error(reportData.error || "Unable to load reports");
 
-      setPatients(Array.isArray(patientData) ? patientData : []);
+      setPatients(Array.isArray(patientData) ? patientData : patientData.patients || []);
       setTests(testData.tests || []);
       setSamples((sampleData.samples || []).filter((sample) => ["collected", "processing"].includes(sample.status)));
       setReports(reportData.reports || []);

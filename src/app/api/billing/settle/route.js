@@ -30,7 +30,7 @@ export async function POST(req) {
       return Response.json({ error: "Billing record ID is required" }, { status: 400 });
     }
 
-    const billingRecord = await BillingRecord.findById(billingRecordId);
+    const billingRecord = await BillingRecord.findOne({ _id: billingRecordId, tenantId });
     if (!billingRecord) {
       return Response.json({ error: "Billing record not found" }, { status: 404 });
     }
@@ -47,13 +47,9 @@ export async function POST(req) {
     }
 
     const result = await connection.transaction(async (session) => {
-      const lockedBillingRecord = await BillingRecord.findById(billingRecordId).session(session);
+      const lockedBillingRecord = await BillingRecord.findOne({ _id: billingRecordId, tenantId }).session(session);
       if (!lockedBillingRecord) throw new Error("Billing record not found");
       if (lockedBillingRecord.billingStatus === "paid") throw new Error("Bill is already paid");
-
-      if (!lockedBillingRecord.tenantId) {
-        lockedBillingRecord.tenantId = tenantId;
-      }
 
       await seedSystemChartOfAccounts(connection, tenantId, { session });
 
@@ -147,6 +143,9 @@ export async function POST(req) {
           lockedBillingRecord.paymentBreakdown.card +
           lockedBillingRecord.paymentBreakdown.online
       );
+      if (totalPaid > money(lockedBillingRecord.totalAmount)) {
+        throw new Error("Payment amount cannot exceed bill balance");
+      }
       const isFullyPaid = totalPaid >= money(lockedBillingRecord.totalAmount);
 
       lockedBillingRecord.billingStatus = isFullyPaid ? "paid" : "partial";
@@ -254,7 +253,7 @@ export async function POST(req) {
     });
 
   } catch (error) {
-    if (["Billing record not found", "Bill is already paid"].includes(error.message)) {
+    if (["Billing record not found", "Bill is already paid", "Payment amount cannot exceed bill balance"].includes(error.message)) {
       return Response.json(
         { error: error.message },
         { status: error.message === "Billing record not found" ? 404 : 400 }

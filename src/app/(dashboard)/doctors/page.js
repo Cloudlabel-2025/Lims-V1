@@ -39,6 +39,8 @@ export default function DoctorList() {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const debounceRef = useRef(null);
   const [viewType, setViewType] = useState("grid"); // 'grid' or 'list'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const [deleteModal, setDeleteModal] = useState({ open: false, doctor: null });
   const [deleting, setDeleting] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -49,13 +51,15 @@ export default function DoctorList() {
   const canEditDoctors = hasPermission(user, "doctors.edit");
   const canDeleteDoctors = hasPermission(user, "doctors.delete");
 
-  const fetchAllDoctors = useCallback(async () => {
+  const fetchAllDoctors = useCallback(async (page = 1) => {
     setListLoading(true);
     try {
-      const { data } = await cachedJsonFetch("/api/doctor", { ttl: 15_000 });
-      setAllDoctors(Array.isArray(data) ? data : []);
+      const { data } = await cachedJsonFetch(`/api/doctor?page=${page}&limit=50`, { ttl: 15_000 });
+      setAllDoctors(Array.isArray(data) ? data : data.doctors || []);
+      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
     } catch {
       setAllDoctors([]);
+      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
     } finally {
       setListLoading(false);
     }
@@ -63,16 +67,18 @@ export default function DoctorList() {
 
   useEffect(() => {
     setMounted(true);
-    fetchAllDoctors();
+    fetchAllDoctors(1);
   }, [fetchAllDoctors]);
 
-  const doSearch = useCallback(async (query) => {
+  const doSearch = useCallback(async (query, page = 1) => {
     setListLoading(true);
     try {
-      const { data } = await cachedJsonFetch(`/api/doctor?search=${encodeURIComponent(query)}`, { ttl: 5_000 });
-      setAllDoctors(Array.isArray(data) ? data : []);
+      const { data } = await cachedJsonFetch(`/api/doctor?search=${encodeURIComponent(query)}&page=${page}&limit=50`, { ttl: 5_000 });
+      setAllDoctors(Array.isArray(data) ? data : data.doctors || []);
+      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
     } catch {
       setAllDoctors([]);
+      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
     } finally {
       setListLoading(false);
     }
@@ -83,13 +89,13 @@ export default function DoctorList() {
     if (!mounted) return;
 
     if (!searchTerm.trim()) {
-      fetchAllDoctors();
+      fetchAllDoctors(currentPage);
       return;
     }
 
-    debounceRef.current = setTimeout(() => doSearch(searchTerm), 350);
+    debounceRef.current = setTimeout(() => doSearch(searchTerm, currentPage), 350);
     return () => clearTimeout(debounceRef.current);
-  }, [searchTerm, doSearch, mounted, fetchAllDoctors]);
+  }, [currentPage, searchTerm, doSearch, mounted, fetchAllDoctors]);
 
   const handleSelectDoctor = (doctor) => {
     setSelectedDoctor(doctor);
@@ -400,7 +406,10 @@ export default function DoctorList() {
               className="lims-input"
               placeholder="Search doctors..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               style={{ paddingLeft: "36px", height: "40px", fontSize: '13px' }}
             />
           </div>
@@ -419,8 +428,8 @@ export default function DoctorList() {
 
       <div className="doctor-list-container" style={{ marginTop: "24px" }}>
         <div className="patient-list-header" style={{ marginBottom: "16px" }}>
-          <span className="patient-list-count">{listLoading ? "Loading..." : `${allDoctors.length} doctors`}</span>
-          <button className="btn-refresh" onClick={fetchAllDoctors} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--brand-action, var(--primary))', fontWeight: '600', fontSize: '13px' }}>
+          <span className="patient-list-count">{listLoading ? "Loading..." : `${pagination.total || allDoctors.length} doctors`}</span>
+          <button className="btn-refresh" onClick={() => fetchAllDoctors(currentPage)} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--brand-action, var(--primary))', fontWeight: '600', fontSize: '13px' }}>
             <div style={{ transform: listLoading ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s' }}>{Icons.logo}</div> Refresh
           </button>
         </div>
@@ -604,6 +613,7 @@ export default function DoctorList() {
             <p style={{ color: "var(--text-muted)" }}>Try searching for a different name or speciality.</p>
           </div>
         )}
+        <PaginationControls pagination={pagination} loading={listLoading} onPageChange={setCurrentPage} />
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -685,6 +695,22 @@ export default function DoctorList() {
           to { opacity: 1; transform: translate(-50%, -50%); }
         }
       `}</style>
+    </div>
+  );
+}
+
+function PaginationControls({ pagination, loading, onPageChange }) {
+  if (!pagination || pagination.totalPages <= 1) return null;
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginTop: "18px", flexWrap: "wrap" }}>
+      <span style={{ color: "var(--text-muted)", fontSize: "13px", fontWeight: 600 }}>
+        Page {pagination.page} of {pagination.totalPages}
+      </span>
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page <= 1} onClick={() => onPageChange(Math.max(1, pagination.page - 1))} style={{ height: "36px", padding: "0 12px" }}>Previous</button>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page >= pagination.totalPages} onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))} style={{ height: "36px", padding: "0 12px" }}>Next</button>
+      </div>
     </div>
   );
 }

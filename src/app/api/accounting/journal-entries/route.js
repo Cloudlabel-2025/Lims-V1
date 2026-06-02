@@ -31,6 +31,8 @@ export async function GET(req) {
     const accountId = clean(searchParams.get("accountId"));
     const from = dateValue(searchParams.get("from"));
     const to = dateValue(searchParams.get("to"));
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(250, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
     const query = { tenantId: auth.tenantId };
 
     if (sourceType && sourceType !== "all") query.sourceType = sourceType;
@@ -42,14 +44,26 @@ export async function GET(req) {
     }
 
     const { JournalEntry } = await getTenantModels(auth.tenantId);
-    const journalEntries = await JournalEntry.find(query)
-      .populate("lines.accountId", "code name type subtype")
-      .populate("postedBy", "firstName lastName email userId")
-      .sort({ date: -1, createdAt: -1 })
-      .limit(250)
-      .lean();
+    const [journalEntries, total] = await Promise.all([
+      JournalEntry.find(query)
+        .populate("lines.accountId", "code name type subtype")
+        .populate("postedBy", "firstName lastName email userId")
+        .sort({ date: -1, createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      JournalEntry.countDocuments(query),
+    ]);
 
-    return Response.json({ journalEntries });
+    return Response.json({
+      journalEntries,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (error) {
     return jsonError("Unable to load journal entries", error, 500);
   }

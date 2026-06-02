@@ -31,27 +31,33 @@ export default function PatientList() {
   const [listLoading, setListLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [viewState, setViewState] = useState("grid");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const debounceRef = useRef(null);
 
-  const fetchAllPatients = useCallback(async () => {
+  const fetchAllPatients = useCallback(async (page = 1) => {
     setListLoading(true);
     try {
-      const { data } = await cachedJsonFetch("/api/patient", { ttl: 15_000 });
-      setAllPatients(Array.isArray(data) ? data : []);
+      const { data } = await cachedJsonFetch(`/api/patient?page=${page}&limit=50`, { ttl: 15_000 });
+      setAllPatients(Array.isArray(data) ? data : data.patients || []);
+      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
     } catch {
       setAllPatients([]);
+      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
     } finally {
       setListLoading(false);
     }
   }, []);
 
-  const doSearch = useCallback(async (query) => {
+  const doSearch = useCallback(async (query, page = 1) => {
     setListLoading(true);
     try {
-      const { data } = await cachedJsonFetch(`/api/patient?search=${encodeURIComponent(query)}`, { ttl: 5_000 });
-      setAllPatients(Array.isArray(data) ? data : []);
+      const { data } = await cachedJsonFetch(`/api/patient?search=${encodeURIComponent(query)}&page=${page}&limit=50`, { ttl: 5_000 });
+      setAllPatients(Array.isArray(data) ? data : data.patients || []);
+      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
     } catch {
       setAllPatients([]);
+      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
     } finally {
       setListLoading(false);
     }
@@ -59,7 +65,7 @@ export default function PatientList() {
 
   useEffect(() => {
     setMounted(true);
-    fetchAllPatients();
+    fetchAllPatients(1);
   }, [fetchAllPatients]);
 
   useEffect(() => {
@@ -67,13 +73,13 @@ export default function PatientList() {
     if (!mounted) return;
 
     if (!searchQuery.trim()) {
-      fetchAllPatients();
+      fetchAllPatients(currentPage);
       return;
     }
 
-    debounceRef.current = setTimeout(() => doSearch(searchQuery), 350);
+    debounceRef.current = setTimeout(() => doSearch(searchQuery, currentPage), 350);
     return () => clearTimeout(debounceRef.current);
-  }, [doSearch, fetchAllPatients, mounted, searchQuery]);
+  }, [currentPage, doSearch, fetchAllPatients, mounted, searchQuery]);
 
   const handleSelectPatient = useCallback((patient) => {
     setSelectedPatient(patient);
@@ -201,7 +207,10 @@ export default function PatientList() {
               className="lims-input"
               placeholder="Search patients..."
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setCurrentPage(1);
+              }}
               style={{ paddingLeft: "36px", height: "40px", fontSize: "13px" }}
             />
           </div>
@@ -221,11 +230,11 @@ export default function PatientList() {
       <div className="patient-list-container">
         <div className="patient-list-header" style={{ marginBottom: "16px" }}>
           <span className="patient-list-count">
-            {listLoading ? "Loading..." : `${allPatients.length} patients`}
+            {listLoading ? "Loading..." : `${pagination.total || allPatients.length} patients`}
           </span>
           <button
             className="btn-refresh"
-            onClick={fetchAllPatients}
+            onClick={() => fetchAllPatients(currentPage)}
             style={{
               display: "flex",
               alignItems: "center",
@@ -275,6 +284,23 @@ export default function PatientList() {
             onEditPatient={goToEditPatient}
           />
         )}
+        <PaginationControls pagination={pagination} loading={listLoading} onPageChange={setCurrentPage} />
+      </div>
+    </div>
+  );
+}
+
+function PaginationControls({ pagination, loading, onPageChange }) {
+  if (!pagination || pagination.totalPages <= 1) return null;
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginTop: "18px", flexWrap: "wrap" }}>
+      <span style={{ color: "var(--text-muted)", fontSize: "13px", fontWeight: 600 }}>
+        Page {pagination.page} of {pagination.totalPages}
+      </span>
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page <= 1} onClick={() => onPageChange(Math.max(1, pagination.page - 1))} style={{ height: "36px", padding: "0 12px" }}>Previous</button>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page >= pagination.totalPages} onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))} style={{ height: "36px", padding: "0 12px" }}>Next</button>
       </div>
     </div>
   );

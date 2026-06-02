@@ -52,7 +52,7 @@ export default function AuditPage() {
     }
   }, [resourceType]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const resourceTypes = [...new Set(logs.map((l) => l.resourceType).filter(Boolean))];
 

@@ -33,15 +33,31 @@ export async function GET(req) {
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "accounts.view");
     if (moduleAuth.error) return moduleAuth.error;
 
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(200, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
     const { ExpenseEntry } = await getTenantModels(auth.tenantId);
-    const expenses = await ExpenseEntry.find({ tenantId: auth.tenantId })
-      .populate("accountId", "code name type subtype")
-      .populate("journalEntryId", "entryNumber date")
-      .sort({ date: -1, createdAt: -1 })
-      .limit(200)
-      .lean();
+    const query = { tenantId: auth.tenantId };
+    const [expenses, total] = await Promise.all([
+      ExpenseEntry.find(query)
+        .populate("accountId", "code name type subtype")
+        .populate("journalEntryId", "entryNumber date")
+        .sort({ date: -1, createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      ExpenseEntry.countDocuments(query),
+    ]);
 
-    return Response.json({ expenses });
+    return Response.json({
+      expenses,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (error) {
     return jsonError("Unable to load expenses", error, 500);
   }

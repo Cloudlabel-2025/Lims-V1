@@ -21,19 +21,33 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
-    const query = {};
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
+    const query = { tenantId: auth.tenantId };
     if (status && status !== "all") query.status = status;
 
     const { BillingRecord } = await getTenantModels(auth.tenantId);
-    const billingRecords = await BillingRecord.find(query)
-      .populate("patient", "name patientId age gender phone")
-      .populate("referralDoctor", "name doctorId commission pendingPayout")
-      .select("billId patient items priority status notes referralDoctor subtotalAmount discountAmount taxAmount totalAmount commissionAmount paymentBreakdown billingStatus invoiceStatus invoiceJournalEntryId paymentReceiptIds commissionJournalEntryId createdBy createdAt updatedAt")
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .lean();
+    const [billingRecords, total] = await Promise.all([
+      BillingRecord.find(query)
+        .populate("patient", "name patientId age gender phone")
+        .populate("referralDoctor", "name doctorId commission pendingPayout")
+        .select("billId patient items priority status notes referralDoctor subtotalAmount discountAmount taxAmount totalAmount commissionAmount paymentBreakdown billingStatus invoiceStatus invoiceJournalEntryId paymentReceiptIds commissionJournalEntryId createdBy createdAt updatedAt")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      BillingRecord.countDocuments(query),
+    ]);
 
-    return Response.json({ billingRecords });
+    return Response.json({
+      billingRecords,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (error) {
     return jsonError("Unable to load billing records", error, 500);
   }

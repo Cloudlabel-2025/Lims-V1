@@ -85,6 +85,10 @@ export default function AccountsPage() {
   const [corporateForm, setCorporateForm] = useState(emptyCorporate);
   const [journalForm, setJournalForm] = useState(emptyJournal);
   const [ledgerFilter, setLedgerFilter] = useState({ sourceType: "all", accountId: "" });
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [expensePage, setExpensePage] = useState(1);
+  const [ledgerPagination, setLedgerPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [expensePagination, setExpensePagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
 
   const accountById = useMemo(() => new Map(accounts.map((account) => [account._id, account])), [accounts]);
   const totals = useMemo(
@@ -116,22 +120,26 @@ export default function AccountsPage() {
       const ledgerQuery = new URLSearchParams();
       if (ledgerFilter.sourceType !== "all") ledgerQuery.set("sourceType", ledgerFilter.sourceType);
       if (ledgerFilter.accountId) ledgerQuery.set("accountId", ledgerFilter.accountId);
+      ledgerQuery.set("page", ledgerPage);
+      ledgerQuery.set("limit", "50");
       const [accountData, ledgerData, expenseData, corporateData] = await Promise.all([
         fetchJson("/api/accounting/accounts"),
         fetchJson(`/api/accounting/journal-entries?${ledgerQuery.toString()}`),
-        fetchJson("/api/expenses"),
+        fetchJson(`/api/expenses?page=${expensePage}&limit=50`),
         fetchJson("/api/corporate-accounts"),
       ]);
       setAccounts(accountData.accounts || []);
       setJournalEntries(ledgerData.journalEntries || []);
       setExpenses(expenseData.expenses || []);
       setCorporates(corporateData.corporateAccounts || []);
+      setLedgerPagination(ledgerData.pagination || { page: ledgerPage, limit: 50, total: ledgerData.journalEntries?.length || 0, totalPages: 1 });
+      setExpensePagination(expenseData.pagination || { page: expensePage, limit: 50, total: expenseData.expenses?.length || 0, totalPages: 1 });
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [ledgerFilter.accountId, ledgerFilter.sourceType]);
+  }, [expensePage, ledgerFilter.accountId, ledgerFilter.sourceType, ledgerPage]);
 
   useEffect(() => {
     loadAccountsData();
@@ -278,18 +286,19 @@ export default function AccountsPage() {
             <div style={{ display: "grid", gap: 14 }}>
               <div className="form-card" style={{ padding: 14, borderRadius: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                 <Field label="Source">
-                  <select className="lims-input" value={ledgerFilter.sourceType} onChange={(event) => setLedgerFilter({ ...ledgerFilter, sourceType: event.target.value })} style={inputStyle()}>
+                  <select className="lims-input" value={ledgerFilter.sourceType} onChange={(event) => { setLedgerFilter({ ...ledgerFilter, sourceType: event.target.value }); setLedgerPage(1); }} style={inputStyle()}>
                     {["all", "billing", "payment", "refund", "commission", "expense", "manual"].map((source) => <option key={source} value={source}>{source}</option>)}
                   </select>
                 </Field>
                 <Field label="Account">
-                  <select className="lims-input" value={ledgerFilter.accountId} onChange={(event) => setLedgerFilter({ ...ledgerFilter, accountId: event.target.value })} style={inputStyle()}>
+                  <select className="lims-input" value={ledgerFilter.accountId} onChange={(event) => { setLedgerFilter({ ...ledgerFilter, accountId: event.target.value }); setLedgerPage(1); }} style={inputStyle()}>
                     <option value="">All accounts</option>
                     {accounts.map((account) => <option key={account._id} value={account._id}>{account.code} - {account.name}</option>)}
                   </select>
                 </Field>
               </div>
               <LedgerTable entries={journalEntries} />
+              <PaginationControls pagination={ledgerPagination} loading={loading} onPageChange={setLedgerPage} />
             </div>
           )}
 
@@ -362,7 +371,12 @@ export default function AccountsPage() {
                   <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Posting..." : "Record Expense"}</button>
                 </form>
               }
-              right={<ExpensesTable expenses={expenses} />}
+              right={
+                <div style={{ display: "grid", gap: 12 }}>
+                  <ExpensesTable expenses={expenses} />
+                  <PaginationControls pagination={expensePagination} loading={loading} onPageChange={setExpensePage} />
+                </div>
+              }
             />
           )}
 
@@ -560,6 +574,22 @@ function Table({ headings, rows, empty, minWidth = 700 }) {
           {rows.length === 0 && <tr><td colSpan={headings.length} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>{empty}</td></tr>}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function PaginationControls({ pagination, loading, onPageChange }) {
+  if (!pagination || pagination.totalPages <= 1) return null;
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <span style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 700 }}>
+        Page {pagination.page} of {pagination.totalPages}
+      </span>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page <= 1} onClick={() => onPageChange(Math.max(1, pagination.page - 1))} style={{ height: 34, padding: "0 12px" }}>Previous</button>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page >= pagination.totalPages} onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))} style={{ height: 34, padding: "0 12px" }}>Next</button>
+      </div>
     </div>
   );
 }

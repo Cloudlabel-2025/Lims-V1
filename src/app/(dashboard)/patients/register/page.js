@@ -58,7 +58,7 @@ export default function PatientRegistration() {
           cachedJsonFetch("/api/tests/packages", { ttl: 30_000 })
         ]);
 
-        if (docRes.response.ok) setDoctors(docRes.data);
+        if (docRes.response.ok) setDoctors(Array.isArray(docRes.data) ? docRes.data : docRes.data.doctors || []);
         if (testRes.response.ok) setAvailableTests(testRes.data.tests || []);
         if (pkgRes.response.ok) setAvailablePackages(pkgRes.data.packages || []);
       } catch (err) {
@@ -149,7 +149,8 @@ export default function PatientRegistration() {
       try {
         const barRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.barcode)}`, { credentials: "include" });
         const barData = await barRes.json();
-        if (Array.isArray(barData) && barData.some(p => p.barcode === payload.barcode)) {
+        const barcodeMatches = Array.isArray(barData) ? barData : barData.patients || [];
+        if (barcodeMatches.some(p => p.barcode === payload.barcode)) {
           setErrors(prev => ({ ...prev, barcode: "This barcode is already assigned to another patient" }));
           setStatus({ type: "danger", message: "Duplicate barcode detected." });
           setLoading(false);
@@ -161,7 +162,8 @@ export default function PatientRegistration() {
     try {
       const dupRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.phone)}`, { credentials: "include" });
       const dupData = await dupRes.json();
-      const matchingPatient = Array.isArray(dupData) ? dupData.find(p => p.phone === payload.phone) : null;
+      const duplicateMatches = Array.isArray(dupData) ? dupData : dupData.patients || [];
+      const matchingPatient = duplicateMatches.find(p => p.phone === payload.phone);
       if (matchingPatient) {
         setPendingPayload(payload);
         setDuplicatePatient(matchingPatient);
@@ -393,7 +395,7 @@ export default function PatientRegistration() {
               <button className="btn-modal-confirm" onClick={async () => {
                 setDuplicateWarning(false); setLoading(true);
                 try {
-                  const res = await fetch("/api/patient", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...pendingPayload, force: true }) });
+                  const res = await fetch("/api/patient", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ ...pendingPayload, force: true }) });
                   const data = await res.json();
                   if (res.ok) { clearCachedApi("/api/patient"); clearCachedApi("/api/billing"); clearCachedApi("/api/samples?status=all"); clearCachedApi("/api/dashboard/stats"); setStatus({ type: "success", message: `Registered: ${data.patientId}` }); setForm(getEmptyForm()); setHasRefDoctor(false); }
                   else setStatus({ type: "danger", message: data.error || "Failed" });

@@ -76,7 +76,7 @@ export default function QualityPage() {
     }
   }, [typeFilter, resultFilter]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   async function submitLog(e) {
     e.preventDefault();

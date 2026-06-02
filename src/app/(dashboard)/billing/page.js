@@ -26,6 +26,8 @@ export default function BillingPage() {
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
   const [billingRecords, setBillingRecords] = useState([]);
+  const [billingPage, setBillingPage] = useState(1);
+  const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const [patient, setPatient] = useState("");
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState("routine");
@@ -78,7 +80,7 @@ export default function BillingPage() {
         cachedJsonFetch("/api/patient", { ttl: 15_000 }),
         cachedJsonFetch("/api/tests/definitions?status=active", { ttl: 30_000 }),
         cachedJsonFetch("/api/tests/packages", { ttl: 30_000 }),
-        cachedJsonFetch("/api/billing", { ttl: 10_000 }),
+        cachedJsonFetch(`/api/billing?page=${billingPage}&limit=50`, { ttl: 10_000 }),
       ]);
 
       const patientData = patientRes.data;
@@ -91,16 +93,17 @@ export default function BillingPage() {
       if (!pkgRes.response.ok) throw new Error(pkgData.error || "Unable to load packages");
       if (!billingRes.response.ok) throw new Error(billingData.error || "Unable to load billing records");
 
-      setPatients(Array.isArray(patientData) ? patientData : []);
+      setPatients(Array.isArray(patientData) ? patientData : patientData.patients || []);
       setTests(testData.tests || []);
       setPackages(pkgData.packages || []);
       setBillingRecords(billingData.billingRecords || []);
+      setBillingPagination(billingData.pagination || { page: billingPage, limit: 50, total: billingData.billingRecords?.length || 0, totalPages: 1 });
     } catch (err) {
       setError("Failed to load data. Please refresh.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [billingPage]);
 
   useEffect(() => {
     loadData();
@@ -121,9 +124,11 @@ export default function BillingPage() {
       if (!response.ok) throw new Error(data.error || "Unable to create bill");
 
       clearCachedApi("/api/billing");
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
       clearCachedApi("/api/dashboard/stats");
       clearCachedApi("/api/samples?status=all");
       setBillingRecords((current) => [data.billingRecord, ...current]);
+      setBillingPage(1);
       setPatient("");
       setSelectedTests([]);
       setPriority("routine");
@@ -140,8 +145,12 @@ export default function BillingPage() {
 
   const openCloseModal = async (billingRecord) => {
     setSelectedBillingRecord(billingRecord);
-    const netPayable = billingRecord.totalAmount || 0;
-    setPayment({ cash: netPayable, card: 0, online: 0 });
+    const paidAmount =
+      Number(billingRecord.paymentBreakdown?.cash || 0) +
+      Number(billingRecord.paymentBreakdown?.card || 0) +
+      Number(billingRecord.paymentBreakdown?.online || 0);
+    const remainingAmount = Math.max(0, Number(billingRecord.totalAmount || 0) - paidAmount);
+    setPayment({ cash: remainingAmount, card: 0, online: 0 });
     
     // Initialize results structure
     const initialResults = {};
@@ -171,8 +180,17 @@ export default function BillingPage() {
 
   const handleCloseBill = async () => {
     const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
-    if (totalPaid < selectedBillingRecord.totalAmount) {
-      if (!confirm(`Total paid (₹${totalPaid}) is less than bill amount (₹${selectedBillingRecord.totalAmount}). Proceed?`)) return;
+    const alreadyPaid =
+      Number(selectedBillingRecord.paymentBreakdown?.cash || 0) +
+      Number(selectedBillingRecord.paymentBreakdown?.card || 0) +
+      Number(selectedBillingRecord.paymentBreakdown?.online || 0);
+    const remainingAmount = Math.max(0, Number(selectedBillingRecord.totalAmount || 0) - alreadyPaid);
+    if (totalPaid > remainingAmount) {
+      alert(`Payment cannot exceed remaining balance (Rs ${remainingAmount}).`);
+      return;
+    }
+    if (totalPaid < remainingAmount) {
+      if (!confirm(`Total paid (Rs ${totalPaid}) is less than remaining balance (Rs ${remainingAmount}). Proceed?`)) return;
     }
 
     setClosing(true);
@@ -191,6 +209,7 @@ export default function BillingPage() {
       if (!res.ok) throw new Error(data.error || "Failed to close bill");
 
       clearCachedApi("/api/billing");
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
       clearCachedApi("/api/dashboard/stats");
       clearCachedApi("/api/samples?status=all");
       clearCachedApi("/api/reports");
@@ -405,7 +424,14 @@ export default function BillingPage() {
         />
       )}
 
-      {activeTab === "history" && <BillingHistoryTab billingRecords={billingRecords} />}
+      {activeTab === "history" && (
+        <BillingHistoryTab
+          billingRecords={billingRecords}
+          pagination={billingPagination}
+          loading={loading}
+          onPageChange={setBillingPage}
+        />
+      )}
       {showCloseModal && selectedBillingRecord && (
         <SettlementModal
           billingRecord={selectedBillingRecord}

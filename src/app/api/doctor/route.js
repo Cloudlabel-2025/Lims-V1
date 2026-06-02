@@ -2,6 +2,14 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
+function clean(value) {
+  return String(value || "").trim();
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // ── POST: Create a new Doctor ──
 export async function POST(req) {
   try {
@@ -118,18 +126,21 @@ export async function GET(req) {
     const { Doctor } = await getTenantModels(tenantId);
 
     const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search");
-    const status = searchParams.get("status");
+    const search = clean(searchParams.get("search"));
+    const status = clean(searchParams.get("status"));
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
 
     let query = {};
 
     if (search) {
+      const regex = new RegExp(escapeRegex(search), "i");
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } },
-        { doctorId: { $regex: search, $options: "i" } },
-        { mciNumber: { $regex: search, $options: "i" } },
-        { speciality: { $regex: search, $options: "i" } },
+        { name: regex },
+        { phone: regex },
+        { doctorId: regex },
+        { mciNumber: regex },
+        { speciality: regex },
       ];
     }
 
@@ -137,11 +148,24 @@ export async function GET(req) {
       query.status = status;
     }
 
-    const doctors = await Doctor.find(query)
-      .sort({ createdAt: -1 })
-      .limit(100);
+    const [doctors, total] = await Promise.all([
+      Doctor.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Doctor.countDocuments(query),
+    ]);
 
-    return Response.json(doctors);
+    return Response.json({
+      doctors,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
 
   } catch (err) {
     console.error("GET /api/doctor error:", err);

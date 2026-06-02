@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
     }
   }, [range]);
 
-  useEffect(() => { load(range); }, [range]);
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div style={{ width: "100%", paddingBottom: 40 }}>

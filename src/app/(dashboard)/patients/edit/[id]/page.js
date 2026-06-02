@@ -48,7 +48,7 @@ export default function EditPatient({ params }) {
     async function fetchDoctors() {
       try {
         const { response: res, data } = await cachedJsonFetch("/api/doctor", { ttl: 15_000 });
-        if (res.ok) setDoctors(data);
+        if (res.ok) setDoctors(Array.isArray(data) ? data : data.doctors || []);
       } catch (err) {
         console.error("Failed to fetch doctors:", err);
       }

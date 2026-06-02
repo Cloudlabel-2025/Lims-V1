@@ -23,8 +23,13 @@ function SettlementModal({
   if (!billingRecord) return null;
 
   const netPayable = billingRecord.totalAmount || 0;
+  const alreadyPaid =
+    Number(billingRecord.paymentBreakdown?.cash || 0) +
+    Number(billingRecord.paymentBreakdown?.card || 0) +
+    Number(billingRecord.paymentBreakdown?.online || 0);
+  const remainingDue = Math.max(0, netPayable - alreadyPaid);
   const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
-  const remaining = netPayable - totalPaid;
+  const remaining = remainingDue - totalPaid;
 
   return (
     <div className="modal-overlay">
@@ -49,6 +54,18 @@ function SettlementModal({
                   <span style={{ fontWeight: "700", color: "var(--text-primary)" }}>Total Amount</span>
                   <span style={{ fontWeight: "800", fontSize: "20px", color: "var(--brand-action, var(--primary))" }}>₹{netPayable}</span>
                 </div>
+                {alreadyPaid > 0 && (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", color: "var(--text-secondary)" }}>
+                      <span>Already Paid</span>
+                      <strong>Rs {alreadyPaid}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", color: "var(--text-primary)" }}>
+                      <span>Remaining Due</span>
+                      <strong>Rs {remainingDue}</strong>
+                    </div>
+                  </>
+                )}
                 {billingRecord.commissionAmount > 0 && (
                   <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--primary-200)", fontSize: "11px", color: "var(--brand-action, var(--primary))" }}>
                     Includes internal commission of <strong>₹{billingRecord.commissionAmount}</strong> for Dr. {billingRecord.referralDoctor?.name}
