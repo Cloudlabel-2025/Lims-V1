@@ -275,7 +275,7 @@ export default function DeveloperCreateLabPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || "Unable to create lab");
+        throw new Error(data.details || data.error || "Unable to create lab");
       }
 
       clearCachedApi("/api/developer/labs");

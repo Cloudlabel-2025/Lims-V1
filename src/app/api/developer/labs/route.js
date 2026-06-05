@@ -30,6 +30,8 @@ import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { buildTenantUrl } from "@/app/lib/subdomain";
 
+export const maxDuration = 60;
+
 const tenantIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const connectionOptions = {
   bufferCommands: false,
@@ -122,11 +124,39 @@ async function initializeTenantCollections(tenantConnection) {
     getRoleModel(tenantConnection).init(),
     getTestCategoryModel(tenantConnection).init(),
     getTestDefinitionModel(tenantConnection).init(),
-    getTestReportModel(tenantConnection).init(),    getUserModel(tenantConnection).init(),
+    getTestReportModel(tenantConnection).init(),
+    getUserModel(tenantConnection).init(),
     getPatientModel(tenantConnection).init(),
     getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
-    getSampleModel(tenantConnection).init(),  ]);
+    getSampleModel(tenantConnection).init(),
+  ]);
+}
+
+function getCreateLabFailureDetails(error, stage) {
+  const message = error?.message || "Unknown error";
+
+  if (error?.code === 11000) {
+    return `${stage}: duplicate database value. Try a different lab name and tenant ID.`;
+  }
+
+  if (message.includes("querySrv") || error?.code === "ETIMEOUT") {
+    return `${stage}: MongoDB DNS lookup timed out. Check Atlas network access and the MongoDB URI.`;
+  }
+
+  if (message.includes("No active role templates")) {
+    return `${stage}: RBAC role templates are missing. Run the RBAC seed against the production database.`;
+  }
+
+  if (message.includes("Default admin role template")) {
+    return `${stage}: default admin role template is missing. Run the RBAC seed against the production database.`;
+  }
+
+  if (message.includes("Tenant database connection string")) {
+    return `${stage}: tenant database connection string is not configured. Check MONGODB_URI or TENANT_MONGODB_URI.`;
+  }
+
+  return `${stage}: ${message}`;
 }
 
 async function createTenantRoles(masterConnection, tenantConnection) {
@@ -220,11 +250,14 @@ export async function GET(req) {
 export async function POST(req) {
   let tenantConnection = null;
   let createdLab = null;
+  let stage = "starting";
 
   try {
+    stage = "checking developer session";
     const auth = requireDeveloperSession(req);
     if (auth.error) return auth.error;
 
+    stage = "reading request";
     const body = await req.json();
     const name = cleanString(body.name);
     const tenantId = normalizeTenantId(body.tenantId);
@@ -265,8 +298,10 @@ export async function POST(req) {
       );
     }
 
+    stage = "connecting master database";
     const masterConnection = await connectMasterDB();
     const Lab = getLabModel(masterConnection);
+    stage = "checking existing tenant";
     const existingLab = await Lab.findOne({ tenantId });
 
     if (existingLab) {
@@ -287,6 +322,7 @@ export async function POST(req) {
       );
     }
 
+    stage = "checking existing tenant database";
     const existingDbName = await Lab.findOne({ dbName });
 
     if (existingDbName) {
@@ -296,6 +332,7 @@ export async function POST(req) {
       );
     }
 
+    stage = "creating lab metadata";
     const lab = await Lab.create({
       name,
       tenantId,
@@ -319,6 +356,7 @@ export async function POST(req) {
     createdLab = lab;
     clearTenantConfigCache(tenantId);
 
+    stage = "connecting tenant database";
     tenantConnection = await mongoose
       .createConnection(dbConnectionString, {
         ...connectionOptions,
@@ -326,10 +364,14 @@ export async function POST(req) {
       })
       .asPromise();
 
+    stage = "initializing tenant collections";
     await initializeTenantCollections(tenantConnection);
+    stage = "creating tenant roles";
     const adminRole = await createTenantRoles(masterConnection, tenantConnection);
+    stage = "seeding chart of accounts";
     await seedSystemChartOfAccounts(tenantConnection, tenantId);
 
+    stage = "creating lab admin";
     const User = getUserModel(tenantConnection);
     const passwordHash = await hashPassword(adminPassword);
     const adminFirstName = cleanString(body.adminFirstName) || "Lab";
@@ -359,12 +401,14 @@ export async function POST(req) {
       });
     }
 
+    stage = "saving lab admin access";
     lab.adminAccess = {
       email: adminUser.email,
       updatedAt: new Date(),
     };
     await lab.save();
 
+    stage = "warming tenant cache";
     warmTenantConfigCache({
       id: String(lab._id),
       labId: lab.labId,
@@ -405,11 +449,24 @@ export async function POST(req) {
       { status: 201 }
     );
   } catch (error) {
+    console.error("POST /api/developer/labs error:", {
+      stage,
+      name: error?.name,
+      code: error?.code,
+      message: error?.message,
+    });
+
     if (createdLab) {
       await createdLab.deleteOne().catch(() => {});
     }
 
-    return nextJsonError("Unable to create lab", error, 500);
+    return NextResponse.json(
+      {
+        error: "Unable to create lab",
+        details: getCreateLabFailureDetails(error, stage),
+      },
+      { status: 500 }
+    );
   } finally {
     if (tenantConnection) {
       await tenantConnection.close();
