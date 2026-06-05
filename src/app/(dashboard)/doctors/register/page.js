@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { clearCachedApi } from "@/app/lib/use-current-user";
+import { validateDoctorPayload } from "@/app/utils/doctor-validation";
 
 const EMPTY_FORM = {
   name: "",
@@ -47,32 +48,7 @@ export default function DoctorRegistration() {
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    if (!form.name.trim()) newErrors.name = "Doctor name is required";
-    else if (form.name.trim().length < 2) newErrors.name = "Name must be at least 2 characters";
-    else if (form.name.length > 50) newErrors.name = "Name must not exceed 50 characters";
-    else if (!/^[A-Za-z .]+$/.test(form.name)) newErrors.name = "Only letters, spaces, and periods allowed";
-    if (!form.speciality.trim()) newErrors.speciality = "speciality is required";
-    if (!form.degree.trim()) newErrors.degree = "Qualification/Degree is required";
-    else if (!/^[A-Za-z .,]+$/.test(form.degree)) newErrors.degree = "Only letters, spaces, and periods/commas allowed";
-    if (!form.experience.toString().trim()) newErrors.experience = "Experience is required";
-    else if (isNaN(form.experience) || parseInt(form.experience) < 0) newErrors.experience = "Invalid experience";
-    
-
-    if (!form.phone.trim()) newErrors.phone = "Mobile number is required";
-    else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      newErrors.email = "Invalid email format";
-    }
-
-    if (!form.clinicName.trim()) newErrors.clinicName = "Clinic/Hospital name is required";
-    if (!form.location.trim()) newErrors.location = "Location is required";
-    if (!form.clinicAddress.trim()) newErrors.clinicAddress = "Practice address is required";
-
-    if (form.commission !== undefined && form.commission !== "" && (isNaN(form.commission) || parseFloat(form.commission) < 0 || parseFloat(form.commission) > 40)) {
-      newErrors.commission = "Commission must be between 0 and 40%";
-    }
-    return newErrors;
+    return validateDoctorPayload(form);
   };
 
   const submitDoctor = async (payload) => {
@@ -120,8 +96,9 @@ export default function DoctorRegistration() {
     }
 
     setErrors({});
-    const payload = { ...form };
-    if (!payload.email) delete payload.email;
+    const payload = Object.fromEntries(
+      Object.entries(form).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
+    );
 
     await submitDoctor(payload);
   };
@@ -173,7 +150,7 @@ export default function DoctorRegistration() {
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
               </div>
               <div className="col-md-4">
-                <label className="lims-label">MCI Registration Number</label>
+                <label className="lims-label">MCI Registration Number <span className="required">*</span></label>
                 <input 
                   name="mciNumber" 
                   className={`lims-input ${errors.mciNumber ? 'invalid' : ''}`} 
@@ -258,7 +235,7 @@ export default function DoctorRegistration() {
                 {errors.phone && <div className="lims-error-text">{errors.phone}</div>}
               </div>
               <div className="col-md-4">
-                <label className="lims-label">Email Address</label>
+                <label className="lims-label">Email Address <span className="required">*</span></label>
                 <input 
                   name="email" 
                   type="email"

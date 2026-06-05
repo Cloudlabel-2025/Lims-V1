@@ -31,17 +31,35 @@ const doctorSchema = new mongoose.Schema({
     },
     degree: {
         type: String,
-        required: true
+        required: true,
+        validate: {
+            validator: (v) => {
+                const value = String(v || "");
+                return !/https?:\/\/|www\.|\.[a-z]{2,}\b/i.test(value) && /^[A-Za-z .,/&()-]+$/.test(value);
+            },
+            message: "Only qualification text is allowed"
+        }
     },
     experience: {
         type: Number,
         required: true,
-        min: 0
+        min: [0, "Experience must be at least 0 years"],
+        max: [80, "Experience cannot exceed 80 years"],
+        validate: {
+            validator: Number.isInteger,
+            message: "Experience must be a whole number"
+        }
     },
     mciNumber: {
         type: String,
+        required: true,
         unique: true,
-        sparse: true
+        uppercase: true,
+        trim: true,
+        validate: {
+            validator: (v) => /^[A-Za-z]{2,}[A-Za-z\s/-]*\d[\d/-]*(?:[\s/-]*\d+)*$/.test(String(v || "")),
+            message: "Enter a valid MCI registration number"
+        }
     },
     phone: {
         type: String,
@@ -54,11 +72,12 @@ const doctorSchema = new mongoose.Schema({
     },
     email: {
         type: String,
+        required: true,
         lowercase: true,
         trim: true,
         validate: {
             validator: function (v) {
-                return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+                return /^[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(v);
             },
             message: "Invalid email format"
         }

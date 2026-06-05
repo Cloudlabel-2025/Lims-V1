@@ -1,6 +1,7 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { formatDoctorValidationErrors, validateDoctorPayload } from "@/app/utils/doctor-validation";
 
 function clean(value) {
   return String(value || "").trim();
@@ -22,47 +23,24 @@ export async function POST(req) {
 
     const { Doctor } = await getTenantModels(tenantId);
     const body = await req.json();
+    const payload = Object.fromEntries(
+      Object.entries(body).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
+    );
 
-    const { name, speciality, degree, experience, mciNumber, phone, clinicName, location, clinicAddress } = body;
+    const validationErrors = validateDoctorPayload(payload);
 
-    // Required field validation
-    const missing = [];
-    if (!name)           missing.push("Doctor Name");
-    if (!speciality)      missing.push("speciality");
-    if (!degree)         missing.push("Degree/Qualification");
-    if (experience === undefined || experience === "") missing.push("Experience");
-
-    if (!phone)          missing.push("Mobile Number");
-    if (!clinicName)     missing.push("Clinic/Hospital Name");
-    if (!location)       missing.push("Practice Location");
-    if (!clinicAddress)  missing.push("Practice Address");
-
-    if (missing.length > 0) {
+    if (Object.keys(validationErrors).length > 0) {
       return Response.json(
-        { error: `Missing required fields: ${missing.join(", ")}` },
+        { error: formatDoctorValidationErrors(validationErrors) },
         { status: 400 }
       );
     }
 
-    // Phone format check
-    if (!/^\d{10}$/.test(String(phone))) {
-      return Response.json(
-        { error: "Mobile Number must be exactly 10 digits" },
-        { status: 400 }
-      );
-    }
-
-    // Commission range check
-    if (body.commission !== undefined && (isNaN(body.commission) || Number(body.commission) < 0 || Number(body.commission) > 100)) {
-      return Response.json(
-        { error: "Commission must be between 0 and 100" },
-        { status: 400 }
-      );
-    }
+    const { mciNumber, phone } = payload;
 
     // --- Duplicate Checks ---
     const [existingMCI, existingPhone] = await Promise.all([
-      mciNumber ? Doctor.findOne({ mciNumber: String(mciNumber) }) : null,
+      Doctor.findOne({ mciNumber: String(mciNumber) }),
       Doctor.findOne({ phone: String(phone) })
     ]);
 
@@ -82,10 +60,12 @@ export async function POST(req) {
     }
 
     const doctor = await Doctor.create({
-      ...body,
+      ...payload,
+      email: String(payload.email).toLowerCase(),
       phone: String(phone),
-      experience: Number(experience),
-      commission: body.commission !== undefined ? Number(body.commission) : 0,
+      mciNumber: String(mciNumber).toUpperCase(),
+      experience: Number(payload.experience),
+      commission: payload.commission !== undefined ? Number(payload.commission) : 0,
     });
 
     return Response.json(doctor, { status: 201 });

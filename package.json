@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test tests/**/*.test.mjs",
+    "test:all": "npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "bootstrap": "^5.3.8",

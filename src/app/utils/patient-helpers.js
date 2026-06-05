@@ -37,6 +37,7 @@ export const calculateAge = (dobString) => {
 export const getInitials = (name) => {
   if (!name) return "?";
   const parts = name.trim().split(/\s+/);
+  if (!parts[0]) return "?";
   return parts.length >= 2
     ? (parts[0][0] + parts[1][0]).toUpperCase()
     : parts[0][0].toUpperCase();

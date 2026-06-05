@@ -1,6 +1,7 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireTenantSession } from "@/app/lib/auth";
+import { formatDoctorValidationErrors, validateDoctorPayload } from "@/app/utils/doctor-validation";
 
 // ── GET: Fetch single doctor by ID ──
 export async function GET(req, { params }) {
@@ -38,17 +39,24 @@ export async function PUT(req, { params }) {
     delete body._id;
     delete body.createdAt;
 
-    if (body.phone && !/^\d{10}$/.test(String(body.phone))) {
-      return Response.json({ error: "Mobile Number must be exactly 10 digits" }, { status: 400 });
+    const payload = Object.fromEntries(
+      Object.entries(body).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
+    );
+
+    const validationErrors = validateDoctorPayload(payload);
+    if (Object.keys(validationErrors).length > 0) {
+      return Response.json({ error: formatDoctorValidationErrors(validationErrors) }, { status: 400 });
     }
 
-    if (body.commission !== undefined && (isNaN(body.commission) || Number(body.commission) < 0 || Number(body.commission) > 100)) {
-      return Response.json({ error: "Commission must be between 0 and 100" }, { status: 400 });
-    }
+    payload.email = String(payload.email).toLowerCase();
+    payload.phone = String(payload.phone);
+    payload.mciNumber = String(payload.mciNumber).toUpperCase();
+    payload.experience = Number(payload.experience);
+    payload.commission = payload.commission !== undefined ? Number(payload.commission) : 0;
 
     const doctor = await Doctor.findByIdAndUpdate(
       id,
-      { $set: body },
+      { $set: payload },
       { returnDocument: "after", runValidators: true }
     );
 
