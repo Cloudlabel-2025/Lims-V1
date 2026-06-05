@@ -1,5 +1,25 @@
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 const trustedTenantHeader = "x-lims-tenant-id";
+const platformSubdomains = new Set([
+  "admin",
+  "api",
+  "app",
+  "assets",
+  "auth",
+  "cdn",
+  "dashboard",
+  "developer",
+  "docs",
+  "help",
+  "internal",
+  "login",
+  "mail",
+  "onboarding",
+  "root",
+  "static",
+  "support",
+  "www",
+]);
 
 export function getTenantIdFromRequest(req) {
   const middlewareTenantId = req.headers.get(trustedTenantHeader);
@@ -26,7 +46,12 @@ export function getTenantIdFromHost(host) {
   }
 
   if (rootDomain && hostname.endsWith(`.${rootDomain}`)) {
-    return normalizeTenantId(hostname.slice(0, -(rootDomain.length + 1)));
+    const tenantCandidate = normalizeTenantId(hostname.slice(0, -(rootDomain.length + 1)));
+    if (platformSubdomains.has(tenantCandidate)) {
+      throw new Error("Tenant not found for platform host.");
+    }
+
+    return tenantCandidate;
   }
 
   if (hostname.endsWith(".localhost")) {
@@ -44,7 +69,8 @@ export function getTenantIdFromHostname(hostname) {
   if (localHosts.has(normalizedHostname)) return null;
   if (rootDomain && normalizedHostname === rootDomain) return null;
   if (rootDomain && normalizedHostname.endsWith(`.${rootDomain}`)) {
-    return normalizeTenantId(normalizedHostname.slice(0, -(rootDomain.length + 1)));
+    const tenantCandidate = normalizeTenantId(normalizedHostname.slice(0, -(rootDomain.length + 1)));
+    return platformSubdomains.has(tenantCandidate) ? null : tenantCandidate;
   }
   if (normalizedHostname === "localhost") return null;
   if (normalizedHostname.endsWith(".localhost")) {
