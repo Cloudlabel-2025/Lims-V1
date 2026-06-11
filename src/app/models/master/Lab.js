@@ -104,85 +104,6 @@ export const LabSchema = new mongoose.Schema(
         type: Date,
       },
     },
-    customDomains: {
-      type: [
-        {
-          domainName: {
-            type: String,
-            required: true,
-            trim: true,
-            lowercase: true,
-          },
-          verificationStatus: {
-            type: String,
-            enum: ["pending", "verifying", "verified", "failed"],
-            default: "pending",
-          },
-          sslStatus: {
-            type: String,
-            enum: ["pending", "active", "expired", "failed"],
-            default: "pending",
-          },
-          verificationToken: {
-            type: String,
-            required: true,
-            select: false,
-          },
-          dnsRecords: {
-            type: [
-              {
-                type: {
-                  type: String,
-                  enum: ["A", "CNAME", "TXT", "NS"],
-                  required: true,
-                },
-                host: {
-                  type: String,
-                  required: true,
-                  trim: true,
-                },
-                value: {
-                  type: String,
-                  required: true,
-                  trim: true,
-                },
-                purpose: {
-                  type: String,
-                  enum: ["ownership", "routing", "optional"],
-                  default: "routing",
-                },
-              },
-            ],
-            default: [],
-          },
-          dnsHealthStatus: {
-            type: String,
-            enum: ["pending", "healthy", "failed"],
-            default: "pending",
-          },
-          trafficCount: {
-            type: Number,
-            default: 0,
-            min: 0,
-          },
-          lastVerifiedAt: {
-            type: Date,
-          },
-          certificateExpiresAt: {
-            type: Date,
-          },
-          createdAt: {
-            type: Date,
-            default: Date.now,
-          },
-          updatedAt: {
-            type: Date,
-            default: Date.now,
-          },
-        },
-      ],
-      default: [],
-    },
     branding: {
       logo: {
         url: {
@@ -268,7 +189,6 @@ export const LabSchema = new mongoose.Schema(
 
 LabSchema.index({ name: 1 });
 LabSchema.index({ tenantId: 1, status: 1 });
-LabSchema.index({ "customDomains.domainName": 1 }, { sparse: true });
 
 LabSchema.pre("save", async function generateLabId() {
   if (this.labId) return;

@@ -1,16 +1,9 @@
 import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import { requireAnySession } from "@/app/lib/auth";
-import { getHostnameFromHeaders, normalizeRootDomain } from "@/app/lib/tenant-resolver";
-
-function isPlatformHost(hostname) {
-  const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
-  return (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)))
-  );
-}
+import { clearSessionCookie } from "@/app/lib/session";
+import { connectTenantDB } from "@/app/lib/tenant-db";
+import { getRoleModel } from "@/app/models/tenant/Role";
 
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
@@ -26,9 +19,6 @@ export async function GET(req) {
     debugRequestLog("start", {
       host: req.headers.get("host"),
     });
-    const hostname = getHostnameFromHeaders(req.headers);
-    const onCustomDomain = !isPlatformHost(hostname);
-
     const auth = requireAnySession(req);
     if (auth.error) {
       debugRequestLog("unauthenticated");
@@ -36,11 +26,27 @@ export async function GET(req) {
     }
 
     const { session } = auth;
+    if (session.userType === "tenant") {
+      const tenantConnection = await connectTenantDB(session.tenantId);
+      const Role = getRoleModel(tenantConnection);
+      const roleExists = session.roleId
+        ? await Role.exists({ _id: session.roleId, status: "active" })
+        : null;
 
-    if (onCustomDomain && session.userType !== "tenant") {
-      debugRequestLog("developer-session-rejected-on-custom-domain", { hostname });
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      if (!roleExists) {
+        debugRequestLog("role-missing", {
+          tenantId: session.tenantId,
+          roleId: session.roleId,
+        });
+        const response = NextResponse.json(
+          { error: "Your assigned role is no longer available. Contact your lab admin." },
+          { status: 403 }
+        );
+        clearSessionCookie(response);
+        return response;
+      }
     }
+
     debugRequestLog("ok", {
       userType: session.userType,
       tenantId: session.tenantId,
@@ -51,7 +57,10 @@ export async function GET(req) {
         id: session.userId,
         userType: session.userType,
         tenantId: session.tenantId || null,
+        userCode: session.userCode || null,
+        name: session.name || null,
         email: session.email,
+        roleId: session.roleId || null,
         roleName: session.roleName || (session.isSystemOwner ? "System Owner" : null),
         permissions: session.permissions || [],
       },

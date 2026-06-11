@@ -15,10 +15,6 @@ function getLocalLabLoginUrl(tenantId) {
 }
 
 function getActiveLabLoginUrl(lab) {
-  const verifiedCustomDomain = lab.customDomains?.find(
-    (domain) => domain.status === "active" || domain.verificationStatus === "verified"
-  )?.domainName;
-  if (verifiedCustomDomain) return `https://${verifiedCustomDomain}/`;
   return getLocalLabLoginUrl(lab.tenantId) || lab.loginUrl;
 }
 
@@ -109,7 +105,6 @@ export default function DeveloperLabsListPage() {
   const visibleLabs = labs.filter((lab) => lab.status !== "archived");
   const activeLabs = visibleLabs.filter((lab) => lab.status === "active").length;
   const suspendedLabs = visibleLabs.filter((lab) => lab.status === "suspended").length;
-  const mappedDomains = visibleLabs.reduce((total, lab) => total + (lab.customDomains?.length || 0), 0);
 
   return (
     <section className="developer-page">
@@ -145,10 +140,6 @@ export default function DeveloperLabsListPage() {
         <article className="developer-summary-card">
           <span>Suspended Labs</span>
           <strong>{suspendedLabs}</strong>
-        </article>
-        <article className="developer-summary-card">
-          <span>Custom Domains</span>
-          <strong>{mappedDomains}</strong>
         </article>
       </div>
 
@@ -193,36 +184,15 @@ export default function DeveloperLabsListPage() {
                     {getLocalLabLoginUrl(lab.tenantId) && (
                       <small className="developer-production-url">Production: {lab.loginUrl}</small>
                     )}
-                    {lab.customDomains?.some((domain) => domain.verificationStatus === "verified") && (
-                      <small className="developer-production-url">Platform fallback: {lab.loginUrl}</small>
-                    )}
                     <div className="developer-lab-domain-summary">
-                      <span>Default Domain</span>
+                      <span>Default Subdomain</span>
                       <button
                         type="button"
-                        onClick={() => copyValue(lab.defaultDomain || lab.loginUrl, "Unable to copy default domain.")}
+                        onClick={() => copyValue(lab.defaultDomain || lab.loginUrl, "Unable to copy default subdomain.")}
                       >
                         {lab.defaultDomain || lab.loginUrl}
                         {Icons.copy}
                       </button>
-                      <span>Custom Domains</span>
-                      {lab.customDomains?.length ? (
-                        <div className="developer-domain-pill-list">
-                          {lab.customDomains.map((domain) => (
-                            <button
-                              key={domain.domainName}
-                              type="button"
-                              title={`DNS ${domain.dnsStatus || domain.dnsHealthStatus}, status ${domain.status || domain.verificationStatus}, SSL ${domain.sslStatus}`}
-                              onClick={() => window.open(`https://${domain.domainName}/`, "_blank", "noopener,noreferrer")}
-                            >
-                              <strong>{domain.domainName}</strong>
-                              <small>{domain.status || domain.verificationStatus}</small>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <small>No custom domains mapped</small>
-                      )}
                     </div>
                     <div className="developer-credential-grid">
                       <div>
@@ -249,10 +219,6 @@ export default function DeveloperLabsListPage() {
                     <Link href={`/developer/labs/${encodeURIComponent(lab.id)}/edit`}>
                       {Icons.edit}
                       Edit
-                    </Link>
-                    <Link href={`/developer/labs/${encodeURIComponent(lab.tenantId)}/domains`}>
-                      {Icons.logo}
-                      Domains
                     </Link>
                     <button
                       type="button"

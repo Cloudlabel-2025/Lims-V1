@@ -89,6 +89,37 @@ async function main() {
     console.log(`Developer owner created: ${email}`);
   }
 
+  const extraEmails = (process.env.CMS_DEVELOPER_EMAILS || "balajibm@gmail.com,vidhya@gmail.com")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((item) => item !== email);
+
+  for (const extraEmail of extraEmails) {
+    const singletonKey = `cms-${extraEmail}`;
+    const existingDeveloper = await DeveloperUser.findOne({ email: extraEmail }).select("+singletonKey +passwordHash");
+    const [firstName] = extraEmail.split("@");
+    const userData = {
+      singletonKey,
+      firstName: firstName.slice(0, 60) || "CMS",
+      lastName: "Developer",
+      email: extraEmail,
+      passwordHash,
+      isSystemOwner: true,
+      status: "active",
+      passwordResetTokenHash: undefined,
+      passwordResetExpiresAt: undefined,
+    };
+
+    if (existingDeveloper) {
+      await DeveloperUser.updateOne({ _id: existingDeveloper._id }, { $set: userData });
+      console.log(`CMS developer updated: ${extraEmail}`);
+    } else {
+      await DeveloperUser.create(userData);
+      console.log(`CMS developer created: ${extraEmail}`);
+    }
+  }
+
   await connection.close();
 }
 

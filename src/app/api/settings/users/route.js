@@ -113,3 +113,120 @@ export async function POST(req) {
     return jsonError("Unable to create user", error, 500);
   }
 }
+
+export async function PATCH(req) {
+  try {
+    const auth = requireTenantSession(req, "users.manage");
+    if (auth.error) return auth.error;
+
+    const body = await req.json();
+    const userId = clean(body.id || body.userId);
+    const email = clean(body.email).toLowerCase();
+    const roleId = clean(body.roleId);
+    const status = clean(body.status) || "active";
+    const password = String(body.password || "");
+    const confirmPassword = String(body.confirmPassword || body.passwordConfirm || "");
+    const { firstName, lastName } = splitName(body.name);
+
+    if (!userId) {
+      return Response.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    if (!firstName || firstName.length < 2) {
+      return Response.json({ error: "User name is required" }, { status: 400 });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Response.json({ error: "Valid login email is required" }, { status: 400 });
+    }
+
+    if (!["active", "inactive", "locked"].includes(status)) {
+      return Response.json({ error: "Invalid user status" }, { status: 400 });
+    }
+
+    if (password) {
+      const passwordPolicy = validatePasswordPolicy(password);
+      if (!passwordPolicy.valid) {
+        return Response.json({ error: passwordPolicy.errors.join("; ") }, { status: 400 });
+      }
+
+      if (!confirmPassword || password !== confirmPassword) {
+        return Response.json({ error: "Password and confirm password must match" }, { status: 400 });
+      }
+    }
+
+    const { Role, User } = await getTenantModels(auth.tenantId);
+    const [role, user] = await Promise.all([
+      Role.findOne({ _id: roleId, status: "active" }),
+      User.findById(userId).select("+passwordHash"),
+    ]);
+
+    if (!role) {
+      return Response.json({ error: "Selected role not found" }, { status: 404 });
+    }
+
+    if (!user) {
+      return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
+    user.set({
+      firstName,
+      lastName,
+      email,
+      role: role._id,
+      status,
+    });
+
+    if (password) {
+      user.passwordHash = await hashPassword(password);
+      user.passwordResetTokenHash = undefined;
+      user.passwordResetExpiresAt = undefined;
+    }
+
+    await user.save();
+    await user.populate("role", "name");
+
+    const { AuditLog } = await getTenantModels(auth.tenantId);
+    AuditLog.create({ action: "users.update", userId: auth.session.userId, tenantId: auth.tenantId, resourceType: "User", resourceId: user._id, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});
+
+    return Response.json({ user: serializeUser(user) });
+  } catch (error) {
+    if (error.code === 11000) {
+      return Response.json({ error: "A user with this login email already exists" }, { status: 409 });
+    }
+
+    return jsonError("Unable to update user", error, 500);
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    const auth = requireTenantSession(req, "users.manage");
+    if (auth.error) return auth.error;
+
+    const { searchParams } = new URL(req.url);
+    const userId = clean(searchParams.get("id"));
+
+    if (!userId) {
+      return Response.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    if (userId === auth.session.userId) {
+      return Response.json({ error: "You cannot delete your own user account" }, { status: 400 });
+    }
+
+    const { User } = await getTenantModels(auth.tenantId);
+    const deleted = await User.findByIdAndDelete(userId);
+
+    if (!deleted) {
+      return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const { AuditLog } = await getTenantModels(auth.tenantId);
+    AuditLog.create({ action: "users.delete", userId: auth.session.userId, tenantId: auth.tenantId, resourceType: "User", resourceId: deleted._id, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});
+
+    return Response.json({ ok: true, deletedUserId: userId });
+  } catch (error) {
+    return jsonError("Unable to delete user", error, 500);
+  }
+}

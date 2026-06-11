@@ -27,14 +27,18 @@ export function getAllowedNavItems(user, theme) {
 }
 
 export function getFirstAllowedHref(user, theme) {
-  return getAllowedNavItems(user, theme)[0]?.href || (hasAnyPermission(user, ["settings.manage", "users.manage"]) ? "/settings" : "");
+  return getAllowedNavItems(user, theme)[0]?.href || (hasPermission(user, "users.manage") ? "/users" : hasPermission(user, "settings.manage") ? "/settings" : "");
 }
 
 export function getRequiredPermissionsForPath(pathname) {
   if (!pathname) return [];
 
+  if (pathname === "/users" || pathname.startsWith("/users/")) {
+    return ["users.manage"];
+  }
+
   if (pathname === "/settings" || pathname.startsWith("/settings/")) {
-    return ["settings.manage", "users.manage"];
+    return ["settings.manage"];
   }
 
   if (pathname.startsWith("/patients/register")) return ["patients.register"];
@@ -58,7 +62,7 @@ export function canAccessPath(user, theme, pathname) {
   const requiredPermissions = getRequiredPermissionsForPath(pathname);
   if (requiredPermissions.length === 0) return true;
 
-  if (pathname !== "/settings" && !pathname.startsWith("/settings/")) {
+  if (pathname !== "/settings" && !pathname.startsWith("/settings/") && pathname !== "/users" && !pathname.startsWith("/users/")) {
     const enabledModules = getEnabledModules(theme);
     const moduleMatch = availableLabModules.find(
       (module) => module.href !== "/dashboard" && (pathname === module.href || pathname.startsWith(`${module.href}/`))

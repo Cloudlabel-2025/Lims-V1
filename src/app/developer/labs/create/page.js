@@ -6,7 +6,6 @@ import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
-import { isValidCustomDomain, normalizeCustomDomain } from "@/app/lib/domain-utils";
 
 const defaultForm = {
   name: "",
@@ -27,8 +26,6 @@ const defaultForm = {
   accentColor: "#f59e0b",
   enabledModules: defaultLabModules,
   loginHighlights: [],
-  domainMappingMode: "without",
-  customDomains: [],
 };
 
 const wizardSteps = [
@@ -36,7 +33,6 @@ const wizardSteps = [
   { id: "modules", title: "Lab Modules" },
   { id: "highlights", title: "Login Page Highlights" },
   { id: "branding", title: "Login Branding" },
-  { id: "domains", title: "Domain Mapping" },
 ];
 
 const loginHighlightOptions = [
@@ -130,36 +126,6 @@ function validateLogoFile(file) {
   return "";
 }
 
-function getCustomDomainError(value, selectedDomains) {
-  const domainName = normalizeCustomDomain(value);
-  if (!domainName) return "";
-
-  if (!isValidCustomDomain(domainName)) {
-    return "Enter a valid purchased domain, for example customerlab.com or portal.customerlab.com.";
-  }
-
-  if (selectedDomains.includes(domainName)) {
-    return "This domain is already added to this lab.";
-  }
-
-  if (selectedDomains.length >= 5) {
-    return "You can add up to 5 custom domains during lab creation.";
-  }
-
-  return "";
-}
-
-function getDomainSetupWarning(form, customDomainError) {
-  if (form.domainMappingMode !== "with") return "";
-  if (form.customDomains.length === 0) {
-    return "Add at least one purchased domain or choose without domain mapping.";
-  }
-  if (customDomainError) {
-    return "Fix or clear the domain field before creating the lab.";
-  }
-  return "";
-}
-
 function getLocalLabLoginUrl(tenantId) {
   if (typeof window === "undefined") return "";
 
@@ -170,26 +136,8 @@ function getLocalLabLoginUrl(tenantId) {
   return `${protocol}//${host}/`;
 }
 
-function getDefaultDomainPreview(tenantId) {
-  if (!tenantId) return "Set tenant ID first";
-  if (typeof window === "undefined") return `${tenantId}.your-root-domain`;
-
-  const { hostname, port } = window.location;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return port ? `${tenantId}.localhost:${port}` : `${tenantId}.localhost`;
-  }
-
-  const labels = hostname.split(".");
-  const rootHost = labels.length > 2 ? labels.slice(1).join(".") : hostname;
-  return `${tenantId}.${rootHost}`;
-}
-
 function getActiveLabLoginUrl(lab, loginUrl) {
   return getLocalLabLoginUrl(lab.tenantId) || loginUrl;
-}
-
-function getCustomDomainUrl(domainName) {
-  return domainName ? `https://${domainName}/` : "";
 }
 
 export default function DeveloperCreateLabPage() {
@@ -199,8 +147,6 @@ export default function DeveloperCreateLabPage() {
   const [createdLab, setCreatedLab] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
   const [customHighlight, setCustomHighlight] = useState("");
-  const [customDomain, setCustomDomain] = useState("");
-  const [domainInputTouched, setDomainInputTouched] = useState(false);
   const [copiedLoginUrl, setCopiedLoginUrl] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [logoInputTouched, setLogoInputTouched] = useState(false);
@@ -209,16 +155,7 @@ export default function DeveloperCreateLabPage() {
 
   const formErrors = useMemo(() => validateDeveloperForm(form), [form]);
   const logoFileError = useMemo(() => validateLogoFile(logoFile), [logoFile]);
-  const customDomainError = useMemo(
-    () => getCustomDomainError(customDomain, form.customDomains),
-    [customDomain, form.customDomains]
-  );
-  const domainSetupWarning = useMemo(
-    () => getDomainSetupWarning(form, customDomainError),
-    [form, customDomainError]
-  );
-  const canSubmit =
-    Object.keys(formErrors).length === 0 && !logoFileError && !domainSetupWarning;
+  const canSubmit = Object.keys(formErrors).length === 0 && !logoFileError;
   const stepId = wizardSteps[activeStep].id;
   const activeStepWarning = getStepWarning(activeStep);
 
@@ -294,46 +231,6 @@ export default function DeveloperCreateLabPage() {
     setCustomHighlight("");
   }
 
-  function addCustomDomain() {
-    const domainName = normalizeCustomDomain(customDomain);
-    setDomainInputTouched(true);
-    if (!domainName) return;
-
-    if (customDomainError) {
-      return;
-    }
-
-    setError("");
-    setForm((current) => {
-      if (current.customDomains.includes(domainName)) return current;
-
-      return {
-        ...current,
-        customDomains: [...current.customDomains, domainName].slice(0, 5),
-      };
-    });
-    setCustomDomain("");
-    setDomainInputTouched(false);
-  }
-
-  function removeCustomDomain(domainName) {
-    setForm((current) => ({
-      ...current,
-      customDomains: current.customDomains.filter((item) => item !== domainName),
-    }));
-  }
-
-  function setDomainMappingMode(mode) {
-    setError("");
-    setDomainInputTouched(false);
-    setCustomDomain("");
-    setForm((current) => ({
-      ...current,
-      domainMappingMode: mode,
-      customDomains: mode === "with" ? current.customDomains : [],
-    }));
-  }
-
   function getStepErrors(index = activeStep) {
     const id = wizardSteps[index].id;
     if (id === "details") {
@@ -354,10 +251,6 @@ export default function DeveloperCreateLabPage() {
       return logoFileError ? ["logoFile"] : [];
     }
 
-    if (id === "domains") {
-      return domainSetupWarning ? ["customDomain"] : [];
-    }
-
     return [];
   }
 
@@ -370,10 +263,6 @@ export default function DeveloperCreateLabPage() {
 
     if (id === "branding" && logoFileError) {
       return "Fix the logo upload issue before continuing.";
-    }
-
-    if (id === "domains" && domainSetupWarning) {
-      return domainSetupWarning;
     }
 
     return "";
@@ -401,7 +290,6 @@ export default function DeveloperCreateLabPage() {
 
   function nextStep() {
     if (getStepErrors().length > 0) {
-      if (stepId === "domains") setDomainInputTouched(true);
       if (stepId === "branding") setLogoInputTouched(true);
       setError("");
       return;
@@ -473,9 +361,6 @@ export default function DeveloperCreateLabPage() {
     if (!canSubmit) {
       const firstInvalidStep = wizardSteps.findIndex((_, index) => getStepErrors(index).length > 0);
       if (firstInvalidStep >= 0) setActiveStep(firstInvalidStep);
-      if (firstInvalidStep >= 0 && wizardSteps[firstInvalidStep].id === "domains") {
-        setDomainInputTouched(true);
-      }
       if (firstInvalidStep >= 0 && wizardSteps[firstInvalidStep].id === "branding") {
         setLogoInputTouched(true);
       }
@@ -493,7 +378,6 @@ export default function DeveloperCreateLabPage() {
         credentials: "include",
         body: JSON.stringify({
           ...form,
-          customDomains: form.domainMappingMode === "with" ? form.customDomains : [],
           logo,
         }),
       });
@@ -508,8 +392,6 @@ export default function DeveloperCreateLabPage() {
       setForm(defaultForm);
       setLogoFile(null);
       setCustomHighlight("");
-      setCustomDomain("");
-      setDomainInputTouched(false);
       setLogoInputTouched(false);
       setActiveStep(0);
     } catch (err) {
@@ -554,53 +436,6 @@ export default function DeveloperCreateLabPage() {
             {getLocalLabLoginUrl(createdLab.lab.tenantId) && (
               <small className="developer-production-url">Production: {createdLab.loginUrl}</small>
             )}
-            {createdLab.lab.customDomains?.length > 0 && (
-              <div className="developer-created-domain-map">
-                <strong>Domain mapping details</strong>
-                <span>After DNS verification, users can open the lab directly from the purchased domain, without tenant ID or lims.store.</span>
-                {createdLab.lab.customDomains.map((domain) => {
-                  const domainName = domain.domainName || domain.domain;
-                  return (
-                  <article key={domainName}>
-                    <h3>{domainName}</h3>
-                    <button
-                      type="button"
-                      className="developer-url-link"
-                      onClick={() => openLoginUrl(getCustomDomainUrl(domainName))}
-                    >
-                      {getCustomDomainUrl(domainName)}
-                    </button>
-                    <div className="developer-domain-records">
-                      {(domain.dnsRecords || []).map((record) => (
-                        <button
-                          type="button"
-                          key={`${domainName}-${record.type}-${record.host}`}
-                          onClick={() => copyLoginUrl(record.value)}
-                          title="Copy DNS value"
-                        >
-                          <strong>{record.type}</strong>
-                          <span>{record.host}</span>
-                          <code>{record.value}</code>
-                        </button>
-                      ))}
-                    </div>
-                  </article>
-                );
-                })}
-              </div>
-            )}
-            {createdLab.lab.domainSetupErrors?.length > 0 && (
-              <div className="developer-created-domain-map">
-                <strong>Domain setup needs attention</strong>
-                <span>The lab was created. Open the Domains page from the lab list to retry mapping.</span>
-                {createdLab.lab.domainSetupErrors.map((item) => (
-                  <article key={item.domainName}>
-                    <h3>{item.domainName}</h3>
-                    <small>{item.error}</small>
-                  </article>
-                ))}
-              </div>
-            )}
           </div>
           <div className="developer-link-actions">
             <button type="button" onClick={() => openLoginUrl(activeCreatedUrl)}>
@@ -609,9 +444,6 @@ export default function DeveloperCreateLabPage() {
             <button type="button" onClick={() => copyLoginUrl(activeCreatedUrl)}>
               {copiedLoginUrl === activeCreatedUrl ? "Copied" : "Copy Link"}
             </button>
-            <Link href={`/developer/labs/${encodeURIComponent(createdLab.lab.tenantId)}/domains`}>
-              Domains
-            </Link>
           </div>
         </section>
       )}
@@ -907,80 +739,6 @@ export default function DeveloperCreateLabPage() {
               </label>
             </div>
           </>
-        )}
-
-        {stepId === "domains" && (
-          <div className="developer-module-picker flush">
-            <div className="developer-panel-header">
-              <h2>Domain Mapping</h2>
-              <p>Choose whether to map a purchased custom domain now or create the lab with only its default tenant URL.</p>
-            </div>
-            {activeStepWarning && <div className="developer-step-warning">{activeStepWarning}</div>}
-            <div className="developer-domain-default">
-              <span>Default domain</span>
-              <strong>{getDefaultDomainPreview(form.tenantId)}</strong>
-            </div>
-
-            <div className="developer-domain-mode-grid">
-              <button
-                type="button"
-                className={form.domainMappingMode === "without" ? "active" : ""}
-                onClick={() => setDomainMappingMode("without")}
-              >
-                <strong>Without Domain Mapping</strong>
-                <span>Create the lab now. Map custom domains later from the lab list.</span>
-              </button>
-              <button
-                type="button"
-                className={form.domainMappingMode === "with" ? "active" : ""}
-                onClick={() => setDomainMappingMode("with")}
-              >
-                <strong>With Domain Mapping</strong>
-                <span>Add a purchased domain now and start Vercel domain setup during creation.</span>
-              </button>
-            </div>
-
-            {form.domainMappingMode === "with" ? (
-              <>
-                <div className="developer-highlight-custom">
-                  <input
-                    className={customDomainError && domainInputTouched ? "invalid" : ""}
-                    value={customDomain}
-                    onChange={(e) => {
-                      setDomainInputTouched(true);
-                      setCustomDomain(e.target.value);
-                    }}
-                    onBlur={() => setDomainInputTouched(true)}
-                    placeholder="uthiram.in or portal.uthiram.in"
-                    maxLength={253}
-                  />
-                  <button type="button" onClick={addCustomDomain}>
-                    Add
-                  </button>
-                </div>
-                {customDomainError && domainInputTouched && (
-                  <em className="developer-field-error">{customDomainError}</em>
-                )}
-                {form.customDomains.length > 0 ? (
-                  <div className="developer-highlight-selected">
-                    {form.customDomains.map((domainName) => (
-                      <button
-                        key={domainName}
-                        type="button"
-                        onClick={() => removeCustomDomain(domainName)}
-                      >
-                        {domainName}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="developer-empty">Add the purchased domain before creating the lab with domain mapping.</p>
-                )}
-              </>
-            ) : (
-              <p className="developer-empty">No custom domain will be mapped now. The lab list will still show a Domains action for adding one later.</p>
-            )}
-          </div>
         )}
 
         <div className="developer-wizard-actions">

@@ -31,17 +31,13 @@ test("root and platform subdomains are not treated as tenants", () => {
   }
 });
 
-test("tenant URLs preserve custom domain hosts", () => {
+test("tenant URLs use the configured root domain", () => {
   const previousRootDomain = process.env.ROOT_DOMAIN;
   const previousProtocol = process.env.PUBLIC_APP_PROTOCOL;
   process.env.ROOT_DOMAIN = "lims.store";
   process.env.PUBLIC_APP_PROTOCOL = "https";
 
   try {
-    assert.equal(
-      buildTenantUrl("blood", "https://portal.bloodlab.com/api/auth/login", "/dashboard"),
-      "https://portal.bloodlab.com/dashboard"
-    );
     assert.equal(
       buildTenantUrl("blood", "https://app.lims.store/api/auth/login", "/dashboard"),
       "https://blood.lims.store/dashboard"
@@ -60,20 +56,20 @@ test("tenant URLs preserve custom domain hosts", () => {
   }
 });
 
-test("hostname extraction prefers forwarded custom domain headers", () => {
+test("hostname extraction prefers forwarded host headers", () => {
   const headers = new Headers({
     host: "lims.store",
-    "x-vercel-forwarded-host": "uthiram.in",
+    "x-forwarded-host": "blood.lims.store",
   });
 
-  assert.equal(getHostnameFromHeaders(headers), "uthiram.in");
+  assert.equal(getHostnameFromHeaders(headers), "blood.lims.store");
 });
 
 test("hostname extraction parses standard forwarded header", () => {
   const headers = new Headers({
     host: "lims.store",
-    forwarded: "for=203.0.113.10;proto=https;host=uthiram.in",
+    forwarded: "for=203.0.113.10;proto=https;host=blood.lims.store",
   });
 
-  assert.equal(getHostnameFromHeaders(headers), "uthiram.in");
+  assert.equal(getHostnameFromHeaders(headers), "blood.lims.store");
 });

@@ -91,7 +91,6 @@ export function normalizeRootDomain(value) {
 export function getHostnameFromHeaders(headers) {
   const forwardedHost =
     headers.get("x-forwarded-host") ||
-    headers.get("x-vercel-forwarded-host") ||
     "";
   const forwarded = headers.get("forwarded") || "";
   const forwardedHostMatch = forwarded.match(/(?:^|;\s*)host=([^;]+)/i);
@@ -105,7 +104,7 @@ export function getHostnameFromHeaders(headers) {
 }
 
 export function getTrustedHost(req) {
-  const forwardedHost = req.headers.get("x-forwarded-host") || req.headers.get("x-vercel-forwarded-host");
+  const forwardedHost = req.headers.get("x-forwarded-host");
   const host = req.headers.get("host");
   const allowedHosts = String(process.env.ALLOWED_HOSTS || "")
     .split(",")

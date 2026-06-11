@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getTenantConfig, getTenantConfigByDomain } from "@/app/lib/tenant-cache";
+import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
-import { normalizeCustomDomain } from "@/app/lib/domain-utils";
 
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
@@ -40,17 +39,14 @@ export async function GET(req) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const domain = normalizeCustomDomain(searchParams.get("domain"));
     const subdomain = searchParams.get("subdomain")
       ? normalizeTenantId(searchParams.get("subdomain"))
       : "";
-    debugRequestLog("start", { subdomain, domain });
-    const tenant = domain
-      ? await getTenantConfigByDomain(domain)
-      : await getTenantConfig(subdomain);
+    debugRequestLog("start", { subdomain });
+    const tenant = await getTenantConfig(subdomain);
 
     if (!tenant) {
-      debugRequestLog("not-found", { subdomain, domain });
+      debugRequestLog("not-found", { subdomain });
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
@@ -70,7 +66,6 @@ export async function GET(req) {
 
     debugRequestLog("ok", {
       subdomain: tenant.tenantId,
-      domain,
       status: tenant.status,
     });
     return NextResponse.json({ tenant: publicTenantPayload(tenant) });

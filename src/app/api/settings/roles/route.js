@@ -164,7 +164,7 @@ export async function DELETE(req) {
       return Response.json({ error: "Role ID is required" }, { status: 400 });
     }
 
-    const { Role, User } = await getTenantModels(auth.tenantId);
+    const { Role } = await getTenantModels(auth.tenantId);
     const role = await Role.findOne({ _id: roleId, isSystemRole: { $ne: true } });
 
     if (!role) {
@@ -173,18 +173,6 @@ export async function DELETE(req) {
 
     if (role.isDefaultAdmin) {
       return Response.json({ error: "Default admin role cannot be deleted" }, { status: 403 });
-    }
-
-    const assignedUsers = await User.countDocuments({
-      role: role._id,
-      status: { $in: ["active", "inactive", "invited", "locked"] },
-    });
-
-    if (assignedUsers > 0) {
-      return Response.json(
-        { error: "Role is assigned to lab users. Reassign those users before deleting it." },
-        { status: 409 }
-      );
     }
 
     await role.deleteOne();

@@ -9,14 +9,6 @@ const skippedPrefixes = [
   "/api/internal",
 ];
 
-const tenantLookupCache = globalThis.limsTenantLookupCache || new Map();
-globalThis.limsTenantLookupCache = tenantLookupCache;
-
-function getTenantLookupCacheTtlMs() {
-  const ttl = Number(process.env.TENANT_PROXY_CACHE_TTL_MS || process.env.TENANT_CACHE_TTL_MS || 30_000);
-  return Number.isFinite(ttl) && ttl > 0 ? ttl : 30_000;
-}
-
 function getLookupSecret() {
   if (process.env.TENANT_LOOKUP_SECRET) return process.env.TENANT_LOOKUP_SECRET;
   if (process.env.NODE_ENV !== "production") return "dev-tenant-lookup-secret";
@@ -61,61 +53,12 @@ function blockedResponse(message, status) {
   });
 }
 
-function getCachedTenantLookup(cacheKey) {
-  const cached = tenantLookupCache.get(cacheKey);
-  if (!cached) return null;
-
-  if (cached.expiresAt <= Date.now()) {
-    tenantLookupCache.delete(cacheKey);
-    return null;
-  }
-
-  return cached;
-}
-
-function setCachedTenantLookup(cacheKey, status, tenantId = "") {
-  tenantLookupCache.set(cacheKey, {
-    status,
-    tenantId,
-    expiresAt: Date.now() + getTenantLookupCacheTtlMs(),
-  });
-}
-
 function isPlatformHost(hostname) {
   const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
   return (
     hostname === "localhost" ||
     hostname.endsWith(".localhost") ||
     (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)))
-  );
-}
-
-function isCustomDomain(hostname) {
-  return !isPlatformHost(hostname);
-}
-
-function isDeveloperPath(pathname) {
-  return (
-    pathname === "/developer" ||
-    pathname.startsWith("/developer/") ||
-    pathname === "/onboarding" ||
-    pathname.startsWith("/onboarding/")
-  );
-}
-
-function isCmsPlatformApiPath(pathname) {
-  return (
-    pathname === "/api/auth/forgot-password" ||
-    pathname === "/api/auth/reset-password"
-  );
-}
-
-function isCmsPlatformPagePath(pathname) {
-  return (
-    pathname === "/forgot-password" ||
-    pathname.startsWith("/forgot-password/") ||
-    pathname === "/reset-password" ||
-    pathname.startsWith("/reset-password/")
   );
 }
 
@@ -133,7 +76,7 @@ export async function proxy(req) {
 
   const hostname = getHostnameFromHeaders(req.headers);
 
-  if (!isCustomDomain(hostname) && isApiPath(pathname) && isPlatformApiPath(pathname)) {
+  if (isPlatformHost(hostname) && isApiPath(pathname) && isPlatformApiPath(pathname)) {
     debugRequestLog("skip-api-tenant-lookup", { pathname });
     return NextResponse.next({
       request: {
@@ -142,29 +85,9 @@ export async function proxy(req) {
     });
   }
 
-  if (isCustomDomain(hostname) && isApiPath(pathname) && isPlatformApiPath(pathname)) {
-    return blockedResponse("Not found", 404);
-  }
+  const tenantId = getTenantIdFromHostname(hostname);
 
-  if (isCustomDomain(hostname) && isDeveloperPath(pathname)) {
-    return blockedResponse("Not found", 404);
-  }
-
-  if (isCustomDomain(hostname) && isCmsPlatformPagePath(pathname)) {
-    return blockedResponse("Not found", 404);
-  }
-
-  if (isCustomDomain(hostname) && isCmsPlatformApiPath(pathname)) {
-    return blockedResponse("Not found", 404);
-  }
-
-  let tenantId = getTenantIdFromHostname(hostname);
-  const shouldLookupCustomDomain = !tenantId && hostname && !isPlatformHost(hostname);
-
-  if (!tenantId && !shouldLookupCustomDomain) {
-    if (isCustomDomain(hostname)) {
-      return blockedResponse("Lab portal not available", 404);
-    }
+  if (!tenantId) {
     debugRequestLog("no-tenant", { pathname, hostname });
     return NextResponse.next({
       request: {
@@ -178,68 +101,34 @@ export async function proxy(req) {
     return blockedResponse("Tenant lookup is not configured", 500);
   }
 
-  const lookupCacheKey = tenantId ? `subdomain:${tenantId}` : `domain:${hostname}`;
-  const cachedLookup = getCachedTenantLookup(lookupCacheKey);
-  if (cachedLookup) {
-    tenantId = tenantId || cachedLookup.tenantId;
-    debugRequestLog("tenant-lookup-cache-hit", {
-      pathname,
-      tenantId,
-      hostname,
-      status: cachedLookup.status,
-    });
+  const lookupUrl = req.nextUrl.clone();
+  lookupUrl.pathname = "/api/internal/tenant";
+  lookupUrl.search = "";
+  lookupUrl.searchParams.set("subdomain", tenantId);
 
-    if (cachedLookup.status === 404) {
-      return blockedResponse("Tenant not found", 404);
-    }
+  debugRequestLog("tenant-lookup-start", { pathname, tenantId });
+  const lookupResponse = await fetch(lookupUrl, {
+    headers: {
+      "x-tenant-secret": lookupSecret,
+    },
+    cache: "no-store",
+  });
+  debugRequestLog("tenant-lookup-finish", {
+    pathname,
+    tenantId,
+    status: lookupResponse.status,
+  });
 
-    if (cachedLookup.status === 423) {
-      return blockedResponse("Tenant is suspended", 423);
-    }
-
-    if (cachedLookup.status !== 200) {
-      return blockedResponse("Tenant is not available", cachedLookup.status || 403);
-    }
+  if (lookupResponse.status === 404) {
+    return blockedResponse("Tenant not found", 404);
   }
 
-  if (!cachedLookup) {
-    const lookupUrl = req.nextUrl.clone();
-    lookupUrl.pathname = "/api/internal/tenant";
-    lookupUrl.search = "";
-    if (tenantId) {
-      lookupUrl.searchParams.set("subdomain", tenantId);
-    } else {
-      lookupUrl.searchParams.set("domain", hostname);
-    }
+  if (lookupResponse.status === 423) {
+    return blockedResponse("Tenant is suspended", 423);
+  }
 
-    debugRequestLog("tenant-lookup-start", { pathname, tenantId, hostname });
-    const lookupResponse = await fetch(lookupUrl, {
-      headers: {
-        "x-tenant-secret": lookupSecret,
-      },
-      cache: "no-store",
-    });
-    debugRequestLog("tenant-lookup-finish", {
-      pathname,
-      tenantId,
-      hostname,
-      status: lookupResponse.status,
-    });
-    const lookupData = await lookupResponse.json().catch(() => ({}));
-    tenantId = tenantId || lookupData.tenant?.tenant_id || "";
-    setCachedTenantLookup(lookupCacheKey, lookupResponse.status, tenantId);
-
-    if (lookupResponse.status === 404) {
-      return blockedResponse("Tenant not found", 404);
-    }
-
-    if (lookupResponse.status === 423) {
-      return blockedResponse("Tenant is suspended", 423);
-    }
-
-    if (!lookupResponse.ok) {
-      return blockedResponse("Tenant is not available", lookupResponse.status || 403);
-    }
+  if (!lookupResponse.ok) {
+    return blockedResponse("Tenant is not available", lookupResponse.status || 403);
   }
 
   requestHeaders.set("x-lims-tenant-id", tenantId);

@@ -7,7 +7,6 @@ import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { hashPassword } from "@/app/lib/password";
 import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { getLabModel } from "@/app/models/master/Lab";
-import { getTenantDomainModel } from "@/app/models/master/TenantDomain";
 import { getPatientModel } from "@/app/models/tenant/Patient";
 import { getRoleTemplateModel } from "@/app/models/master/RoleTemplate";
 import { getAccountModel } from "@/app/models/tenant/Account";
@@ -30,12 +29,6 @@ import { getUserModel } from "@/app/models/tenant/User";
 import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { buildTenantUrl } from "@/app/lib/subdomain";
-import {
-  isPlatformDomain,
-  isValidCustomDomain,
-  normalizeCustomDomain,
-} from "@/app/lib/domain-utils";
-import { createTenantDomain } from "@/app/lib/domain-management";
 
 export const maxDuration = 60;
 
@@ -109,56 +102,6 @@ function normalizeCloudinaryLogo(value, fallbackAltText) {
     mimeType: cleanString(value.mimeType).slice(0, 80),
     altText: cleanString(value.altText).slice(0, 120) || fallbackAltText,
     uploadedAt: value.uploadedAt ? new Date(value.uploadedAt) : new Date(),
-  };
-}
-
-function normalizeCustomDomains(value) {
-  if (!Array.isArray(value)) return [];
-
-  const domains = [];
-  const seen = new Set();
-
-  for (const item of value) {
-    const domainName = normalizeCustomDomain(
-      typeof item === "string" ? item : item?.domainName
-    );
-    if (!domainName || seen.has(domainName)) continue;
-    seen.add(domainName);
-    domains.push(domainName);
-  }
-
-  return domains.slice(0, 5);
-}
-
-function serializeCustomDomain(domain) {
-  return {
-    id: domain._id,
-    domainName: domain.domainName,
-    verificationStatus: domain.verificationStatus,
-    sslStatus: domain.sslStatus,
-    dnsHealthStatus: domain.dnsHealthStatus,
-    dnsRecords: domain.dnsRecords || [],
-    createdAt: domain.createdAt,
-    updatedAt: domain.updatedAt,
-  };
-}
-
-function serializeTenantDomain(domain) {
-  return {
-    id: domain._id,
-    domainName: domain.domain,
-    domain: domain.domain,
-    isPrimary: domain.isPrimary,
-    status: domain.status,
-    verificationStatus: domain.status === "active" ? "verified" : domain.status,
-    sslStatus: domain.sslStatus,
-    dnsHealthStatus: domain.dnsStatus,
-    dnsStatus: domain.dnsStatus,
-    dnsVerified: domain.dnsVerified,
-    sslIssued: domain.sslIssued,
-    dnsRecords: domain.dnsRecords || [],
-    createdAt: domain.createdAt,
-    updatedAt: domain.updatedAt,
   };
 }
 
@@ -262,7 +205,6 @@ export async function GET(req) {
 
     const masterConnection = await connectMasterDB();
     const Lab = getLabModel(masterConnection);
-    const TenantDomain = getTenantDomainModel(masterConnection);
     const labs = await Lab.find({})
       .sort({ createdAt: -1 })
       .select({
@@ -276,54 +218,36 @@ export async function GET(req) {
         contactPhone: 1,
         "adminAccess.email": 1,
         branding: 1,
-        customDomains: 1,
         enabledModules: 1,
         createdAt: 1,
       });
-    const tenantDomains = await TenantDomain.find({
-      tenantId: { $in: labs.map((lab) => lab.tenantId) },
-    })
-      .sort({ isPrimary: -1, createdAt: -1 })
-      .lean();
-    const domainsByTenant = tenantDomains.reduce((groups, domain) => {
-      const list = groups.get(domain.tenantId) || [];
-      list.push(serializeTenantDomain(domain));
-      groups.set(domain.tenantId, list);
-      return groups;
-    }, new Map());
 
     return NextResponse.json({
-      labs: labs.map((lab) => {
-        const tenantDomainList = domainsByTenant.get(lab.tenantId) || [];
-        return {
-          id: lab._id,
-          labId: lab.labId,
-          name: lab.name,
-          tenantId: lab.tenantId,
-          dbName: lab.dbName,
-          status: lab.status,
-          subscriptionPlan: lab.subscriptionPlan,
-          contactEmail: lab.contactEmail,
-          contactPhone: lab.contactPhone,
-          adminEmail: lab.adminAccess?.email || "",
-          primaryColor: lab.branding?.primaryColor,
-          logoUrl: lab.branding?.logo?.url || null,
-          loginHighlights: lab.branding?.loginHighlights || [],
-          defaultDomain: (() => {
-            try {
-              return new URL(buildLabLoginUrl(req, lab.tenantId)).host;
-            } catch {
-              return "";
-            }
-          })(),
-          customDomains: tenantDomainList.length
-            ? tenantDomainList
-            : (lab.customDomains || []).map(serializeCustomDomain),
-          enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultLabModules,
-          loginUrl: buildLabLoginUrl(req, lab.tenantId),
-          createdAt: lab.createdAt,
-        };
-      }),
+      labs: labs.map((lab) => ({
+        id: lab._id,
+        labId: lab.labId,
+        name: lab.name,
+        tenantId: lab.tenantId,
+        dbName: lab.dbName,
+        status: lab.status,
+        subscriptionPlan: lab.subscriptionPlan,
+        contactEmail: lab.contactEmail,
+        contactPhone: lab.contactPhone,
+        adminEmail: lab.adminAccess?.email || "",
+        primaryColor: lab.branding?.primaryColor,
+        logoUrl: lab.branding?.logo?.url || null,
+        loginHighlights: lab.branding?.loginHighlights || [],
+        defaultDomain: (() => {
+          try {
+            return new URL(buildLabLoginUrl(req, lab.tenantId)).host;
+          } catch {
+            return "";
+          }
+        })(),
+        enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultLabModules,
+        loginUrl: buildLabLoginUrl(req, lab.tenantId),
+        createdAt: lab.createdAt,
+      })),
     });
   } catch (error) {
     return nextJsonError("Unable to load labs", error, 500);
@@ -349,7 +273,6 @@ export async function POST(req) {
     const adminPasswordConfirm = String(body.adminPasswordConfirm || body.adminConfirmPassword || "");
     const enabledModules = normalizeEnabledModules(body.enabledModules);
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
-    const customDomains = normalizeCustomDomains(body.customDomains);
     const logoAltText = cleanString(body.logoAltText).slice(0, 120) || `${name} logo`;
     const logo = normalizeCloudinaryLogo(body.logo, logoAltText);
 
@@ -382,26 +305,9 @@ export async function POST(req) {
       );
     }
 
-    for (const domainName of customDomains) {
-      if (!isValidCustomDomain(domainName)) {
-        return NextResponse.json(
-          { error: `Enter a valid custom domain: ${domainName}` },
-          { status: 400 }
-        );
-      }
-
-      if (isPlatformDomain(domainName)) {
-        return NextResponse.json(
-          { error: "Use customer-owned domains only. Platform domains are already handled by tenant ID." },
-          { status: 400 }
-        );
-      }
-    }
-
     stage = "connecting master database";
     const masterConnection = await connectMasterDB();
     const Lab = getLabModel(masterConnection);
-    const TenantDomain = getTenantDomainModel(masterConnection);
     stage = "checking existing tenant";
     const existingLab = await Lab.findOne({ tenantId }).select("tenantId status name").lean();
 
@@ -416,23 +322,6 @@ export async function POST(req) {
         { error: `Tenant ID "${tenantId}" is already in use by lab "${existingLab.name}". Choose a different tenant ID.` },
         { status: 409 }
       );
-    }
-
-    if (customDomains.length > 0) {
-      stage = "checking existing custom domains";
-      const [existingRegisteredDomain, existingEmbeddedDomain] = await Promise.all([
-        TenantDomain.findOne({ domain: { $in: customDomains } }).select("domain tenantId").lean(),
-        Lab.findOne({
-          "customDomains.domainName": { $in: customDomains },
-        }).select("name customDomains.domainName"),
-      ]);
-
-      if (existingRegisteredDomain || existingEmbeddedDomain) {
-        return NextResponse.json(
-          { error: "One of these custom domains is already connected to another lab" },
-          { status: 409 }
-        );
-      }
     }
 
     const masterUri = process.env.MASTER_MONGODB_URI || process.env.MONGODB_URI;
@@ -546,25 +435,6 @@ export async function POST(req) {
       branding: lab.branding || {},
     });
 
-    stage = "creating custom domains";
-    const createdDomains = [];
-    const domainSetupErrors = [];
-    for (const domainName of customDomains) {
-      try {
-        const result = await createTenantDomain(masterConnection, lab, domainName, auth.session.userId);
-        if (result.error) {
-          domainSetupErrors.push({ domainName, error: result.error });
-        } else if (result.domain) {
-          createdDomains.push(result.domain);
-        }
-      } catch (domainError) {
-        domainSetupErrors.push({
-          domainName,
-          error: domainError.message || "Unable to start domain mapping",
-        });
-      }
-    }
-
     return NextResponse.json(
       {
         lab: {
@@ -578,8 +448,6 @@ export async function POST(req) {
           enabledModules,
           loginHighlights,
           logoUrl: logo?.url || null,
-          customDomains: createdDomains,
-          domainSetupErrors,
           adminEmail: adminUser.email,
           adminPassword,
         },

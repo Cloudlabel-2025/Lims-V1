@@ -33,10 +33,10 @@ export const DeveloperUserSchema = new mongoose.Schema(
     },
     singletonKey: {
       type: String,
-      default: "system-owner",
       unique: true,
       immutable: true,
       select: false,
+      sparse: true,
     },
     firstName: {
       type: String,
@@ -69,7 +69,7 @@ export const DeveloperUserSchema = new mongoose.Schema(
     },
     isSystemOwner: {
       type: Boolean,
-      default: true,
+      default: false,
       immutable: true,
     },
     status: {

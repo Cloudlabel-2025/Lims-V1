@@ -34,6 +34,8 @@ export default function Topbar({ onToggleSidebar, user }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const displayName = user?.name || user?.email?.split("@")[0] || "Admin";
+  const avatarInitial = displayName.trim()[0]?.toUpperCase() || "A";
 
   const moduleSuggestions = useMemo(
     () =>
@@ -176,19 +178,25 @@ export default function Topbar({ onToggleSidebar, user }) {
               setNotificationsOpen(false);
             }}
           >
-            <span>{user?.email?.[0]?.toUpperCase() || "A"}</span>
+            <span>{avatarInitial}</span>
           </button>
           {accountOpen && (
             <div className="dash-menu-dropdown account">
               <div className="dash-account-summary">
-                <strong>{user?.name || "Admin"}</strong>
+                <strong>{displayName}</strong>
                 <small>{user?.email || "admin@lims.local"}</small>
               </div>
-              <button type="button" className="dash-dropdown-item" onClick={() => router.push("/settings")}>
+              <button type="button" className="dash-dropdown-item" onClick={() => {
+                setAccountOpen(false);
+                router.push("/profile");
+              }}>
                 <span className="dash-dropdown-icon">{Icons.user}</span>
                 <span><strong>View profile</strong><small>Account details</small></span>
               </button>
-              <button type="button" className="dash-dropdown-item" onClick={() => router.push("/settings")}>
+              <button type="button" className="dash-dropdown-item" onClick={() => {
+                setAccountOpen(false);
+                router.push("/settings");
+              }}>
                 <span className="dash-dropdown-icon">{Icons.settings}</span>
                 <span><strong>Settings</strong><small>Preferences and access</small></span>
               </button>

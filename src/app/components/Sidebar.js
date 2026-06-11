@@ -82,6 +82,17 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
               {!collapsed && <span className="dash-nav-label">Settings</span>}
               {pathname === "/settings" && <div className="dash-nav-indicator" />}
             </Link>
+            {hasAnyPermission(user, ["users.manage"]) && (
+              <Link
+                href="/users"
+                className={`dash-nav-item ${pathname === "/users" ? "active" : ""}`}
+                onClick={() => setMobileOpen && setMobileOpen(false)}
+              >
+                <span className="dash-nav-icon">{Icons.person}</span>
+                {!collapsed && <span className="dash-nav-label">User Assignment</span>}
+                {pathname === "/users" && <div className="dash-nav-indicator" />}
+              </Link>
+            )}
             {canViewAudit && (
               <Link
                 href="/audit"

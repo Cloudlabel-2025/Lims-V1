@@ -5,23 +5,13 @@ import { createSessionToken, setSessionCookie } from "@/app/lib/session";
 import { buildTenantUrl } from "@/app/lib/subdomain";
 import { connectTenantDB } from "@/app/lib/tenant-db";
 import {
-  getHostnameFromHeaders,
   getTenantIdFromRequest,
   normalizeTenantId,
-  normalizeRootDomain,
 } from "@/app/lib/tenant-resolver";
 import { verifyPassword } from "@/app/lib/password";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getUserModel } from "@/app/models/tenant/User";
-
-function isCustomDomainRequest(req) {
-  const hostname = getHostnameFromHeaders(req.headers);
-  const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
-  if (hostname === "localhost" || hostname.endsWith(".localhost")) return false;
-  if (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`))) return false;
-  return hostname.includes(".");
-}
 
 function resolveTenantId(req, bodyTenantId) {
   let requestTenantId = null;
@@ -57,9 +47,6 @@ export async function POST(req) {
     }
 
     if (userType === "developer") {
-      if (isCustomDomainRequest(req)) {
-        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-      }
       return loginDeveloper({ email, password, rememberMe: Boolean(body.rememberMe) });
     }
 
@@ -137,20 +124,30 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const [role] = await Promise.all([
-    user.role
-      ? Role.findById(user.role).select("_id name permissions").lean()
-      : Promise.resolve(null),
-    User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }),
-  ]);
+  const role = user.role
+    ? await Role.findOne({ _id: user.role, status: "active" })
+        .select("_id name permissions")
+        .lean()
+    : null;
+
+  if (!role) {
+    return NextResponse.json(
+      { error: "Your assigned role is no longer available. Contact your lab admin." },
+      { status: 403 }
+    );
+  }
+
+  await User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
 
   const permissions = role?.permissions || [];
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
   const token = createSessionToken({
     userType: "tenant",
     tenantId,
     userId: String(user._id),
     userCode: user.userId,
     email: user.email,
+    name: fullName,
     roleId: role ? String(role._id) : null,
     roleName: role?.name || null,
     permissions,

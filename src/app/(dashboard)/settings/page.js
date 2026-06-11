@@ -25,15 +25,6 @@ const PermissionMatrix = dynamic(() => import("./PermissionMatrix"), {
   ),
 });
 
-const UserManager = dynamic(() => import("./UserManager"), {
-  ssr: false,
-  loading: () => (
-    <section className="settings-panel">
-      <p className="developer-empty">Loading users...</p>
-    </section>
-  ),
-});
-
 function groupByModule(permissions) {
   return permissions.reduce((groups, permission) => {
     const moduleId = permission.module || "general";
@@ -73,20 +64,10 @@ export default function LabAdminSettingsPage() {
   const [roles, setRoles] = useState([]);
   const [savedRoles, setSavedRoles] = useState([]);
   const [newRoleName, setNewRoleName] = useState("");
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    roleId: "",
-  });
-  const [users, setUsers] = useState([]);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [roleSaving, setRoleSaving] = useState(false);
-  const [userSaving, setUserSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [roleMessage, setRoleMessage] = useState("");
-  const [userMessage, setUserMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -96,42 +77,21 @@ export default function LabAdminSettingsPage() {
         setSettingsError("");
         if (!user) return;
 
-        const canManageRoles = hasPermission(user, "settings.manage");
-        const canManageUsers = hasPermission(user, "users.manage");
-
-        const [roleResponse, userResponse] = await Promise.all([
-          canManageRoles || canManageUsers
-            ? cachedJsonFetch("/api/settings/roles", { ttl: 10_000 })
-            : Promise.resolve(null),
-          canManageUsers
-            ? cachedJsonFetch("/api/settings/users", { ttl: 10_000 })
-            : Promise.resolve(null),
-        ]);
-        const roleData = roleResponse ? roleResponse.data : { roles: [] };
-        const userData = userResponse ? userResponse.data : { users: [] };
-
-        if (roleResponse && !roleResponse.response.ok) {
-          throw new Error(roleData.error || roleData.details || "Unable to load roles");
+        if (!hasPermission(user, "settings.manage")) {
+          if (!cancelled) setRoles([]);
+          return;
         }
 
-        if (userResponse && !userResponse.response.ok) {
-          throw new Error(userData.error || userData.details || "Unable to load users");
-        }
+        const { response, data } = await cachedJsonFetch("/api/settings/roles", { ttl: 10_000 });
+        if (!response.ok) throw new Error(data.error || data.details || "Unable to load roles");
 
         if (!cancelled) {
-          const loadedRoles = roleData.roles || [];
+          const loadedRoles = data.roles || [];
           setRoles(loadedRoles);
           setSavedRoles(loadedRoles);
-          setUsers(userData.users || []);
-          setNewUser((current) => ({
-            ...current,
-            roleId: current.roleId || loadedRoles[0]?.id || "",
-          }));
         }
       } catch (err) {
-        if (!cancelled) {
-          setSettingsError(err.message);
-        }
+        if (!cancelled) setSettingsError(err.message);
       } finally {
         if (!cancelled) setLoadingSettings(false);
       }
@@ -146,7 +106,6 @@ export default function LabAdminSettingsPage() {
 
   const enabledModules = theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules;
   const canManageRoles = hasPermission(user, "settings.manage");
-  const canManageUsers = hasPermission(user, "users.manage");
   const labPermissions = useMemo(
     () =>
       rbacConfig.permissions.filter(
@@ -168,23 +127,6 @@ export default function LabAdminSettingsPage() {
   );
   const activePermissionSet = useMemo(() => new Set(activePermissions), [activePermissions]);
   const rolesDirty = !sameRoleConfiguration(roles, savedRoles);
-  const newUserErrors = useMemo(() => {
-    const errors = {};
-
-    if (newUser.password && newUser.password.length < 8) {
-      errors.password = "Password must be at least 8 characters.";
-    }
-
-    if (newUser.password && !newUser.confirmPassword) {
-      errors.confirmPassword = "Confirm password is required.";
-    } else if (newUser.password && newUser.password !== newUser.confirmPassword) {
-      errors.confirmPassword = "Password and confirm password must match.";
-    }
-
-    return errors;
-  }, [newUser.confirmPassword, newUser.password]);
-  const canCreateUser =
-    Boolean(newUser.password && newUser.confirmPassword) && Object.keys(newUserErrors).length === 0;
 
   function toggleRolePermission(permissionKey) {
     setRoles((current) =>
@@ -193,9 +135,7 @@ export default function LabAdminSettingsPage() {
           ? {
               ...role,
               permissions: role.permissions.includes("*")
-                ? labPermissions
-                    .map((permission) => permission.key)
-                    .filter((key) => key !== permissionKey)
+                ? labPermissions.map((permission) => permission.key).filter((key) => key !== permissionKey)
                 : toggleSetValue(role.permissions, permissionKey),
             }
           : role
@@ -236,7 +176,6 @@ export default function LabAdminSettingsPage() {
   async function deleteRole(role, index) {
     setRoleMessage("");
     setSettingsError("");
-
     if (!role) return;
 
     if (role.isDefaultAdmin || role.isSystemRole) {
@@ -261,10 +200,7 @@ export default function LabAdminSettingsPage() {
         credentials: "include",
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.details || "Unable to delete role");
-      }
+      if (!response.ok) throw new Error(data.error || data.details || "Unable to delete role");
 
       const nextRoles = data.roles || [];
       clearCachedApi("/api/settings/roles");
@@ -272,10 +208,6 @@ export default function LabAdminSettingsPage() {
       setRoles(nextRoles);
       setSavedRoles(nextRoles);
       setActiveRoleIndex((current) => clampRoleIndex(nextRoles, Math.max(0, current - (current >= index ? 1 : 0))));
-      setNewUser((current) => ({
-        ...current,
-        roleId: nextRoles.some((item) => item.id === current.roleId) ? current.roleId : nextRoles[0]?.id || "",
-      }));
       setRoleMessage(`Role "${role.name}" deleted.`);
     } catch (err) {
       setSettingsError(err.message);
@@ -304,62 +236,18 @@ export default function LabAdminSettingsPage() {
         }),
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.details || "Unable to save role configuration");
-      }
+      if (!response.ok) throw new Error(data.error || data.details || "Unable to save role configuration");
 
       const nextRoles = data.roles || [];
       clearCachedApi("/api/settings/roles");
       setRoles(nextRoles);
       setSavedRoles(nextRoles);
       setActiveRoleIndex(0);
-      setNewUser((current) => ({
-        ...current,
-        roleId: nextRoles.some((role) => role.id === current.roleId)
-          ? current.roleId
-          : nextRoles[0]?.id || "",
-      }));
       setRoleMessage("Role configuration saved.");
     } catch (err) {
       setSettingsError(err.message);
     } finally {
       setRoleSaving(false);
-    }
-  }
-
-  async function createUser() {
-    setUserSaving(true);
-    setUserMessage("");
-    setSettingsError("");
-
-    try {
-      const response = await fetch("/api/settings/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(newUser),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.details || "Unable to create user");
-      }
-
-      clearCachedApi("/api/settings/users");
-      setUsers((current) => [data.user, ...current]);
-      setUserMessage(`User created. Login User ID: ${data.user.userId}`);
-      setNewUser({
-        name: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-        roleId: roles[0]?.id || "",
-      });
-    } catch (err) {
-      setSettingsError(err.message);
-    } finally {
-      setUserSaving(false);
     }
   }
 
@@ -369,13 +257,12 @@ export default function LabAdminSettingsPage() {
         <div>
           <p className="module-kicker">Lab Admin</p>
           <h1>System Configuration</h1>
-          <span>{theme?.labName || "Tenant Lab"} configuration, roles, users, and permission mapping.</span>
+          <span>{theme?.labName || "Tenant Lab"} roles and permission mapping.</span>
         </div>
       </div>
 
       {settingsError && <div className="developer-alert">{settingsError}</div>}
       {roleMessage && <div className="developer-success">{roleMessage}</div>}
-      {userMessage && <div className="developer-success">{userMessage}</div>}
 
       <div className="settings-summary-grid">
         <article>
@@ -394,60 +281,39 @@ export default function LabAdminSettingsPage() {
 
       {loadingSettings ? (
         <p className="developer-empty">Loading settings...</p>
-      ) : (
+      ) : canManageRoles ? (
         <>
-          {canManageRoles && (
-            <RoleManager
-              roles={roles}
-              activeRoleIndex={activeRoleIndex}
-              setActiveRoleIndex={setActiveRoleIndex}
-              newRoleName={newRoleName}
-              setNewRoleName={setNewRoleName}
-              addRole={addRole}
-              deleteRole={deleteRole}
-              roleSaving={roleSaving}
-              rolesDirty={rolesDirty}
-              cancelRoleChanges={cancelRoleChanges}
-              saveRoleConfiguration={saveRoleConfiguration}
-            />
-          )}
+          <RoleManager
+            roles={roles}
+            activeRoleIndex={activeRoleIndex}
+            setActiveRoleIndex={setActiveRoleIndex}
+            newRoleName={newRoleName}
+            setNewRoleName={setNewRoleName}
+            addRole={addRole}
+            deleteRole={deleteRole}
+            roleSaving={roleSaving}
+            rolesDirty={rolesDirty}
+            cancelRoleChanges={cancelRoleChanges}
+            saveRoleConfiguration={saveRoleConfiguration}
+          />
 
-          {canManageRoles && (
-            <PermissionMatrix
-              activeRole={activeRole}
-              roles={roles}
-              permissionsByModule={permissionsByModule}
-              activePermissionSet={activePermissionSet}
-              toggleRolePermission={toggleRolePermission}
-              rolesDirty={rolesDirty}
-              roleSaving={roleSaving}
-              cancelRoleChanges={cancelRoleChanges}
-              saveRoleConfiguration={saveRoleConfiguration}
-            />
-          )}
-
-          {canManageUsers && (
-            <UserManager
-              newUser={newUser}
-              setNewUser={setNewUser}
-              newUserErrors={newUserErrors}
-              roles={roles}
-              createUser={createUser}
-              userSaving={userSaving}
-              rolesDirty={rolesDirty}
-              canCreateUser={canCreateUser}
-              users={users}
-            />
-          )}
-
-          {!canManageRoles && !canManageUsers && (
-            <section className="settings-panel">
-              <p className="developer-empty">Your role does not have permission to manage settings or users.</p>
-            </section>
-          )}
+          <PermissionMatrix
+            activeRole={activeRole}
+            roles={roles}
+            permissionsByModule={permissionsByModule}
+            activePermissionSet={activePermissionSet}
+            toggleRolePermission={toggleRolePermission}
+            rolesDirty={rolesDirty}
+            roleSaving={roleSaving}
+            cancelRoleChanges={cancelRoleChanges}
+            saveRoleConfiguration={saveRoleConfiguration}
+          />
         </>
+      ) : (
+        <section className="settings-panel">
+          <p className="developer-empty">Your role does not have permission to manage settings.</p>
+        </section>
       )}
-
     </section>
   );
 }

@@ -35,17 +35,6 @@ function buildTenantLoginFallback() {
   return `/?${params.toString()}`;
 }
 
-function isCustomDomainHost() {
-  if (typeof window === "undefined") return false;
-  const hostname = window.location.hostname.toLowerCase();
-  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "").toLowerCase();
-  return (
-    hostname !== "localhost" &&
-    !hostname.endsWith(".localhost") &&
-    !(rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)))
-  );
-}
-
 const shellCache = {
   key: "",
   value: null,
@@ -113,10 +102,6 @@ export default function MainLayout({ children }) {
       try {
         const data = await loadTenantShellData();
         if (!cancelled) {
-          if (isCustomDomainHost() && data.user?.userType !== "tenant") {
-            router.replace("/");
-            return;
-          }
           setUser(data.user);
           setTheme(data.theme);
         }
