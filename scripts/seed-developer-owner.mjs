@@ -95,16 +95,29 @@ async function main() {
     .filter(Boolean)
     .filter((item) => item !== email);
 
+  const defaultExtraPasswords = {
+    "balajibm@gmail.com": "Balaji@25",
+    "vidhya@gmail.com": "Vidhya@25",
+  };
+
   for (const extraEmail of extraEmails) {
     const singletonKey = `cms-${extraEmail}`;
     const existingDeveloper = await DeveloperUser.findOne({ email: extraEmail }).select("+singletonKey +passwordHash");
     const [firstName] = extraEmail.split("@");
+    const passwordEnvKey = `CMS_DEVELOPER_PASSWORD_${extraEmail.replace(/[^A-Z0-9]/gi, "_").toUpperCase()}`;
+    const extraPassword = process.env[passwordEnvKey] || defaultExtraPasswords[extraEmail] || password;
+    const extraPasswordPolicy = validatePasswordPolicy(extraPassword);
+
+    if (!extraPasswordPolicy.valid) {
+      throw new Error(`${passwordEnvKey} is invalid: ${extraPasswordPolicy.errors.join("; ")}`);
+    }
+
     const userData = {
       singletonKey,
       firstName: firstName.slice(0, 60) || "CMS",
       lastName: "Developer",
       email: extraEmail,
-      passwordHash,
+      passwordHash: await hashPassword(extraPassword),
       isSystemOwner: true,
       status: "active",
       passwordResetTokenHash: undefined,
