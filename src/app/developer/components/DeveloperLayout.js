@@ -31,6 +31,7 @@ const sections = [
     label: "System",
     items: [
       { label: "System Configuration", href: "/developer/system", icon: Icons.settings },
+      { label: "Archived Labs", href: "/developer/labs/archived", icon: Icons.trash },
     ],
   },
 ];

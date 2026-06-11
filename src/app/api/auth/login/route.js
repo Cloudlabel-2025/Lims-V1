@@ -4,11 +4,24 @@ import connectMasterDB from "@/app/lib/master-db";
 import { createSessionToken, setSessionCookie } from "@/app/lib/session";
 import { buildTenantUrl } from "@/app/lib/subdomain";
 import { connectTenantDB } from "@/app/lib/tenant-db";
-import { getTenantIdFromRequest, normalizeTenantId } from "@/app/lib/tenant-resolver";
+import {
+  getHostnameFromHeaders,
+  getTenantIdFromRequest,
+  normalizeTenantId,
+  normalizeRootDomain,
+} from "@/app/lib/tenant-resolver";
 import { verifyPassword } from "@/app/lib/password";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getUserModel } from "@/app/models/tenant/User";
+
+function isCustomDomainRequest(req) {
+  const hostname = getHostnameFromHeaders(req.headers);
+  const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) return false;
+  if (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`))) return false;
+  return hostname.includes(".");
+}
 
 function resolveTenantId(req, bodyTenantId) {
   let requestTenantId = null;
@@ -44,6 +57,9 @@ export async function POST(req) {
     }
 
     if (userType === "developer") {
+      if (isCustomDomainRequest(req)) {
+        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      }
       return loginDeveloper({ email, password, rememberMe: Boolean(body.rememberMe) });
     }
 

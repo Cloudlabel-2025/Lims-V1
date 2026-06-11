@@ -50,6 +50,7 @@ export default function LoginPage({
       : undefined;
 
   function openForgotPassword() {
+    if (lockUserType && !isTenantLogin) return;
     const params = new URLSearchParams({
       userType: isTenantLogin ? "tenant" : "developer",
     });

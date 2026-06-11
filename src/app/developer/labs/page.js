@@ -8,15 +8,17 @@ import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
 function getLocalLabLoginUrl(tenantId) {
   if (typeof window === "undefined") return "";
-
   const { hostname, port, protocol } = window.location;
   if (hostname !== "localhost" && hostname !== "127.0.0.1") return "";
-
   const host = port ? `${tenantId}.localhost:${port}` : `${tenantId}.localhost`;
   return `${protocol}//${host}/`;
 }
 
 function getActiveLabLoginUrl(lab) {
+  const verifiedCustomDomain = lab.customDomains?.find(
+    (domain) => domain.status === "active" || domain.verificationStatus === "verified"
+  )?.domainName;
+  if (verifiedCustomDomain) return `https://${verifiedCustomDomain}/`;
   return getLocalLabLoginUrl(lab.tenantId) || lab.loginUrl;
 }
 
@@ -42,11 +44,7 @@ export default function DeveloperLabsListPage() {
     async function loadLabs() {
       try {
         const { response, data } = await cachedJsonFetch("/api/developer/labs", { ttl: 15_000 });
-
-        if (!response.ok) {
-          throw new Error(data.error || "Unable to load labs");
-        }
-
+        if (!response.ok) throw new Error(data.error || "Unable to load labs");
         if (!cancelled) setLabs(data.labs || []);
       } catch (err) {
         if (!cancelled) setError(err.message);
@@ -56,15 +54,11 @@ export default function DeveloperLabsListPage() {
     }
 
     loadLabs();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   async function copyLoginUrl(loginUrl) {
     if (!loginUrl) return;
-
     await copyValue(loginUrl, "Unable to copy login link. Please copy it manually.");
     setCopiedLoginUrl(loginUrl);
     window.setTimeout(() => {
@@ -74,7 +68,6 @@ export default function DeveloperLabsListPage() {
 
   async function copyValue(value, failureMessage = "Unable to copy value. Please copy it manually.") {
     if (!value) return;
-
     try {
       await navigator.clipboard.writeText(value);
     } catch {
@@ -88,7 +81,7 @@ export default function DeveloperLabsListPage() {
 
   async function deleteLab(lab) {
     const confirmed = window.confirm(
-      `Delete ${lab.name}? This removes the lab from developer management.`
+      `Archive "${lab.name}"?\n\nThe lab will be deactivated and moved to Archived Labs. All data stays intact and can be restored at any time.`
     );
     if (!confirmed) return;
 
@@ -101,12 +94,10 @@ export default function DeveloperLabsListPage() {
         credentials: "include",
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.details || "Unable to delete lab");
-      }
+      if (!response.ok) throw new Error(data.error || data.details || "Unable to archive lab");
 
       clearCachedApi("/api/developer/labs");
+      clearCachedApi("/api/developer/labs/archived");
       setLabs((current) => current.filter((item) => item.id !== lab.id));
     } catch (err) {
       setError(err.message);
@@ -115,8 +106,10 @@ export default function DeveloperLabsListPage() {
     }
   }
 
-  const activeLabs = labs.filter((lab) => lab.status === "active").length;
-  const suspendedLabs = labs.filter((lab) => lab.status === "suspended").length;
+  const visibleLabs = labs.filter((lab) => lab.status !== "archived");
+  const activeLabs = visibleLabs.filter((lab) => lab.status === "active").length;
+  const suspendedLabs = visibleLabs.filter((lab) => lab.status === "suspended").length;
+  const mappedDomains = visibleLabs.reduce((total, lab) => total + (lab.customDomains?.length || 0), 0);
 
   return (
     <section className="developer-page">
@@ -126,10 +119,16 @@ export default function DeveloperLabsListPage() {
           <h2>Created Labs</h2>
           <span>Review tenant labs, login URLs, modules, status, and plan details.</span>
         </div>
-        <Link className="developer-primary-link" href="/developer/labs/create">
-          {Icons.plus}
-          Create Lab
-        </Link>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <Link className="developer-secondary-link" href="/developer/labs/archived">
+            {Icons.trash}
+            Archived Labs
+          </Link>
+          <Link className="developer-primary-link" href="/developer/labs/create">
+            {Icons.plus}
+            Create Lab
+          </Link>
+        </div>
       </div>
 
       {error && <div className="developer-alert">{error}</div>}
@@ -137,7 +136,7 @@ export default function DeveloperLabsListPage() {
       <div className="developer-summary-grid">
         <article className="developer-summary-card">
           <span>Total Labs</span>
-          <strong>{labs.length}</strong>
+          <strong>{visibleLabs.length}</strong>
         </article>
         <article className="developer-summary-card">
           <span>Active Labs</span>
@@ -146,6 +145,10 @@ export default function DeveloperLabsListPage() {
         <article className="developer-summary-card">
           <span>Suspended Labs</span>
           <strong>{suspendedLabs}</strong>
+        </article>
+        <article className="developer-summary-card">
+          <span>Custom Domains</span>
+          <strong>{mappedDomains}</strong>
         </article>
       </div>
 
@@ -157,7 +160,7 @@ export default function DeveloperLabsListPage() {
 
         {loading ? (
           <p className="developer-empty">Loading labs...</p>
-        ) : labs.length === 0 ? (
+        ) : visibleLabs.length === 0 ? (
           <div className="developer-empty-state">
             <strong>No labs created yet.</strong>
             <span>Create the first tenant lab to initialize its database and admin user.</span>
@@ -168,7 +171,7 @@ export default function DeveloperLabsListPage() {
           </div>
         ) : (
           <div className="developer-lab-list">
-            {labs.map((lab) => {
+            {visibleLabs.map((lab) => {
               const loginUrl = getActiveLabLoginUrl(lab);
               return (
                 <article key={lab.tenantId} className="developer-lab-card">
@@ -190,14 +193,43 @@ export default function DeveloperLabsListPage() {
                     {getLocalLabLoginUrl(lab.tenantId) && (
                       <small className="developer-production-url">Production: {lab.loginUrl}</small>
                     )}
+                    {lab.customDomains?.some((domain) => domain.verificationStatus === "verified") && (
+                      <small className="developer-production-url">Platform fallback: {lab.loginUrl}</small>
+                    )}
+                    <div className="developer-lab-domain-summary">
+                      <span>Default Domain</span>
+                      <button
+                        type="button"
+                        onClick={() => copyValue(lab.defaultDomain || lab.loginUrl, "Unable to copy default domain.")}
+                      >
+                        {lab.defaultDomain || lab.loginUrl}
+                        {Icons.copy}
+                      </button>
+                      <span>Custom Domains</span>
+                      {lab.customDomains?.length ? (
+                        <div className="developer-domain-pill-list">
+                          {lab.customDomains.map((domain) => (
+                            <button
+                              key={domain.domainName}
+                              type="button"
+                              title={`DNS ${domain.dnsStatus || domain.dnsHealthStatus}, status ${domain.status || domain.verificationStatus}, SSL ${domain.sslStatus}`}
+                              onClick={() => window.open(`https://${domain.domainName}/`, "_blank", "noopener,noreferrer")}
+                            >
+                              <strong>{domain.domainName}</strong>
+                              <small>{domain.status || domain.verificationStatus}</small>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <small>No custom domains mapped</small>
+                      )}
+                    </div>
                     <div className="developer-credential-grid">
                       <div>
                         <span>Lab Admin User ID</span>
                         <button
                           type="button"
-                          onClick={() =>
-                            copyValue(lab.adminEmail, "Unable to copy lab admin user ID.")
-                          }
+                          onClick={() => copyValue(lab.adminEmail, "Unable to copy lab admin user ID.")}
                           disabled={!lab.adminEmail}
                           title="Copy lab admin user ID"
                         >
@@ -218,6 +250,10 @@ export default function DeveloperLabsListPage() {
                       {Icons.edit}
                       Edit
                     </Link>
+                    <Link href={`/developer/labs/${encodeURIComponent(lab.tenantId)}/domains`}>
+                      {Icons.logo}
+                      Domains
+                    </Link>
                     <button
                       type="button"
                       className="danger"
@@ -225,7 +261,7 @@ export default function DeveloperLabsListPage() {
                       onClick={() => deleteLab(lab)}
                     >
                       {Icons.trash}
-                      {deletingLabId === lab.id ? "Deleting" : "Delete"}
+                      {deletingLabId === lab.id ? "Archiving..." : "Delete"}
                     </button>
                   </div>
                 </article>

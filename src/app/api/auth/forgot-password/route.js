@@ -3,9 +3,17 @@ import connectMasterDB from "@/app/lib/master-db";
 import { createResetToken } from "@/app/lib/password";
 import { buildPasswordResetUrl, sendPasswordResetEmail } from "@/app/lib/reset-email";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { normalizeTenantId } from "@/app/lib/tenant-resolver";
+import { getHostnameFromHeaders, normalizeTenantId, normalizeRootDomain } from "@/app/lib/tenant-resolver";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getLabModel } from "@/app/models/master/Lab";
+
+function isCustomDomainRequest(req) {
+  const hostname = getHostnameFromHeaders(req.headers);
+  const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) return false;
+  if (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`))) return false;
+  return hostname.includes(".");
+}
 
 const resetTokenTtlMs = 30 * 60 * 1000;
 
@@ -15,6 +23,10 @@ export async function POST(req) {
     const email = String(body.email || "").trim().toLowerCase();
     const userType = body.userType === "developer" ? "developer" : "tenant";
     const bodyTenantId = String(body.tenantId || "").trim();
+
+    if (userType === "developer" && isCustomDomainRequest(req)) {
+      return Response.json({ message: "If the account exists, a password reset link has been generated." });
+    }
 
     if (!email) {
       return Response.json({ error: "Email is required" }, { status: 400 });

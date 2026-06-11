@@ -1,4 +1,5 @@
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
+import { normalizeCustomDomain } from "@/app/lib/domain-utils";
 
 const tenantConfigCache = globalThis.tenantConfigCache || new Map();
 globalThis.tenantConfigCache = tenantConfigCache;
@@ -119,6 +120,58 @@ export async function getTenantConfig(tenantId, { includeSecret = false } = {}) 
   return value;
 }
 
+export async function getTenantConfigByDomain(domainName) {
+  const domain = normalizeCustomDomain(domainName);
+  if (!domain) return null;
+
+  const cacheKey = `domain:${domain}`;
+  const cached = tenantConfigCache.get(cacheKey);
+  if (cached && cached.expiry > Date.now()) return cached.data;
+
+  const [{ default: connectMasterDB }, { getLabModel }, { getTenantDomainModel }] = await Promise.all([
+    import("@/app/lib/master-db"),
+    import("@/app/models/master/Lab"),
+    import("@/app/models/master/TenantDomain"),
+  ]);
+  const masterConnection = await connectMasterDB();
+  const Lab = getLabModel(masterConnection);
+  const TenantDomain = getTenantDomainModel(masterConnection);
+  const tenantDomain = await TenantDomain.findOne({
+    domain,
+    dnsVerified: true,
+    status: { $in: ["dns_verified", "ssl_provisioning", "active"] },
+  })
+    .select("tenantId lab")
+    .lean();
+  let lab = tenantDomain
+    ? await Lab.findOne({ _id: tenantDomain.lab })
+        .select("labId name tenantId dbName status subscriptionPlan enabledModules branding")
+        .lean()
+    : null;
+
+  if (!lab) {
+    lab = await Lab.findOne({
+      customDomains: {
+        $elemMatch: {
+          domainName: domain,
+          verificationStatus: "verified",
+        },
+      },
+    })
+      .select("labId name tenantId dbName status subscriptionPlan enabledModules branding")
+      .lean();
+  }
+  const value = toTenantConfig(lab);
+
+  pruneExpiredEntries();
+  tenantConfigCache.set(cacheKey, {
+    data: value,
+    expiry: Date.now() + getTtlMs(),
+  });
+
+  return value;
+}
+
 export function clearTenantConfigCache(tenantId) {
   if (!tenantId) {
     tenantConfigCache.clear();
@@ -126,6 +179,20 @@ export function clearTenantConfigCache(tenantId) {
   }
 
   const normalizedTenantId = normalizeTenantId(tenantId);
-  tenantConfigCache.delete(`${normalizedTenantId}:secret`);
-  tenantConfigCache.delete(`${normalizedTenantId}:public`);
+  for (const [cacheKey, cached] of tenantConfigCache.entries()) {
+    if (
+      cacheKey === `${normalizedTenantId}:secret` ||
+      cacheKey === `${normalizedTenantId}:public` ||
+      cached?.data?.tenantId === normalizedTenantId
+    ) {
+      tenantConfigCache.delete(cacheKey);
+    }
+  }
+}
+
+export function clearTenantDomainConfigCache(domainName) {
+  const domain = normalizeCustomDomain(domainName);
+  if (!domain) return;
+
+  tenantConfigCache.delete(`domain:${domain}`);
 }

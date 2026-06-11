@@ -69,6 +69,6 @@ export async function POST(req) {
   } catch (error) {
     console.error("POST /api/uploads/image error:", error.message);
 
-    return nextJsonError("Image upload failed", error, 400);
+    return nextJsonError("Image upload failed", error, error.status || 400);
   }
 }

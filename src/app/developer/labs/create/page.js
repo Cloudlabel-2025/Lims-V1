@@ -6,6 +6,7 @@ import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
+import { isValidCustomDomain, normalizeCustomDomain } from "@/app/lib/domain-utils";
 
 const defaultForm = {
   name: "",
@@ -26,7 +27,17 @@ const defaultForm = {
   accentColor: "#f59e0b",
   enabledModules: defaultLabModules,
   loginHighlights: [],
+  domainMappingMode: "without",
+  customDomains: [],
 };
+
+const wizardSteps = [
+  { id: "details", title: "Lab Details" },
+  { id: "modules", title: "Lab Modules" },
+  { id: "highlights", title: "Login Page Highlights" },
+  { id: "branding", title: "Login Branding" },
+  { id: "domains", title: "Domain Mapping" },
+];
 
 const loginHighlightOptions = [
   "Patient Registration & Tracking",
@@ -39,6 +50,11 @@ const loginHighlightOptions = [
   "Inventory Management",
   "Quality Control",
 ];
+
+const logoUploadRules = {
+  maxSizeBytes: 2 * 1024 * 1024,
+  allowedTypes: new Set(["image/png", "image/jpeg", "image/webp"]),
+};
 
 function slugifyTenantId(value) {
   return value
@@ -100,6 +116,50 @@ function validateDeveloperForm(form) {
   return errors;
 }
 
+function validateLogoFile(file) {
+  if (!file) return "";
+
+  if (!logoUploadRules.allowedTypes.has(file.type)) {
+    return "Logo must be a PNG, JPG, or WebP image.";
+  }
+
+  if (file.size > logoUploadRules.maxSizeBytes) {
+    return "Logo image must be 2 MB or smaller.";
+  }
+
+  return "";
+}
+
+function getCustomDomainError(value, selectedDomains) {
+  const domainName = normalizeCustomDomain(value);
+  if (!domainName) return "";
+
+  if (!isValidCustomDomain(domainName)) {
+    return "Enter a valid purchased domain, for example customerlab.com or portal.customerlab.com.";
+  }
+
+  if (selectedDomains.includes(domainName)) {
+    return "This domain is already added to this lab.";
+  }
+
+  if (selectedDomains.length >= 5) {
+    return "You can add up to 5 custom domains during lab creation.";
+  }
+
+  return "";
+}
+
+function getDomainSetupWarning(form, customDomainError) {
+  if (form.domainMappingMode !== "with") return "";
+  if (form.customDomains.length === 0) {
+    return "Add at least one purchased domain or choose without domain mapping.";
+  }
+  if (customDomainError) {
+    return "Fix or clear the domain field before creating the lab.";
+  }
+  return "";
+}
+
 function getLocalLabLoginUrl(tenantId) {
   if (typeof window === "undefined") return "";
 
@@ -110,8 +170,26 @@ function getLocalLabLoginUrl(tenantId) {
   return `${protocol}//${host}/`;
 }
 
+function getDefaultDomainPreview(tenantId) {
+  if (!tenantId) return "Set tenant ID first";
+  if (typeof window === "undefined") return `${tenantId}.your-root-domain`;
+
+  const { hostname, port } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return port ? `${tenantId}.localhost:${port}` : `${tenantId}.localhost`;
+  }
+
+  const labels = hostname.split(".");
+  const rootHost = labels.length > 2 ? labels.slice(1).join(".") : hostname;
+  return `${tenantId}.${rootHost}`;
+}
+
 function getActiveLabLoginUrl(lab, loginUrl) {
   return getLocalLabLoginUrl(lab.tenantId) || loginUrl;
+}
+
+function getCustomDomainUrl(domainName) {
+  return domainName ? `https://${domainName}/` : "";
 }
 
 export default function DeveloperCreateLabPage() {
@@ -119,17 +197,33 @@ export default function DeveloperCreateLabPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [createdLab, setCreatedLab] = useState(null);
+  const [activeStep, setActiveStep] = useState(0);
   const [customHighlight, setCustomHighlight] = useState("");
+  const [customDomain, setCustomDomain] = useState("");
+  const [domainInputTouched, setDomainInputTouched] = useState(false);
   const [copiedLoginUrl, setCopiedLoginUrl] = useState("");
   const [logoFile, setLogoFile] = useState(null);
+  const [logoInputTouched, setLogoInputTouched] = useState(false);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const formErrors = useMemo(() => validateDeveloperForm(form), [form]);
-  const canSubmit = Object.keys(formErrors).length === 0;
+  const logoFileError = useMemo(() => validateLogoFile(logoFile), [logoFile]);
+  const customDomainError = useMemo(
+    () => getCustomDomainError(customDomain, form.customDomains),
+    [customDomain, form.customDomains]
+  );
+  const domainSetupWarning = useMemo(
+    () => getDomainSetupWarning(form, customDomainError),
+    [form, customDomainError]
+  );
+  const canSubmit =
+    Object.keys(formErrors).length === 0 && !logoFileError && !domainSetupWarning;
+  const stepId = wizardSteps[activeStep].id;
+  const activeStepWarning = getStepWarning(activeStep);
 
   useEffect(() => {
-    if (!logoFile) {
+    if (!logoFile || logoFileError) {
       setLogoPreviewUrl("");
       return undefined;
     }
@@ -138,7 +232,7 @@ export default function DeveloperCreateLabPage() {
     setLogoPreviewUrl(objectUrl);
 
     return () => URL.revokeObjectURL(objectUrl);
-  }, [logoFile]);
+  }, [logoFile, logoFileError]);
 
   function updateField(name, value) {
     setForm((current) => ({
@@ -200,6 +294,128 @@ export default function DeveloperCreateLabPage() {
     setCustomHighlight("");
   }
 
+  function addCustomDomain() {
+    const domainName = normalizeCustomDomain(customDomain);
+    setDomainInputTouched(true);
+    if (!domainName) return;
+
+    if (customDomainError) {
+      return;
+    }
+
+    setError("");
+    setForm((current) => {
+      if (current.customDomains.includes(domainName)) return current;
+
+      return {
+        ...current,
+        customDomains: [...current.customDomains, domainName].slice(0, 5),
+      };
+    });
+    setCustomDomain("");
+    setDomainInputTouched(false);
+  }
+
+  function removeCustomDomain(domainName) {
+    setForm((current) => ({
+      ...current,
+      customDomains: current.customDomains.filter((item) => item !== domainName),
+    }));
+  }
+
+  function setDomainMappingMode(mode) {
+    setError("");
+    setDomainInputTouched(false);
+    setCustomDomain("");
+    setForm((current) => ({
+      ...current,
+      domainMappingMode: mode,
+      customDomains: mode === "with" ? current.customDomains : [],
+    }));
+  }
+
+  function getStepErrors(index = activeStep) {
+    const id = wizardSteps[index].id;
+    if (id === "details") {
+      return [
+        "name",
+        "tenantId",
+        "contactEmail",
+        "contactPhone",
+        "adminFirstName",
+        "adminLastName",
+        "adminEmail",
+        "adminPassword",
+        "adminConfirmPassword",
+      ].filter((field) => formErrors[field]);
+    }
+
+    if (id === "branding") {
+      return logoFileError ? ["logoFile"] : [];
+    }
+
+    if (id === "domains") {
+      return domainSetupWarning ? ["customDomain"] : [];
+    }
+
+    return [];
+  }
+
+  function getStepWarning(index = activeStep) {
+    const id = wizardSteps[index].id;
+
+    if (id === "details" && getStepErrors(index).length > 0) {
+      return "Complete the required lab, admin, email, and password fields before continuing.";
+    }
+
+    if (id === "branding" && logoFileError) {
+      return "Fix the logo upload issue before continuing.";
+    }
+
+    if (id === "domains" && domainSetupWarning) {
+      return domainSetupWarning;
+    }
+
+    return "";
+  }
+
+  function goToStep(index) {
+    if (index <= activeStep) {
+      setActiveStep(index);
+      return;
+    }
+
+    const blockingStep = wizardSteps.findIndex((_, currentIndex) => {
+      return currentIndex < index && getStepErrors(currentIndex).length > 0;
+    });
+
+    if (blockingStep >= 0) {
+      setActiveStep(blockingStep);
+      setError("");
+      return;
+    }
+
+    setError("");
+    setActiveStep(index);
+  }
+
+  function nextStep() {
+    if (getStepErrors().length > 0) {
+      if (stepId === "domains") setDomainInputTouched(true);
+      if (stepId === "branding") setLogoInputTouched(true);
+      setError("");
+      return;
+    }
+
+    setError("");
+    setActiveStep((current) => Math.min(current + 1, wizardSteps.length - 1));
+  }
+
+  function previousStep() {
+    setError("");
+    setActiveStep((current) => Math.max(current - 1, 0));
+  }
+
   async function copyLoginUrl(loginUrl) {
     if (!loginUrl) return;
 
@@ -255,7 +471,15 @@ export default function DeveloperCreateLabPage() {
     setCreatedLab(null);
 
     if (!canSubmit) {
-      setError("Please fix the highlighted fields before creating the lab.");
+      const firstInvalidStep = wizardSteps.findIndex((_, index) => getStepErrors(index).length > 0);
+      if (firstInvalidStep >= 0) setActiveStep(firstInvalidStep);
+      if (firstInvalidStep >= 0 && wizardSteps[firstInvalidStep].id === "domains") {
+        setDomainInputTouched(true);
+      }
+      if (firstInvalidStep >= 0 && wizardSteps[firstInvalidStep].id === "branding") {
+        setLogoInputTouched(true);
+      }
+      setError("");
       return;
     }
 
@@ -269,6 +493,7 @@ export default function DeveloperCreateLabPage() {
         credentials: "include",
         body: JSON.stringify({
           ...form,
+          customDomains: form.domainMappingMode === "with" ? form.customDomains : [],
           logo,
         }),
       });
@@ -283,6 +508,10 @@ export default function DeveloperCreateLabPage() {
       setForm(defaultForm);
       setLogoFile(null);
       setCustomHighlight("");
+      setCustomDomain("");
+      setDomainInputTouched(false);
+      setLogoInputTouched(false);
+      setActiveStep(0);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -325,6 +554,53 @@ export default function DeveloperCreateLabPage() {
             {getLocalLabLoginUrl(createdLab.lab.tenantId) && (
               <small className="developer-production-url">Production: {createdLab.loginUrl}</small>
             )}
+            {createdLab.lab.customDomains?.length > 0 && (
+              <div className="developer-created-domain-map">
+                <strong>Domain mapping details</strong>
+                <span>After DNS verification, users can open the lab directly from the purchased domain, without tenant ID or lims.store.</span>
+                {createdLab.lab.customDomains.map((domain) => {
+                  const domainName = domain.domainName || domain.domain;
+                  return (
+                  <article key={domainName}>
+                    <h3>{domainName}</h3>
+                    <button
+                      type="button"
+                      className="developer-url-link"
+                      onClick={() => openLoginUrl(getCustomDomainUrl(domainName))}
+                    >
+                      {getCustomDomainUrl(domainName)}
+                    </button>
+                    <div className="developer-domain-records">
+                      {(domain.dnsRecords || []).map((record) => (
+                        <button
+                          type="button"
+                          key={`${domainName}-${record.type}-${record.host}`}
+                          onClick={() => copyLoginUrl(record.value)}
+                          title="Copy DNS value"
+                        >
+                          <strong>{record.type}</strong>
+                          <span>{record.host}</span>
+                          <code>{record.value}</code>
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                );
+                })}
+              </div>
+            )}
+            {createdLab.lab.domainSetupErrors?.length > 0 && (
+              <div className="developer-created-domain-map">
+                <strong>Domain setup needs attention</strong>
+                <span>The lab was created. Open the Domains page from the lab list to retry mapping.</span>
+                {createdLab.lab.domainSetupErrors.map((item) => (
+                  <article key={item.domainName}>
+                    <h3>{item.domainName}</h3>
+                    <small>{item.error}</small>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
           <div className="developer-link-actions">
             <button type="button" onClick={() => openLoginUrl(activeCreatedUrl)}>
@@ -333,22 +609,42 @@ export default function DeveloperCreateLabPage() {
             <button type="button" onClick={() => copyLoginUrl(activeCreatedUrl)}>
               {copiedLoginUrl === activeCreatedUrl ? "Copied" : "Copy Link"}
             </button>
+            <Link href={`/developer/labs/${encodeURIComponent(createdLab.lab.tenantId)}/domains`}>
+              Domains
+            </Link>
           </div>
         </section>
       )}
 
       <form
         className="developer-panel"
-        onSubmit={handleSubmit}
+        onSubmit={(e) => e.preventDefault()}
         autoComplete="on"
         name="developer-create-lab-form"
       >
-        <div className="developer-panel-header">
-          <h2>Lab Details</h2>
-          <p>Tenant ID becomes the lab subdomain or local lab login identifier.</p>
+        <div className="developer-wizard-steps" aria-label="Create lab steps">
+          {wizardSteps.map((step, index) => (
+            <button
+              key={step.id}
+              type="button"
+              className={index === activeStep ? "active" : ""}
+              onClick={() => goToStep(index)}
+            >
+              <span>{index + 1}</span>
+              {step.title}
+            </button>
+          ))}
         </div>
 
-        <div className="developer-form-grid">
+        {stepId === "details" && (
+          <>
+            <div className="developer-panel-header">
+              <h2>Lab Details</h2>
+              <p>Tenant ID becomes the lab subdomain or local lab login identifier.</p>
+            </div>
+            {activeStepWarning && <div className="developer-step-warning">{activeStepWarning}</div>}
+
+            <div className="developer-form-grid">
           <label>
             Lab Name
             <input
@@ -470,75 +766,17 @@ export default function DeveloperCreateLabPage() {
             />
             {formErrors.adminConfirmPassword && <em>{formErrors.adminConfirmPassword}</em>}
           </label>
-        </div>
+            </div>
+          </>
+        )}
 
-        <div className="developer-branding-fields">
-          <div className="developer-panel-header">
-            <h2>Login Branding</h2>
-            <p>Upload a lab logo to Cloudinary. Only the Cloudinary URL and public ID are saved.</p>
-          </div>
-          <div className="developer-form-grid">
-            <label>
-              Logo Image
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
-              />
-            </label>
-            <label>
-              Logo Alt Text
-              <input
-                value={form.logoAltText}
-                onChange={(e) => updateField("logoAltText", e.target.value)}
-                placeholder="Enter logo alt text"
-                maxLength={120}
-              />
-            </label>
-          </div>
-          {logoPreviewUrl && (
-            <div
-              className="developer-logo-preview"
-              role="img"
-              aria-label={form.logoAltText || `${form.name || "Lab"} logo`}
-              style={{ backgroundImage: `url("${logoPreviewUrl}")` }}
-            />
-          )}
-        </div>
-
-        <div className="developer-colors">
-          <label>
-            Primary
-            <input
-              type="color"
-              value={form.primaryColor}
-              onChange={(e) => updateField("primaryColor", e.target.value)}
-            />
-          </label>
-          <label>
-            Secondary
-            <input
-              type="color"
-              value={form.secondaryColor}
-              onChange={(e) => updateField("secondaryColor", e.target.value)}
-            />
-          </label>
-          <label>
-            Accent
-            <input
-              type="color"
-              value={form.accentColor}
-              onChange={(e) => updateField("accentColor", e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="developer-module-picker">
-          <div className="developer-panel-header">
-            <h2>Lab Modules</h2>
-            <p>Only selected modules appear in this lab after login.</p>
-          </div>
-          <div className="developer-module-grid">
+        {stepId === "modules" && (
+          <div className="developer-module-picker flush">
+            <div className="developer-panel-header">
+              <h2>Lab Modules</h2>
+              <p>Only selected modules appear in this lab after login.</p>
+            </div>
+            <div className="developer-module-grid">
             {availableLabModules.map((module) => (
               <label key={module.id} className="developer-module-option">
                 <input
@@ -550,15 +788,17 @@ export default function DeveloperCreateLabPage() {
                 <span>{module.label}</span>
               </label>
             ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="developer-module-picker">
-          <div className="developer-panel-header">
-            <h2>Login Page Highlights</h2>
-            <p>Optional lines shown below the lab name on the lab login page.</p>
-          </div>
-          <div className="developer-module-grid">
+        {stepId === "highlights" && (
+          <div className="developer-module-picker flush">
+            <div className="developer-panel-header">
+              <h2>Login Page Highlights</h2>
+              <p>Optional lines shown below the lab name on the lab login page.</p>
+            </div>
+            <div className="developer-module-grid">
             {loginHighlightOptions.map((highlight) => (
               <label key={highlight} className="developer-module-option">
                 <input
@@ -569,36 +809,194 @@ export default function DeveloperCreateLabPage() {
                 <span>{highlight}</span>
               </label>
             ))}
-          </div>
-          <div className="developer-highlight-custom">
-            <input
-              value={customHighlight}
-              onChange={(e) => setCustomHighlight(e.target.value)}
-              placeholder="Enter login highlight"
-              maxLength={80}
-            />
-            <button type="button" onClick={addCustomHighlight}>
-              Add
-            </button>
-          </div>
-          {form.loginHighlights.length > 0 && (
-            <div className="developer-highlight-selected">
-              {form.loginHighlights.map((highlight) => (
-                <button
-                  key={highlight}
-                  type="button"
-                  onClick={() => toggleLoginHighlight(highlight)}
-                >
-                  {highlight}
-                </button>
-              ))}
             </div>
+            <div className="developer-highlight-custom">
+              <input
+                value={customHighlight}
+                onChange={(e) => setCustomHighlight(e.target.value)}
+                placeholder="Enter login highlight"
+                maxLength={80}
+              />
+              <button type="button" onClick={addCustomHighlight}>
+                Add
+              </button>
+            </div>
+            {form.loginHighlights.length > 0 && (
+              <div className="developer-highlight-selected">
+                {form.loginHighlights.map((highlight) => (
+                  <button
+                    key={highlight}
+                    type="button"
+                    onClick={() => toggleLoginHighlight(highlight)}
+                  >
+                    {highlight}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {stepId === "branding" && (
+          <>
+            <div className="developer-branding-fields flush">
+              <div className="developer-panel-header">
+                <h2>Login Branding</h2>
+                <p>Upload a lab logo to Cloudinary. Only the Cloudinary URL and public ID are saved.</p>
+              </div>
+              {activeStepWarning && <div className="developer-step-warning">{activeStepWarning}</div>}
+              <div className="developer-form-grid">
+                <label>
+                  Logo Image
+                  <input
+                    className={logoFileError && logoInputTouched ? "invalid" : ""}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => {
+                      setLogoInputTouched(true);
+                      setLogoFile(e.target.files?.[0] || null);
+                    }}
+                  />
+                  <small>PNG, JPG, or WebP. Maximum 2 MB.</small>
+                  {logoFileError && logoInputTouched && <em>{logoFileError}</em>}
+                </label>
+                <label>
+                  Logo Alt Text
+                  <input
+                    value={form.logoAltText}
+                    onChange={(e) => updateField("logoAltText", e.target.value)}
+                    placeholder="Enter logo alt text"
+                    maxLength={120}
+                  />
+                </label>
+              </div>
+              {logoPreviewUrl && (
+                <div
+                  className="developer-logo-preview"
+                  role="img"
+                  aria-label={form.logoAltText || `${form.name || "Lab"} logo`}
+                  style={{ backgroundImage: `url("${logoPreviewUrl}")` }}
+                />
+              )}
+            </div>
+
+            <div className="developer-colors">
+              <label>
+                Primary
+                <input
+                  type="color"
+                  value={form.primaryColor}
+                  onChange={(e) => updateField("primaryColor", e.target.value)}
+                />
+              </label>
+              <label>
+                Secondary
+                <input
+                  type="color"
+                  value={form.secondaryColor}
+                  onChange={(e) => updateField("secondaryColor", e.target.value)}
+                />
+              </label>
+              <label>
+                Accent
+                <input
+                  type="color"
+                  value={form.accentColor}
+                  onChange={(e) => updateField("accentColor", e.target.value)}
+                />
+              </label>
+            </div>
+          </>
+        )}
+
+        {stepId === "domains" && (
+          <div className="developer-module-picker flush">
+            <div className="developer-panel-header">
+              <h2>Domain Mapping</h2>
+              <p>Choose whether to map a purchased custom domain now or create the lab with only its default tenant URL.</p>
+            </div>
+            {activeStepWarning && <div className="developer-step-warning">{activeStepWarning}</div>}
+            <div className="developer-domain-default">
+              <span>Default domain</span>
+              <strong>{getDefaultDomainPreview(form.tenantId)}</strong>
+            </div>
+
+            <div className="developer-domain-mode-grid">
+              <button
+                type="button"
+                className={form.domainMappingMode === "without" ? "active" : ""}
+                onClick={() => setDomainMappingMode("without")}
+              >
+                <strong>Without Domain Mapping</strong>
+                <span>Create the lab now. Map custom domains later from the lab list.</span>
+              </button>
+              <button
+                type="button"
+                className={form.domainMappingMode === "with" ? "active" : ""}
+                onClick={() => setDomainMappingMode("with")}
+              >
+                <strong>With Domain Mapping</strong>
+                <span>Add a purchased domain now and start Vercel domain setup during creation.</span>
+              </button>
+            </div>
+
+            {form.domainMappingMode === "with" ? (
+              <>
+                <div className="developer-highlight-custom">
+                  <input
+                    className={customDomainError && domainInputTouched ? "invalid" : ""}
+                    value={customDomain}
+                    onChange={(e) => {
+                      setDomainInputTouched(true);
+                      setCustomDomain(e.target.value);
+                    }}
+                    onBlur={() => setDomainInputTouched(true)}
+                    placeholder="uthiram.in or portal.uthiram.in"
+                    maxLength={253}
+                  />
+                  <button type="button" onClick={addCustomDomain}>
+                    Add
+                  </button>
+                </div>
+                {customDomainError && domainInputTouched && (
+                  <em className="developer-field-error">{customDomainError}</em>
+                )}
+                {form.customDomains.length > 0 ? (
+                  <div className="developer-highlight-selected">
+                    {form.customDomains.map((domainName) => (
+                      <button
+                        key={domainName}
+                        type="button"
+                        onClick={() => removeCustomDomain(domainName)}
+                      >
+                        {domainName}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="developer-empty">Add the purchased domain before creating the lab with domain mapping.</p>
+                )}
+              </>
+            ) : (
+              <p className="developer-empty">No custom domain will be mapped now. The lab list will still show a Domains action for adding one later.</p>
+            )}
+          </div>
+        )}
+
+        <div className="developer-wizard-actions">
+          <button type="button" onClick={previousStep} disabled={activeStep === 0 || saving || uploadingLogo}>
+            Back
+          </button>
+          {activeStep < wizardSteps.length - 1 ? (
+            <button type="button" className="developer-submit" onClick={nextStep}>
+              Next
+            </button>
+          ) : (
+            <button type="button" className="developer-submit" onClick={handleSubmit} disabled={!canSubmit || saving || uploadingLogo}>
+              {uploadingLogo ? "Uploading Logo..." : saving ? "Creating Lab..." : "Create Lab And Admin"}
+            </button>
           )}
         </div>
-
-        <button type="submit" className="developer-submit" disabled={!canSubmit || saving || uploadingLogo}>
-          {uploadingLogo ? "Uploading Logo..." : saving ? "Creating Lab..." : "Create Lab And Admin"}
-        </button>
       </form>
     </section>
   );

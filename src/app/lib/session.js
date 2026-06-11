@@ -88,13 +88,17 @@ export function verifySessionToken(token) {
     .update(data)
     .digest("base64url");
 
-  const signatureBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signature, "base64url");
+  const expectedBuffer = Buffer.from(expectedSignature, "base64url");
 
-  if (
-    signatureBuffer.length !== expectedBuffer.length ||
-    !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
-  ) {
+  try {
+    if (
+      signatureBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+    ) {
+      return null;
+    }
+  } catch {
     return null;
   }
 

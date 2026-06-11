@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getHostnameFromHeaders,
   getTenantIdFromHostname,
   normalizeRootDomain,
 } from "../../src/app/lib/tenant-resolver.js";
+import { buildTenantUrl } from "../../src/app/lib/subdomain.js";
 
 test("normalizeRootDomain accepts plain and URL values", () => {
   assert.equal(normalizeRootDomain("lims.store"), "lims.store");
@@ -27,4 +29,51 @@ test("root and platform subdomains are not treated as tenants", () => {
       process.env.ROOT_DOMAIN = previousRootDomain;
     }
   }
+});
+
+test("tenant URLs preserve custom domain hosts", () => {
+  const previousRootDomain = process.env.ROOT_DOMAIN;
+  const previousProtocol = process.env.PUBLIC_APP_PROTOCOL;
+  process.env.ROOT_DOMAIN = "lims.store";
+  process.env.PUBLIC_APP_PROTOCOL = "https";
+
+  try {
+    assert.equal(
+      buildTenantUrl("blood", "https://portal.bloodlab.com/api/auth/login", "/dashboard"),
+      "https://portal.bloodlab.com/dashboard"
+    );
+    assert.equal(
+      buildTenantUrl("blood", "https://app.lims.store/api/auth/login", "/dashboard"),
+      "https://blood.lims.store/dashboard"
+    );
+  } finally {
+    if (previousRootDomain === undefined) {
+      delete process.env.ROOT_DOMAIN;
+    } else {
+      process.env.ROOT_DOMAIN = previousRootDomain;
+    }
+    if (previousProtocol === undefined) {
+      delete process.env.PUBLIC_APP_PROTOCOL;
+    } else {
+      process.env.PUBLIC_APP_PROTOCOL = previousProtocol;
+    }
+  }
+});
+
+test("hostname extraction prefers forwarded custom domain headers", () => {
+  const headers = new Headers({
+    host: "lims.store",
+    "x-vercel-forwarded-host": "uthiram.in",
+  });
+
+  assert.equal(getHostnameFromHeaders(headers), "uthiram.in");
+});
+
+test("hostname extraction parses standard forwarded header", () => {
+  const headers = new Headers({
+    host: "lims.store",
+    forwarded: "for=203.0.113.10;proto=https;host=uthiram.in",
+  });
+
+  assert.equal(getHostnameFromHeaders(headers), "uthiram.in");
 });

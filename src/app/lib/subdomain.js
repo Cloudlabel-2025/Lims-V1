@@ -1,4 +1,4 @@
-import { normalizeRootDomain } from "@/app/lib/tenant-resolver";
+import { normalizeRootDomain } from "./tenant-resolver.js";
 
 export const subdomainPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const reservedSubdomains = new Set([
@@ -77,6 +77,14 @@ function shouldUseLocalTenantHost(requestUrl) {
   );
 }
 
+function shouldUseCurrentCustomHost(requestUrl, rootDomain) {
+  const hostname = getRequestHostname(requestUrl);
+  if (!hostname || !rootDomain) return false;
+  if (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)) return false;
+
+  return true;
+}
+
 export function buildTenantUrl(subdomain, requestUrl, pathname = "/") {
   const normalizedPathname = pathname.startsWith("/") ? pathname : `/${pathname}`;
   const url = new URL(requestUrl);
@@ -88,6 +96,10 @@ export function buildTenantUrl(subdomain, requestUrl, pathname = "/") {
 
   const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
   const protocol = String(process.env.PUBLIC_APP_PROTOCOL || "https").replace(/:$/, "");
+
+  if (shouldUseCurrentCustomHost(requestUrl, rootDomain)) {
+    return `${protocol}://${url.host}${normalizedPathname}`;
+  }
 
   if (rootDomain) {
     return `${protocol}://${subdomain}.${rootDomain}${normalizedPathname}`;

@@ -321,12 +321,18 @@ export async function DELETE(req, context) {
       return NextResponse.json({ error: "Lab not found" }, { status: 404 });
     }
 
-    const tenantId = lab.tenantId;
-    await lab.deleteOne();
-    clearTenantConfigCache(tenantId);
+    if (lab.status === "archived") {
+      return NextResponse.json({ error: "Lab is already archived" }, { status: 400 });
+    }
 
-    return NextResponse.json({ ok: true, tenantId });
+    lab.status = "archived";
+    lab.archivedAt = new Date();
+    lab.archivedBy = auth.session.userId;
+    await lab.save();
+    clearTenantConfigCache(lab.tenantId);
+
+    return NextResponse.json({ ok: true, tenantId: lab.tenantId, status: "archived" });
   } catch (error) {
-    return nextJsonError("Unable to delete lab", error, 500);
+    return nextJsonError("Unable to archive lab", error, 500);
   }
 }

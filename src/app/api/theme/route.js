@@ -1,9 +1,9 @@
 import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import { getSessionFromRequest, requireTenantSession } from "@/app/lib/auth";
-import { getTenantIdFromRequest } from "@/app/lib/tenant-resolver";
+import { getHostnameFromHeaders, getTenantIdFromRequest, normalizeRootDomain } from "@/app/lib/tenant-resolver";
 import { defaultLabModules } from "@/app/lib/modules";
-import { clearTenantConfigCache, getTenantConfig } from "@/app/lib/tenant-cache";
+import { clearTenantConfigCache, getTenantConfig, getTenantConfigByDomain } from "@/app/lib/tenant-cache";
 
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
@@ -26,11 +26,26 @@ const defaultTheme = {
   loginHighlights: [],
 };
 
+function getRequestHostname(req) {
+  return getHostnameFromHeaders(req.headers);
+}
+
+function isPlatformHost(hostname) {
+  const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
+  return (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)))
+  );
+}
+
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const session = getSessionFromRequest(req);
     let tenantId = session?.userType === "tenant" ? session.tenantId : null;
+    const hostname = getRequestHostname(req);
+    const customDomainRequest = Boolean(hostname && !isPlatformHost(hostname));
     const source = tenantId ? "session" : "request";
 
     if (!tenantId) {
@@ -44,8 +59,16 @@ export async function GET(req) {
     debugRequestLog("start", {
       tenantId,
       source,
-      host: req.headers.get("host"),
+      host: hostname,
     });
+
+    if (!tenantId && customDomainRequest) {
+      const domainLab = await getTenantConfigByDomain(hostname);
+      if (!domainLab) {
+        return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+      }
+      tenantId = domainLab.tenantId;
+    }
 
     if (!tenantId) {
       debugRequestLog("default-no-tenant");

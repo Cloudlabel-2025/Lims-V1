@@ -88,8 +88,24 @@ export function normalizeRootDomain(value) {
     .toLowerCase();
 }
 
+export function getHostnameFromHeaders(headers) {
+  const forwardedHost =
+    headers.get("x-forwarded-host") ||
+    headers.get("x-vercel-forwarded-host") ||
+    "";
+  const forwarded = headers.get("forwarded") || "";
+  const forwardedHostMatch = forwarded.match(/(?:^|;\s*)host=([^;]+)/i);
+  const selectedHost =
+    forwardedHost ||
+    (forwardedHostMatch ? forwardedHostMatch[1].replace(/^"|"$/g, "") : "") ||
+    headers.get("host") ||
+    "";
+
+  return String(selectedHost).split(",")[0].split(":")[0].trim().toLowerCase();
+}
+
 export function getTrustedHost(req) {
-  const forwardedHost = req.headers.get("x-forwarded-host");
+  const forwardedHost = req.headers.get("x-forwarded-host") || req.headers.get("x-vercel-forwarded-host");
   const host = req.headers.get("host");
   const allowedHosts = String(process.env.ALLOWED_HOSTS || "")
     .split(",")

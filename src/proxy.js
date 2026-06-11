@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTenantIdFromHostname, normalizeRootDomain } from "@/app/lib/tenant-resolver";
+import { getHostnameFromHeaders, getTenantIdFromHostname, normalizeRootDomain } from "@/app/lib/tenant-resolver";
 
 const skippedPrefixes = [
   "/_next",
@@ -13,7 +13,7 @@ const tenantLookupCache = globalThis.limsTenantLookupCache || new Map();
 globalThis.limsTenantLookupCache = tenantLookupCache;
 
 function getTenantLookupCacheTtlMs() {
-  const ttl = Number(process.env.TENANT_PROXY_CACHE_TTL_MS || 30_000);
+  const ttl = Number(process.env.TENANT_PROXY_CACHE_TTL_MS || process.env.TENANT_CACHE_TTL_MS || 30_000);
   return Number.isFinite(ttl) && ttl > 0 ? ttl : 30_000;
 }
 
@@ -29,6 +29,15 @@ function isSkippedPath(pathname) {
 
 function isApiPath(pathname) {
   return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+function isPlatformApiPath(pathname) {
+  return (
+    pathname === "/api/developer" ||
+    pathname.startsWith("/api/developer/") ||
+    pathname === "/api/tenants" ||
+    pathname.startsWith("/api/tenants/")
+  );
 }
 
 function debugRequestLog(message, details = {}) {
@@ -52,23 +61,62 @@ function blockedResponse(message, status) {
   });
 }
 
-function getCachedTenantLookup(tenantId) {
-  const cached = tenantLookupCache.get(tenantId);
+function getCachedTenantLookup(cacheKey) {
+  const cached = tenantLookupCache.get(cacheKey);
   if (!cached) return null;
 
   if (cached.expiresAt <= Date.now()) {
-    tenantLookupCache.delete(tenantId);
+    tenantLookupCache.delete(cacheKey);
     return null;
   }
 
   return cached;
 }
 
-function setCachedTenantLookup(tenantId, status) {
-  tenantLookupCache.set(tenantId, {
+function setCachedTenantLookup(cacheKey, status, tenantId = "") {
+  tenantLookupCache.set(cacheKey, {
     status,
+    tenantId,
     expiresAt: Date.now() + getTenantLookupCacheTtlMs(),
   });
+}
+
+function isPlatformHost(hostname) {
+  const rootDomain = normalizeRootDomain(process.env.ROOT_DOMAIN);
+  return (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    (rootDomain && (hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)))
+  );
+}
+
+function isCustomDomain(hostname) {
+  return !isPlatformHost(hostname);
+}
+
+function isDeveloperPath(pathname) {
+  return (
+    pathname === "/developer" ||
+    pathname.startsWith("/developer/") ||
+    pathname === "/onboarding" ||
+    pathname.startsWith("/onboarding/")
+  );
+}
+
+function isCmsPlatformApiPath(pathname) {
+  return (
+    pathname === "/api/auth/forgot-password" ||
+    pathname === "/api/auth/reset-password"
+  );
+}
+
+function isCmsPlatformPagePath(pathname) {
+  return (
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/forgot-password/") ||
+    pathname === "/reset-password" ||
+    pathname.startsWith("/reset-password/")
+  );
 }
 
 export async function proxy(req) {
@@ -83,7 +131,9 @@ export async function proxy(req) {
   requestHeaders.delete("x-lims-tenant-id");
   requestHeaders.delete("x-lims-tenant-status");
 
-  if (isApiPath(pathname)) {
+  const hostname = getHostnameFromHeaders(req.headers);
+
+  if (!isCustomDomain(hostname) && isApiPath(pathname) && isPlatformApiPath(pathname)) {
     debugRequestLog("skip-api-tenant-lookup", { pathname });
     return NextResponse.next({
       request: {
@@ -92,11 +142,29 @@ export async function proxy(req) {
     });
   }
 
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
-  const hostname = host.split(":")[0].toLowerCase();
-  const tenantId = getTenantIdFromHostname(hostname);
+  if (isCustomDomain(hostname) && isApiPath(pathname) && isPlatformApiPath(pathname)) {
+    return blockedResponse("Not found", 404);
+  }
 
-  if (!tenantId) {
+  if (isCustomDomain(hostname) && isDeveloperPath(pathname)) {
+    return blockedResponse("Not found", 404);
+  }
+
+  if (isCustomDomain(hostname) && isCmsPlatformPagePath(pathname)) {
+    return blockedResponse("Not found", 404);
+  }
+
+  if (isCustomDomain(hostname) && isCmsPlatformApiPath(pathname)) {
+    return blockedResponse("Not found", 404);
+  }
+
+  let tenantId = getTenantIdFromHostname(hostname);
+  const shouldLookupCustomDomain = !tenantId && hostname && !isPlatformHost(hostname);
+
+  if (!tenantId && !shouldLookupCustomDomain) {
+    if (isCustomDomain(hostname)) {
+      return blockedResponse("Lab portal not available", 404);
+    }
     debugRequestLog("no-tenant", { pathname, hostname });
     return NextResponse.next({
       request: {
@@ -110,11 +178,14 @@ export async function proxy(req) {
     return blockedResponse("Tenant lookup is not configured", 500);
   }
 
-  const cachedLookup = getCachedTenantLookup(tenantId);
+  const lookupCacheKey = tenantId ? `subdomain:${tenantId}` : `domain:${hostname}`;
+  const cachedLookup = getCachedTenantLookup(lookupCacheKey);
   if (cachedLookup) {
+    tenantId = tenantId || cachedLookup.tenantId;
     debugRequestLog("tenant-lookup-cache-hit", {
       pathname,
       tenantId,
+      hostname,
       status: cachedLookup.status,
     });
 
@@ -135,9 +206,13 @@ export async function proxy(req) {
     const lookupUrl = req.nextUrl.clone();
     lookupUrl.pathname = "/api/internal/tenant";
     lookupUrl.search = "";
-    lookupUrl.searchParams.set("subdomain", tenantId);
+    if (tenantId) {
+      lookupUrl.searchParams.set("subdomain", tenantId);
+    } else {
+      lookupUrl.searchParams.set("domain", hostname);
+    }
 
-    debugRequestLog("tenant-lookup-start", { pathname, tenantId });
+    debugRequestLog("tenant-lookup-start", { pathname, tenantId, hostname });
     const lookupResponse = await fetch(lookupUrl, {
       headers: {
         "x-tenant-secret": lookupSecret,
@@ -147,9 +222,12 @@ export async function proxy(req) {
     debugRequestLog("tenant-lookup-finish", {
       pathname,
       tenantId,
+      hostname,
       status: lookupResponse.status,
     });
-    setCachedTenantLookup(tenantId, lookupResponse.status);
+    const lookupData = await lookupResponse.json().catch(() => ({}));
+    tenantId = tenantId || lookupData.tenant?.tenant_id || "";
+    setCachedTenantLookup(lookupCacheKey, lookupResponse.status, tenantId);
 
     if (lookupResponse.status === 404) {
       return blockedResponse("Tenant not found", 404);
