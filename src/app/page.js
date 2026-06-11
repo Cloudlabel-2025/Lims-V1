@@ -78,20 +78,29 @@ export default async function Home({ searchParams }) {
   const requestHeaders = await headers();
   const middlewareTenantId = requestHeaders.get("x-lims-tenant-id");
   const hostname = getHostnameFromHeaders(requestHeaders);
-  const onCustomDomain = !isPlatformHost(hostname);
+  const canResolveCustomDomain =
+    Boolean(hostname) &&
+    hostname !== "localhost" &&
+    !hostname.endsWith(".localhost");
+  let customDomainTheme = canResolveCustomDomain
+    ? await getInitialCustomDomainTheme(hostname)
+    : null;
+  const onCustomDomain = Boolean(customDomainTheme) || !isPlatformHost(hostname);
   let hostTenantId = "";
-  let customDomainTheme = null;
 
   try {
-    hostTenantId = middlewareTenantId
-      ? normalizeTenantId(middlewareTenantId)
-      : getTenantIdFromHostname(hostname) || "";
+    if (customDomainTheme?.tenantId) {
+      hostTenantId = normalizeTenantId(customDomainTheme.tenantId);
+    } else if (middlewareTenantId) {
+      hostTenantId = normalizeTenantId(middlewareTenantId);
+    } else {
+      hostTenantId = getTenantIdFromHostname(hostname) || "";
+    }
   } catch {
     hostTenantId = "";
   }
 
   if (onCustomDomain && !hostTenantId) {
-    customDomainTheme = await getInitialCustomDomainTheme(hostname);
     hostTenantId = customDomainTheme?.tenantId || "";
   }
 

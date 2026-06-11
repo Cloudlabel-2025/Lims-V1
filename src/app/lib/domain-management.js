@@ -51,7 +51,10 @@ export async function getLabByIdOrTenantId(masterConnection, labId) {
   ];
 
   if (mongoose.Types.ObjectId.isValid(cleanLabId)) {
-    identifierFilters.unshift({ _id: cleanLabId });
+    identifierFilters.unshift(
+      { _id: new mongoose.Types.ObjectId(cleanLabId) },
+      { _id: cleanLabId }
+    );
   }
 
   const query = { $or: identifierFilters };

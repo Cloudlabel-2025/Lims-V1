@@ -4,6 +4,7 @@ import { nextJsonError } from "@/app/lib/api-response";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import {
   createTenantDomain,
+  getLabByIdOrTenantId,
   listTenantDomains,
   removeTenantDomain,
   setPrimaryTenantDomain,
@@ -11,7 +12,6 @@ import {
 } from "@/app/lib/domain-management";
 import connectMasterDB from "@/app/lib/master-db";
 import { normalizeCustomDomain } from "@/app/lib/domain-utils";
-import { getLabModel } from "@/app/models/master/Lab";
 
 function serializeLab(lab, req) {
   const rootDomain = normalizeCustomDomain(process.env.ROOT_DOMAIN);
@@ -28,44 +28,30 @@ function serializeLab(lab, req) {
   };
 }
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+async function getKnownLabsForDebug(masterConnection) {
+  if (process.env.NODE_ENV === "production") return [];
 
-function buildLabIdentifierFilters(identifier) {
-  const cleanIdentifier = String(identifier || "").trim();
-  const normalizedIdentifier = cleanIdentifier.toLowerCase();
-  const filters = [
-    { tenantId: normalizedIdentifier },
-    { labId: cleanIdentifier },
-    { labId: normalizedIdentifier },
-    { name: new RegExp(`^${escapeRegex(cleanIdentifier)}$`, "i") },
-  ];
-
-  if (mongoose.Types.ObjectId.isValid(cleanIdentifier)) {
-    filters.unshift(
-      { _id: new mongoose.Types.ObjectId(cleanIdentifier) },
-      { _id: cleanIdentifier }
+  return masterConnection.db
+    .collection("labs")
+    .find({}, { projection: { _id: 1, tenantId: 1, labId: 1, name: 1, status: 1 } })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .toArray()
+    .then((labs) =>
+      labs.map((lab) => ({
+        id: String(lab._id),
+        tenantId: lab.tenantId,
+        labId: lab.labId,
+        name: lab.name,
+        status: lab.status,
+      }))
     );
-  }
-
-  return filters;
-}
-
-async function findLabForDomainRoute(masterConnection, identifier) {
-  const Lab = getLabModel(masterConnection);
-  const query = { $or: buildLabIdentifierFilters(identifier) };
-  const rawLab = await masterConnection.db.collection("labs").findOne(query);
-
-  if (rawLab) return Lab.hydrate(rawLab);
-
-  return Lab.findOne(query);
 }
 
 async function loadDomainPagePayload(req, params) {
   const { tenantId } = await params;
   const masterConnection = await connectMasterDB();
-  const lab = await findLabForDomainRoute(masterConnection, tenantId);
+  const lab = await getLabByIdOrTenantId(masterConnection, tenantId);
   const dbName = masterConnection.db?.databaseName || "unknown";
 
   if (process.env.NODE_ENV !== "production") {
@@ -79,6 +65,7 @@ async function loadDomainPagePayload(req, params) {
   }
 
   if (!lab) {
+    const knownLabs = await getKnownLabsForDebug(masterConnection);
     return {
       error: NextResponse.json(
         {
@@ -86,6 +73,7 @@ async function loadDomainPagePayload(req, params) {
           ...(process.env.NODE_ENV !== "production"
             ? {
                 details: `No lab matched "${tenantId}" in database "${dbName}"`,
+                knownLabs,
               }
             : {}),
         },
