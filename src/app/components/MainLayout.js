@@ -182,6 +182,7 @@ export default function MainLayout({ children }) {
               }
             }}
             user={user}
+            theme={theme}
           />
           <div className="dash-content">
             {hasPageAccess ? (

@@ -63,6 +63,16 @@ export const TestReportSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    sample: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Sample",
+      index: true,
+    },
+    billingRecord: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BillingRecord",
+      index: true,
+    },
     testSnapshot: {
       testId: String,
       name: String,
@@ -81,8 +91,8 @@ export const TestReportSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["draft", "completed", "verified", "released"],
-      default: "completed",
+      enum: ["draft", "verified", "released", "delivered"],
+      default: "draft",
       index: true,
     },
     enteredBy: {

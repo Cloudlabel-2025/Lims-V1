@@ -1,5 +1,4 @@
 import { jsonError } from "@/app/lib/api-response";
-import { getAccountByCode, postJournalEntry, seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -7,71 +6,8 @@ function clean(value) {
   return String(value || "").trim();
 }
 
-function money(value) {
-  return Math.round((Number(value) || 0) * 100) / 100;
-}
-
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-async function buildOrderItems({ selectedTests, TestDefinition, TestPackage, session }) {
-  const orderItems = [];
-  let subtotalAmount = 0;
-
-  for (const itemKey of selectedTests || []) {
-    if (itemKey.startsWith("test_")) {
-      const test = await TestDefinition.findById(itemKey.replace("test_", ""))
-        .populate("category")
-        .session(session);
-      if (!test) continue;
-
-      const price = money(test.price);
-      subtotalAmount = money(subtotalAmount + price);
-      orderItems.push({
-        testDefinition: test._id,
-        testSnapshot: {
-          testId: test.testId,
-          name: test.name,
-          code: test.code,
-          categoryName: test.category?.name,
-          sampleType: test.sampleType,
-          price,
-        },
-        status: "sample-pending",
-      });
-      continue;
-    }
-
-    if (itemKey.startsWith("pkg_")) {
-      const pkg = await TestPackage.findById(itemKey.replace("pkg_", ""))
-        .populate({ path: "tests", populate: { path: "category" } })
-        .session(session);
-      if (!pkg) continue;
-
-      subtotalAmount = money(subtotalAmount + money(pkg.price));
-      for (const test of pkg.tests || []) {
-        if (orderItems.some((item) => item.testDefinition.toString() === test._id.toString())) {
-          continue;
-        }
-
-        orderItems.push({
-          testDefinition: test._id,
-          testSnapshot: {
-            testId: test.testId,
-            name: test.name,
-            code: test.code,
-            categoryName: test.category?.name,
-            sampleType: test.sampleType,
-            price: 0,
-          },
-          status: "sample-pending",
-        });
-      }
-    }
-  }
-
-  return { orderItems, subtotalAmount };
 }
 
 export async function POST(req) {
@@ -83,11 +19,10 @@ export async function POST(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "patients.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { connection, Patient, BillingRecord, TestDefinition, TestPackage, Doctor, Sample } =
-      await getTenantModels(tenantId);
+    const { Patient } = await getTenantModels(tenantId);
     const body = await req.json();
 
-    const { name, dob, age, gender, phone, receivedTime, address, selectedTests, force } = body;
+    const { name, dob, age, gender, phone, receivedTime, address, force } = body;
     const missing = [];
     if (!clean(name)) missing.push("Full Name");
     if (!dob) missing.push("Date of Birth");
@@ -124,106 +59,14 @@ export async function POST(req) {
       }
     }
 
-    const result = await connection.transaction(async (session) => {
-      const doctor = body.refDoctorName
-        ? await Doctor.findOne({ name: body.refDoctorName }).session(session)
-        : null;
-
-      const [patient] = await Patient.create(
-        [
-          {
-            ...body,
-            phone: String(phone),
-            refDoctorName: body.refDoctorName || undefined,
-          },
-        ],
-        { session }
-      );
-
-      const response = { patient, billingRecord: null, samples: [] };
-      if (!Array.isArray(selectedTests) || selectedTests.length === 0) return response;
-
-      const { orderItems, subtotalAmount } = await buildOrderItems({
-        selectedTests,
-        TestDefinition,
-        TestPackage,
-        session,
-      });
-      if (orderItems.length === 0) return response;
-
-      await seedSystemChartOfAccounts(connection, tenantId, { session });
-
-      const commissionRate = doctor?.commission || 0;
-      const commissionAmount = money((subtotalAmount * commissionRate) / 100);
-      const [billingRecord] = await BillingRecord.create(
-        [
-          {
-            patient: patient._id,
-            items: orderItems,
-            referralDoctor: doctor?._id,
-            subtotalAmount,
-            discountAmount: 0,
-            taxAmount: 0,
-            totalAmount: subtotalAmount,
-            commissionAmount,
-            tenantId,
-            billingStatus: "unpaid",
-            invoiceStatus: "confirmed",
-            createdBy: auth.session?.email || "System",
-            status: "open",
-          },
-        ],
-        { session }
-      );
-
-      const samples = await Sample.create(
-        billingRecord.items.map((item) => ({
-          billingRecord: billingRecord._id,
-          billingItemId: item._id,
-          patient: patient._id,
-          testDefinition: item.testDefinition,
-          testSnapshot: item.testSnapshot,
-        })),
-        { session }
-      );
-
-      const receivableAccount = await getAccountByCode(connection, tenantId, "1100", { session });
-      const revenueAccount = await getAccountByCode(connection, tenantId, "4001", { session });
-      const invoiceJournalEntry = await postJournalEntry(
-        connection,
-        {
-          tenantId,
-          postedBy: auth.session.userId,
-          sourceType: "billing",
-          sourceId: billingRecord._id,
-          description: `Invoice confirmed for ${billingRecord.billId}`,
-          lines: [
-            { accountId: receivableAccount._id, debit: subtotalAmount, credit: 0 },
-            { accountId: revenueAccount._id, debit: 0, credit: subtotalAmount },
-          ],
-        },
-        { session }
-      );
-
-      billingRecord.invoiceJournalEntryId = invoiceJournalEntry._id;
-      await billingRecord.save({ session });
-
-      response.billingRecord = billingRecord;
-      response.samples = samples;
-      return response;
+    const patient = await Patient.create({
+      ...body,
+      selectedTests: undefined,
+      phone: String(phone),
+      refDoctorName: body.refDoctorName || undefined,
     });
 
-    const payload = result.patient.toObject();
-    if (result.billingRecord) {
-      payload.billingRecord = {
-        _id: result.billingRecord._id,
-        billId: result.billingRecord.billId,
-        totalAmount: result.billingRecord.totalAmount,
-      };
-      payload.samplesCreated = result.samples.length;
-    }
-
-    return Response.json(payload, { status: 201 });
+    return Response.json(patient.toObject(), { status: 201 });
   } catch (err) {
     console.error("POST /api/patient error:", err);
 

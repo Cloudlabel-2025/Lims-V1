@@ -24,7 +24,7 @@ const statusBadge = {
   released: ["#ecfdf5", "#047857"],
 };
 
-export default function ReportPreview({ selectedReport, canPrintReports, canVerifyReports, canReleaseReports, onReportUpdated }) {
+export default function ReportPreview({ selectedReport, canPrintReports, canVerifyReports, canReleaseReports, onReportUpdated, onSuccess }) {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,6 +48,7 @@ export default function ReportPreview({ selectedReport, canPrintReports, canVeri
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to update report");
       onReportUpdated?.(data.report);
+      onSuccess?.(`Report ${data.report?.reportId || ""} ${action === "verify" ? "verified" : "released"} successfully.`);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -8,6 +8,7 @@ export default function PasswordField({
   name,
   value,
   onChange,
+  onBlur,
   placeholder,
   autoComplete = "new-password",
   required = false,
@@ -27,6 +28,7 @@ export default function PasswordField({
         name={name}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}

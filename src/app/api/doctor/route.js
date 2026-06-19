@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { formatDoctorValidationErrors, validateDoctorPayload } from "@/app/utils/doctor-validation";
 
 function clean(value) {
@@ -128,8 +128,14 @@ export async function GET(req) {
       query.status = status;
     }
 
+    const canViewFinancials = hasPermission(auth.session, "accounts.view");
+    const selectFields = canViewFinancials
+      ? null
+      : "-commission -pendingPayout";
+
     const [doctors, total] = await Promise.all([
       Doctor.find(query)
+        .select(selectFields)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)

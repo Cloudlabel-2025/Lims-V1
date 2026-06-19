@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 async function safeMetric(label, task, fallback) {
   try {
@@ -70,7 +70,7 @@ export async function GET(req) {
         { $limit: 10 },
       ]), []),
 
-      // Doctor referral stats
+      // Doctor referral stats — commission amounts only for users with accounts.view
       safeMetric("doctor-referrals", BillingRecord.aggregate([
         { $match: { createdAt: { $gte: since }, referralDoctor: { $exists: true, $ne: null } } },
         {
@@ -98,7 +98,7 @@ export async function GET(req) {
             doctorId: "$doctor.doctorId",
             bills: 1,
             revenue: 1,
-            commission: 1,
+            ...(hasPermission(auth.session, "accounts.view") ? { commission: 1 } : {}),
           },
         },
       ]), []),

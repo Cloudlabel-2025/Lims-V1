@@ -46,8 +46,9 @@ export default function DeveloperDashboardPage() {
   }, []);
 
   const activeLabs = labs.filter((lab) => lab.status === "active").length;
-  const suspendedLabs = labs.filter((lab) => lab.status === "suspended").length;
-  const recentLabs = labs.slice(0, 5);
+  const archivedLabs = labs.filter((lab) => lab.status === "archived").length;
+  const deletedLabs = labs.filter((lab) => lab.status === "deleted").length;
+  const recentLabs = labs.filter((lab) => lab.status === "active").slice(0, 5);
   const moduleCount = new Set(labs.flatMap((lab) => lab.enabledModules || [])).size;
 
   return (
@@ -76,8 +77,12 @@ export default function DeveloperDashboardPage() {
           <strong>{loading ? "-" : activeLabs}</strong>
         </article>
         <article className="developer-summary-card">
-          <span>Suspended Labs</span>
-          <strong>{loading ? "-" : suspendedLabs}</strong>
+          <span>Archived Labs</span>
+          <strong>{loading ? "-" : archivedLabs}</strong>
+        </article>
+        <article className="developer-summary-card">
+          <span>Deleted Labs</span>
+          <strong>{loading ? "-" : deletedLabs}</strong>
         </article>
         <article className="developer-summary-card">
           <span>Assigned Modules</span>
@@ -89,12 +94,12 @@ export default function DeveloperDashboardPage() {
         <section className="developer-panel">
           <div className="developer-panel-header">
             <h2>Recent Labs</h2>
-            <p>Latest tenant labs created in the platform.</p>
+            <p>Latest active tenant labs in the platform.</p>
           </div>
           {loading ? (
             <p className="developer-empty">Loading recent labs...</p>
           ) : recentLabs.length === 0 ? (
-            <p className="developer-empty">No labs created yet.</p>
+            <p className="developer-empty">No active labs available.</p>
           ) : (
             <div className="developer-compact-list">
               {recentLabs.map((lab) => (
@@ -118,7 +123,6 @@ export default function DeveloperDashboardPage() {
           <div className="developer-action-grid">
             <Link href="/developer/labs/create">{Icons.plus} Create Lab</Link>
             <Link href="/developer/labs">{Icons.list} View Labs</Link>
-            <Link href="/developer/modules">{Icons.grid} Manage Modules</Link>
             <Link href="/developer/system">{Icons.settings} System Config</Link>
           </div>
         </section>

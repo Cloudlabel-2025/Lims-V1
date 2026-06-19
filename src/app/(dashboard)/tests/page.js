@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
 
@@ -62,6 +63,7 @@ export default function TestsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const canSave = useMemo(
     () => form.name && form.category && form.parameters.some((parameter) => parameter.name.trim()),
@@ -97,6 +99,7 @@ export default function TestsPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
       const [categoryResponse, testResponse, packageResponse] = await Promise.all([
         cachedJsonFetch("/api/tests/categories", { ttl: 30_000 }),
@@ -180,6 +183,7 @@ export default function TestsPage() {
       setCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
       setForm((current) => ({ ...current, category: data.category._id }));
       setCategoryName("");
+      setSuccess(`Category "${data.category.name}" created successfully.`);
     } catch (err) {
       setError(err.message);
     }
@@ -189,6 +193,8 @@ export default function TestsPage() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    setSuccess("");
+    const wasEditing = Boolean(editingId);
 
     try {
       const response = await fetch(
@@ -212,6 +218,7 @@ export default function TestsPage() {
           : [data.test, ...current];
       });
       resetForm();
+      setSuccess(`Test "${data.test.name}" ${wasEditing ? "updated" : "created"} successfully.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -223,6 +230,8 @@ export default function TestsPage() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    setSuccess("");
+    const wasEditing = Boolean(editingPackageId);
 
     try {
       const response = await fetch(
@@ -245,6 +254,7 @@ export default function TestsPage() {
           : [data.package, ...current];
       });
       resetPackageForm();
+      setSuccess(`Package "${data.package.name}" ${wasEditing ? "updated" : "created"} successfully.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -325,6 +335,7 @@ export default function TestsPage() {
         </div>
       </div>
 
+      <SuccessDialog message={success} onClose={() => setSuccess("")} />
       <div className="module-tabs" style={{ display: "flex", gap: "24px", marginBottom: "28px", borderBottom: "1px solid var(--border-light)", padding: "0 4px" }}>
         <button 
           onClick={() => setActiveTab("tests")} 

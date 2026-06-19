@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
 
@@ -38,6 +39,7 @@ export default function BillingPage() {
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [selectedBillingRecord, setSelectedBillingRecord] = useState(null);
   const [payment, setPayment] = useState({ cash: 0, card: 0, online: 0 });
@@ -113,6 +115,7 @@ export default function BillingPage() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await fetch("/api/billing", {
@@ -136,6 +139,7 @@ export default function BillingPage() {
       setDiscountAmount("");
       setTaxAmount("");
       setActiveTab("pending");
+      setSuccess(`Bill ${data.billingRecord?.billId || ""} created successfully.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -186,7 +190,7 @@ export default function BillingPage() {
       Number(selectedBillingRecord.paymentBreakdown?.online || 0);
     const remainingAmount = Math.max(0, Number(selectedBillingRecord.totalAmount || 0) - alreadyPaid);
     if (totalPaid > remainingAmount) {
-      alert(`Payment cannot exceed remaining balance (Rs ${remainingAmount}).`);
+      setError(`Payment cannot exceed remaining balance (Rs ${remainingAmount}).`);
       return;
     }
     if (totalPaid < remainingAmount) {
@@ -194,6 +198,8 @@ export default function BillingPage() {
     }
 
     setClosing(true);
+    setError("");
+    setSuccess("");
     try {
       const res = await fetch("/api/billing/settle", {
         method: "POST",
@@ -221,8 +227,9 @@ export default function BillingPage() {
         )
       );
       setShowCloseModal(false);
+      setSuccess(data.message || "Bill settlement completed successfully.");
     } catch (err) {
-      alert(err.message);
+      setError(err.message);
     } finally {
       setClosing(false);
     }
@@ -260,6 +267,7 @@ export default function BillingPage() {
         </div>
       </div>
 
+      <SuccessDialog message={success} onClose={() => setSuccess("")} />
       <div className="module-tabs" style={{ 
         display: "flex", 
         gap: "16px", 

@@ -1,4 +1,5 @@
 import { jsonError } from "@/app/lib/api-response";
+import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -36,15 +37,24 @@ export async function POST(req) {
     if (moduleAuth.error) return moduleAuth.error;
 
     const body = await req.json();
-    const { type, testName, instrument, lotNumber, result, value, expectedRange, remarks } = body;
+    const { type, instrument, lotNumber, result, value, expectedRange, remarks } = body;
+    const sampleId = String(body.sample || "").trim();
+    let testName = String(body.testName || "").trim();
 
-    if (!testName?.trim()) return Response.json({ error: "Test name is required" }, { status: 400 });
+    const { QcLog, Sample, BillingRecord } = await getTenantModels(auth.tenantId);
+    let sample = null;
+    if (sampleId) {
+      sample = await Sample.findById(sampleId);
+      if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
+      testName = testName || sample.testSnapshot?.name || "";
+    }
+
+    if (!testName) return Response.json({ error: "Test name is required" }, { status: 400 });
     if (!result) return Response.json({ error: "Result is required" }, { status: 400 });
 
-    const { QcLog } = await getTenantModels(auth.tenantId);
     const log = await QcLog.create({
       type: type || "qc-run",
-      testName: testName.trim(),
+      testName,
       instrument: instrument?.trim(),
       lotNumber: lotNumber?.trim(),
       result,
@@ -52,7 +62,31 @@ export async function POST(req) {
       expectedRange: expectedRange?.trim(),
       remarks: remarks?.trim(),
       enteredBy: auth.session.email,
+      sample: sample?._id,
+      billingRecord: sample?.billingRecord,
+      testDefinition: sample?.testDefinition,
       tenantId: auth.tenantId,
+    });
+
+    if (sample && result === "fail") {
+      sample.status = "rejected";
+      sample.rejectionReason = remarks?.trim() || "QC failed";
+      await sample.save();
+
+      const billingRecord = await BillingRecord.findById(sample.billingRecord);
+      const item = billingRecord?.items.id(sample.billingItemId);
+      if (item) {
+        item.status = "cancelled";
+        billingRecord.status = "in-progress";
+        await billingRecord.save();
+      }
+    }
+
+    await writeAuditLog(req, auth, {
+      action: result === "pass" ? "quality.qc_passed" : result === "fail" ? "quality.qc_failed" : "quality.create",
+      resourceType: "QcLog",
+      resourceId: log._id,
+      metadata: { sampleId: sample?._id, result },
     });
 
     return Response.json({ log }, { status: 201 });

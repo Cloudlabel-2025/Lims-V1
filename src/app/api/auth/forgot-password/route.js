@@ -1,13 +1,55 @@
 import { jsonError } from "@/app/lib/api-response";
 import connectMasterDB from "@/app/lib/master-db";
-import { createResetToken } from "@/app/lib/password";
-import { buildPasswordResetUrl, sendPasswordResetEmail } from "@/app/lib/reset-email";
+import { sendPasswordResetEmail } from "@/app/lib/reset-email";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getLabModel } from "@/app/models/master/Lab";
+import crypto from "node:crypto";
 
-const resetTokenTtlMs = 30 * 60 * 1000;
+const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const OTP_LENGTH = 6;
+
+function generateOtp() {
+  const otp = String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
+  const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+  return { otp, otpHash };
+}
+
+async function resolveUserByEmailAndTenant(email, tenantIdValue) {
+  let tenantId = "";
+  try {
+    tenantId = normalizeTenantId(tenantIdValue);
+  } catch {
+    return { tenantId: null, user: null };
+  }
+
+  try {
+    const masterConnection = await connectMasterDB();
+    const Lab = getLabModel(masterConnection);
+    const lab = await Lab.findOne({ tenantId, status: "active" }).select("tenantId").lean();
+    if (!lab) return { tenantId: null, user: null };
+
+    const { User } = await getTenantModels(lab.tenantId);
+    const user = await User.findOne({
+      email,
+      status: { $in: ["active", "invited"] },
+    }).select("+passwordResetTokenHash +passwordResetExpiresAt");
+
+    return user ? { tenantId: lab.tenantId, user } : { tenantId: null, user: null };
+  } catch {
+    return { tenantId: null, user: null };
+  }
+}
+
+async function resolveDeveloperUser(email) {
+  const masterConnection = await connectMasterDB();
+  const DeveloperUser = getDeveloperUserModel(masterConnection);
+  const user = await DeveloperUser.findOne({ email, status: "active" }).select(
+    "+passwordResetTokenHash +passwordResetExpiresAt"
+  );
+  return user || null;
+}
 
 export async function POST(req) {
   try {
@@ -20,126 +62,49 @@ export async function POST(req) {
       return Response.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const { token, tokenHash } = createResetToken();
-    const expiresAt = new Date(Date.now() + resetTokenTtlMs);
+    if (userType === "tenant" && !bodyTenantId) {
+      return Response.json({ error: "Tenant ID is required" }, { status: 400 });
+    }
+
     let user = null;
     let resetTenantId = null;
 
     if (userType === "developer") {
-      const masterConnection = await connectMasterDB();
-      const DeveloperUser = getDeveloperUserModel(masterConnection);
-      user = await DeveloperUser.findOne({ email, status: "active" }).select(
-        "+passwordResetTokenHash +passwordResetExpiresAt"
-      );
+      user = await resolveDeveloperUser(email);
     } else {
-      const resolved = bodyTenantId
-        ? await resolveTenantUserByEmailAndTenant(email, bodyTenantId)
-        : await resolveTenantUserByEmail(email);
+      const resolved = await resolveUserByEmailAndTenant(email, bodyTenantId);
       user = resolved.user;
       resetTenantId = resolved.tenantId;
     }
 
     if (user) {
-      user.passwordResetTokenHash = tokenHash;
+      const { otp, otpHash } = generateOtp();
+      const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+
+      user.passwordResetTokenHash = otpHash;
       user.passwordResetExpiresAt = expiresAt;
       await user.save();
-    }
 
-    let emailDelivery = null;
-    if (user) {
-      const resetUrl = buildPasswordResetUrl(req, {
-        token,
-        userType,
-        tenantId: resetTenantId,
-      });
-
+      let emailResult = null;
       try {
-        emailDelivery = await sendPasswordResetEmail({
-          to: email,
-          resetUrl,
-          expiresAt,
-        });
+        emailResult = await sendPasswordResetEmail({ to: email, otp, expiresAt });
       } catch (emailError) {
-        emailDelivery = { sent: false, reason: emailError.message };
-        console.error("Password reset email failed:", emailError.message);
+        console.error("Password reset OTP email failed:", emailError.message);
+        emailResult = { sent: false, reason: emailError.message };
+      }
+
+      if (process.env.NODE_ENV !== "production") {
+        if (!emailResult?.sent) {
+          console.warn("[forgot-password] OTP not sent via email.", emailResult?.reason);
+          console.info(`[forgot-password] DEV OTP for ${email}: ${otp}`);
+        }
       }
     }
 
-    const response = {
-      message: "If the account exists, a password reset link has been generated.",
-    };
-
-    if (process.env.NODE_ENV !== "production" && user) {
-      response.resetToken = token;
-      response.expiresAt = expiresAt;
-      response.emailDelivery = emailDelivery;
-      response.resetContext = {
-        userType,
-        tenantId: resetTenantId,
-      };
-    }
-
-    return Response.json(response);
+    return Response.json({
+      message: "If the account exists, a 6-digit OTP has been sent to your email.",
+    });
   } catch (error) {
     return jsonError("Unable to start password reset", error, 500);
-  }
-}
-
-async function resolveTenantUserByEmail(email) {
-  const masterConnection = await connectMasterDB();
-  const Lab = getLabModel(masterConnection);
-  const labs = await Lab.find({ status: "active" }).select("tenantId").lean();
-  const matches = [];
-
-  for (const lab of labs) {
-    try {
-      const { User } = await getTenantModels(lab.tenantId);
-      const user = await User.findOne({
-        email,
-        status: { $in: ["active", "invited"] },
-      }).select("+passwordResetTokenHash +passwordResetExpiresAt");
-
-      if (user) {
-        matches.push({ tenantId: lab.tenantId, user });
-      }
-    } catch {
-      // Skip unavailable tenant databases so reset requests remain non-enumerating.
-    }
-  }
-
-  if (matches.length !== 1) {
-    return { tenantId: null, user: null };
-  }
-
-  return matches[0];
-}
-
-async function resolveTenantUserByEmailAndTenant(email, tenantIdValue) {
-  let tenantId = "";
-
-  try {
-    tenantId = normalizeTenantId(tenantIdValue);
-  } catch {
-    return { tenantId: null, user: null };
-  }
-
-  try {
-    const masterConnection = await connectMasterDB();
-    const Lab = getLabModel(masterConnection);
-    const lab = await Lab.findOne({ tenantId, status: "active" }).select("tenantId").lean();
-
-    if (!lab) {
-      return { tenantId: null, user: null };
-    }
-
-    const { User } = await getTenantModels(lab.tenantId);
-    const user = await User.findOne({
-      email,
-      status: { $in: ["active", "invited"] },
-    }).select("+passwordResetTokenHash +passwordResetExpiresAt");
-
-    return user ? { tenantId: lab.tenantId, user } : { tenantId: null, user: null };
-  } catch {
-    return { tenantId: null, user: null };
   }
 }

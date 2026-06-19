@@ -1,7 +1,8 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getAccountByCode, postJournalEntry } from "@/app/lib/accounting";
+import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 function clean(value) {
   return String(value || "").trim();
@@ -26,12 +27,23 @@ export async function GET(req) {
     const query = { tenantId: auth.tenantId };
     if (status && status !== "all") query.status = status;
 
+    // Doctor Regular: scope to bills for patients they referred
+    if (auth.session.doctorId) {
+      query.referralDoctor = auth.session.doctorId;
+    }
+
+    const canViewFinancials = hasPermission(auth.session, "accounts.view");
+    const financialSelect = canViewFinancials
+      ? "billId patient items priority status notes referralDoctor subtotalAmount discountAmount taxAmount totalAmount commissionAmount paymentBreakdown billingStatus invoiceStatus invoiceJournalEntryId paymentReceiptIds commissionJournalEntryId createdBy createdAt updatedAt"
+      : "billId patient items priority status notes referralDoctor billingStatus createdAt updatedAt";
+    const doctorPopulateSelect = canViewFinancials ? "name doctorId commission pendingPayout" : "name doctorId";
+
     const { BillingRecord } = await getTenantModels(auth.tenantId);
     const [billingRecords, total] = await Promise.all([
       BillingRecord.find(query)
         .populate("patient", "name patientId age gender phone")
-        .populate("referralDoctor", "name doctorId commission pendingPayout")
-        .select("billId patient items priority status notes referralDoctor subtotalAmount discountAmount taxAmount totalAmount commissionAmount paymentBreakdown billingStatus invoiceStatus invoiceJournalEntryId paymentReceiptIds commissionJournalEntryId createdBy createdAt updatedAt")
+        .populate("referralDoctor", doctorPopulateSelect)
+        .select(financialSelect)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -76,8 +88,14 @@ export async function POST(req) {
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
 
     const doctor = patient.refDoctorName
-      ? await Doctor.findOne({ name: patient.refDoctorName }).select("_id commission").lean()
+      ? await Doctor.findOne({ name: patient.refDoctorName }).select("_id commission status").lean()
       : null;
+    if (patient.refDoctorName && !doctor) {
+      return Response.json({ error: "Referring doctor must be verified before billing" }, { status: 400 });
+    }
+    if (doctor && doctor.status !== "Active") {
+      return Response.json({ error: "Referring doctor must be active before billing" }, { status: 400 });
+    }
 
     const billingItems = [];
     let totalAmount = 0;
@@ -245,8 +263,12 @@ export async function POST(req) {
 
     await billingRecord.populate("patient", "name patientId age gender phone");
 
-    const { AuditLog } = await getTenantModels(auth.tenantId);
-    AuditLog.create({ action: "billing.create", userId: auth.session.userId, tenantId: auth.tenantId, resourceType: "BillingRecord", resourceId: billingRecord._id, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});
+    await writeAuditLog(req, auth, {
+      action: "billing.created",
+      resourceType: "BillingRecord",
+      resourceId: billingRecord._id,
+      metadata: { billId: billingRecord.billId, totalAmount: billingRecord.totalAmount },
+    });
 
     return Response.json({ billingRecord, samples }, { status: 201 });
   } catch (error) {

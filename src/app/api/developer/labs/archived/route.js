@@ -118,3 +118,45 @@ export async function POST(req) {
     return nextJsonError("Unable to restore lab", error, 500);
   }
 }
+
+// DELETE /api/developer/labs/archived  — move an archived lab to deleted list
+// body: { tenantId: "my-lab" }
+export async function DELETE(req) {
+  try {
+    const auth = requireDeveloperSession(req);
+    if (auth.error) return auth.error;
+
+    const body = await req.json();
+    const tenantId = String(body.tenantId || "").trim().toLowerCase();
+
+    if (!tenantId) {
+      return NextResponse.json({ error: "tenantId is required" }, { status: 400 });
+    }
+
+    const masterConnection = await connectMasterDB();
+    const Lab = getLabModel(masterConnection);
+    const lab = await Lab.findOne({ tenantId, status: "archived" });
+
+    if (!lab) {
+      return NextResponse.json(
+        { error: "Archived lab not found" },
+        { status: 404 }
+      );
+    }
+
+    lab.status = "deleted";
+    lab.deletedAt = new Date();
+    lab.deletedBy = auth.session.userId;
+    await lab.save();
+
+    clearTenantConfigCache(tenantId);
+
+    return NextResponse.json({
+      ok: true,
+      tenantId: lab.tenantId,
+      status: "deleted",
+    });
+  } catch (error) {
+    return nextJsonError("Unable to move lab to deleted list", error, 500);
+  }
+}

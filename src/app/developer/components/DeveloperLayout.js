@@ -21,17 +21,11 @@ const sections = [
     ],
   },
   {
-    label: "Platform Control",
-    items: [
-      { label: "Module Management", href: "/developer/modules", icon: Icons.grid },
-      { label: "Default Lab Setup", href: "/developer/defaults", icon: Icons.flask },
-    ],
-  },
-  {
     label: "System",
     items: [
       { label: "System Configuration", href: "/developer/system", icon: Icons.settings },
       { label: "Archived Labs", href: "/developer/labs/archived", icon: Icons.trash },
+      { label: "Deleted Labs", href: "/developer/labs/deleted", icon: Icons.trash },
     ],
   },
 ];

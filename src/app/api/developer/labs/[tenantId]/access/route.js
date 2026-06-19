@@ -38,8 +38,8 @@ async function getLab(tenantId) {
   const masterConnection = await connectMasterDB();
   const Lab = getLabModel(masterConnection);
   const query = mongoose.Types.ObjectId.isValid(labId)
-    ? { _id: labId }
-    : { tenantId: labId.toLowerCase() };
+    ? { $or: [{ _id: labId }, { tenantId: labId.toLowerCase() }, { labId }] }
+    : { $or: [{ tenantId: labId.toLowerCase() }, { labId }] };
 
   return Lab.findOne(query).select(
     "name tenantId status subscriptionPlan enabledModules dbName +dbConnectionString"
@@ -78,7 +78,12 @@ export async function GET(req, { params }) {
 
     const { tenantId } = await params;
     const lab = await getLab(tenantId);
-    if (!lab) return NextResponse.json({ error: "Lab not found" }, { status: 404 });
+    if (!lab) {
+      return NextResponse.json(
+        { error: "Lab not found", details: `No lab exists for identifier "${tenantId}".` },
+        { status: 404 }
+      );
+    }
 
     const { connection, Role } = await connectLabRoleModel(lab);
     let adminRole;
@@ -121,7 +126,12 @@ export async function PATCH(req, { params }) {
     const adminPermissions = normalizePermissionKeys(body.adminPermissions, enabledModules);
 
     const lab = await getLab(tenantId);
-    if (!lab) return NextResponse.json({ error: "Lab not found" }, { status: 404 });
+    if (!lab) {
+      return NextResponse.json(
+        { error: "Lab not found", details: `No lab exists for identifier "${tenantId}".` },
+        { status: 404 }
+      );
+    }
 
     const { connection, Role } = await connectLabRoleModel(lab);
     try {

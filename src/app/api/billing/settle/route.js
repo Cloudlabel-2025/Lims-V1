@@ -1,7 +1,8 @@
 import { getAccountByCode, postJournalEntry, seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { jsonError } from "@/app/lib/api-response";
+import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireTenantSession } from "@/app/lib/auth";
 
 function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
@@ -23,8 +24,12 @@ export async function POST(req) {
     const { tenantId } = auth;
     const { connection, BillingRecord, Doctor, PaymentReceipt, TestReport, TestDefinition } =
       await getTenantModels(tenantId);
-    
+
     const { billingRecordId, payment, results } = await req.json();
+
+    if (results && Object.keys(results).length > 0 && !hasPermission(auth.session, "reports.edit")) {
+      return Response.json({ error: "Permission denied: reports.edit required to enter results" }, { status: 403 });
+    }
 
     if (!billingRecordId) {
       return Response.json({ error: "Billing record ID is required" }, { status: 400 });
@@ -244,8 +249,16 @@ export async function POST(req) {
       };
     });
 
-    const { AuditLog } = await getTenantModels(tenantId);
-    AuditLog.create({ action: "billing.settle", userId: auth.session.userId, tenantId, resourceType: "BillingRecord", resourceId: billingRecordId, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});
+    await writeAuditLog(req, auth, {
+      action: "billing.payment_recorded",
+      resourceType: "BillingRecord",
+      resourceId: billingRecordId,
+      metadata: {
+        billingStatus: result.billingStatus,
+        invoiceStatus: result.invoiceStatus,
+        receivedAmount: result.receivedAmount,
+      },
+    });
 
     return Response.json({
       message: result.billingStatus === "paid" ? "Bill closed successfully" : "Payment recorded successfully",

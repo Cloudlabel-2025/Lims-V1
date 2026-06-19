@@ -90,11 +90,6 @@ export const tenantModuleGroups = [
     label: "Finance",
     items: ["billing", "accounts", "inventory", "analytics"],
   },
-  {
-    id: "configuration",
-    label: "Configuration",
-    items: ["settings"],
-  },
 ];
 
 export const tenantAdminItems = [

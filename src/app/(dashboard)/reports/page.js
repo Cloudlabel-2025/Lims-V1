@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
 
@@ -36,6 +37,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const test = useMemo(() => tests.find((item) => item._id === selectedTest), [tests, selectedTest]);
   const sortedParameters = useMemo(
@@ -110,6 +112,7 @@ export default function ReportsPage() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await fetch("/api/reports", {
@@ -136,6 +139,7 @@ export default function ReportsPage() {
       setSelectedSample("");
       setResults({});
       setRemarks("");
+      setSuccess(`Report ${data.report?.reportId || ""} saved successfully.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -159,6 +163,7 @@ export default function ReportsPage() {
       </div>
 
       {error && <div className="module-alert">{error}</div>}
+      <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
       <div className="module-grid">
         {canEditReports && (
@@ -193,6 +198,7 @@ export default function ReportsPage() {
           canVerifyReports={canVerifyReports}
           canReleaseReports={canReleaseReports}
           onReportUpdated={handleReportUpdated}
+          onSuccess={setSuccess}
         />
       )}
     </div>

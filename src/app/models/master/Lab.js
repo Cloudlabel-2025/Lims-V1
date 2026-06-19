@@ -60,7 +60,7 @@ export const LabSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "active", "suspended", "archived"],
+      enum: ["pending", "active", "suspended", "archived", "deleted"],
       default: "pending",
       index: true,
     },
@@ -176,6 +176,15 @@ export const LabSchema = new mongoose.Schema(
       index: true,
     },
     archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DeveloperUser",
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    deletedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "DeveloperUser",
     },

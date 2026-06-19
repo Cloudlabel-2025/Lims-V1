@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { formatDoctorValidationErrors, validateDoctorPayload } from "@/app/utils/doctor-validation";
 
 // ── GET: Fetch single doctor by ID ──
@@ -10,9 +10,14 @@ export async function GET(req, { params }) {
     if (auth.error) return auth.error;
 
     const { tenantId } = auth;
+    const moduleAuth = await requireEnabledTenantModule(tenantId, "doctors.view");
+    if (moduleAuth.error) return moduleAuth.error;
+
     const { Doctor } = await getTenantModels(tenantId);
     const { id } = await params;
-    const doctor = await Doctor.findById(id);
+    const canViewFinancials = hasPermission(auth.session, "accounts.view");
+    const doctor = await Doctor.findById(id)
+      .select(canViewFinancials ? null : "-commission -pendingPayout");
     if (!doctor) {
       return Response.json({ error: "Doctor not found" }, { status: 404 });
     }

@@ -7,6 +7,8 @@ export const AuditLogSchema = new mongoose.Schema(
     tenantId: { type: String, required: true, trim: true, lowercase: true, index: true },
     resourceType: { type: String, required: true, trim: true, maxlength: 80, index: true },
     resourceId: { type: mongoose.Schema.Types.ObjectId, index: true },
+    userRole: { type: String, trim: true, maxlength: 120 },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     timestamp: { type: Date, default: Date.now, immutable: true, index: true },
     ipAddress: { type: String, trim: true, maxlength: 80 },
   },

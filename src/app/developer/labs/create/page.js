@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
 
 const defaultForm = {
   name: "",
   tenantId: "",
-  subscriptionPlan: "trial",
   adminFirstName: "Lab",
   adminLastName: "Admin",
   adminEmail: "",
@@ -33,6 +33,18 @@ const wizardSteps = [
   { id: "modules", title: "Lab Modules" },
   { id: "highlights", title: "Login Page Highlights" },
   { id: "branding", title: "Login Branding" },
+];
+
+const detailsStepFields = [
+  "name",
+  "tenantId",
+  "contactEmail",
+  "contactPhone",
+  "adminFirstName",
+  "adminLastName",
+  "adminEmail",
+  "adminPassword",
+  "adminConfirmPassword",
 ];
 
 const loginHighlightOptions = [
@@ -59,43 +71,64 @@ function slugifyTenantId(value) {
     .replace(/^-+|-+$/g, "");
 }
 
-function isEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+function isContactEmail(value) {
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(String(value || "").trim());
 }
 
 function isPhone(value) {
   const phone = String(value || "").trim();
-  return !phone || /^\d{10}$/.test(phone);
+  return /^\d{10}$/.test(phone);
+}
+
+function validateLabName(value) {
+  const name = String(value || "").trim();
+  if (name.length < 2) return "Lab name must be at least 2 characters.";
+  if (name.length > 25) return "Lab name must not exceed 25 characters.";
+  if (!/^[A-Za-z0-9][A-Za-z0-9 .&'-]*[A-Za-z0-9]$/.test(name)) {
+    return "Lab name can include letters, numbers, spaces, and . & ' - only.";
+  }
+  return "";
+}
+
+function isPersonName(value) {
+  return /^[A-Za-z]+(?: [A-Za-z]+)*$/.test(String(value || "").trim());
 }
 
 function validateDeveloperForm(form) {
   const errors = {};
 
-  if (!form.name.trim() || form.name.trim().length < 2) {
-    errors.name = "Lab name must be at least 2 characters.";
-  }
+  const labNameError = validateLabName(form.name);
+  if (labNameError) errors.name = labNameError;
 
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.tenantId)) {
     errors.tenantId = "Use lowercase letters, numbers, and hyphens only.";
   }
 
-  if (form.contactEmail && !isEmail(form.contactEmail)) {
+  if (!form.contactEmail.trim()) {
+    errors.contactEmail = "Contact email is required.";
+  } else if (!isContactEmail(form.contactEmail)) {
     errors.contactEmail = "Enter a valid contact email.";
   }
 
-  if (!isPhone(form.contactPhone)) {
+  if (!form.contactPhone.trim()) {
+    errors.contactPhone = "Contact phone is required.";
+  } else if (!isPhone(form.contactPhone)) {
     errors.contactPhone = "Phone number must be exactly 10 digits.";
   }
 
   if (!form.adminFirstName.trim()) {
     errors.adminFirstName = "Admin first name is required.";
+  } else if (!isPersonName(form.adminFirstName)) {
+    errors.adminFirstName = "Admin first name must contain letters only.";
   }
 
   if (!form.adminLastName.trim()) {
     errors.adminLastName = "Admin last name is required.";
+  } else if (!isPersonName(form.adminLastName)) {
+    errors.adminLastName = "Admin last name must contain letters only.";
   }
 
-  if (!isEmail(form.adminEmail)) {
+  if (!isContactEmail(form.adminEmail)) {
     errors.adminEmail = "Enter a valid admin email.";
   }
 
@@ -144,6 +177,7 @@ export default function DeveloperCreateLabPage() {
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [createdLab, setCreatedLab] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
   const [customHighlight, setCustomHighlight] = useState("");
@@ -152,12 +186,14 @@ export default function DeveloperCreateLabPage() {
   const [logoInputTouched, setLogoInputTouched] = useState(false);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [touchedFields, setTouchedFields] = useState({});
+  const [attemptedSteps, setAttemptedSteps] = useState({});
 
   const formErrors = useMemo(() => validateDeveloperForm(form), [form]);
   const logoFileError = useMemo(() => validateLogoFile(logoFile), [logoFile]);
   const canSubmit = Object.keys(formErrors).length === 0 && !logoFileError;
   const stepId = wizardSteps[activeStep].id;
-  const activeStepWarning = getStepWarning(activeStep);
+  const activeStepWarning = shouldShowStepWarning(stepId) ? getStepWarning(activeStep) : "";
 
   useEffect(() => {
     if (!logoFile || logoFileError) {
@@ -179,6 +215,23 @@ export default function DeveloperCreateLabPage() {
         ? { tenantId: slugifyTenantId(value) }
         : {}),
     }));
+  }
+
+  function markFieldTouched(name) {
+    setTouchedFields((current) => ({ ...current, [name]: true }));
+  }
+
+  function markStepAttempted(id = stepId) {
+    setAttemptedSteps((current) => ({ ...current, [id]: true }));
+  }
+
+  function shouldShowStepWarning(id = stepId) {
+    if (id === "branding") return Boolean(attemptedSteps[id] || logoInputTouched);
+    return Boolean(attemptedSteps[id]);
+  }
+
+  function shouldShowFieldError(name) {
+    return Boolean(formErrors[name] && (touchedFields[name] || attemptedSteps.details));
   }
 
   function toggleModule(moduleId) {
@@ -234,17 +287,7 @@ export default function DeveloperCreateLabPage() {
   function getStepErrors(index = activeStep) {
     const id = wizardSteps[index].id;
     if (id === "details") {
-      return [
-        "name",
-        "tenantId",
-        "contactEmail",
-        "contactPhone",
-        "adminFirstName",
-        "adminLastName",
-        "adminEmail",
-        "adminPassword",
-        "adminConfirmPassword",
-      ].filter((field) => formErrors[field]);
+      return detailsStepFields.filter((field) => formErrors[field]);
     }
 
     if (id === "branding") {
@@ -280,6 +323,7 @@ export default function DeveloperCreateLabPage() {
 
     if (blockingStep >= 0) {
       setActiveStep(blockingStep);
+      markStepAttempted(wizardSteps[blockingStep].id);
       setError("");
       return;
     }
@@ -290,6 +334,7 @@ export default function DeveloperCreateLabPage() {
 
   function nextStep() {
     if (getStepErrors().length > 0) {
+      markStepAttempted(stepId);
       if (stepId === "branding") setLogoInputTouched(true);
       setError("");
       return;
@@ -356,11 +401,13 @@ export default function DeveloperCreateLabPage() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setSuccess("");
     setCreatedLab(null);
 
     if (!canSubmit) {
       const firstInvalidStep = wizardSteps.findIndex((_, index) => getStepErrors(index).length > 0);
       if (firstInvalidStep >= 0) setActiveStep(firstInvalidStep);
+      if (firstInvalidStep >= 0) markStepAttempted(wizardSteps[firstInvalidStep].id);
       if (firstInvalidStep >= 0 && wizardSteps[firstInvalidStep].id === "branding") {
         setLogoInputTouched(true);
       }
@@ -389,10 +436,13 @@ export default function DeveloperCreateLabPage() {
 
       clearCachedApi("/api/developer/labs");
       setCreatedLab(data);
+      setSuccess(`Lab "${data.lab.name}" created successfully.`);
       setForm(defaultForm);
       setLogoFile(null);
       setCustomHighlight("");
       setLogoInputTouched(false);
+      setTouchedFields({});
+      setAttemptedSteps({});
       setActiveStep(0);
     } catch (err) {
       setError(err.message);
@@ -420,6 +470,7 @@ export default function DeveloperCreateLabPage() {
       </div>
 
       {error && <div className="developer-alert">{error}</div>}
+      <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
       {createdLab && (
         <section className="developer-success">
@@ -480,95 +531,94 @@ export default function DeveloperCreateLabPage() {
           <label>
             Lab Name
             <input
-              className={formErrors.name ? "invalid" : ""}
+              className={shouldShowFieldError("name") ? "invalid" : ""}
               value={form.name}
               onChange={(e) => updateField("name", e.target.value)}
+              onBlur={() => markFieldTouched("name")}
               placeholder="Enter lab name"
+              minLength={2}
+              maxLength={25}
               required
             />
-            {formErrors.name && <em>{formErrors.name}</em>}
+            {shouldShowFieldError("name") && <em>{formErrors.name}</em>}
           </label>
           <label>
             Tenant ID
             <input
-              className={formErrors.tenantId ? "invalid" : ""}
+              className={shouldShowFieldError("tenantId") ? "invalid" : ""}
               value={form.tenantId}
               onChange={(e) => updateField("tenantId", slugifyTenantId(e.target.value))}
+              onBlur={() => markFieldTouched("tenantId")}
               placeholder="Enter tenant ID"
               required
             />
-            {formErrors.tenantId && <em>{formErrors.tenantId}</em>}
-          </label>
-          <label>
-            Plan
-            <select
-              value={form.subscriptionPlan}
-              onChange={(e) => updateField("subscriptionPlan", e.target.value)}
-            >
-              <option value="trial">Trial</option>
-              <option value="basic">Basic</option>
-              <option value="professional">Professional</option>
-              <option value="enterprise">Enterprise</option>
-            </select>
+            {shouldShowFieldError("tenantId") && <em>{formErrors.tenantId}</em>}
           </label>
           <label>
             Contact Phone
             <input
-              className={formErrors.contactPhone ? "invalid" : ""}
+              className={shouldShowFieldError("contactPhone") ? "invalid" : ""}
               inputMode="numeric"
               maxLength={10}
               value={form.contactPhone}
               onChange={(e) => updateField("contactPhone", e.target.value.replace(/\D/g, ""))}
+              onBlur={() => markFieldTouched("contactPhone")}
               placeholder="Enter mobile number"
+              required
             />
-            {formErrors.contactPhone && <em>{formErrors.contactPhone}</em>}
+            {shouldShowFieldError("contactPhone") && <em>{formErrors.contactPhone}</em>}
           </label>
           <label>
             Contact Email
             <input
-              className={formErrors.contactEmail ? "invalid" : ""}
+              className={shouldShowFieldError("contactEmail") ? "invalid" : ""}
               type="email"
               name="developer-create-lab-contact-email"
               value={form.contactEmail}
               onChange={(e) => updateField("contactEmail", e.target.value)}
+              onBlur={() => markFieldTouched("contactEmail")}
               placeholder="Enter email"
               autoComplete="section-developer-create-lab email"
+              required
             />
-            {formErrors.contactEmail && <em>{formErrors.contactEmail}</em>}
+            {shouldShowFieldError("contactEmail") && <em>{formErrors.contactEmail}</em>}
           </label>
           <label>
             Admin First Name
             <input
-              className={formErrors.adminFirstName ? "invalid" : ""}
+              className={shouldShowFieldError("adminFirstName") ? "invalid" : ""}
               value={form.adminFirstName}
               onChange={(e) => updateField("adminFirstName", e.target.value)}
+              onBlur={() => markFieldTouched("adminFirstName")}
               required
             />
-            {formErrors.adminFirstName && <em>{formErrors.adminFirstName}</em>}
+            {shouldShowFieldError("adminFirstName") && <em>{formErrors.adminFirstName}</em>}
           </label>
           <label>
             Admin Last Name
             <input
-              className={formErrors.adminLastName ? "invalid" : ""}
+              className={shouldShowFieldError("adminLastName") ? "invalid" : ""}
               value={form.adminLastName}
               onChange={(e) => updateField("adminLastName", e.target.value)}
+              onBlur={() => markFieldTouched("adminLastName")}
               required
             />
-            {formErrors.adminLastName && <em>{formErrors.adminLastName}</em>}
+            {shouldShowFieldError("adminLastName") && <em>{formErrors.adminLastName}</em>}
           </label>
           <label>
             Admin Email
             <input
-              className={formErrors.adminEmail ? "invalid" : ""}
+              className={shouldShowFieldError("adminEmail") ? "invalid" : ""}
               type="email"
               name="developer-create-lab-admin-email"
               value={form.adminEmail}
               onChange={(e) => updateField("adminEmail", e.target.value)}
+              onBlur={() => markFieldTouched("adminEmail")}
               placeholder="Enter admin email"
               autoComplete="section-developer-create-lab username"
               required
             />
-            {formErrors.adminEmail && <em>{formErrors.adminEmail}</em>}
+            {shouldShowFieldError("adminEmail") && <em>{formErrors.adminEmail}</em>}
           </label>
           <label>
             Admin Password
@@ -576,13 +626,14 @@ export default function DeveloperCreateLabPage() {
               name="developer-create-lab-admin-password"
               value={form.adminPassword}
               onChange={(e) => updateField("adminPassword", e.target.value)}
-              invalid={Boolean(formErrors.adminPassword)}
+              onBlur={() => markFieldTouched("adminPassword")}
+              invalid={shouldShowFieldError("adminPassword")}
               autoComplete="section-developer-create-lab new-password"
               toggleLabel="admin password"
               minLength={8}
               required
             />
-            {formErrors.adminPassword && <em>{formErrors.adminPassword}</em>}
+            {shouldShowFieldError("adminPassword") && <em>{formErrors.adminPassword}</em>}
           </label>
           <label>
             Confirm Password
@@ -590,13 +641,14 @@ export default function DeveloperCreateLabPage() {
               name="developer-create-lab-admin-confirm-password"
               value={form.adminConfirmPassword}
               onChange={(e) => updateField("adminConfirmPassword", e.target.value)}
-              invalid={Boolean(formErrors.adminConfirmPassword)}
+              onBlur={() => markFieldTouched("adminConfirmPassword")}
+              invalid={shouldShowFieldError("adminConfirmPassword")}
               autoComplete="section-developer-create-lab new-password"
               toggleLabel="confirm admin password"
               minLength={8}
               required
             />
-            {formErrors.adminConfirmPassword && <em>{formErrors.adminConfirmPassword}</em>}
+            {shouldShowFieldError("adminConfirmPassword") && <em>{formErrors.adminConfirmPassword}</em>}
           </label>
             </div>
           </>
@@ -750,7 +802,12 @@ export default function DeveloperCreateLabPage() {
               Next
             </button>
           ) : (
-            <button type="button" className="developer-submit" onClick={handleSubmit} disabled={!canSubmit || saving || uploadingLogo}>
+            <button
+              type="button"
+              className="developer-submit developer-final-submit"
+              onClick={handleSubmit}
+              disabled={!canSubmit || saving || uploadingLogo}
+            >
               {uploadingLogo ? "Uploading Logo..." : saving ? "Creating Lab..." : "Create Lab And Admin"}
             </button>
           )}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 
 const emptyItem = {
   itemCode: "",
@@ -112,6 +113,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [inventory, setInventory] = useState({ categories: [], uoms: [], items: [], movements: [], stats: {} });
   const [categoryForm, setCategoryForm] = useState({ name: "", code: "", parentCategory: "", description: "" });
@@ -156,6 +158,7 @@ export default function InventoryPage() {
   async function postInventory(payload, success) {
     setSaving(true);
     setError("");
+    setSuccessMessage("");
     try {
       const response = await fetch("/api/inventory", {
         method: "POST",
@@ -176,12 +179,16 @@ export default function InventoryPage() {
   async function saveItem(event) {
     event.preventDefault();
     if (!editingItemId) {
-      await postInventory({ action: "item", ...itemForm }, () => setItemForm(emptyItem));
+      await postInventory({ action: "item", ...itemForm }, (data) => {
+        setItemForm(emptyItem);
+        setSuccessMessage(`Inventory item "${data.item?.name || itemForm.name}" created successfully.`);
+      });
       return;
     }
 
     setSaving(true);
     setError("");
+    setSuccessMessage("");
     try {
       const response = await fetch(`/api/inventory/${editingItemId}`, {
         method: "PATCH",
@@ -192,6 +199,7 @@ export default function InventoryPage() {
       if (!response.ok) throw new Error(data.error || "Unable to update item");
       setEditingItemId("");
       setItemForm(emptyItem);
+      setSuccessMessage(`Inventory item "${data.item?.name || itemForm.name}" updated successfully.`);
       await loadInventory();
     } catch (err) {
       setError(err.message);
@@ -259,6 +267,7 @@ export default function InventoryPage() {
           {error}
         </div>
       )}
+      <SuccessDialog message={successMessage} onClose={() => setSuccessMessage("")} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         {tabs.map(([key, label, icon]) => (
@@ -367,7 +376,10 @@ export default function InventoryPage() {
               setForm={setCategoryForm}
               onSubmit={(event) => {
                 event.preventDefault();
-                postInventory({ action: "category", ...categoryForm }, () => setCategoryForm({ name: "", code: "", parentCategory: "", description: "" }));
+                postInventory({ action: "category", ...categoryForm }, (data) => {
+                  setCategoryForm({ name: "", code: "", parentCategory: "", description: "" });
+                  setSuccessMessage(`Inventory category "${data.category?.name || categoryForm.name}" created successfully.`);
+                });
               }}
               saving={saving}
               fields={<>
@@ -393,7 +405,10 @@ export default function InventoryPage() {
               setForm={setUomForm}
               onSubmit={(event) => {
                 event.preventDefault();
-                postInventory({ action: "uom", ...uomForm }, () => setUomForm({ name: "", symbol: "", type: "count", conversionToBase: 1, baseSymbol: "" }));
+                postInventory({ action: "uom", ...uomForm }, (data) => {
+                  setUomForm({ name: "", symbol: "", type: "count", conversionToBase: 1, baseSymbol: "" });
+                  setSuccessMessage(`Inventory UOM "${data.uom?.symbol || uomForm.symbol}" created successfully.`);
+                });
               }}
               saving={saving}
               fields={<>
@@ -421,7 +436,10 @@ export default function InventoryPage() {
               saving={saving}
               onSubmit={(event) => {
                 event.preventDefault();
-                postInventory({ action: "movement", ...movementForm }, () => setMovementForm(emptyMovement));
+                postInventory({ action: "movement", ...movementForm }, () => {
+                  setMovementForm(emptyMovement);
+                  setSuccessMessage("Stock transaction posted successfully.");
+                });
               }}
             />
           )}

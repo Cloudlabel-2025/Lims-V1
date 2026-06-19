@@ -20,6 +20,10 @@ function cleanString(value) {
   return String(value || "").trim();
 }
 
+function isContactEmail(value) {
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(cleanString(value));
+}
+
 function normalizeLoginHighlights(value) {
   if (!Array.isArray(value)) return [];
 
@@ -48,13 +52,6 @@ function normalizeEnum(value, fallback, allowedValues) {
   return allowedValues[0];
 }
 
-function normalizePhone(value) {
-  const digits = cleanString(value).replace(/\D/g, "");
-  if (!digits) return "";
-
-  return digits.length > 10 ? digits.slice(-10) : digits;
-}
-
 function normalizeOptionalEmail(value) {
   const email = cleanString(value).toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
@@ -66,11 +63,6 @@ function normalizeRequiredName(value, fallback) {
 
   const fallbackName = cleanString(fallback);
   return fallbackName.length >= 2 ? fallbackName : "Lab";
-}
-
-function normalizePersistedPhone(value) {
-  const phone = normalizePhone(value);
-  return /^\d{10}$/.test(phone) ? phone : "";
 }
 
 function buildLabLoginUrl(req, tenantId) {
@@ -162,10 +154,9 @@ export async function PATCH(req, context) {
 
     const name = normalizeRequiredName(body.name, lab.name);
     const rawContactEmail = cleanString(body.contactEmail).toLowerCase();
-    const existingContactEmail = cleanString(lab.contactEmail).toLowerCase();
-    const contactEmail = normalizeOptionalEmail(rawContactEmail || existingContactEmail);
-    const rawContactPhone = normalizePhone(body.contactPhone);
-    const contactPhone = normalizePersistedPhone(rawContactPhone);
+    const contactEmail = isContactEmail(rawContactEmail) ? rawContactEmail : "";
+    const submittedContactPhone = cleanString(body.contactPhone);
+    const contactPhone = /^\d{10}$/.test(submittedContactPhone) ? submittedContactPhone : "";
     const rawAdminEmail = cleanString(body.adminEmail).toLowerCase();
     const adminEmail = normalizeOptionalEmail(rawAdminEmail);
     const existingAdminEmail = cleanString(lab.adminAccess?.email).toLowerCase();
@@ -176,7 +167,6 @@ export async function PATCH(req, context) {
     const status = normalizeEnum(body.status, lab.status, [
       "pending",
       "active",
-      "suspended",
       "archived",
     ]);
     const subscriptionPlan = normalizeEnum(body.subscriptionPlan, lab.subscriptionPlan, [
@@ -187,14 +177,19 @@ export async function PATCH(req, context) {
     ]);
     const adminEmailChanged = Boolean(rawAdminEmail && rawAdminEmail !== existingAdminEmail);
     const adminPasswordChanged = Boolean(adminPassword);
-    const contactEmailChanged = rawContactEmail !== existingContactEmail;
+    if (!rawContactEmail) {
+      return NextResponse.json({ error: "Contact email is required" }, { status: 400 });
+    }
 
-    if (contactEmailChanged && rawContactEmail && !contactEmail) {
+    if (!contactEmail) {
       return NextResponse.json({ error: "Valid contact email is required" }, { status: 400 });
     }
 
-    const phoneChanged = rawContactPhone !== normalizePhone(lab.contactPhone);
-    if (phoneChanged && rawContactPhone && !contactPhone) {
+    if (!submittedContactPhone) {
+      return NextResponse.json({ error: "Contact phone is required" }, { status: 400 });
+    }
+
+    if (!contactPhone) {
       return NextResponse.json({ error: "Enter a valid 10 digit contact phone" }, { status: 400 });
     }
 

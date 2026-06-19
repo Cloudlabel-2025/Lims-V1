@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { cachedJsonFetch, clearCachedApi, useTenantShell } from "@/app/lib/use-current-user";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { defaultLabModules } from "@/app/lib/modules";
@@ -35,16 +36,6 @@ function groupByModule(permissions) {
   }, {});
 }
 
-function toggleSetValue(values, value) {
-  const next = new Set(values);
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-  return [...next];
-}
-
 function sameRoleConfiguration(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -56,6 +47,26 @@ function normalizeRoleName(value) {
 function clampRoleIndex(nextRoles, preferredIndex) {
   if (nextRoles.length === 0) return 0;
   return Math.min(preferredIndex, nextRoles.length - 1);
+}
+
+function addPermissionWithDependencies(selected, permissionKey, permissionByKey) {
+  if (selected.has(permissionKey)) return;
+  const permission = permissionByKey.get(permissionKey);
+  if (!permission) return;
+
+  selected.add(permissionKey);
+  (permission.dependencies || []).forEach((dependencyKey) => {
+    addPermissionWithDependencies(selected, dependencyKey, permissionByKey);
+  });
+}
+
+function removePermissionWithDependents(selected, permissionKey, dependentKeysByPermission) {
+  if (!selected.has(permissionKey)) return;
+
+  selected.delete(permissionKey);
+  (dependentKeysByPermission.get(permissionKey) || []).forEach((dependentKey) => {
+    removePermissionWithDependents(selected, dependentKey, dependentKeysByPermission);
+  });
 }
 
 export default function LabAdminSettingsPage() {
@@ -117,6 +128,22 @@ export default function LabAdminSettingsPage() {
     [enabledModules]
   );
   const permissionsByModule = useMemo(() => groupByModule(labPermissions), [labPermissions]);
+  const permissionByKey = useMemo(
+    () => new Map(labPermissions.map((permission) => [permission.key, permission])),
+    [labPermissions]
+  );
+  const dependentKeysByPermission = useMemo(() => {
+    const dependents = new Map();
+
+    labPermissions.forEach((permission) => {
+      (permission.dependencies || []).forEach((dependencyKey) => {
+        if (!permissionByKey.has(dependencyKey)) return;
+        dependents.set(dependencyKey, [...(dependents.get(dependencyKey) || []), permission.key]);
+      });
+    });
+
+    return dependents;
+  }, [labPermissions, permissionByKey]);
   const activeRole = roles[activeRoleIndex] || roles[0];
   const activePermissions = useMemo(
     () =>
@@ -134,9 +161,23 @@ export default function LabAdminSettingsPage() {
         index === activeRoleIndex
           ? {
               ...role,
-              permissions: role.permissions.includes("*")
-                ? labPermissions.map((permission) => permission.key).filter((key) => key !== permissionKey)
-                : toggleSetValue(role.permissions, permissionKey),
+              permissions: (() => {
+                const selected = new Set(
+                  role.permissions.includes("*")
+                    ? labPermissions.map((permission) => permission.key)
+                    : role.permissions
+                );
+
+                if (selected.has(permissionKey)) {
+                  removePermissionWithDependents(selected, permissionKey, dependentKeysByPermission);
+                } else {
+                  addPermissionWithDependencies(selected, permissionKey, permissionByKey);
+                }
+
+                return labPermissions
+                  .map((permission) => permission.key)
+                  .filter((key) => selected.has(key));
+              })(),
             }
           : role
       )
@@ -208,7 +249,7 @@ export default function LabAdminSettingsPage() {
       setRoles(nextRoles);
       setSavedRoles(nextRoles);
       setActiveRoleIndex((current) => clampRoleIndex(nextRoles, Math.max(0, current - (current >= index ? 1 : 0))));
-      setRoleMessage(`Role "${role.name}" deleted.`);
+      setRoleMessage(`Role "${role.name}" deleted successfully.`);
     } catch (err) {
       setSettingsError(err.message);
     } finally {
@@ -243,7 +284,7 @@ export default function LabAdminSettingsPage() {
       setRoles(nextRoles);
       setSavedRoles(nextRoles);
       setActiveRoleIndex(0);
-      setRoleMessage("Role configuration saved.");
+      setRoleMessage("Role configuration saved successfully.");
     } catch (err) {
       setSettingsError(err.message);
     } finally {
@@ -261,8 +302,8 @@ export default function LabAdminSettingsPage() {
         </div>
       </div>
 
+      <SuccessDialog message={roleMessage} onClose={() => setRoleMessage("")} />
       {settingsError && <div className="developer-alert">{settingsError}</div>}
-      {roleMessage && <div className="developer-success">{roleMessage}</div>}
 
       <div className="settings-summary-grid">
         <article>

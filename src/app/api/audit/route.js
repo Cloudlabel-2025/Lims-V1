@@ -1,11 +1,15 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireTenantSession } from "@/app/lib/auth";
 
 export async function GET(req) {
   try {
-    const auth = requireTenantSession(req, "settings.manage");
+    const auth = requireTenantSession(req);
     if (auth.error) return auth.error;
+
+    if (!hasPermission(auth.session, "audit.view") && !hasPermission(auth.session, "settings.manage")) {
+      return Response.json({ error: "Permission denied" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(req.url);
     const resourceType = searchParams.get("resourceType") || "";

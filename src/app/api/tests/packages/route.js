@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 function clean(value) {
   return String(value || "").trim();
@@ -46,7 +46,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const auth = requireTenantSession(req, "tests.edit");
+    const auth = requireTenantSession(req, "tests.create");
     if (auth.error) return auth.error;
 
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "tests.view");
@@ -56,6 +56,10 @@ export async function POST(req) {
     const name = clean(body.name);
     const price = Number(body.price) || 0;
     const tests = Array.isArray(body.tests) ? body.tests : [];
+
+    if (price > 0 && !hasPermission(auth.session, "tests.price")) {
+      return Response.json({ error: "tests.price permission is required to set package price" }, { status: 403 });
+    }
 
     if (!name) return Response.json({ error: "Package name is required" }, { status: 400 });
     if (tests.length === 0) return Response.json({ error: "At least one test must be included" }, { status: 400 });

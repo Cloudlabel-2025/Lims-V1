@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { cachedJsonFetch, clearCachedApi, useTenantShell } from "@/app/lib/use-current-user";
 import { hasPermission } from "@/app/lib/client-rbac";
 
@@ -112,7 +113,7 @@ export default function UserAssignmentPage() {
 
       clearCachedApi("/api/settings/users");
       setUsers((current) => [data.user, ...current]);
-      setUserMessage(`User created. Login User ID: ${data.user.userId}`);
+      setUserMessage(`User created successfully. Login User ID: ${data.user.userId}.`);
       setNewUser({
         name: "",
         email: "",
@@ -166,7 +167,7 @@ export default function UserAssignmentPage() {
       clearCachedApi("/api/settings/users");
       setUsers((current) => current.map((item) => (item.id === data.user.id ? data.user : item)));
       setEditingUser(null);
-      setUserMessage(`User ${data.user.userId} updated.`);
+      setUserMessage(`User ${data.user.userId} updated successfully.`);
     } catch (err) {
       setPageError(err.message);
     } finally {
@@ -193,7 +194,7 @@ export default function UserAssignmentPage() {
       clearCachedApi("/api/settings/users");
       setUsers((current) => current.filter((item) => item.id !== userRecord.id));
       if (editingUser?.id === userRecord.id) setEditingUser(null);
-      setUserMessage(`User ${userRecord.userId} deleted.`);
+      setUserMessage(`User ${userRecord.userId} deleted successfully.`);
     } catch (err) {
       setPageError(err.message);
     } finally {
@@ -211,8 +212,8 @@ export default function UserAssignmentPage() {
         </div>
       </div>
 
+      <SuccessDialog message={userMessage} onClose={() => setUserMessage("")} />
       {pageError && <div className="developer-alert">{pageError}</div>}
-      {userMessage && <div className="developer-success">{userMessage}</div>}
 
       {loadingUsers ? (
         <p className="developer-empty">Loading users...</p>

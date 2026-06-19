@@ -1,4 +1,5 @@
 import { jsonError } from "@/app/lib/api-response";
+import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -18,6 +19,13 @@ export async function GET(req, { params }) {
       return Response.json({ error: "Report not found" }, { status: 404 });
     }
 
+    await writeAuditLog(req, auth, {
+      action: "reports.accessed",
+      resourceType: "TestReport",
+      resourceId: report._id,
+      metadata: { status: report.status },
+    });
+
     return Response.json({ report });
   } catch (error) {
     return jsonError("Unable to load report", error, 500);
@@ -30,7 +38,7 @@ export async function PATCH(req, { params }) {
     const body = await req.json();
     const action = String(body.action || "");
 
-    const permissionMap = { verify: "reports.verify", release: "reports.release" };
+    const permissionMap = { verify: "reports.verify", release: "reports.release", deliver: "reports.print" };
     const permission = permissionMap[action];
     if (!permission) return Response.json({ error: "Invalid action" }, { status: 400 });
 
@@ -40,11 +48,29 @@ export async function PATCH(req, { params }) {
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "reports.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { TestReport } = await getTenantModels(auth.tenantId);
+    const isLabAdmin =
+      auth.session?.permissions?.includes("*") ||
+      ["admin", "lab admin"].includes(String(auth.session?.roleName || "").trim().toLowerCase());
+    if ((action === "verify" || action === "release") && !isLabAdmin) {
+      return Response.json({ error: "Only Lab Admin can verify or release reports" }, { status: 403 });
+    }
+
+    const { TestReport, BillingRecord } = await getTenantModels(auth.tenantId);
     const report = await TestReport.findById(id);
     if (!report) return Response.json({ error: "Report not found" }, { status: 404 });
 
-    const transitions = { verify: ["completed", "verified"], release: ["verified", "released"] };
+    if (action === "verify" && (!report.results || report.results.length === 0)) {
+      return Response.json({ error: "Draft results are required before verification" }, { status: 400 });
+    }
+
+    if (action === "deliver") {
+      const billingRecord = report.billingRecord ? await BillingRecord.findById(report.billingRecord) : null;
+      if (!billingRecord || billingRecord.billingStatus !== "paid") {
+        return Response.json({ error: "Bill must be paid before report delivery" }, { status: 400 });
+      }
+    }
+
+    const transitions = { verify: ["draft", "verified"], release: ["verified", "released"], deliver: ["released", "delivered"] };
     const [from, to] = transitions[action];
     if (report.status !== from) {
       return Response.json({ error: `Report must be in '${from}' status to ${action}` }, { status: 400 });
@@ -53,6 +79,13 @@ export async function PATCH(req, { params }) {
     report.status = to;
     await report.save();
     await report.populate("patient", "name patientId age gender phone");
+
+    await writeAuditLog(req, auth, {
+      action: action === "verify" ? "reports.verified" : action === "release" ? "reports.released" : "reports.delivered",
+      resourceType: "TestReport",
+      resourceId: report._id,
+      metadata: { status: report.status, billingRecordId: report.billingRecord },
+    });
 
     return Response.json({ report });
   } catch (error) {

@@ -10,6 +10,24 @@ function getCacheKey(url) {
   return `${window.location.origin}:${url}`;
 }
 
+async function readJsonResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  const fallbackMessage = response.ok
+    ? "Server returned a non-JSON response."
+    : `Request failed with ${response.status} ${response.statusText || "error"}.`;
+
+  return {
+    error: fallbackMessage,
+    details: text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180),
+  };
+}
+
 export function clearCachedApi(url) {
   if (!url) {
     apiCache.clear();
@@ -30,7 +48,7 @@ export async function cachedJsonFetch(url, options = {}) {
 
   if (method !== "GET") {
     const response = await fetch(url, { ...fetchOptions, credentials });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     return { response, data };
   }
 
@@ -49,7 +67,7 @@ export async function cachedJsonFetch(url, options = {}) {
   let promise;
   promise = (async () => {
     const response = await fetch(url, { ...fetchOptions, credentials });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     const value = { response, data };
 
     if (response.ok) {

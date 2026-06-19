@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { clearCachedApi } from "@/app/lib/use-current-user";
 import { validateDoctorPayload } from "@/app/utils/doctor-validation";
 
@@ -66,7 +67,7 @@ export default function DoctorRegistration() {
       if (res.status === 201) {
         clearCachedApi("/api/doctor");
         clearCachedApi("/api/dashboard/stats");
-        setStatus({ type: "success", message: `Doctor registered successfully — ID: ${data.doctorId}` });
+        setStatus({ type: "success", message: `Doctor registered successfully. Doctor ID: ${data.doctorId}.` });
         setForm(EMPTY_FORM);
         setShowErrors(false);
       } else {
@@ -118,7 +119,12 @@ export default function DoctorRegistration() {
         </button>
       </div>
 
-      {status.message && (
+      <SuccessDialog
+        message={status.type === "success" ? status.message : ""}
+        onClose={() => setStatus({ type: "", message: "" })}
+      />
+
+      {status.message && status.type !== "success" && (
         <div className={`lims-alert ${status.type}`} role="alert" style={{ marginBottom: '20px' }}>
           <span>{status.message}</span>
           <button className="lims-alert-close" onClick={() => setStatus({ type: "", message: "" })}>{Icons.close}</button>

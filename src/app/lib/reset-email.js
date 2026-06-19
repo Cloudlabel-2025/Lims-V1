@@ -2,30 +2,6 @@ function cleanEnv(name) {
   return String(process.env[name] || "").trim();
 }
 
-function getPublicBaseUrl(req) {
-  const configured =
-    cleanEnv("PASSWORD_RESET_BASE_URL") ||
-    cleanEnv("PUBLIC_APP_URL") ||
-    cleanEnv("NEXT_PUBLIC_APP_URL");
-
-  if (configured) return configured.replace(/\/+$/, "");
-
-  const requestUrl = new URL(req.url);
-  return requestUrl.origin;
-}
-
-export function buildPasswordResetUrl(req, { token, userType, tenantId }) {
-  const resetUrl = new URL("/reset-password", getPublicBaseUrl(req));
-  resetUrl.searchParams.set("token", token);
-  resetUrl.searchParams.set("userType", userType);
-
-  if (tenantId) {
-    resetUrl.searchParams.set("tenantId", tenantId);
-  }
-
-  return resetUrl.toString();
-}
-
 function getResendConfig() {
   return {
     apiKey: cleanEnv("RESEND_API_KEY"),
@@ -34,7 +10,7 @@ function getResendConfig() {
   };
 }
 
-export async function sendPasswordResetEmail({ to, resetUrl, expiresAt }) {
+export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
   const { apiKey, from, replyTo } = getResendConfig();
 
   if (!apiKey || !from) {
@@ -60,25 +36,23 @@ export async function sendPasswordResetEmail({ to, resetUrl, expiresAt }) {
       from,
       to,
       reply_to: replyTo || undefined,
-      subject: "Reset your LIMS password",
+      subject: "Your LIMS password reset OTP",
       text: [
         "We received a request to reset your LIMS password.",
         "",
-        `Reset link: ${resetUrl}`,
-        `This link expires at ${expiresText}.`,
+        `Your OTP: ${otp}`,
+        `This OTP expires at ${expiresText}. Do not share it with anyone.`,
         "",
         "If you did not request this, you can ignore this email.",
       ].join("\n"),
       html: `
         <div style="font-family:Arial,sans-serif;line-height:1.5;color:#172033">
           <h2 style="margin:0 0 12px">Reset your LIMS password</h2>
-          <p>We received a request to reset your password.</p>
-          <p>
-            <a href="${resetUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;padding:10px 14px;border-radius:6px;text-decoration:none">
-              Reset password
-            </a>
-          </p>
-          <p>This link expires at ${expiresText}.</p>
+          <p>We received a request to reset your password. Use the OTP below:</p>
+          <div style="margin:20px 0;text-align:center">
+            <span style="display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:14px 32px;font-size:32px;font-weight:700;letter-spacing:10px;color:#0d9488">${otp}</span>
+          </div>
+          <p>This OTP expires at <strong>${expiresText}</strong>. Do not share it with anyone.</p>
           <p>If you did not request this, you can ignore this email.</p>
         </div>
       `,

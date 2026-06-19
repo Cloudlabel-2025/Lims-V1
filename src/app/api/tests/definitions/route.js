@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import mongoose from "mongoose";
 
 function clean(value) {
@@ -88,13 +88,17 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const auth = requireTenantSession(req, "tests.edit");
+    const auth = requireTenantSession(req, "tests.create");
     if (auth.error) return auth.error;
 
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "tests.view");
     if (moduleAuth.error) return moduleAuth.error;
 
     const body = await req.json();
+    if (!hasPermission(auth.session, "tests.price") && Number(body.price || 0) !== 0) {
+      return Response.json({ error: "tests.price permission is required to set test price" }, { status: 403 });
+    }
+
     const name = clean(body.name);
     const category = clean(body.category);
     const parameters = normalizeParameters(body.parameters);

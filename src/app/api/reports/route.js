@@ -1,4 +1,5 @@
 import { jsonError } from "@/app/lib/api-response";
+import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
@@ -29,6 +30,17 @@ export async function GET(req) {
     const query = {};
     if (patientId) query.patient = patientId;
 
+    // Doctor Regular: scope reports to patients referred by this doctor only
+    if (auth.session.userType === "tenant" && auth.session.doctorId) {
+      const { BillingRecord } = await getTenantModels(auth.tenantId);
+      const referredPatientIds = await BillingRecord.distinct("patient", {
+        referralDoctor: auth.session.doctorId,
+      });
+      query.patient = patientId
+        ? { $in: referredPatientIds.map(String).includes(patientId) ? [patientId] : [] }
+        : { $in: referredPatientIds };
+    }
+
     const { TestReport } = await getTenantModels(auth.tenantId);
     const reports = await TestReport.find(query)
       .populate("patient", "name patientId age gender phone")
@@ -56,17 +68,28 @@ export async function POST(req) {
     let patientId = clean(body.patient);
     let testDefinitionId = clean(body.testDefinition);
 
-    const { Patient, TestDefinition, TestReport, Sample, BillingRecord } = await getTenantModels(auth.tenantId);
-    let sample = null;
+    const { Patient, TestDefinition, TestReport, Sample, BillingRecord, QcLog } = await getTenantModels(auth.tenantId);
 
-    if (sampleId) {
-      sample = await Sample.findById(sampleId);
-      if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
-      if (!["collected", "processing"].includes(sample.status)) {
-        return Response.json({ error: "Sample must be collected before result entry" }, { status: 400 });
-      }
-      patientId = String(sample.patient);
-      testDefinitionId = String(sample.testDefinition);
+    if (!sampleId) {
+      return Response.json({ error: "Sample is required for result entry" }, { status: 400 });
+    }
+
+    const sample = await Sample.findById(sampleId);
+    if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
+    if (!["collected", "processing"].includes(sample.status)) {
+      return Response.json({ error: "Sample must be collected before result entry" }, { status: 400 });
+    }
+    patientId = String(sample.patient);
+    testDefinitionId = String(sample.testDefinition);
+
+    const qcPass = await QcLog.findOne({
+      sample: sample._id,
+      tenantId: auth.tenantId,
+      result: "pass",
+    }).sort({ createdAt: -1 });
+
+    if (!qcPass) {
+      return Response.json({ error: "QC approval is required before result entry" }, { status: 400 });
     }
 
     if (!patientId) return Response.json({ error: "Patient is required" }, { status: 400 });
@@ -118,6 +141,8 @@ export async function POST(req) {
     const report = await TestReport.create({
       patient: patient._id,
       testDefinition: test._id,
+      sample: sample._id,
+      billingRecord: sample.billingRecord,
       testSnapshot: {
         testId: test.testId,
         name: test.name,
@@ -127,29 +152,31 @@ export async function POST(req) {
       },
       results,
       remarks: clean(body.remarks),
-      status: body.status || "completed",
+      status: "draft",
       enteredBy: auth.session.email,
     });
 
-    if (sample) {
-      sample.status = "reported";
-      await sample.save();
+    sample.status = "reported";
+    await sample.save();
 
-      const billingRecord = await BillingRecord.findById(sample.billingRecord);
-      if (billingRecord) {
-        const item = billingRecord.items.id(sample.billingItemId);
-        if (item) item.status = "reported";
-        billingRecord.status = billingRecord.items.every((billingItem) => billingItem.status === "reported")
-          ? "completed"
-          : "in-progress";
-        await billingRecord.save();
-      }
+    const billingRecord = await BillingRecord.findById(sample.billingRecord);
+    if (billingRecord) {
+      const item = billingRecord.items.id(sample.billingItemId);
+      if (item) item.status = "reported";
+      billingRecord.status = billingRecord.items.every((billingItem) => billingItem.status === "reported")
+        ? "completed"
+        : "in-progress";
+      await billingRecord.save();
     }
 
     await report.populate("patient", "name patientId age gender phone");
 
-    const { AuditLog } = await getTenantModels(auth.tenantId);
-    AuditLog.create({ action: "reports.create", userId: auth.session.userId, tenantId: auth.tenantId, resourceType: "TestReport", resourceId: report._id, ipAddress: req.headers.get("x-forwarded-for") || "" }).catch(() => {});
+    await writeAuditLog(req, auth, {
+      action: "reports.draft_created",
+      resourceType: "TestReport",
+      resourceId: report._id,
+      metadata: { sampleId: sample._id, billingRecordId: sample.billingRecord },
+    });
 
     return Response.json({ report }, { status: 201 });
   } catch (error) {

@@ -43,6 +43,24 @@ function cleanString(value) {
   return String(value || "").trim();
 }
 
+function isContactEmail(value) {
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(cleanString(value));
+}
+
+function validateLabName(value) {
+  const name = cleanString(value);
+  if (name.length < 2) return "Lab name must be at least 2 characters";
+  if (name.length > 25) return "Lab name must not exceed 25 characters";
+  if (!/^[A-Za-z0-9][A-Za-z0-9 .&'-]*[A-Za-z0-9]$/.test(name)) {
+    return "Lab name can include letters, numbers, spaces, and . & ' - only";
+  }
+  return "";
+}
+
+function isPersonName(value) {
+  return /^[A-Za-z]+(?: [A-Za-z]+)*$/.test(cleanString(value));
+}
+
 function normalizeTenantId(value) {
   return cleanString(value).toLowerCase();
 }
@@ -268,6 +286,10 @@ export async function POST(req) {
     const body = await req.json();
     const name = cleanString(body.name);
     const tenantId = normalizeTenantId(body.tenantId);
+    const contactEmail = cleanString(body.contactEmail).toLowerCase();
+    const contactPhone = cleanString(body.contactPhone);
+    const adminFirstName = cleanString(body.adminFirstName);
+    const adminLastName = cleanString(body.adminLastName);
     const adminEmail = cleanString(body.adminEmail).toLowerCase();
     const adminPassword = String(body.adminPassword || "");
     const adminPasswordConfirm = String(body.adminPasswordConfirm || body.adminConfirmPassword || "");
@@ -275,9 +297,10 @@ export async function POST(req) {
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
     const logoAltText = cleanString(body.logoAltText).slice(0, 120) || `${name} logo`;
     const logo = normalizeCloudinaryLogo(body.logo, logoAltText);
+    const labNameError = validateLabName(name);
 
-    if (!name || name.length < 2) {
-      return NextResponse.json({ error: "Lab name is required" }, { status: 400 });
+    if (labNameError) {
+      return NextResponse.json({ error: labNameError }, { status: 400 });
     }
 
     if (!tenantIdPattern.test(tenantId)) {
@@ -287,7 +310,39 @@ export async function POST(req) {
       );
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    if (!contactPhone) {
+      return NextResponse.json({ error: "Contact phone is required" }, { status: 400 });
+    }
+
+    if (!/^\d{10}$/.test(contactPhone)) {
+      return NextResponse.json({ error: "Contact phone must be exactly 10 digits" }, { status: 400 });
+    }
+
+    if (!contactEmail) {
+      return NextResponse.json({ error: "Contact email is required" }, { status: 400 });
+    }
+
+    if (!isContactEmail(contactEmail)) {
+      return NextResponse.json({ error: "Valid contact email is required" }, { status: 400 });
+    }
+
+    if (!adminFirstName) {
+      return NextResponse.json({ error: "Admin first name is required" }, { status: 400 });
+    }
+
+    if (!isPersonName(adminFirstName)) {
+      return NextResponse.json({ error: "Admin first name must contain letters only" }, { status: 400 });
+    }
+
+    if (!adminLastName) {
+      return NextResponse.json({ error: "Admin last name is required" }, { status: 400 });
+    }
+
+    if (!isPersonName(adminLastName)) {
+      return NextResponse.json({ error: "Admin last name must contain letters only" }, { status: 400 });
+    }
+
+    if (!isContactEmail(adminEmail)) {
       return NextResponse.json({ error: "Valid lab admin email is required" }, { status: 400 });
     }
 
@@ -312,9 +367,9 @@ export async function POST(req) {
     const existingLab = await Lab.findOne({ tenantId }).select("tenantId status name").lean();
 
     if (existingLab) {
-      if (existingLab.status === "archived") {
+      if (existingLab.status === "archived" || existingLab.status === "deleted") {
         return NextResponse.json(
-          { error: `Tenant ID "${tenantId}" belongs to a deleted lab (${existingLab.name}). Tenant IDs are permanently reserved and cannot be reused. Choose a different tenant ID.` },
+          { error: `Tenant ID "${tenantId}" belongs to a ${existingLab.status} lab (${existingLab.name}). Tenant IDs are permanently reserved and cannot be reused. Choose a different tenant ID.` },
           { status: 409 }
         );
       }
@@ -355,8 +410,8 @@ export async function POST(req) {
       subscriptionPlan: body.subscriptionPlan || "trial",
       enabledModules,
       contactName: cleanString(body.contactName),
-      contactEmail: cleanString(body.contactEmail).toLowerCase(),
-      contactPhone: cleanString(body.contactPhone),
+      contactEmail,
+      contactPhone,
       branding: {
         logo: logo || undefined,
         primaryColor: body.primaryColor || "#0d9488",
@@ -387,8 +442,6 @@ export async function POST(req) {
     stage = "creating lab admin";
     const User = getUserModel(tenantConnection);
     const passwordHash = await hashPassword(adminPassword);
-    const adminFirstName = cleanString(body.adminFirstName) || "Lab";
-    const adminLastName = cleanString(body.adminLastName) || "Admin";
     const existingAdmin = await User.findOne({ email: adminEmail }).select("+passwordHash");
     let adminUser = existingAdmin;
 

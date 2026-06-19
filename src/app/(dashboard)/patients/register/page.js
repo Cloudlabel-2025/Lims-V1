@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { getISTNow, getEmptyForm, calculateAge } from "@/app/utils/patient-helpers";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
@@ -188,13 +189,13 @@ export default function PatientRegistration() {
         clearCachedApi("/api/dashboard/stats");
         setStatus({ 
           type: "success", 
-          message: `Patient registered successfully — ID: ${data.patientId}. A pending bill has been generated in the Billing Center.`
+          message: `Patient registered successfully. Patient ID: ${data.patientId}. A pending bill has been generated in the Billing Center.`
         });
         setForm(getEmptyForm());
         setHasRefDoctor(false);
         setShowErrors(false);
         // Optionally redirect after a short delay
-        setTimeout(() => router.push("/billing"), 2500);
+        setTimeout(() => router.push("/billing"), 5000);
       } else {
         setStatus({ type: "danger", message: data.error || "Something went wrong." });
       }
@@ -220,7 +221,12 @@ export default function PatientRegistration() {
         </button>
       </div>
 
-      {status.message && (
+      <SuccessDialog
+        message={status.type === "success" ? status.message : ""}
+        onClose={() => setStatus({ type: "", message: "" })}
+      />
+
+      {status.message && status.type !== "success" && (
         <div className={`lims-alert ${status.type}`} role="alert" style={{ marginBottom: '20px' }}>
           <span>{status.message}</span>
           <button className="lims-alert-close" onClick={() => setStatus({ type: "", message: "" })}>{Icons.close}</button>
@@ -397,7 +403,7 @@ export default function PatientRegistration() {
                 try {
                   const res = await fetch("/api/patient", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ ...pendingPayload, force: true }) });
                   const data = await res.json();
-                  if (res.ok) { clearCachedApi("/api/patient"); clearCachedApi("/api/billing"); clearCachedApi("/api/samples?status=all"); clearCachedApi("/api/dashboard/stats"); setStatus({ type: "success", message: `Registered: ${data.patientId}` }); setForm(getEmptyForm()); setHasRefDoctor(false); }
+                  if (res.ok) { clearCachedApi("/api/patient"); clearCachedApi("/api/billing"); clearCachedApi("/api/samples?status=all"); clearCachedApi("/api/dashboard/stats"); setStatus({ type: "success", message: `Patient registered successfully. Patient ID: ${data.patientId}.` }); setForm(getEmptyForm()); setHasRefDoctor(false); }
                   else setStatus({ type: "danger", message: data.error || "Failed" });
                 } catch { setStatus({ type: "danger", message: "Network error" }); }
                 finally { setLoading(false); }

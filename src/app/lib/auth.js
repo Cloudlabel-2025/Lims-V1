@@ -3,6 +3,8 @@ import { getSessionCookieName, verifySessionToken } from "@/app/lib/session";
 import { getTenantIdFromRequest } from "@/app/lib/tenant-resolver";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
+import rbacConfig from "@/app/lib/rbac-config.json";
+import { getViewPermissionForModule } from "@/app/lib/rbac";
 
 export function getSessionFromRequest(req) {
   const token = req.cookies.get(getSessionCookieName())?.value;
@@ -16,6 +18,23 @@ export function hasPermission(session, permission) {
   return (
     Array.isArray(session.permissions) &&
     (session.permissions.includes("*") || session.permissions.includes(permission))
+  );
+}
+
+function getRequiredPermissions(permission) {
+  if (!permission) return [];
+
+  const config = rbacConfig.permissions.find((item) => item.key === permission);
+  const required = new Set([permission, ...(config?.dependencies || [])]);
+  const moduleViewPermission = config ? getViewPermissionForModule(config.module) : null;
+  if (moduleViewPermission && config.action !== "view") required.add(moduleViewPermission);
+
+  return [...required];
+}
+
+function hasRequiredPermissions(session, permission) {
+  return getRequiredPermissions(permission).every((requiredPermission) =>
+    hasPermission(session, requiredPermission)
   );
 }
 
@@ -43,11 +62,17 @@ export function requireTenantSession(req, permission) {
       };
     }
     tenantId = requestedTenantId || tenantId;
-  } catch {
+  } catch (error) {
+    if (["Untrusted host", "Invalid tenant identifier"].includes(error.message)) {
+      return {
+        error: NextResponse.json({ error: error.message }, { status: 403 }),
+      };
+    }
+
     tenantId = session.tenantId;
   }
 
-  if (!hasPermission(session, permission)) {
+  if (!hasRequiredPermissions(session, permission)) {
     return {
       error: NextResponse.json({ error: "Permission denied" }, { status: 403 }),
     };

@@ -255,6 +255,18 @@
                             "sortOrder":  100
                         },
                         {
+                            "name":  "Create Tests",
+                            "key":  "tests.create",
+                            "module":  "tests",
+                            "action":  "create",
+                            "category":  "lab",
+                            "dependencies":  [
+                                                 "tests.view"
+                                             ],
+                            "description":  "Create lab test entries.",
+                            "sortOrder":  105
+                        },
+                        {
                             "name":  "Edit Tests",
                             "key":  "tests.edit",
                             "module":  "tests",
@@ -265,6 +277,19 @@
                                              ],
                             "description":  "Create or update lab test entries.",
                             "sortOrder":  110
+                        },
+                        {
+                            "name":  "Set Test Prices",
+                            "key":  "tests.price",
+                            "module":  "tests",
+                            "action":  "price",
+                            "category":  "lab",
+                            "dependencies":  [
+                                                 "tests.view"
+                                             ],
+                            "description":  "Create or update test and package prices.",
+                            "isDangerous":  true,
+                            "sortOrder":  112
                         },
                         {
                             "name":  "Delete Tests",

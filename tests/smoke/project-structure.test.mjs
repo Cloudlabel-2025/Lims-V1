@@ -34,8 +34,6 @@ const criticalPages = [
   "developer/labs/page.js",
   "developer/labs/create/page.js",
   "developer/labs/[id]/edit/page.js",
-  "developer/defaults/page.js",
-  "developer/modules/page.js",
   "developer/system/page.js",
 ];
 

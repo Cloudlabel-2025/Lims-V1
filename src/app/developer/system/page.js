@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
+import CmsSuccessDialog from "@/app/developer/components/CmsSuccessDialog";
 
 function groupBy(items, key) {
   return items.reduce((groups, item) => {
@@ -31,6 +32,16 @@ function sameValues(left, right) {
   return left.every((value) => rightSet.has(value));
 }
 
+function getModuleLabel(moduleId) {
+  const moduleConfig = availableLabModules.find((module) => module.id === moduleId);
+  if (moduleConfig) return moduleConfig.label;
+
+  return moduleId
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function normalizeAdminPermissions(permissions, enabledModules, labPermissions) {
   const enabledModuleSet = new Set(enabledModules);
   const allowedKeys = new Set(
@@ -46,33 +57,15 @@ function normalizeAdminPermissions(permissions, enabledModules, labPermissions) 
   return permissions.filter((permissionKey) => allowedKeys.has(permissionKey));
 }
 
-function formatDate(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default function DeveloperSystemPage() {
-  const developerPermissions = useMemo(
-    () => rbacConfig.permissions.filter((permission) => permission.scope === "developer"),
-    []
-  );
   const labPermissions = useMemo(
     () => rbacConfig.permissions.filter((permission) => permission.scope !== "developer"),
     []
   );
-  const developerPermissionGroups = useMemo(
-    () => groupBy(developerPermissions, "category"),
-    [developerPermissions]
-  );
 
   const [labs, setLabs] = useState([]);
-  const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [selectedLabId, setSelectedLabId] = useState("");
   const [savedAccess, setSavedAccess] = useState(null);
   const [draftAccess, setDraftAccess] = useState(null);
   const [loadingLabs, setLoadingLabs] = useState(true);
@@ -80,15 +73,9 @@ export default function DeveloperSystemPage() {
   const [savingAccess, setSavingAccess] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [expandedPermissionModules, setExpandedPermissionModules] = useState(new Set(["dashboard"]));
 
-  // Archived labs state
-  const [archivedLabs, setArchivedLabs] = useState([]);
-  const [loadingArchived, setLoadingArchived] = useState(true);
-  const [restoringId, setRestoringId] = useState("");
-  const [archiveError, setArchiveError] = useState("");
-  const [archiveSuccess, setArchiveSuccess] = useState("");
-
-  const selectedLab = labs.find((lab) => lab.tenantId === selectedTenantId);
+  const selectedLab = labs.find((lab) => lab.id === selectedLabId);
   const activeDraftModules = useMemo(() => draftAccess?.enabledModules || [], [draftAccess]);
   const visibleLabPermissions = useMemo(
     () =>
@@ -104,6 +91,18 @@ export default function DeveloperSystemPage() {
     () => groupBy(visibleLabPermissions, "module"),
     [visibleLabPermissions]
   );
+  const orderedPermissionGroups = useMemo(() => {
+    const moduleOrder = [
+      ...availableLabModules.map((module) => module.id),
+      "users",
+      "settings",
+    ];
+
+    return Object.entries(labPermissionGroups).sort(
+      ([leftModule], [rightModule]) =>
+        moduleOrder.indexOf(leftModule) - moduleOrder.indexOf(rightModule)
+    );
+  }, [labPermissionGroups]);
   const accessDirty = Boolean(
     savedAccess &&
       draftAccess &&
@@ -118,10 +117,10 @@ export default function DeveloperSystemPage() {
       try {
         const { response, data } = await cachedJsonFetch("/api/developer/labs", { ttl: 15_000 });
         if (!response.ok) throw new Error(data.error || "Unable to load labs");
-        const loadedLabs = (data.labs || []).filter((lab) => lab.status !== "archived");
+        const loadedLabs = (data.labs || []).filter((lab) => lab.status === "active");
         if (!cancelled) {
           setLabs(loadedLabs);
-          setSelectedTenantId(loadedLabs[0]?.tenantId || "");
+          setSelectedLabId(loadedLabs[0]?.id || "");
         }
       } catch (err) {
         if (!cancelled) setError(err.message);
@@ -135,26 +134,7 @@ export default function DeveloperSystemPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadArchived() {
-      try {
-        const { response, data } = await cachedJsonFetch("/api/developer/labs/archived", { ttl: 10_000 });
-        if (!response.ok) throw new Error(data.error || "Unable to load archived labs");
-        if (!cancelled) setArchivedLabs(data.labs || []);
-      } catch (err) {
-        if (!cancelled) setArchiveError(err.message);
-      } finally {
-        if (!cancelled) setLoadingArchived(false);
-      }
-    }
-
-    loadArchived();
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedTenantId) return;
+    if (!selectedLabId) return;
     let cancelled = false;
 
     async function loadLabAccess() {
@@ -163,8 +143,9 @@ export default function DeveloperSystemPage() {
       setSuccess("");
 
       try {
+        const encodedLabId = encodeURIComponent(selectedLabId);
         const { response, data } = await cachedJsonFetch(
-          `/api/developer/labs/${selectedTenantId}/access`,
+          `/api/developer/labs/${encodedLabId}/access`,
           { ttl: 10_000 }
         );
         if (!response.ok) throw new Error(data.error || data.details || "Unable to load lab access");
@@ -198,7 +179,7 @@ export default function DeveloperSystemPage() {
 
     loadLabAccess();
     return () => { cancelled = true; };
-  }, [selectedTenantId, labPermissions]);
+  }, [selectedLabId, labPermissions]);
 
   function toggleLabModule(moduleId) {
     setDraftAccess((current) => {
@@ -233,6 +214,33 @@ export default function DeveloperSystemPage() {
     );
   }
 
+  function togglePermissionModule(moduleId) {
+    setExpandedPermissionModules((current) => {
+      const next = new Set(current);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+      } else {
+        next.add(moduleId);
+      }
+      return next;
+    });
+  }
+
+  function setModulePermissions(permissions, checked) {
+    setDraftAccess((current) => {
+      if (!current) return current;
+      const nextPermissions = new Set(current.adminPermissions);
+      for (const permission of permissions) {
+        if (checked) {
+          nextPermissions.add(permission.key);
+        } else {
+          nextPermissions.delete(permission.key);
+        }
+      }
+      return { ...current, adminPermissions: [...nextPermissions] };
+    });
+  }
+
   function cancelAccessChanges() {
     setDraftAccess(savedAccess);
     setError("");
@@ -240,22 +248,21 @@ export default function DeveloperSystemPage() {
   }
 
   async function saveAccessChanges() {
-    if (!selectedTenantId || !draftAccess) return;
+    if (!selectedLabId || !draftAccess) return;
     setSavingAccess(true);
     setError("");
     setSuccess("");
 
     try {
-      const response = await fetch(`/api/developer/labs/${selectedTenantId}/access`, {
+      const encodedLabId = encodeURIComponent(selectedLabId);
+      const { response, data } = await cachedJsonFetch(`/api/developer/labs/${encodedLabId}/access`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           enabledModules: draftAccess.enabledModules,
           adminPermissions: draftAccess.adminPermissions,
         }),
       });
-      const data = await response.json();
       if (!response.ok) throw new Error(data.error || data.details || "Unable to save lab access");
 
       const nextSavedAccess = {
@@ -263,12 +270,12 @@ export default function DeveloperSystemPage() {
         adminPermissions: data.adminRole.permissions,
       };
       clearCachedApi("/api/developer/labs");
-      clearCachedApi(`/api/developer/labs/${selectedTenantId}/access`);
+      clearCachedApi(`/api/developer/labs/${encodedLabId}/access`);
       setSavedAccess(nextSavedAccess);
       setDraftAccess(nextSavedAccess);
       setLabs((current) =>
         current.map((lab) =>
-          lab.tenantId === selectedTenantId
+          lab.id === selectedLabId
             ? { ...lab, enabledModules: data.lab.enabledModules }
             : lab
         )
@@ -281,62 +288,23 @@ export default function DeveloperSystemPage() {
     }
   }
 
-  async function restoreLab(lab) {
-    const confirmed = window.confirm(
-      `Restore "${lab.name}"?\n\nThis will set the lab back to active and allow users to log in again.`
-    );
-    if (!confirmed) return;
-
-    setArchiveError("");
-    setArchiveSuccess("");
-    setRestoringId(lab.tenantId);
-
-    try {
-      const response = await fetch("/api/developer/labs/archived", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ tenantId: lab.tenantId }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to restore lab");
-
-      clearCachedApi("/api/developer/labs/archived");
-      clearCachedApi("/api/developer/labs");
-      setArchivedLabs((current) => current.filter((item) => item.tenantId !== lab.tenantId));
-      setArchiveSuccess(`"${lab.name}" has been restored and is now active.`);
-    } catch (err) {
-      setArchiveError(err.message);
-    } finally {
-      setRestoringId("");
-    }
-  }
-
   return (
     <section className="developer-page">
       <div className="developer-page-actions">
         <div>
           <p className="developer-kicker">System</p>
           <h2>System Configuration</h2>
-          <span>Global RBAC, lab-wise admin access, module assignment, and archived lab recovery.</span>
+          <span>Lab-wise admin access and module assignment.</span>
         </div>
       </div>
 
       {error && <div className="developer-alert">{error}</div>}
-      {success && <div className="developer-success">{success}</div>}
+      <CmsSuccessDialog message={success} onClose={() => setSuccess("")} />
 
       <div className="developer-summary-grid">
         <article className="developer-summary-card">
           <span>Active Labs</span>
           <strong>{loadingLabs ? "—" : labs.length}</strong>
-        </article>
-        <article className="developer-summary-card">
-          <span>Archived Labs</span>
-          <strong>{loadingArchived ? "—" : archivedLabs.length}</strong>
-        </article>
-        <article className="developer-summary-card">
-          <span>Developer Permissions</span>
-          <strong>{developerPermissions.length}</strong>
         </article>
         <article className="developer-summary-card">
           <span>Lab Permissions</span>
@@ -355,15 +323,15 @@ export default function DeveloperSystemPage() {
           <label>
             Select Lab
             <select
-              value={selectedTenantId}
-              onChange={(event) => setSelectedTenantId(event.target.value)}
+              value={selectedLabId}
+              onChange={(event) => setSelectedLabId(event.target.value)}
               disabled={loadingLabs || labs.length === 0}
             >
               {labs.length === 0 ? (
                 <option value="">No labs available</option>
               ) : (
                 labs.map((lab) => (
-                  <option key={lab.tenantId} value={lab.tenantId}>
+                  <option key={lab.id} value={lab.id}>
                     {lab.name} ({lab.tenantId})
                   </option>
                 ))
@@ -400,30 +368,78 @@ export default function DeveloperSystemPage() {
 
             <div className="developer-panel-header developer-subsection-header">
               <h2>Lab Admin Permissions</h2>
-              <p>Only permissions for selected modules are shown here.</p>
+              <p>Open a module card to choose the permissions required for this lab.</p>
             </div>
-            <div className="permission-matrix">
-              {Object.entries(labPermissionGroups).map(([moduleId, permissions]) => (
-                <article className="permission-group" key={moduleId}>
-                  <div className="permission-group-header">
-                    <strong>{moduleId}</strong>
-                    <span>{permissions.length} permissions</span>
-                  </div>
-                  {permissions.map((permission) => (
-                    <label className="permission-checkbox" key={permission.key}>
-                      <input
-                        type="checkbox"
-                        checked={draftAccess.adminPermissions.includes(permission.key)}
-                        onChange={() => toggleLabAdminPermission(permission.key)}
-                      />
-                      <span>
-                        <strong>{permission.name}</strong>
-                        <small>{permission.key}</small>
+            <div className="cms-permission-card-list">
+              {orderedPermissionGroups.map(([moduleId, permissions]) => {
+                const selectedCount = permissions.filter((permission) =>
+                  draftAccess.adminPermissions.includes(permission.key)
+                ).length;
+                const expanded = expandedPermissionModules.has(moduleId);
+
+                return (
+                  <article className="cms-permission-card" key={moduleId}>
+                    <button
+                      type="button"
+                      className="cms-permission-card-header"
+                      onClick={() => togglePermissionModule(moduleId)}
+                      aria-expanded={expanded}
+                    >
+                      <span className="cms-permission-toggle">{expanded ? "-" : "+"}</span>
+                      <span className="cms-permission-title">
+                        <strong>{getModuleLabel(moduleId)}</strong>
+                        <small>{selectedCount} selected of {permissions.length}</small>
                       </span>
-                    </label>
-                  ))}
-                </article>
-              ))}
+                      <span className="cms-permission-status">
+                        {selectedCount === permissions.length ? "Full access" : "Custom"}
+                      </span>
+                    </button>
+
+                    {expanded && (
+                      <div className="cms-permission-card-body">
+                        <div className="cms-permission-card-tools">
+                          <button
+                            type="button"
+                            className="developer-secondary-link"
+                            onClick={() => setModulePermissions(permissions, true)}
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            className="developer-secondary-link"
+                            onClick={() => setModulePermissions(permissions, false)}
+                          >
+                            Clear
+                          </button>
+                        </div>
+
+                        <div className="permission-matrix cms-permission-matrix">
+                          <article className="permission-group" key={moduleId}>
+                            <div className="permission-group-header">
+                              <strong>{getModuleLabel(moduleId)} Permission Matrix</strong>
+                              <span>{permissions.length} permissions</span>
+                            </div>
+                            {permissions.map((permission) => (
+                              <label className="permission-checkbox" key={permission.key}>
+                                <input
+                                  type="checkbox"
+                                  checked={draftAccess.adminPermissions.includes(permission.key)}
+                                  onChange={() => toggleLabAdminPermission(permission.key)}
+                                />
+                                <span>
+                                  <strong>{permission.name}</strong>
+                                  <small>{permission.key}</small>
+                                </span>
+                              </label>
+                            ))}
+                          </article>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
 
             <div className="developer-config-actions">
@@ -450,98 +466,6 @@ export default function DeveloperSystemPage() {
         )}
       </section>
 
-      {/* Developer RBAC */}
-      <section className="developer-panel developer-config-section">
-        <div className="developer-panel-header">
-          <h2>Developer RBAC</h2>
-          <p>Developer control-panel permissions are code-defined and change only during development.</p>
-        </div>
-        <div className="developer-form-grid">
-          <label>
-            Role Name
-            <input value="Platform Owner" readOnly />
-          </label>
-          <label>
-            Access Scope
-            <select value="developer" disabled>
-              <option value="developer">Developer Control Panel</option>
-            </select>
-          </label>
-        </div>
-
-        <div className="permission-matrix">
-          {Object.entries(developerPermissionGroups).map(([group, permissions]) => (
-            <article className="permission-group" key={group}>
-              <div className="permission-group-header">
-                <strong>{group.replaceAll("-", " ")}</strong>
-                <span>{permissions.length} permissions</span>
-              </div>
-              {permissions.map((permission) => (
-                <label className="permission-checkbox" key={permission.key}>
-                  <input type="checkbox" checked disabled readOnly />
-                  <span>
-                    <strong>{permission.name}</strong>
-                    <small>{permission.key}</small>
-                  </span>
-                </label>
-              ))}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* Archived Labs */}
-      <section className="developer-panel developer-config-section">
-        <div className="developer-panel-header">
-          <h2>Archived Labs</h2>
-          <p>
-            Labs that were deleted. All tenant data is intact. Restore a lab to make it active again.
-          </p>
-        </div>
-
-        {archiveError && <div className="developer-alert">{archiveError}</div>}
-        {archiveSuccess && <div className="developer-success">{archiveSuccess}</div>}
-
-        {loadingArchived ? (
-          <p className="developer-empty">Loading archived labs...</p>
-        ) : archivedLabs.length === 0 ? (
-          <p className="developer-empty">No archived labs. Deleted labs will appear here.</p>
-        ) : (
-          <div className="developer-lab-list">
-            {archivedLabs.map((lab) => (
-              <article key={lab.tenantId} className="developer-lab-card">
-                <div
-                  className="developer-lab-swatch"
-                  style={{ background: lab.primaryColor || "#6b7280" }}
-                />
-                <div>
-                  <h3>{lab.name}</h3>
-                  <span>
-                    {lab.tenantId} · {lab.subscriptionPlan} ·{" "}
-                    <em style={{ color: "var(--danger, #dc2626)" }}>archived</em>
-                  </span>
-                  <small>Created {formatDate(lab.createdAt)}</small>
-                  <small style={{ color: "var(--danger, #dc2626)" }}>
-                    Archived {formatDate(lab.archivedAt)}
-                  </small>
-                  {lab.adminEmail && <small>Admin: {lab.adminEmail}</small>}
-                  <small>DB: {lab.dbName}</small>
-                </div>
-                <div className="developer-link-actions">
-                  <button
-                    type="button"
-                    className="developer-submit"
-                    disabled={restoringId === lab.tenantId}
-                    onClick={() => restoreLab(lab)}
-                  >
-                    {restoringId === lab.tenantId ? "Restoring..." : "Restore Lab"}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
     </section>
   );
 }

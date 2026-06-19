@@ -12,10 +12,8 @@ export function hasAnyPermission(user, permissions) {
 
 export function getEnabledModules(theme) {
   if (!theme?.enabledModules?.length) return new Set(defaultLabModules);
-  
-  const current = new Set(theme.enabledModules);
-  defaultLabModules.forEach(m => current.add(m));
-  return current;
+
+  return new Set(theme.enabledModules);
 }
 
 export function getAllowedNavItems(user, theme) {

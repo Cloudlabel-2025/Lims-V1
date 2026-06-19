@@ -1,5 +1,5 @@
 import { jsonError } from "@/app/lib/api-response";
-import { requireTenantSession } from "@/app/lib/auth";
+import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
 
@@ -38,6 +38,8 @@ export async function GET(req) {
   try {
     const auth = requireTenantSession(req, "users.manage");
     if (auth.error) return auth.error;
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "users.manage");
+    if (moduleAuth.error) return moduleAuth.error;
 
     const { User } = await getTenantModels(auth.tenantId);
     const users = await User.find({}).populate("role", "name").sort({ createdAt: -1 }).limit(50);
@@ -52,6 +54,8 @@ export async function POST(req) {
   try {
     const auth = requireTenantSession(req, "users.manage");
     if (auth.error) return auth.error;
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "users.manage");
+    if (moduleAuth.error) return moduleAuth.error;
 
     const body = await req.json();
     const email = clean(body.email).toLowerCase();
@@ -118,6 +122,8 @@ export async function PATCH(req) {
   try {
     const auth = requireTenantSession(req, "users.manage");
     if (auth.error) return auth.error;
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "users.manage");
+    if (moduleAuth.error) return moduleAuth.error;
 
     const body = await req.json();
     const userId = clean(body.id || body.userId);
@@ -203,6 +209,8 @@ export async function DELETE(req) {
   try {
     const auth = requireTenantSession(req, "users.manage");
     if (auth.error) return auth.error;
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "users.manage");
+    if (moduleAuth.error) return moduleAuth.error;
 
     const { searchParams } = new URL(req.url);
     const userId = clean(searchParams.get("id"));

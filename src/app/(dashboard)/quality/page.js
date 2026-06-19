@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { useCurrentUser } from "@/app/lib/use-current-user";
 
@@ -94,8 +95,7 @@ export default function QualityPage() {
       if (!res.ok) throw new Error(data.error || "Unable to save QC log");
       setLogs((current) => [data.log, ...current]);
       setForm(emptyForm);
-      setSuccess("QC log recorded.");
-      setTimeout(() => setSuccess(""), 3000);
+      setSuccess("QC log recorded successfully.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -109,6 +109,7 @@ export default function QualityPage() {
       const res = await fetch(`/api/quality?id=${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Unable to delete");
       setLogs((current) => current.filter((l) => l._id !== id));
+      setSuccess("QC log deleted successfully.");
     } catch (err) {
       setError(err.message);
     }
@@ -135,7 +136,7 @@ export default function QualityPage() {
       </div>
 
       {error && <div className="module-alert">{error}</div>}
-      {success && <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#ecfdf5", color: "#047857", fontSize: 13, fontWeight: 800 }}>{success}</div>}
+      <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 20 }}>
         {[

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 
 const emptyAccount = { code: "", name: "", type: "asset", subtype: "" };
 const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxAmount: "", paidFrom: "vendor-payable", attachmentUrl: "" };
@@ -145,7 +146,7 @@ export default function AccountsPage() {
     loadAccountsData();
   }, [loadAccountsData]);
 
-  async function submitForm(event, url, payload, reset) {
+  async function submitForm(event, url, payload, reset, successMessage = "Action completed successfully.") {
     event.preventDefault();
     setSaving(true);
     setError("");
@@ -157,7 +158,7 @@ export default function AccountsPage() {
         body: JSON.stringify(payload),
       });
       reset();
-      setSuccess("Saved successfully");
+      setSuccess(successMessage);
       await loadAccountsData();
     } catch (err) {
       setError(err.message);
@@ -172,7 +173,7 @@ export default function AccountsPage() {
     setSuccess("");
     try {
       await fetchJson(`/api/accounting/accounts/${accountId}`, { method: "DELETE" });
-      setSuccess("Account deleted");
+      setSuccess("Account deleted successfully.");
       await loadAccountsData();
     } catch (err) {
       setError(err.message);
@@ -235,7 +236,7 @@ export default function AccountsPage() {
       </div>
 
       {error && <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 800 }}>{error}</div>}
-      {success && <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#ecfdf5", color: "#047857", fontSize: 13, fontWeight: 800 }}>{success}</div>}
+      <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14, marginBottom: 18 }}>
         <StatCard label="Assets" value={`Rs ${money(totals.asset)}`} icon={Icons.barChart} />
@@ -265,7 +266,7 @@ export default function AccountsPage() {
           {activeTab === "accounts" && (
             <TwoColumn
               left={
-                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/accounts", accountForm, () => setAccountForm(emptyAccount))} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/accounts", accountForm, () => setAccountForm(emptyAccount), "Account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                   <h5 style={{ margin: 0, fontSize: 16 }}>Add Account</h5>
                   <Field label="Code"><input required className="lims-input" value={accountForm.code} onChange={(event) => setAccountForm({ ...accountForm, code: event.target.value })} style={inputStyle()} /></Field>
                   <Field label="Name"><input required className="lims-input" value={accountForm.name} onChange={(event) => setAccountForm({ ...accountForm, name: event.target.value })} style={inputStyle()} /></Field>
@@ -320,7 +321,7 @@ export default function AccountsPage() {
           )}
 
           {activeTab === "manual" && (
-            <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/journal-entries", journalForm, () => setJournalForm(emptyJournal))} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 14 }}>
+            <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/journal-entries", journalForm, () => setJournalForm(emptyJournal), "Manual journal posted successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 14 }}>
               <h5 style={{ margin: 0, fontSize: 16 }}>Manual Journal</h5>
               <Field label="Description"><input required className="lims-input" value={journalForm.description} onChange={(event) => setJournalForm({ ...journalForm, description: event.target.value })} style={inputStyle()} /></Field>
               <div style={{ display: "grid", gap: 10 }}>
@@ -350,7 +351,7 @@ export default function AccountsPage() {
           {activeTab === "expenses" && (
             <TwoColumn
               left={
-                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/expenses", expenseForm, () => setExpenseForm(emptyExpense))} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/expenses", expenseForm, () => setExpenseForm(emptyExpense), "Expense recorded successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                   <h5 style={{ margin: 0, fontSize: 16 }}>Record Expense</h5>
                   <Field label="Category">
                     <select className="lims-input" value={expenseForm.category} onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })} style={inputStyle()}>
@@ -383,7 +384,7 @@ export default function AccountsPage() {
           {activeTab === "corporate" && (
             <TwoColumn
               left={
-                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/corporate-accounts", corporateForm, () => setCorporateForm(emptyCorporate))} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/corporate-accounts", corporateForm, () => setCorporateForm(emptyCorporate), "Corporate account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                   <h5 style={{ margin: 0, fontSize: 16 }}>Corporate Account</h5>
                   <Field label="Name"><input required className="lims-input" value={corporateForm.name} onChange={(event) => setCorporateForm({ ...corporateForm, name: event.target.value })} style={inputStyle()} /></Field>
                   <Field label="Contact Person"><input className="lims-input" value={corporateForm.contactPerson} onChange={(event) => setCorporateForm({ ...corporateForm, contactPerson: event.target.value })} style={inputStyle()} /></Field>

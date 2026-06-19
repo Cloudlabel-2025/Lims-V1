@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 export async function GET(req, { params }) {
   try {
@@ -12,14 +12,15 @@ export async function GET(req, { params }) {
 
     const { id } = await params;
     const { BillingRecord, Sample } = await getTenantModels(auth.tenantId);
+    const canViewSamples = hasPermission(auth.session, "samples.view");
     const [billingRecord, samples] = await Promise.all([
       BillingRecord.findById(id).populate("patient", "name patientId age gender phone"),
-      Sample.find({ billingRecord: id }).populate("patient", "name patientId"),
+      canViewSamples ? Sample.find({ billingRecord: id }).populate("patient", "name patientId") : Promise.resolve([]),
     ]);
 
     if (!billingRecord) return Response.json({ error: "Billing record not found" }, { status: 404 });
 
-    return Response.json({ billingRecord, samples });
+    return Response.json({ billingRecord, ...(canViewSamples ? { samples } : {}) });
   } catch (error) {
     return jsonError("Unable to load billing record", error, 500);
   }

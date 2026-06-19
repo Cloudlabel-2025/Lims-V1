@@ -5,7 +5,7 @@ import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth
 
 export async function POST(req) {
   try {
-    const auth = requireTenantSession(req, "doctors.edit");
+    const auth = requireTenantSession(req, "billing.collect");
     if (auth.error) return auth.error;
 
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "doctors.view");

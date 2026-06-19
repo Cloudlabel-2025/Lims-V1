@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
 
@@ -14,6 +15,7 @@ export default function SamplesPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const canCollectSamples = hasPermission(user, "samples.collect");
   const canUpdateSamples = hasPermission(user, "samples.update");
   const canRejectSamples = hasPermission(user, "samples.reject");
@@ -40,6 +42,7 @@ export default function SamplesPage() {
   async function updateSample(sampleId, action) {
     setUpdatingId(sampleId);
     setError("");
+    setSuccess("");
     try {
       const response = await fetch(`/api/samples/${sampleId}`, {
         method: "PUT",
@@ -62,6 +65,12 @@ export default function SamplesPage() {
         current.map((sample) => (sample._id === sampleId ? data.sample : sample))
       );
       setRejectionReason("");
+      const actionLabel = {
+        collect: "collected",
+        processing: "moved to processing",
+        reject: "rejected",
+      }[action] || "updated";
+      setSuccess(`Sample ${data.sample?.sampleId || ""} ${actionLabel} successfully.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -83,6 +92,7 @@ export default function SamplesPage() {
       </div>
 
       {error && <div className="module-alert">{error}</div>}
+      <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
       <section className="module-panel">
         <div className="sample-toolbar">

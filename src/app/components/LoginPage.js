@@ -11,6 +11,47 @@ const developerLoginFeatures = [
   "Platform Configuration",
 ];
 
+const rememberedLoginPrefix = "lims:remembered-login:v1";
+
+function getRememberedLoginKey(scope) {
+  return `${rememberedLoginPrefix}:${scope}`;
+}
+
+function loadRememberedLogin(scope) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawCredentials = window.localStorage.getItem(getRememberedLoginKey(scope));
+    if (!rawCredentials) return null;
+
+    const credentials = JSON.parse(rawCredentials);
+    if (
+      typeof credentials?.email === "string" &&
+      typeof credentials?.password === "string"
+    ) {
+      return credentials;
+    }
+  } catch {
+    window.localStorage.removeItem(getRememberedLoginKey(scope));
+  }
+
+  return null;
+}
+
+function saveRememberedLogin(scope, credentials) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(
+    getRememberedLoginKey(scope),
+    JSON.stringify(credentials)
+  );
+}
+
+function clearRememberedLogin(scope) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(getRememberedLoginKey(scope));
+}
+
 export default function LoginPage({
   onLogin,
   initialTenantId = "",
@@ -28,6 +69,7 @@ export default function LoginPage({
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const isTenantLogin = userType === "tenant";
   const credentialScope = isTenantLogin
     ? `section-tenant-${tenantId.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || "lab"}-login`
@@ -38,7 +80,7 @@ export default function LoginPage({
   const labName = theme?.labName || (isTenantLogin ? "Lab LIMS" : "CHC Lab CMS");
   const brandLogoUrl = isTenantLogin ? theme?.logo : null;
   const brandLogoLabel = theme?.logoAltText || `${labName} logo`;
-  const brandLogoStyle = brandLogoUrl ? { backgroundImage: `url("${brandLogoUrl}")` } : undefined;
+  const showBrandLogoAltText = isTenantLogin && (!brandLogoUrl || logoLoadFailed);
   const loginFeatures = isTenantLogin
     ? Array.isArray(theme?.loginHighlights)
       ? theme.loginHighlights
@@ -66,6 +108,25 @@ export default function LoginPage({
       applyCmsTheme();
     }
   }, [isTenantLogin]);
+
+  useEffect(() => {
+    setLogoLoadFailed(false);
+  }, [brandLogoUrl]);
+
+  useEffect(() => {
+    const credentials = loadRememberedLogin(credentialScope);
+
+    if (credentials) {
+      setEmail(credentials.email);
+      setPassword(credentials.password);
+      setRememberMe(true);
+      return;
+    }
+
+    setEmail("");
+    setPassword("");
+    setRememberMe(false);
+  }, [credentialScope]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,6 +188,15 @@ export default function LoginPage({
         return;
       }
 
+      if (rememberMe) {
+        saveRememberedLogin(credentialScope, {
+          email: email.trim(),
+          password,
+        });
+      } else {
+        clearRememberedLogin(credentialScope);
+      }
+
       if (onLogin) onLogin(data.user);
       router.push(userType === "developer" ? "/developer/dashboard" : data.redirectUrl || "/dashboard");
     } catch {
@@ -160,12 +230,15 @@ export default function LoginPage({
           <div className="login-brand-content">
             <div className="login-brand-logo">
               <div
-                className={`login-brand-logo-icon ${brandLogoUrl ? "has-image" : ""}`}
-                role={brandLogoUrl ? "img" : undefined}
-                aria-label={brandLogoUrl ? brandLogoLabel : undefined}
-                style={brandLogoStyle}
+                className={`login-brand-logo-icon ${brandLogoUrl && !logoLoadFailed ? "has-image" : ""} ${showBrandLogoAltText ? "has-alt-text" : ""}`}
               >
-                {!brandLogoUrl && Icons.logo}
+                {brandLogoUrl && !logoLoadFailed ? (
+                  <img src={brandLogoUrl} alt={brandLogoLabel} onError={() => setLogoLoadFailed(true)} />
+                ) : showBrandLogoAltText ? (
+                  <span>{brandLogoLabel}</span>
+                ) : (
+                  Icons.logo
+                )}
               </div>
             </div>
             <h1 className="login-brand-title">{labName}</h1>
@@ -203,12 +276,15 @@ export default function LoginPage({
             {/* Mobile Logo */}
             <div className="login-mobile-logo">
               <div
-                className={`login-brand-logo-icon small ${brandLogoUrl ? "has-image" : ""}`}
-                role={brandLogoUrl ? "img" : undefined}
-                aria-label={brandLogoUrl ? brandLogoLabel : undefined}
-                style={brandLogoStyle}
+                className={`login-brand-logo-icon small ${brandLogoUrl && !logoLoadFailed ? "has-image" : ""} ${showBrandLogoAltText ? "has-alt-text" : ""}`}
               >
-                {!brandLogoUrl && Icons.logo}
+                {brandLogoUrl && !logoLoadFailed ? (
+                  <img src={brandLogoUrl} alt={brandLogoLabel} onError={() => setLogoLoadFailed(true)} />
+                ) : showBrandLogoAltText ? (
+                  <span>{brandLogoLabel}</span>
+                ) : (
+                  Icons.logo
+                )}
               </div>
               <span>{labName}</span>
             </div>
@@ -324,7 +400,11 @@ export default function LoginPage({
                   <input
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={() => setRememberMe((p) => !p)}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setRememberMe(checked);
+                      if (!checked) clearRememberedLogin(credentialScope);
+                    }}
                   />
                   <span className="login-checkbox-custom" />
                   Remember me
@@ -361,13 +441,6 @@ export default function LoginPage({
               </button>
             </form>
 
-            {/* Footer */}
-            <div className="login-form-footer">
-              <p>
-                Don&apos;t have an account?{" "}
-                <button type="button" className="login-link" suppressHydrationWarning>Contact Admin</button>
-              </p>
-            </div>
           </div>
         </div>
       </div>

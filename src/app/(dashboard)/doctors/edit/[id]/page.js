@@ -2,6 +2,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 import { validateDoctorPayload } from "@/app/utils/doctor-validation";
 
@@ -78,8 +79,8 @@ export default function EditDoctor({ params }) {
       if (res.ok) {
         clearCachedApi("/api/doctor");
         clearCachedApi(`/api/doctor/${id}`);
-        setStatus({ type: "success", message: "Doctor profile updated successfully!" });
-        setTimeout(() => router.push("/doctors"), 1500);
+        setStatus({ type: "success", message: "Doctor profile updated successfully." });
+        setTimeout(() => router.push("/doctors"), 5000);
       } else {
         setStatus({ type: "danger", message: data.error || "Update failed." });
       }
@@ -106,7 +107,12 @@ export default function EditDoctor({ params }) {
         </button>
       </div>
 
-      {status.message && (
+      <SuccessDialog
+        message={status.type === "success" ? status.message : ""}
+        onClose={() => setStatus({ type: "", message: "" })}
+      />
+
+      {status.message && status.type !== "success" && (
         <div className={`lims-alert ${status.type}`} role="alert" style={{ marginBottom: '20px' }}>
           <span>{status.message}</span>
           <button className="lims-alert-close" onClick={() => setStatus({ type: "", message: "" })}>{Icons.close}</button>

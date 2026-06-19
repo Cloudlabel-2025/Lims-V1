@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 function clean(value) {
   return String(value || "").trim();
@@ -75,6 +75,14 @@ export async function PUT(req, { params }) {
     }
 
     const { TestDefinition } = await getTenantModels(auth.tenantId);
+    const existingTest = await TestDefinition.findById(id).select("price");
+    if (!existingTest) return Response.json({ error: "Test not found" }, { status: 404 });
+
+    const nextPrice = body.price === undefined ? existingTest.price : Number(body.price) || 0;
+    if (nextPrice !== existingTest.price && !hasPermission(auth.session, "tests.price")) {
+      return Response.json({ error: "tests.price permission is required to change test price" }, { status: 403 });
+    }
+
     const test = await TestDefinition.findByIdAndUpdate(
       id,
       {
@@ -83,7 +91,7 @@ export async function PUT(req, { params }) {
           code: clean(body.code).toUpperCase() || undefined,
           category: clean(body.category),
           sampleType: clean(body.sampleType),
-          price: Number(body.price) || 0,
+          price: nextPrice,
           parameters,
           status: body.status === "inactive" ? "inactive" : "active",
         },

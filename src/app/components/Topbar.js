@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { availableLabModules } from "@/app/lib/modules";
+import { getAllowedNavItems } from "@/app/lib/client-rbac";
 
 const NOTIFICATIONS = [
   {
@@ -27,7 +28,7 @@ const DEFAULT_RECENTS = [
   { label: "Test master", href: "/tests", type: "Recent" },
 ];
 
-export default function Topbar({ onToggleSidebar, user }) {
+export default function Topbar({ onToggleSidebar, user, theme }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [recentSearches, setRecentSearches] = useState(DEFAULT_RECENTS);
@@ -37,24 +38,39 @@ export default function Topbar({ onToggleSidebar, user }) {
   const displayName = user?.name || user?.email?.split("@")[0] || "Admin";
   const avatarInitial = displayName.trim()[0]?.toUpperCase() || "A";
 
+  const allowedModuleItems = useMemo(() => getAllowedNavItems(user, theme), [user, theme]);
+
   const moduleSuggestions = useMemo(
     () =>
-      availableLabModules.map((module) => ({
+      allowedModuleItems.map((module) => ({
         label: module.label,
         href: module.href,
         type: "Module",
       })),
-    []
+    [allowedModuleItems]
   );
 
+  const notificationItems = useMemo(
+    () =>
+      NOTIFICATIONS.filter((item) => {
+        const matchedModule = availableLabModules.find((entry) => item.href === entry.href || item.href.startsWith(`${entry.href}/`));
+        return !matchedModule || allowedModuleItems.some((allowed) => allowed.id === matchedModule.id);
+      }),
+    [allowedModuleItems]
+  );
+
+  const allowedHrefs = useMemo(() => new Set(allowedModuleItems.map((module) => module.href)), [allowedModuleItems]);
+
   const visibleSuggestions = useMemo(() => {
-    const source = query.trim() ? moduleSuggestions : recentSearches;
+    const source = query.trim()
+      ? moduleSuggestions
+      : recentSearches.filter((item) => allowedHrefs.has(item.href));
     const normalizedQuery = query.trim().toLowerCase();
 
     return source
       .filter((item) => !normalizedQuery || item.label.toLowerCase().includes(normalizedQuery))
       .slice(0, 6);
-  }, [moduleSuggestions, query, recentSearches]);
+  }, [allowedHrefs, moduleSuggestions, query, recentSearches]);
 
   const navigateTo = (item) => {
     setRecentSearches((prev) => [
@@ -150,12 +166,12 @@ export default function Topbar({ onToggleSidebar, user }) {
             }}
           >
             {Icons.bell}
-            {NOTIFICATIONS.length > 0 && <span className="dash-notif-dot" />}
+            {notificationItems.length > 0 && <span className="dash-notif-dot" />}
           </button>
           {notificationsOpen && (
             <div className="dash-menu-dropdown notifications">
               <div className="dash-dropdown-header">Notifications</div>
-              {NOTIFICATIONS.map((item) => (
+              {notificationItems.map((item) => (
                 <button type="button" className="dash-notification-item" key={item.id} onClick={() => router.push(item.href)}>
                   <span className={`dash-priority-dot ${item.priority}`} />
                   <span>

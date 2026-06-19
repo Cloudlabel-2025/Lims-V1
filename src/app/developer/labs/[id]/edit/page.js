@@ -6,6 +6,7 @@ import { availableLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
+import CmsSuccessDialog from "@/app/developer/components/CmsSuccessDialog";
 
 const loginHighlightOptions = [
   "Patient Registration & Tracking",
@@ -41,6 +42,10 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function isContactEmail(value) {
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(String(value || "").trim());
+}
+
 async function readResponseJson(response) {
   const text = await response.text();
   if (!text) return {};
@@ -59,11 +64,15 @@ function validateForm(form) {
     errors.name = "Lab name must be at least 2 characters.";
   }
 
-  if (form.contactEmail && !isEmail(form.contactEmail)) {
+  if (!form.contactEmail.trim()) {
+    errors.contactEmail = "Contact email is required.";
+  } else if (!isContactEmail(form.contactEmail)) {
     errors.contactEmail = "Enter a valid contact email.";
   }
 
-  if (form.contactPhone && !/^\d{10}$/.test(form.contactPhone)) {
+  if (!form.contactPhone.trim()) {
+    errors.contactPhone = "Contact phone is required.";
+  } else if (!/^\d{10}$/.test(form.contactPhone)) {
     errors.contactPhone = "Phone number must be exactly 10 digits.";
   }
 
@@ -293,7 +302,7 @@ export default function DeveloperEditLabPage({ params }) {
       </div>
 
       {error && <div className="developer-alert">{error}</div>}
-      {success && <div className="developer-success">{success}</div>}
+      <CmsSuccessDialog message={success} onClose={() => setSuccess("")} />
 
       {loading ? (
         <section className="developer-panel">
@@ -332,7 +341,6 @@ export default function DeveloperEditLabPage({ params }) {
               <select value={form.status} onChange={(event) => updateField("status", event.target.value)}>
                 <option value="pending">Pending</option>
                 <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
                 <option value="archived">Archived</option>
               </select>
             </label>
@@ -367,6 +375,7 @@ export default function DeveloperEditLabPage({ params }) {
                   updateField("contactPhone", event.target.value.replace(/\D/g, ""))
                 }
                 placeholder="Enter mobile number"
+                required
               />
               {formErrors.contactPhone && <em>{formErrors.contactPhone}</em>}
             </label>
@@ -380,6 +389,7 @@ export default function DeveloperEditLabPage({ params }) {
                 onChange={(event) => updateField("contactEmail", event.target.value)}
                 placeholder="Enter email"
                 autoComplete="section-developer-edit-lab email"
+                required
               />
               {formErrors.contactEmail && <em>{formErrors.contactEmail}</em>}
             </label>

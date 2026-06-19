@@ -20,7 +20,6 @@ test("tenant modules are grouped into enterprise LIMS areas", () => {
   }
 
   assert.ok(tenantModuleGroups.some((group) => group.id === "operations"), "Lab operations group is required");
-  assert.ok(tenantModuleGroups.some((group) => group.id === "configuration"), "Configuration group is required");
   assert.ok(tenantModuleGroups.some((group) => group.id === "finance"), "Finance group is required");
 });
 
