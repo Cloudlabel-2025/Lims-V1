@@ -5,6 +5,7 @@ import { getTenantModels } from "@/app/lib/tenant-db";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getLabModel } from "@/app/models/master/Lab";
+import { checkRateLimit, resetRateLimit, getClientIp } from "@/app/lib/rate-limit";
 import crypto from "node:crypto";
 
 function hashOtp(otp) {
@@ -24,6 +25,7 @@ async function resolveUserByOtpAndTenant(otpHash, tenantId) {
 
 export async function POST(req) {
   try {
+    const ip = getClientIp(req);
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
     const otp = String(body.otp || "").trim();
@@ -40,6 +42,22 @@ export async function POST(req) {
 
     if (!/^\d{6}$/.test(otp)) {
       return Response.json({ error: "OTP must be a 6-digit number" }, { status: 400 });
+    }
+
+    const rateKey = `${userType}:${email}`;
+
+    const rateCheck = await checkRateLimit({
+      namespace: "reset-password",
+      identifier: `${rateKey}:${ip}`,
+      maxAttempts: 5,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    if (!rateCheck.allowed) {
+      return Response.json(
+        { error: `Too many attempts. Try again in ${rateCheck.retryAfter} seconds.` },
+        { status: 429 }
+      );
     }
 
     if (password !== confirmPassword) {
@@ -95,11 +113,15 @@ export async function POST(req) {
       return Response.json({ error: "Invalid or expired OTP" }, { status: 400 });
     }
 
+    const now = new Date();
     user.passwordHash = await hashPassword(password);
     user.passwordResetTokenHash = undefined;
     user.passwordResetExpiresAt = undefined;
+    user.passwordChangedAt = now;
     user.status = user.status === "invited" ? "active" : user.status;
     await user.save();
+
+    await resetRateLimit("forgot-password", ip);
 
     return Response.json({ message: "Password has been reset successfully" });
   } catch (error) {

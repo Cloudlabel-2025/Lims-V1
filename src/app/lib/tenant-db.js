@@ -72,6 +72,8 @@ export async function connectTenantDB(tenantId) {
 export async function getTenantModels(tenantId) {
   const connection = await connectTenantDB(tenantId);
 
+  const lab = await getTenantConfig(tenantId);
+
   return {
     connection,
     Account: getAccountModel(connection),
@@ -81,7 +83,7 @@ export async function getTenantModels(tenantId) {
     Doctor: getDoctorModel(connection),
     ExpenseEntry: getExpenseEntryModel(connection),
     JournalEntry: getJournalEntryModel(connection),
-    Patient: getPatientModel(connection),
+    Patient: getPatientModel(connection, { patientPrefix: lab?.numbering?.patientPrefix }),
     PaymentReceipt: getPaymentReceiptModel(connection),
     QcLog: getQcLogModel(connection),
     Role: getRoleModel(connection),

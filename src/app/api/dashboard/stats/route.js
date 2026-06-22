@@ -30,6 +30,7 @@ export async function GET(req) {
 
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
+    const canViewDoctorsFinance = hasPermission(auth.session, "accounts.view");
     const [
       totalPatients,
       todayPatients,
@@ -37,6 +38,7 @@ export async function GET(req) {
       totalDoctors,
       reportsReady,
       pendingReports,
+      pendingPayouts,
     ] = await Promise.all([
       canViewPatients ? Patient.countDocuments({}) : Promise.resolve(null),
       canViewPatients
@@ -51,6 +53,12 @@ export async function GET(req) {
         ? TestReport.countDocuments({ status: { $in: ["completed", "verified", "released"] } })
         : Promise.resolve(null),
       canViewReports ? TestReport.countDocuments({ status: "draft" }) : Promise.resolve(null),
+      canViewDoctorsFinance
+        ? Doctor.aggregate([
+            { $match: { status: "Active" } },
+            { $group: { _id: null, total: { $sum: { $ifNull: ["$pendingPayout", 0] } } } },
+          ])
+        : Promise.resolve([]),
     ]);
 
     debugRequestLog("ok", {
@@ -65,6 +73,7 @@ export async function GET(req) {
       todayPatients,
       reportsReady,
       pendingReports,
+      pendingPayouts: pendingPayouts[0]?.total || 0,
       recentPatients,
       permissions: {
         patients: canViewPatients,

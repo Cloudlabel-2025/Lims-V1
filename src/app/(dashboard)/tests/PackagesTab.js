@@ -19,6 +19,7 @@ export default function PackagesTab({
   packageTestOptions,
   packages,
   editPackage,
+  showList = true,
 }) {
   return (
     <div className="module-grid">
@@ -31,23 +32,28 @@ export default function PackagesTab({
 
           <form onSubmit={savePackage} className="module-form">
             <div className="module-form-grid">
-              <label>
-                Package Name
-                <input
-                  value={packageForm.name}
-                  onChange={(e) => setPackageForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Enter package name"
-                  required
-                />
-              </label>
-              <label>
-                Code
-                <input
-                  value={packageForm.code}
-                  onChange={(e) => setPackageForm((p) => ({ ...p, code: e.target.value }))}
-                  placeholder="Enter package code"
-                />
-              </label>
+                <label>
+                  Package Name
+                  <input
+                    value={packageForm.name}
+                    onChange={(e) => setPackageForm((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="Enter package name"
+                    required
+                    pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*"
+                    title="Only letters, numbers, spaces, and . &amp; ' / , - allowed"
+                  />
+                </label>
+                <label>
+                  Code
+                  <input
+                    value={packageForm.code}
+                    onChange={(e) => setPackageForm((p) => ({ ...p, code: e.target.value }))}
+                    placeholder="Enter package code"
+                    required
+                    pattern="[A-Za-z0-9_-]+"
+                    title="Only letters, numbers, underscore, and hyphen"
+                  />
+                </label>
               <label className="full-width">
                 Description
                 <textarea
@@ -62,6 +68,8 @@ export default function PackagesTab({
                 <div style={{ position: "relative" }}>
                   <input
                     type="number"
+                    min="0"
+                    max="999999999"
                     value={packageForm.price}
                     onChange={(e) => setPackageForm((p) => ({ ...p, price: e.target.value }))}
                     placeholder="Enter price"
@@ -111,29 +119,31 @@ export default function PackagesTab({
         </section>
       )}
 
-      <aside className="module-panel">
-        <div className="module-panel-header">
-          <h2>Defined Packages</h2>
-          <p>{packages.length} packages configured</p>
-        </div>
-        <div className="test-card-list">
-          {packages.map((pkg) => (
-            <article
-              key={pkg._id}
-              className={`test-card ${editingPackageId === pkg._id ? "active" : ""}`}
-              onClick={() => {
-                if (canEditTests) editPackage(pkg);
-              }}
-            >
-              <div>
-                <h3>{pkg.name}</h3>
-                <span>{pkg.tests?.length || 0} tests included · ₹{pkg.price}</span>
-              </div>
-              <strong>{pkg.status}</strong>
-            </article>
-          ))}
-        </div>
-      </aside>
+      {showList && (
+        <aside className="module-panel">
+          <div className="module-panel-header">
+            <h2>Defined Packages</h2>
+            <p>{packages.length} packages configured</p>
+          </div>
+          <div className="test-card-list">
+            {packages.map((pkg) => (
+              <article
+                key={pkg._id}
+                className={`test-card ${editingPackageId === pkg._id ? "active" : ""}`}
+                onClick={() => {
+                  if (canEditTests) editPackage(pkg);
+                }}
+              >
+                <div>
+                  <h3>{pkg.name}</h3>
+                  <span>{pkg.tests?.length || 0} tests included · ₹{pkg.price}</span>
+                </div>
+                <strong>{pkg.status}</strong>
+              </article>
+            ))}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

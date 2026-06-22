@@ -233,6 +233,7 @@ export default function LoginPage({
                 className={`login-brand-logo-icon ${brandLogoUrl && !logoLoadFailed ? "has-image" : ""} ${showBrandLogoAltText ? "has-alt-text" : ""}`}
               >
                 {brandLogoUrl && !logoLoadFailed ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={brandLogoUrl} alt={brandLogoLabel} onError={() => setLogoLoadFailed(true)} />
                 ) : showBrandLogoAltText ? (
                   <span>{brandLogoLabel}</span>
@@ -279,6 +280,7 @@ export default function LoginPage({
                 className={`login-brand-logo-icon small ${brandLogoUrl && !logoLoadFailed ? "has-image" : ""} ${showBrandLogoAltText ? "has-alt-text" : ""}`}
               >
                 {brandLogoUrl && !logoLoadFailed ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={brandLogoUrl} alt={brandLogoLabel} onError={() => setLogoLoadFailed(true)} />
                 ) : showBrandLogoAltText ? (
                   <span>{brandLogoLabel}</span>

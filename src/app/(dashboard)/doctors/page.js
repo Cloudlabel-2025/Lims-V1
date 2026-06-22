@@ -47,6 +47,9 @@ export default function DoctorList() {
   const [actionError, setActionError] = useState("");
   const [payoutConfirm, setPayoutConfirm] = useState(false);
   const [payoutMethod, setPayoutMethod] = useState("cash");
+  const [payoutHistory, setPayoutHistory] = useState([]);
+  const [showPayoutHistory, setShowPayoutHistory] = useState(false);
+  const [payoutHistoryLoading, setPayoutHistoryLoading] = useState(false);
   const canRegisterDoctors = hasPermission(user, "doctors.register");
   const canEditDoctors = hasPermission(user, "doctors.edit");
   const canDeleteDoctors = hasPermission(user, "doctors.delete");
@@ -162,6 +165,19 @@ export default function DoctorList() {
       setPaying(false);
     }
   };
+
+  const loadPayoutHistory = useCallback(async (doctorId) => {
+    setPayoutHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/doctor/payout?doctorId=${doctorId}&limit=50`);
+      const data = await res.json();
+      if (res.ok) setPayoutHistory(data.payouts || []);
+    } catch {
+      setPayoutHistory([]);
+    } finally {
+      setPayoutHistoryLoading(false);
+    }
+  }, []);
 
   if (!mounted) return null;
 
@@ -300,6 +316,12 @@ export default function DoctorList() {
                   <span style={{ fontSize: '13px', color: '#065f46', fontWeight: '600' }}>No pending payout</span>
                 </div>
               )}
+              <button
+                onClick={() => { loadPayoutHistory(selectedDoctor._id); setShowPayoutHistory(true); }}
+                style={{ width: '100%', height: '34px', marginTop: '8px', border: '1px solid var(--border)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}
+              >
+                View Payout History
+              </button>
             </div>
 
             {(canEditDoctors || canDeleteDoctors) && (
@@ -335,6 +357,43 @@ export default function DoctorList() {
           </div>
         )}
       </aside>
+
+      {showPayoutHistory && (
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "grid", placeItems: "center", zIndex: 1100 }} onClick={() => setShowPayoutHistory(false)}>
+          <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 560, width: "90%", maxHeight: "80vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h5 style={{ margin: 0, fontSize: 16 }}>Payout History</h5>
+              <button onClick={() => setShowPayoutHistory(false)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>✕</button>
+            </div>
+            {payoutHistoryLoading ? (
+              <p style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>Loading...</p>
+            ) : payoutHistory.length === 0 ? (
+              <p style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>No payout history found.</p>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ padding: "10px 12px", textAlign: "left", color: "var(--text-secondary)", fontWeight: 700 }}>Date</th>
+                    <th style={{ padding: "10px 12px", textAlign: "left", color: "var(--text-secondary)", fontWeight: 700 }}>Description</th>
+                    <th style={{ padding: "10px 12px", textAlign: "right", color: "var(--text-secondary)", fontWeight: 700 }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payoutHistory.map((entry) => (
+                    <tr key={entry._id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+                      <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>
+                        {new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td style={{ padding: "10px 12px" }}>{entry.description}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#b91c1c" }}>₹{Number(entry.amount || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Page Header */}
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>

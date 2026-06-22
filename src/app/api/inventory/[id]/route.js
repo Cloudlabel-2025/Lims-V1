@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { jsonError } from "@/app/lib/api-response";
+import { writeAuditLog } from "@/app/lib/audit";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
 
@@ -79,5 +80,35 @@ export async function PATCH(req, context) {
     }
 
     return jsonError("Unable to update inventory item", error, 500);
+  }
+}
+
+export async function DELETE(req, context) {
+  try {
+    const auth = await requireInventory(req);
+    if (auth.error) return auth.error;
+
+    const { id } = await context.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return Response.json({ error: "Invalid item id" }, { status: 400 });
+    }
+
+    const { InventoryItem } = await getTenantModels(auth.tenantId);
+    const item = await InventoryItem.findById(id);
+    if (!item) return Response.json({ error: "Inventory item not found" }, { status: 404 });
+
+    item.status = "inactive";
+    await item.save();
+
+    await writeAuditLog(req, auth, {
+      action: "inventory.item_deleted",
+      resourceType: "InventoryItem",
+      resourceId: item._id,
+      metadata: { name: item.name, itemCode: item.itemCode },
+    });
+
+    return Response.json({ message: "Inventory item deactivated successfully" });
+  } catch (error) {
+    return jsonError("Unable to delete inventory item", error, 500);
   }
 }

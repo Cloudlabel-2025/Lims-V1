@@ -57,7 +57,11 @@ const doctorSchema = new mongoose.Schema({
         uppercase: true,
         trim: true,
         validate: {
-            validator: (v) => /^[A-Za-z]{2,}[A-Za-z\s/-]*\d[\d/-]*(?:[\s/-]*\d+)*$/.test(String(v || "")),
+            validator: (v) => {
+                const cleaned = String(v || "").trim();
+                if (/https?:\/\//i.test(cleaned) || /www\./i.test(cleaned)) return false;
+                return /^[A-Z]{2,}[A-Z\s/-]*\d[\d\s/-]*$/.test(cleaned.toUpperCase());
+            },
             message: "Enter a valid MCI registration number"
         }
     },
@@ -77,28 +81,63 @@ const doctorSchema = new mongoose.Schema({
         trim: true,
         validate: {
             validator: function (v) {
-                return /^[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(v);
+                return /^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(v);
             },
             message: "Invalid email format"
         }
     },
     clinicName: {
         type: String,
-        required: true
+        required: true,
+        validate: {
+            validator: (v) => {
+                const cleaned = String(v || "").trim();
+                if (/https?:\/\/|www\./i.test(cleaned)) return false;
+                return /^[A-Za-z][A-Za-z0-9 .&'-]*[A-Za-z0-9]$|^[A-Za-z]$/.test(cleaned);
+            },
+            message: "Enter a valid clinic name"
+        }
     },
     location: {
         type: String,
-        required: true
+        required: true,
+        validate: {
+            validator: (v) => {
+                const cleaned = String(v || "").trim();
+                if (/https?:\/\/|www\./i.test(cleaned)) return false;
+                return /^[A-Za-z][A-Za-z0-9 .,'-]*[A-Za-z0-9.]$|^[A-Za-z]$/.test(cleaned);
+            },
+            message: "Enter a valid location"
+        }
     },
     clinicAddress: {
         type: String,
-        required: true
+        required: true,
+        validate: {
+            validator: (v) => {
+                const cleaned = String(v || "").trim();
+                if (/https?:\/\/|www\./i.test(cleaned)) return false;
+                const specialChars = (cleaned.match(/[^A-Za-z0-9 .,/#-]/g) || []).length;
+                if (specialChars / cleaned.length > 0.5) return false;
+                return cleaned.length >= 5;
+            },
+            message: "Enter a valid practice address"
+        }
+    },
+    gender: {
+        type: String,
+        enum: ["Male", "Female", "Other"],
+        default: "Male"
     },
     commission: {
         type: Number,
         default: 0,
         min: [0, "Commission must be at least 0%"],
-        max: [40, "Commission cannot exceed 40%"]
+        max: [40, "Commission cannot exceed 40%"],
+        validate: {
+            validator: (v) => v === 0 || (Number.isFinite(v) && v >= 0 && v <= 40),
+            message: "Commission must be between 0 and 40%"
+        }
     },
     doctorType: {
         type: String,

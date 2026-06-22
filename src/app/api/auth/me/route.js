@@ -2,8 +2,11 @@ import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import { requireAnySession } from "@/app/lib/auth";
 import { clearSessionCookie } from "@/app/lib/session";
+import connectMasterDB from "@/app/lib/master-db";
 import { connectTenantDB } from "@/app/lib/tenant-db";
 import { getRoleModel } from "@/app/models/tenant/Role";
+import { getUserModel } from "@/app/models/tenant/User";
+import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
@@ -26,6 +29,7 @@ export async function GET(req) {
     }
 
     const { session } = auth;
+
     if (session.userType === "tenant") {
       const tenantConnection = await connectTenantDB(session.tenantId);
       const Role = getRoleModel(tenantConnection);
@@ -42,8 +46,45 @@ export async function GET(req) {
           { error: "Your assigned role is no longer available. Contact your lab admin." },
           { status: 403 }
         );
-        clearSessionCookie(response);
+        clearSessionCookie(response, req);
         return response;
+      }
+
+      const User = getUserModel(tenantConnection);
+      const currentUser = await User.findById(session.userId)
+        .select("passwordChangedAt")
+        .lean();
+
+      if (currentUser?.passwordChangedAt) {
+        const sessionIat = session.iat ? new Date(session.iat * 1000) : null;
+        if (sessionIat && currentUser.passwordChangedAt > sessionIat) {
+          debugRequestLog("password-changed", { userId: session.userId });
+          const response = NextResponse.json(
+            { error: "Session expired. Please log in again." },
+            { status: 401 }
+          );
+          clearSessionCookie(response, req);
+          return response;
+        }
+      }
+    } else if (session.userType === "developer") {
+      const masterConnection = await connectMasterDB();
+      const DeveloperUser = getDeveloperUserModel(masterConnection);
+      const devUser = await DeveloperUser.findById(session.userId)
+        .select("passwordChangedAt")
+        .lean();
+
+      if (devUser?.passwordChangedAt) {
+        const sessionIat = session.iat ? new Date(session.iat * 1000) : null;
+        if (sessionIat && devUser.passwordChangedAt > sessionIat) {
+          debugRequestLog("password-changed", { userId: session.userId });
+          const response = NextResponse.json(
+            { error: "Session expired. Please log in again." },
+            { status: 401 }
+          );
+          clearSessionCookie(response, req);
+          return response;
+        }
       }
     }
 

@@ -29,7 +29,7 @@ export async function GET(req) {
     since.setDate(since.getDate() - days);
     since.setHours(0, 0, 0, 0);
 
-    const { BillingRecord, TestReport, Sample, Patient } = await getTenantModels(auth.tenantId);
+    const { BillingRecord, TestReport, Sample, Patient, QcLog, ExpenseEntry, InventoryItem, InventoryCategory } = await getTenantModels(auth.tenantId);
 
     const [
       revenueSeries,
@@ -41,6 +41,9 @@ export async function GET(req) {
       totalBills,
       totalPatients,
       newPatients,
+      qcSeries,
+      expenseBreakdown,
+      inventoryValuation,
     ] = await Promise.all([
       // Daily revenue for chart
       safeMetric("revenue-series", BillingRecord.aggregate([
@@ -124,6 +127,60 @@ export async function GET(req) {
       safeMetric("total-bills", BillingRecord.countDocuments({ createdAt: { $gte: since } }), 0),
       safeMetric("total-patients", Patient.countDocuments({}), 0),
       safeMetric("new-patients", Patient.countDocuments({ createdAt: { $gte: since } }), 0),
+
+      // QC Levey-Jennings series — daily pass/fail/warning counts per test
+      safeMetric("qc-series", QcLog.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              testName: "$testName",
+              result: "$result",
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.date": 1 } },
+      ]), []),
+
+      // Expense breakdown by category
+      safeMetric("expense-breakdown", ExpenseEntry.aggregate([
+        { $match: { date: { $gte: since } } },
+        {
+          $group: {
+            _id: "$category",
+            total: { $sum: { $add: ["$amount", { $ifNull: ["$taxAmount", 0] }] } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { total: -1 } },
+      ]), []),
+
+      // Inventory valuation — total stock value by category
+      safeMetric("inventory-valuation", InventoryItem.aggregate([
+        { $match: { status: "active" } },
+        {
+          $lookup: {
+            from: "inventorycategories",
+            localField: "category",
+            foreignField: "_id",
+            as: "cat",
+          },
+        },
+        { $unwind: { path: "$cat", preserveNullAndEmpty: true } },
+        {
+          $group: {
+            _id: {
+              categoryId: "$category",
+              categoryName: { $ifNull: ["$cat.name", "Uncategorized"] },
+            },
+            items: { $sum: 1 },
+            totalStock: { $sum: { $ifNull: ["$stockOnHandBase", 0] } },
+          },
+        },
+        { $sort: { items: -1 } },
+      ]), []),
     ]);
 
     return Response.json({
@@ -141,6 +198,9 @@ export async function GET(req) {
       doctorReferrals,
       reportStatusCounts,
       sampleStatusCounts,
+      qcSeries,
+      expenseBreakdown,
+      inventoryValuation,
     });
   } catch (error) {
     return jsonError("Unable to load analytics", error, 500);

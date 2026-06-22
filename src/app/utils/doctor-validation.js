@@ -13,7 +13,8 @@ export function isValidDoctorName(value) {
 
 export function isValidMciNumber(value) {
   const cleaned = cleanDoctorValue(value);
-  return /^[A-Za-z]{2,}[A-Za-z\s/-]*\d[\d/-]*(?:[\s/-]*\d+)*$/.test(cleaned);
+  if (/https?:\/\//i.test(cleaned) || /www\./i.test(cleaned)) return false;
+  return /^[A-Z]{2,}[A-Z\s/-]*\d[\d\s/-]*$/.test(cleaned.toUpperCase());
 }
 
 export function isValidDoctorDegree(value) {
@@ -24,13 +25,13 @@ export function isValidDoctorDegree(value) {
 
 export function isValidExperienceYears(value) {
   const cleaned = cleanDoctorValue(value);
-  if (!/^\d+$/.test(cleaned)) return false;
+  if (!/^\d{1,2}$/.test(cleaned)) return false;
   const years = Number(cleaned);
   return Number.isInteger(years) && years >= 0 && years <= DOCTOR_LIMITS.maxExperienceYears;
 }
 
 export function isValidDoctorEmail(value) {
-  return /^[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(cleanDoctorValue(value));
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(cleanDoctorValue(value));
 }
 
 export function isValidPhoneNumber(value) {
@@ -39,9 +40,33 @@ export function isValidPhoneNumber(value) {
 
 export function isValidCommission(value) {
   const cleaned = cleanDoctorValue(value);
-  if (cleaned === "") return true;
+  if (cleaned === "" || !/^\d+(\.\d{1,2})?$/.test(cleaned)) return false;
   const commission = Number(cleaned);
   return Number.isFinite(commission) && commission >= 0 && commission <= 40;
+}
+
+function containsUrl(value) {
+  return /https?:\/\/|www\./i.test(value);
+}
+
+export function isValidClinicName(value) {
+  const cleaned = cleanDoctorValue(value);
+  if (containsUrl(cleaned)) return false;
+  return /^[A-Za-z][A-Za-z0-9 .&'-]*[A-Za-z0-9]$|^[A-Za-z]$/.test(cleaned);
+}
+
+export function isValidLocation(value) {
+  const cleaned = cleanDoctorValue(value);
+  if (containsUrl(cleaned)) return false;
+  return /^[A-Za-z][A-Za-z0-9 .,'-]*[A-Za-z0-9.]$|^[A-Za-z]$/.test(cleaned);
+}
+
+export function isValidAddress(value) {
+  const cleaned = cleanDoctorValue(value);
+  if (containsUrl(cleaned)) return false;
+  const specialChars = (cleaned.match(/[^A-Za-z0-9 .,/#-]/g) || []).length;
+  if (specialChars / cleaned.length > 0.5) return false;
+  return cleaned.length >= 5;
 }
 
 export function validateDoctorPayload(payload, { partial = false } = {}) {
@@ -90,8 +115,19 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
   }
 
   requireField("clinicName", "Clinic/Hospital name is required");
+  if (cleanDoctorValue(form.clinicName) && !isValidClinicName(form.clinicName)) {
+    errors.clinicName = "Enter a valid clinic name";
+  }
+
   requireField("location", "Location is required");
+  if (cleanDoctorValue(form.location) && !isValidLocation(form.location)) {
+    errors.location = "Enter a valid location";
+  }
+
   requireField("clinicAddress", "Practice address is required");
+  if (cleanDoctorValue(form.clinicAddress) && !isValidAddress(form.clinicAddress)) {
+    errors.clinicAddress = "Enter a valid practice address";
+  }
 
   if ((!partial || Object.prototype.hasOwnProperty.call(form, "commission")) && !isValidCommission(form.commission)) {
     errors.commission = "Commission must be between 0 and 40%";

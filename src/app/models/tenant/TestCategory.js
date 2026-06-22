@@ -39,6 +39,11 @@ export const TestCategorySchema = new mongoose.Schema(
       minlength: 2,
       maxlength: 80,
       unique: true,
+      match: [/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/, "Category name contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\/|www\./i.test(v),
+        message: "Category name cannot contain a URL",
+      },
     },
     description: {
       type: String,

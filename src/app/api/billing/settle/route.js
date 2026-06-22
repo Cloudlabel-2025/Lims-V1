@@ -2,7 +2,7 @@ import { getAccountByCode, postJournalEntry, seedSystemChartOfAccounts } from "@
 import { jsonError } from "@/app/lib/api-response";
 import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { hasPermission, requireTenantSession } from "@/app/lib/auth";
+import { requireTenantSession } from "@/app/lib/auth";
 
 function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
@@ -12,7 +12,8 @@ function getPaymentParts(payment) {
   return [
     { key: "cash", method: "cash", accountCode: "1001", amount: money(payment?.cash) },
     { key: "card", method: "card", accountCode: "1002", amount: money(payment?.card) },
-    { key: "online", method: "upi", accountCode: "1002", amount: money(payment?.online) },
+    { key: "online", method: "online", accountCode: "1002", amount: money(payment?.online) },
+    { key: "corporate", method: "corporate", accountCode: "1200", amount: money(payment?.corporate) },
   ].filter((part) => part.amount > 0);
 }
 
@@ -22,14 +23,10 @@ export async function POST(req) {
     if (auth.error) return auth.error;
 
     const { tenantId } = auth;
-    const { connection, BillingRecord, Doctor, PaymentReceipt, TestReport, TestDefinition } =
+    const { connection, BillingRecord, Doctor, PaymentReceipt, CorporateAccount } =
       await getTenantModels(tenantId);
 
-    const { billingRecordId, payment, results } = await req.json();
-
-    if (results && Object.keys(results).length > 0 && !hasPermission(auth.session, "reports.edit")) {
-      return Response.json({ error: "Permission denied: reports.edit required to enter results" }, { status: 403 });
-    }
+    const { billingRecordId, payment, corporateAccountId } = await req.json();
 
     if (!billingRecordId) {
       return Response.json({ error: "Billing record ID is required" }, { status: 400 });
@@ -137,73 +134,39 @@ export async function POST(req) {
         lockedBillingRecord.paymentReceiptIds.push(receipt._id);
       }
 
+      const corporateAmount = paymentParts.find((part) => part.key === "corporate")?.amount || 0;
+
+      if (corporateAmount > 0) {
+        if (!corporateAccountId) throw new Error("Corporate account ID is required for corporate payment");
+        const corporateAccount = await CorporateAccount.findById(corporateAccountId).session(session);
+        if (!corporateAccount) throw new Error("Corporate account not found");
+        corporateAccount.outstandingBalance = money(corporateAccount.outstandingBalance + corporateAmount);
+        await corporateAccount.save({ session });
+      }
+
       lockedBillingRecord.paymentBreakdown = {
         cash: money((lockedBillingRecord.paymentBreakdown?.cash || 0) + (paymentParts.find((part) => part.key === "cash")?.amount || 0)),
         card: money((lockedBillingRecord.paymentBreakdown?.card || 0) + (paymentParts.find((part) => part.key === "card")?.amount || 0)),
         online: money((lockedBillingRecord.paymentBreakdown?.online || 0) + (paymentParts.find((part) => part.key === "online")?.amount || 0)),
+        corporate: money((lockedBillingRecord.paymentBreakdown?.corporate || 0) + corporateAmount),
       };
 
-      const totalPaid = money(
-        lockedBillingRecord.paymentBreakdown.cash +
-          lockedBillingRecord.paymentBreakdown.card +
-          lockedBillingRecord.paymentBreakdown.online
+      const alreadyPaid = money(
+        (lockedBillingRecord.paymentBreakdown?.cash || 0) +
+          (lockedBillingRecord.paymentBreakdown?.card || 0) +
+          (lockedBillingRecord.paymentBreakdown?.online || 0) +
+          (lockedBillingRecord.paymentBreakdown?.corporate || 0)
       );
-      if (totalPaid > money(lockedBillingRecord.totalAmount)) {
+      const remainingDue = money(lockedBillingRecord.totalAmount - alreadyPaid);
+      if (receivedAmount > remainingDue) {
         throw new Error("Payment amount cannot exceed bill balance");
       }
+      const totalPaid = money(alreadyPaid + receivedAmount);
       const isFullyPaid = totalPaid >= money(lockedBillingRecord.totalAmount);
 
       lockedBillingRecord.billingStatus = isFullyPaid ? "paid" : "partial";
       lockedBillingRecord.invoiceStatus = isFullyPaid ? "paid" : "partial";
       lockedBillingRecord.status = isFullyPaid ? "completed" : "in-progress";
-
-      if (results) {
-        for (const item of lockedBillingRecord.items) {
-          const itemResults = results[item._id];
-          if (itemResults && Object.keys(itemResults).length > 0) {
-            const testDef = await TestDefinition.findById(item.testDefinition).session(session);
-            if (testDef) {
-              const reportResults = testDef.parameters.map((param) => {
-                const val = itemResults[param.key];
-                let flag = "normal";
-                const numVal = parseFloat(val);
-
-                if (!Number.isNaN(numVal)) {
-                  if (param.normalMin !== undefined && numVal < param.normalMin) flag = "low";
-                  else if (param.normalMax !== undefined && numVal > param.normalMax) flag = "high";
-                }
-
-                return {
-                  key: param.key,
-                  name: param.name,
-                  unit: param.unit,
-                  normalMin: param.normalMin,
-                  normalMax: param.normalMax,
-                  value: Number.isNaN(numVal) ? undefined : numVal,
-                  textValue: val,
-                  flag,
-                };
-              });
-
-              await TestReport.create(
-                [
-                  {
-                    patient: lockedBillingRecord.patient,
-                    testDefinition: testDef._id,
-                    testSnapshot: item.testSnapshot,
-                    results: reportResults,
-                    status: "completed",
-                    enteredBy: auth.session?.email || "System",
-                  },
-                ],
-                { session }
-              );
-
-              item.status = "reported";
-            }
-          }
-        }
-      }
 
       if (
         isFullyPaid &&

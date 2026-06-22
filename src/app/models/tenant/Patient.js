@@ -21,9 +21,8 @@ const patientSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        minlength: 2,
-        maxlength: 20,
-        match: /^[A-Za-z .]+$/ // only letters, spaces, and periods
+        minlength: 1,
+        maxlength: 100,
     },
     dob: {
         type: Date,
@@ -121,12 +120,20 @@ patientSchema.pre("save", async function () {
             { returnDocument: "after", upsert: true }
         );
 
-        this.patientId = `UDHIRAM-${String(counter.seq).padStart(8, "0")}`;
+        const prefix = this.constructor.patientPrefix || "UDHIRAM-";
+        this.patientId = `${prefix}${String(counter.seq).padStart(8, "0")}`;
     }
 });
 
-export function getPatientModel(connection = mongoose) {
-    return connection.models.Patient || connection.model("Patient", patientSchema);
+export function getPatientModel(connection = mongoose, options = {}) {
+    if (connection.models.Patient) {
+        connection.models.Patient.patientPrefix = options.patientPrefix || "UDHIRAM-";
+        return connection.models.Patient;
+    }
+
+    const Patient = connection.model("Patient", patientSchema);
+    Patient.patientPrefix = options.patientPrefix || "UDHIRAM-";
+    return Patient;
 }
 
 const Patient = getPatientModel();

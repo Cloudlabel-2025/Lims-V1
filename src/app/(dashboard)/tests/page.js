@@ -15,6 +15,27 @@ const CategoriesTab = dynamic(() => import("./CategoriesTab"), {
   ssr: false,
   loading: () => <div className="module-panel">Loading categories...</div>,
 });
+const ListsTab = dynamic(() => import("./ListsTab"), {
+  ssr: false,
+  loading: () => <div className="module-panel">Loading lists...</div>,
+});
+
+const NAME_PATTERN = /^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/;
+const CODE_PATTERN = /^[A-Za-z0-9_-]+$/;
+const UNIT_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
+const URL_RE = /https?:\/\/|www\./i;
+
+function isValidField(value, pattern) {
+  return value && pattern.test(value);
+}
+
+function rejectUrl(value) {
+  return URL_RE.test(value);
+}
+
+function isExponential(value) {
+  return typeof value === "string" && /[eE]/.test(value);
+}
 
 const blankParameter = {
   name: "",
@@ -49,7 +70,7 @@ const blankPackageForm = {
 
 export default function TestsPage() {
   const user = useCurrentUser();
-  const [activeTab, setActiveTab] = useState("tests"); // tests, packages, categories
+  const [activeTab, setActiveTab] = useState("categories"); // categories, tests, packages, lists
   const [categories, setCategories] = useState([]);
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
@@ -66,12 +87,25 @@ export default function TestsPage() {
   const [success, setSuccess] = useState("");
 
   const canSave = useMemo(
-    () => form.name && form.category && form.parameters.some((parameter) => parameter.name.trim()),
+    () =>
+      form.name &&
+      form.code &&
+      form.category &&
+      form.sampleType &&
+      form.price !== "" &&
+      form.price !== undefined &&
+      form.parameters.length > 0 &&
+      form.parameters.every((p) => p.name.trim() && p.unit.trim()),
     [form]
   );
 
   const canSavePackage = useMemo(
-    () => packageForm.name && packageForm.tests.length > 0 && packageForm.price !== "",
+    () =>
+      packageForm.name &&
+      packageForm.code &&
+      packageForm.tests.length > 0 &&
+      packageForm.price !== "" &&
+      packageForm.price !== undefined,
     [packageForm]
   );
 
@@ -166,7 +200,16 @@ export default function TestsPage() {
 
   async function createCategory(event) {
     event.preventDefault();
-    if (!categoryName.trim()) return;
+    const name = categoryName.trim();
+    if (!name) return;
+    if (!isValidField(name, NAME_PATTERN)) {
+      setError("Category name contains invalid characters");
+      return;
+    }
+    if (rejectUrl(name)) {
+      setError("Category name cannot contain a URL");
+      return;
+    }
 
     setError("");
     try {
@@ -191,8 +234,84 @@ export default function TestsPage() {
 
   async function saveTest(event) {
     event.preventDefault();
-    setSaving(true);
     setError("");
+
+    if (!isValidField(form.name, NAME_PATTERN)) {
+      setError("Test name contains invalid characters");
+      return;
+    }
+    if (rejectUrl(form.name)) {
+      setError("Test name cannot contain a URL");
+      return;
+    }
+    if (!isValidField(form.code, CODE_PATTERN)) {
+      setError("Code contains invalid characters");
+      return;
+    }
+    if (rejectUrl(form.code)) {
+      setError("Code cannot contain a URL");
+      return;
+    }
+    if (!form.sampleType.trim()) {
+      setError("Sample type is required");
+      return;
+    }
+    if (!isValidField(form.sampleType, NAME_PATTERN)) {
+      setError("Sample type contains invalid characters");
+      return;
+    }
+    if (rejectUrl(form.sampleType)) {
+      setError("Sample type cannot contain a URL");
+      return;
+    }
+    if (form.price === "" || form.price === null || form.price === undefined) {
+      setError("Price is required");
+      return;
+    }
+    if (isExponential(form.price)) {
+      setError("Price contains an invalid value");
+      return;
+    }
+    if (Number(form.price) < 0) {
+      setError("Price cannot be negative");
+      return;
+    }
+
+    for (let i = 0; i < form.parameters.length; i++) {
+      const p = form.parameters[i];
+      if (!p.name.trim()) {
+        setError(`Parameter ${i + 1} name is required`);
+        return;
+      }
+      if (!isValidField(p.name, NAME_PATTERN)) {
+        setError(`Parameter ${i + 1} name contains invalid characters`);
+        return;
+      }
+      if (rejectUrl(p.name)) {
+        setError(`Parameter ${i + 1} name cannot contain a URL`);
+        return;
+      }
+      if (!p.unit.trim()) {
+        setError(`Parameter ${i + 1} unit is required`);
+        return;
+      }
+      if (!isValidField(p.unit, UNIT_PATTERN)) {
+        setError(`Parameter ${i + 1} unit should be only measured in numerals`);
+        return;
+      }
+      if (rejectUrl(p.unit)) {
+        setError(`Parameter ${i + 1} unit cannot contain a URL`);
+        return;
+      }
+      if (isExponential(p.normalMin) || isExponential(p.normalMax) ||
+          isExponential(p.maleMin) || isExponential(p.maleMax) ||
+          isExponential(p.femaleMin) || isExponential(p.femaleMax)) {
+        setError(`Parameter ${i + 1} range contains an invalid value`);
+        return;
+      }
+    }
+
+    setSaving(true);
     setSuccess("");
     const wasEditing = Boolean(editingId);
 
@@ -228,8 +347,38 @@ export default function TestsPage() {
 
   async function savePackage(event) {
     event.preventDefault();
-    setSaving(true);
     setError("");
+
+    if (!isValidField(packageForm.name, NAME_PATTERN)) {
+      setError("Package name contains invalid characters");
+      return;
+    }
+    if (rejectUrl(packageForm.name)) {
+      setError("Package name cannot contain a URL");
+      return;
+    }
+    if (!isValidField(packageForm.code, CODE_PATTERN)) {
+      setError("Code contains invalid characters");
+      return;
+    }
+    if (rejectUrl(packageForm.code)) {
+      setError("Code cannot contain a URL");
+      return;
+    }
+    if (packageForm.price === "" || packageForm.price === null || packageForm.price === undefined) {
+      setError("Package price is required");
+      return;
+    }
+    if (isExponential(packageForm.price)) {
+      setError("Package price contains an invalid value");
+      return;
+    }
+    if (Number(packageForm.price) < 0) {
+      setError("Package price cannot be negative");
+      return;
+    }
+
+    setSaving(true);
     setSuccess("");
     const wasEditing = Boolean(editingPackageId);
 
@@ -337,44 +486,12 @@ export default function TestsPage() {
 
       <SuccessDialog message={success} onClose={() => setSuccess("")} />
       <div className="module-tabs" style={{ display: "flex", gap: "24px", marginBottom: "28px", borderBottom: "1px solid var(--border-light)", padding: "0 4px" }}>
-        <button 
-          onClick={() => setActiveTab("tests")} 
-          style={{ 
-            padding: "12px 4px", 
-            background: "none", 
-            border: "none", 
-            borderBottom: activeTab === "tests" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
-            color: activeTab === "tests" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-            fontWeight: activeTab === "tests" ? "700" : "500",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          Tests & Parameters
-        </button>
-        <button 
-          onClick={() => setActiveTab("packages")} 
-          style={{ 
-            padding: "12px 4px", 
-            background: "none", 
-            border: "none", 
-            borderBottom: activeTab === "packages" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
-            color: activeTab === "packages" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-            fontWeight: activeTab === "packages" ? "700" : "500",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          Test Packages
-        </button>
-        <button 
-          onClick={() => setActiveTab("categories")} 
-          style={{ 
-            padding: "12px 4px", 
-            background: "none", 
-            border: "none", 
+        <button
+          onClick={() => setActiveTab("categories")}
+          style={{
+            padding: "12px 4px",
+            background: "none",
+            border: "none",
             borderBottom: activeTab === "categories" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
             color: activeTab === "categories" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
             fontWeight: activeTab === "categories" ? "700" : "500",
@@ -385,12 +502,74 @@ export default function TestsPage() {
         >
           Categories
         </button>
+        <button
+          onClick={() => setActiveTab("tests")}
+          style={{
+            padding: "12px 4px",
+            background: "none",
+            border: "none",
+            borderBottom: activeTab === "tests" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
+            color: activeTab === "tests" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
+            fontWeight: activeTab === "tests" ? "700" : "500",
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+        >
+          Tests & Parameters
+        </button>
+        <button
+          onClick={() => setActiveTab("packages")}
+          style={{
+            padding: "12px 4px",
+            background: "none",
+            border: "none",
+            borderBottom: activeTab === "packages" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
+            color: activeTab === "packages" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
+            fontWeight: activeTab === "packages" ? "700" : "500",
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+        >
+          Test Packages
+        </button>
+        <button
+          onClick={() => setActiveTab("lists")}
+          style={{
+            padding: "12px 4px",
+            background: "none",
+            border: "none",
+            borderBottom: activeTab === "lists" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
+            color: activeTab === "lists" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
+            fontWeight: activeTab === "lists" ? "700" : "500",
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+        >
+          View Lists
+        </button>
       </div>
 
       {error && <div className="module-alert">{error}</div>}
 
+      {activeTab === "categories" && (
+        <CategoriesTab
+          canEditTests={canEditTests}
+          editingCategoryId={editingCategoryId}
+          createCategory={createCategory}
+          categoryName={categoryName}
+          setCategoryName={setCategoryName}
+          saving={saving}
+          categories={categories}
+          categoryUsageCounts={categoryUsageCounts}
+          showList={false}
+        />
+      )}
+
       {activeTab === "tests" && (
-        <div className="module-grid">
+        <div>
           {canEditTests && (
           <section className="module-panel">
             <div className="module-panel-header">
@@ -402,11 +581,11 @@ export default function TestsPage() {
               <div className="module-form-grid">
                 <label>
                   Test Name
-                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required />
+                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*" title="Only letters, numbers, spaces, and . &amp; ' / , - allowed" />
                 </label>
                 <label>
                   Code
-                  <input value={form.code} onChange={(e) => updateField("code", e.target.value)} placeholder="Enter test code" />
+                  <input value={form.code} onChange={(e) => updateField("code", e.target.value)} placeholder="Enter test code" required pattern="[A-Za-z0-9_-]+" title="Only letters, numbers, underscore, and hyphen" />
                 </label>
                 <label>
                   Category
@@ -419,11 +598,11 @@ export default function TestsPage() {
                 </label>
                 <label>
                   Sample Type
-                  <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Enter sample type" />
+                  <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Enter sample type" required pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*" title="Only letters, numbers, spaces, and . &amp; ' / , - allowed" />
                 </label>
                 <label>
                   Price
-                  <input type="number" min="0" value={form.price} onChange={(e) => updateField("price", e.target.value)} placeholder="Enter price" />
+                  <input type="number" min="0" max="999999999" value={form.price} onChange={(e) => updateField("price", e.target.value)} placeholder="Enter price" required />
                 </label>
                 <label>
                   Status
@@ -464,6 +643,8 @@ export default function TestsPage() {
                           onChange={(e) => updateParameter(index, "name", e.target.value)} 
                           placeholder="Enter parameter name" 
                           required 
+                          pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*"
+                          title="Only letters, numbers, spaces, and . &amp; ' / , - allowed"
                           style={{ width: "100%" }}
                         />
                       </div>
@@ -473,6 +654,9 @@ export default function TestsPage() {
                           value={parameter.unit} 
                           onChange={(e) => updateParameter(index, "unit", e.target.value)} 
                           placeholder="Enter unit" 
+                          required
+                          pattern="[0-9]+(\.[0-9]+)?"
+                          title="Unit should be only measured in numerals"
                           style={{ width: "100%" }}
                         />
                       </div>
@@ -553,30 +737,6 @@ export default function TestsPage() {
             </form>
           </section>
           )}
-
-          <aside className="module-panel">
-            <div className="module-panel-header">
-              <h2>Defined Tests</h2>
-              <p>{tests.length} tests configured</p>
-            </div>
-            <div className="test-card-list">
-              {tests.map((test) => (
-                <article
-                  key={test._id}
-                  className={`test-card ${editingId === test._id ? 'active' : ''}`}
-                  onClick={() => {
-                    if (canEditTests) editTest(test);
-                  }}
-                >
-                  <div>
-                    <h3>{test.name}</h3>
-                    <span>{test.category?.name || "Uncategorized"} · {test.parameters?.length || 0} parameters</span>
-                  </div>
-                  <strong>{test.status}</strong>
-                </article>
-              ))}
-            </div>
-          </aside>
         </div>
       )}
 
@@ -593,19 +753,21 @@ export default function TestsPage() {
           packageTestOptions={packageTestOptions}
           packages={packages}
           editPackage={editPackage}
+          showList={false}
         />
       )}
 
-      {activeTab === "categories" && (
-        <CategoriesTab
-          canEditTests={canEditTests}
-          editingCategoryId={editingCategoryId}
-          createCategory={createCategory}
-          categoryName={categoryName}
-          setCategoryName={setCategoryName}
-          saving={saving}
+      {activeTab === "lists" && (
+        <ListsTab
           categories={categories}
           categoryUsageCounts={categoryUsageCounts}
+          tests={tests}
+          packages={packages}
+          canEditTests={canEditTests}
+          editingId={editingId}
+          editingPackageId={editingPackageId}
+          editTest={editTest}
+          editPackage={editPackage}
         />
       )}
     </div>

@@ -9,6 +9,7 @@ export default function CategoriesTab({
   saving,
   categories,
   categoryUsageCounts,
+  showList = true,
 }) {
   return (
     <div className="module-grid">
@@ -27,6 +28,8 @@ export default function CategoriesTab({
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
                   placeholder="Enter category name"
+                  pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*"
+                  title="Only letters, numbers, spaces, and . & ' / , - allowed"
                   required
                 />
               </label>
@@ -38,25 +41,27 @@ export default function CategoriesTab({
         </section>
       )}
 
-      <aside className="module-panel">
-        <div className="module-panel-header">
-          <h2>Department Categories</h2>
-          <p>{categories.length} categories available</p>
-        </div>
-        <div className="test-card-list">
-          {categories.map((cat) => (
-            <article
-              key={cat._id}
-              className={`test-card ${editingCategoryId === cat._id ? "active" : ""}`}
-            >
-              <div>
-                <h3>{cat.name}</h3>
-                <span>Used in {categoryUsageCounts.get(cat._id) || 0} tests</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </aside>
+      {showList && (
+        <aside className="module-panel">
+          <div className="module-panel-header">
+            <h2>Department Categories</h2>
+            <p>{categories.length} categories available</p>
+          </div>
+          <div className="test-card-list">
+            {categories.map((cat) => (
+              <article
+                key={cat._id}
+                className={`test-card ${editingCategoryId === cat._id ? "active" : ""}`}
+              >
+                <div>
+                  <h3>{cat.name}</h3>
+                  <span>Used in {categoryUsageCounts.get(cat._id) || 0} tests</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

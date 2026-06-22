@@ -152,6 +152,18 @@ export const BillingRecordSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    cancelledAt: {
+      type: Date,
+    },
+    cancelledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    cancellationReason: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
   },
   { timestamps: true }
 );

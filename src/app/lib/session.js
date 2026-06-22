@@ -119,21 +119,27 @@ export function verifySessionToken(token) {
   return payload;
 }
 
-export function setSessionCookie(response, token, rememberMe = false) {
+function isSecure(req) {
+  if (process.env.NODE_ENV === "production") return true;
+  if (req?.headers?.get("x-forwarded-proto") === "https") return true;
+  return false;
+}
+
+export function setSessionCookie(response, token, rememberMe = false, req) {
   response.cookies.set(sessionCookieName, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecure(req),
     path: "/",
     maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 8,
   });
 }
 
-export function clearSessionCookie(response) {
+export function clearSessionCookie(response, req) {
   response.cookies.set(sessionCookieName, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecure(req),
     path: "/",
     maxAge: 0,
   });

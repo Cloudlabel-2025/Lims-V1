@@ -10,6 +10,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        <meta charSet="utf-8" />
+      </head>
       <body suppressHydrationWarning>
         {children}
       </body>

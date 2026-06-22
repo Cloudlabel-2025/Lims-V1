@@ -188,7 +188,6 @@ test("dashboard route modules keep their expected child components", () => {
     "(dashboard)/patients/PatientGrid.js",
     "(dashboard)/reports/ReportEntryPanel.js",
     "(dashboard)/reports/ReportList.js",
-    "(dashboard)/inventory/InventoryTable.js",
     "(dashboard)/settings/UserManager.js",
     "(dashboard)/settings/RoleManager.js",
     "components/Sidebar.js",

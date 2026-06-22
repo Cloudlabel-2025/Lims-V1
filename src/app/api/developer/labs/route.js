@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import connectMasterDB from "@/app/lib/master-db";
 import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
-import { hashPassword } from "@/app/lib/password";
+import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
 import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { getLabModel } from "@/app/models/master/Lab";
 import { getPatientModel } from "@/app/models/tenant/Patient";
@@ -346,9 +346,10 @@ export async function POST(req) {
       return NextResponse.json({ error: "Valid lab admin email is required" }, { status: 400 });
     }
 
-    if (adminPassword.length < 8) {
+    const passwordPolicy = validatePasswordPolicy(adminPassword);
+    if (!passwordPolicy.valid) {
       return NextResponse.json(
-        { error: "Lab admin password must be at least 8 characters" },
+        { error: passwordPolicy.errors.join("; ") },
         { status: 400 }
       );
     }
@@ -445,6 +446,7 @@ export async function POST(req) {
     const existingAdmin = await User.findOne({ email: adminEmail }).select("+passwordHash");
     let adminUser = existingAdmin;
 
+    const now = new Date();
     if (existingAdmin) {
       existingAdmin.set({
         firstName: adminFirstName,
@@ -452,6 +454,7 @@ export async function POST(req) {
         passwordHash,
         role: adminRole._id,
         status: "active",
+        passwordChangedAt: now,
         passwordResetTokenHash: undefined,
         passwordResetExpiresAt: undefined,
       });
@@ -464,6 +467,7 @@ export async function POST(req) {
         passwordHash,
         role: adminRole._id,
         status: "active",
+        passwordChangedAt: now,
       });
     }
 
@@ -502,11 +506,9 @@ export async function POST(req) {
           loginHighlights,
           logoUrl: logo?.url || null,
           adminEmail: adminUser.email,
-          adminPassword,
         },
         admin: {
           email: adminEmail,
-          password: adminPassword,
           firstName: adminFirstName,
           lastName: adminLastName,
         },

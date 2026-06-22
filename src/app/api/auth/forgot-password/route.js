@@ -5,6 +5,7 @@ import { getTenantModels } from "@/app/lib/tenant-db";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getLabModel } from "@/app/models/master/Lab";
+import { checkRateLimit, getClientIp } from "@/app/lib/rate-limit";
 import crypto from "node:crypto";
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -53,6 +54,22 @@ async function resolveDeveloperUser(email) {
 
 export async function POST(req) {
   try {
+    const ip = getClientIp(req);
+
+    const rateCheck = await checkRateLimit({
+      namespace: "forgot-password",
+      identifier: ip,
+      maxAttempts: 3,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    if (!rateCheck.allowed) {
+      return Response.json(
+        { error: `Too many requests. Try again in ${rateCheck.retryAfter} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
     const userType = body.userType === "developer" ? "developer" : "tenant";

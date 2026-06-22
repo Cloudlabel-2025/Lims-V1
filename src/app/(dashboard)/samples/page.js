@@ -20,6 +20,36 @@ export default function SamplesPage() {
   const canUpdateSamples = hasPermission(user, "samples.update");
   const canRejectSamples = hasPermission(user, "samples.reject");
   const canActOnSamples = canCollectSamples || canUpdateSamples || canRejectSamples;
+  const canViewSamples = hasPermission(user, "samples.view");
+
+  async function printLabel(sampleId) {
+    try {
+      const resp = await fetch(`/api/samples/${sampleId}/barcode`, { credentials: "include" });
+      const data = await resp.json();
+      if (!resp.ok) { setError(data.error || "Unable to fetch label data"); return; }
+      const printWin = window.open("", "_blank", "width=400,height=300");
+      if (!printWin) { setError("Popup blocked. Please allow popups for this site."); return; }
+      printWin.document.write(`
+        <html><head><title>Sample Label</title>
+        <style>
+          body { font-family: monospace; text-align: center; padding: 20px; }
+          .label { border: 2px solid #000; padding: 16px; display: inline-block; }
+          h2 { margin: 4px 0; } p { margin: 2px 0; }
+          @media print { body { padding: 0; } }
+        </style></head><body>
+        <div class="label">
+          <h2>${data.sampleId}</h2>
+          <p><strong>${data.barcode || ""}</strong></p>
+          <p>${data.patientName || ""}${data.patientId ? ` (${data.patientId})` : ""}</p>
+          <p>${data.type || ""}</p>
+          <p>${data.collectedAt ? new Date(data.collectedAt).toLocaleDateString() : ""}</p>
+        </div>
+        <p style="margin-top:20px"><button onclick="window.print()">Print</button></p>
+        </body></html>
+      `);
+      printWin.document.close();
+    } catch { setError("Failed to load label data"); }
+  }
 
   const loadSamples = useCallback(async (nextStatus = status) => {
     setLoading(true);
@@ -153,6 +183,9 @@ export default function SamplesPage() {
                 <span><em>{sample.status}</em></span>
                 {canActOnSamples && (
                   <span className="sample-actions">
+                    {canViewSamples && (
+                      <button disabled={updatingId === sample._id} onClick={() => printLabel(sample._id)}>Label</button>
+                    )}
                     {canCollectSamples && (
                       <button disabled={updatingId === sample._id || sample.status !== "pending"} onClick={() => updateSample(sample._id, "collect")}>Collect</button>
                     )}

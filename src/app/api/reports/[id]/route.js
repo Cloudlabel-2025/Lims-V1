@@ -38,7 +38,7 @@ export async function PATCH(req, { params }) {
     const body = await req.json();
     const action = String(body.action || "");
 
-    const permissionMap = { verify: "reports.verify", release: "reports.release", deliver: "reports.print" };
+    const permissionMap = { save: "reports.edit", verify: "reports.verify", release: "reports.release", deliver: "reports.print" };
     const permission = permissionMap[action];
     if (!permission) return Response.json({ error: "Invalid action" }, { status: 400 });
 
@@ -63,25 +63,39 @@ export async function PATCH(req, { params }) {
       return Response.json({ error: "Draft results are required before verification" }, { status: 400 });
     }
 
-    if (action === "deliver") {
-      const billingRecord = report.billingRecord ? await BillingRecord.findById(report.billingRecord) : null;
-      if (!billingRecord || billingRecord.billingStatus !== "paid") {
-        return Response.json({ error: "Bill must be paid before report delivery" }, { status: 400 });
+    if (action === "save") {
+      if (report.status !== "draft") {
+        return Response.json({ error: "Only draft reports can be edited" }, { status: 400 });
       }
-    }
+      if (body.results) report.results = body.results;
+      if (body.remarks !== undefined) report.remarks = body.remarks;
+    } else {
+      if (action === "deliver") {
+        const billingRecord = report.billingRecord ? await BillingRecord.findById(report.billingRecord) : null;
+        if (!billingRecord || billingRecord.billingStatus !== "paid") {
+          return Response.json({ error: "Bill must be paid before report delivery" }, { status: 400 });
+        }
+      }
 
-    const transitions = { verify: ["draft", "verified"], release: ["verified", "released"], deliver: ["released", "delivered"] };
-    const [from, to] = transitions[action];
-    if (report.status !== from) {
-      return Response.json({ error: `Report must be in '${from}' status to ${action}` }, { status: 400 });
-    }
+      const transitions = { verify: ["draft", "verified"], release: ["verified", "released"], deliver: ["released", "delivered"] };
+      const [from, to] = transitions[action];
+      if (report.status !== from) {
+        return Response.json({ error: `Report must be in '${from}' status to ${action}` }, { status: 400 });
+      }
 
-    report.status = to;
+      report.status = to;
+    }
     await report.save();
     await report.populate("patient", "name patientId age gender phone");
 
+    const auditAction =
+      action === "save" ? "reports.saved" :
+      action === "verify" ? "reports.verified" :
+      action === "release" ? "reports.released" :
+      "reports.delivered";
+
     await writeAuditLog(req, auth, {
-      action: action === "verify" ? "reports.verified" : action === "release" ? "reports.released" : "reports.delivered",
+      action: auditAction,
       resourceType: "TestReport",
       resourceId: report._id,
       metadata: { status: report.status, billingRecordId: report.billingRecord },

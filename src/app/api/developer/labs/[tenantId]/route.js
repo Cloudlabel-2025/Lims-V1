@@ -82,7 +82,6 @@ function serializeLab(lab, req) {
     contactEmail: lab.contactEmail || "",
     contactPhone: lab.contactPhone || "",
     adminEmail: lab.adminAccess?.email || "",
-    adminPassword: "",
     primaryColor: lab.branding?.primaryColor || "#0d9488",
     secondaryColor: lab.branding?.secondaryColor || "#0f766e",
     accentColor: lab.branding?.accentColor || "#f59e0b",

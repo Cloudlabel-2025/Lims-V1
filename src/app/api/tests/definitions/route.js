@@ -16,13 +16,49 @@ function slug(value, fallback) {
   );
 }
 
-function normalizeParameters(parameters) {
+function isExponentialNotation(value) {
+  if (typeof value === "string" && /[eE]/.test(value)) return true;
+  return false;
+}
+
+function normalizeParameters(parameters, errors) {
   if (!Array.isArray(parameters)) return [];
 
   return parameters
     .map((parameter, index) => {
       if (!parameter) return null;
       const name = clean(parameter.name);
+
+      if (!name) {
+        errors.push(`Parameter ${index + 1} name is required`);
+        return null;
+      }
+
+      if (!/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/.test(name)) {
+        errors.push(`Parameter ${index + 1} name contains invalid characters`);
+        return null;
+      }
+
+      if (/https?:\/\/|www\./i.test(name)) {
+        errors.push(`Parameter ${index + 1} name cannot contain a URL`);
+        return null;
+      }
+
+      const unit = clean(parameter.unit);
+      if (!unit) {
+        errors.push(`Parameter ${index + 1} unit is required`);
+        return null;
+      }
+
+      if (!/^[0-9]+(\.[0-9]+)?$/.test(unit)) {
+        errors.push(`Parameter ${index + 1} unit should be only measured in numerals`);
+        return null;
+      }
+
+      if (/https?:\/\/|www\./i.test(unit)) {
+        errors.push(`Parameter ${index + 1} unit cannot contain a URL`);
+        return null;
+      }
 
       const maleMin = parameter.maleMin === "" || parameter.maleMin === null ? undefined : Number(parameter.maleMin);
       const maleMax = parameter.maleMax === "" || parameter.maleMax === null ? undefined : Number(parameter.maleMax);
@@ -31,10 +67,17 @@ function normalizeParameters(parameters) {
       const normalMin = parameter.normalMin === "" || parameter.normalMin === null ? undefined : Number(parameter.normalMin);
       const normalMax = parameter.normalMax === "" || parameter.normalMax === null ? undefined : Number(parameter.normalMax);
 
+      if (isExponentialNotation(parameter.maleMin) || isExponentialNotation(parameter.maleMax) ||
+          isExponentialNotation(parameter.femaleMin) || isExponentialNotation(parameter.femaleMax) ||
+          isExponentialNotation(parameter.normalMin) || isExponentialNotation(parameter.normalMax)) {
+        errors.push(`Parameter ${index + 1} range contains an invalid value`);
+        return null;
+      }
+
       return {
         key: slug(parameter.key || name, `parameter-${index + 1}`),
         name,
-        unit: clean(parameter.unit),
+        unit,
         maleMin: Number.isFinite(maleMin) ? maleMin : undefined,
         maleMax: Number.isFinite(maleMax) ? maleMax : undefined,
         femaleMin: Number.isFinite(femaleMin) ? femaleMin : undefined,
@@ -46,6 +89,22 @@ function normalizeParameters(parameters) {
       };
     })
     .filter(Boolean);
+}
+
+function validateField(value, pattern, fieldName, errors) {
+  if (!value) {
+    errors.push(`${fieldName} is required`);
+    return false;
+  }
+  if (pattern && !pattern.test(value)) {
+    errors.push(`${fieldName} contains invalid characters`);
+    return false;
+  }
+  if (/https?:\/\/|www\./i.test(value)) {
+    errors.push(`${fieldName} cannot contain a URL`);
+    return false;
+  }
+  return true;
 }
 
 export async function GET(req) {
@@ -99,25 +158,53 @@ export async function POST(req) {
       return Response.json({ error: "tests.price permission is required to set test price" }, { status: 403 });
     }
 
-    const name = clean(body.name);
-    const category = clean(body.category);
-    const parameters = normalizeParameters(body.parameters);
+    const errors = [];
 
-    if (!name) return Response.json({ error: "Test name is required" }, { status: 400 });
-    if (!category) return Response.json({ error: "Category is required" }, { status: 400 });
+    const name = clean(body.name);
+    if (!validateField(name, /^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/, "Test name", errors)) {
+      return Response.json({ error: errors[0] }, { status: 400 });
+    }
+
+    const category = clean(body.category);
+    if (!category) {
+      return Response.json({ error: "Category is required" }, { status: 400 });
+    }
 
     if (!mongoose.Types.ObjectId.isValid(category)) {
       return Response.json({ error: "Invalid Department selected" }, { status: 400 });
     }
 
+    const code = clean(body.code);
+    if (!validateField(code, /^[A-Za-z0-9_-]+$/, "Code", errors)) {
+      return Response.json({ error: errors[0] }, { status: 400 });
+    }
+
+    const sampleType = clean(body.sampleType);
+    if (!validateField(sampleType, /^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/, "Sample type", errors)) {
+      return Response.json({ error: errors[0] }, { status: 400 });
+    }
+
+    const price = body.price === "" || body.price === null || body.price === undefined ? undefined : Number(body.price);
+    if (price === undefined || isNaN(price)) {
+      return Response.json({ error: "Price is required" }, { status: 400 });
+    }
+    if (price > 999999999) {
+      return Response.json({ error: "Price contains an invalid value" }, { status: 400 });
+    }
+
+    const paramErrors = [];
+    const parameters = normalizeParameters(body.parameters, paramErrors);
+    if (paramErrors.length > 0) {
+      return Response.json({ error: paramErrors[0] }, { status: 400 });
+    }
 
     const { TestDefinition } = await getTenantModels(auth.tenantId);
     const test = await TestDefinition.create({
       name,
-      code: clean(body.code).toUpperCase() || undefined,
+      code: code.toUpperCase() || undefined,
       category,
-      sampleType: clean(body.sampleType),
-      price: Number(body.price) || 0,
+      sampleType,
+      price,
       parameters,
       status: body.status === "inactive" ? "inactive" : "active",
     });

@@ -94,6 +94,13 @@ export const LabSchema = new mongoose.Schema(
       type: [String],
       default: ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports"],
     },
+    numbering: {
+      patientPrefix: {
+        type: String,
+        default: "UDHIRAM-",
+        trim: true,
+      },
+    },
     adminAccess: {
       email: {
         type: String,

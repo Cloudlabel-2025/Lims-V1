@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import connectMasterDB from "@/app/lib/master-db";
 import { createSessionToken, setSessionCookie } from "@/app/lib/session";
 import { buildTenantUrl } from "@/app/lib/subdomain";
+import { writeAuditLog } from "@/app/lib/audit";
 import { connectTenantDB } from "@/app/lib/tenant-db";
 import {
   getTenantIdFromRequest,
@@ -12,6 +13,7 @@ import { verifyPassword } from "@/app/lib/password";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getUserModel } from "@/app/models/tenant/User";
+import { checkRateLimit, resetRateLimit, getClientIp } from "@/app/lib/rate-limit";
 
 function resolveTenantId(req, bodyTenantId) {
   let requestTenantId = null;
@@ -47,7 +49,7 @@ export async function POST(req) {
     }
 
     if (userType === "developer") {
-      return loginDeveloper({ email, password, rememberMe: Boolean(body.rememberMe) });
+      return loginDeveloper({ req, email, password, rememberMe: Boolean(body.rememberMe) });
     }
 
     const tenantId = resolveTenantId(req, body.tenantId);
@@ -71,18 +73,53 @@ export async function POST(req) {
   }
 }
 
-async function loginDeveloper({ email, password, rememberMe }) {
+async function loginDeveloper({ req, email, password, rememberMe }) {
+  const ip = getClientIp(req);
+
+  const rateCheck = await checkRateLimit({
+    namespace: "login:developer",
+    identifier: `${email}:${ip}`,
+    maxAttempts: 5,
+    windowMs: 15 * 60 * 1000,
+  });
+
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: `Too many login attempts. Try again in ${rateCheck.retryAfter} seconds.` },
+      { status: 429 }
+    );
+  }
+
   const masterConnection = await connectMasterDB();
   const DeveloperUser = getDeveloperUserModel(masterConnection);
-  const user = await DeveloperUser.findOne({ email, status: "active" })
-    .select("_id developerUserId firstName lastName email isSystemOwner +passwordHash")
+  const user = await DeveloperUser.findOne({ email, status: { $in: ["active", "locked"] } })
+    .select("_id developerUserId firstName lastName email isSystemOwner +passwordHash failedLoginAttempts lockedUntil")
     .lean();
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    if (user) {
+      await DeveloperUser.updateOne(
+        { _id: user._id },
+        {
+          $inc: { failedLoginAttempts: 1 },
+          $set: user.failedLoginAttempts + 1 >= 5
+            ? { lockedUntil: new Date(Date.now() + 15 * 60 * 1000), status: "locked" }
+            : {},
+        }
+      );
+    }
+
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  await DeveloperUser.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    return NextResponse.json({ error: "Account is temporarily locked. Try again later." }, { status: 423 });
+  }
+
+  await DeveloperUser.updateOne(
+    { _id: user._id },
+    { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null } }
+  );
 
   const token = createSessionToken({
     userType: "developer",
@@ -104,24 +141,63 @@ async function loginDeveloper({ email, password, rememberMe }) {
     },
   });
 
-  setSessionCookie(response, token, rememberMe);
+  setSessionCookie(response, token, rememberMe, req);
   return response;
 }
 
 async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
+  const ip = getClientIp(req);
+
+  const rateCheck = await checkRateLimit({
+    namespace: `login:tenant:${tenantId}`,
+    identifier: `${loginId}:${ip}`,
+    maxAttempts: 5,
+    windowMs: 15 * 60 * 1000,
+  });
+
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: `Too many login attempts. Try again in ${rateCheck.retryAfter} seconds.` },
+      { status: 429 }
+    );
+  }
+
   const tenantConnection = await connectTenantDB(tenantId);
   const User = getUserModel(tenantConnection);
   const Role = getRoleModel(tenantConnection);
   const normalizedLoginId = String(loginId || "").trim();
   const userQuery = normalizedLoginId.includes("@")
-    ? { email: normalizedLoginId.toLowerCase(), status: "active" }
-    : { userId: normalizedLoginId.toUpperCase(), status: "active" };
+    ? { email: normalizedLoginId.toLowerCase(), status: { $in: ["active", "locked"] } }
+    : { userId: normalizedLoginId.toUpperCase(), status: { $in: ["active", "locked"] } };
   const user = await User.findOne(userQuery)
-    .select("_id userId firstName lastName email role +passwordHash")
+    .select("_id userId firstName lastName email role +passwordHash failedLoginAttempts lockedUntil")
     .lean();
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    if (user) {
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $inc: { failedLoginAttempts: 1 },
+          $set: user.failedLoginAttempts + 1 >= 5
+            ? { lockedUntil: new Date(Date.now() + 15 * 60 * 1000), status: "locked" }
+            : {},
+        }
+      );
+    }
+
+    writeAuditLog(req, { tenantId, session: { userId: user?._id || "unknown" } }, {
+      action: "login.failed",
+      resourceType: "user",
+      resourceId: user?._id?.toString() || loginId,
+      metadata: { loginId, reason: "invalid_credentials" },
+    });
+
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  }
+
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    return NextResponse.json({ error: "Account is temporarily locked. Try again later." }, { status: 423 });
   }
 
   const role = user.role
@@ -137,7 +213,10 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     );
   }
 
-  await User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+  await User.updateOne(
+    { _id: user._id },
+    { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null } }
+  );
 
   const permissions = role?.permissions || [];
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
@@ -151,6 +230,13 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     roleId: role ? String(role._id) : null,
     roleName: role?.name || null,
     permissions,
+  });
+
+  writeAuditLog(req, { tenantId, session: { userId: String(user._id) } }, {
+    action: "login.success",
+    resourceType: "user",
+    resourceId: String(user._id),
+    metadata: { loginId },
   });
 
   const response = NextResponse.json({
@@ -174,6 +260,6 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     },
   });
 
-  setSessionCookie(response, token, rememberMe);
+  setSessionCookie(response, token, rememberMe, req);
   return response;
 }

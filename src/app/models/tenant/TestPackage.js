@@ -38,6 +38,11 @@ export const TestPackageSchema = new mongoose.Schema(
       trim: true,
       minlength: 2,
       maxlength: 150,
+      match: [/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/, "Package name contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\/|www\./i.test(v),
+        message: "Package name cannot contain a URL",
+      },
     },
     code: {
       type: String,
@@ -46,6 +51,11 @@ export const TestPackageSchema = new mongoose.Schema(
       maxlength: 30,
       unique: true,
       sparse: true,
+      match: [/^[A-Za-z0-9_-]+$/, "Code contains invalid characters"],
+      validate: {
+        validator: (v) => !v || !/https?:\/\/|www\./i.test(v),
+        message: "Code cannot contain a URL",
+      },
     },
     description: {
       type: String,

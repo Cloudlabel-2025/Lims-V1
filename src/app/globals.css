@@ -2454,7 +2454,6 @@ body {
   border-radius: 8px;
   box-shadow: var(--shadow-xl);
   z-index: 80;
-  overflow: hidden;
 }
 
 .dash-search-dropdown {
@@ -2547,6 +2546,7 @@ body {
 
 .dash-action-wrap {
   position: relative;
+  overflow: visible;
 }
 
 .dash-topbar-btn {

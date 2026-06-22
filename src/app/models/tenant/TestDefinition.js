@@ -35,14 +35,25 @@ const TestParameterSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: false,
+      required: true,
       trim: true,
       maxlength: 100,
+      match: [/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/, "Parameter name contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\/|www\./i.test(v),
+        message: "Parameter name cannot contain a URL",
+      },
     },
     unit: {
       type: String,
+      required: true,
       trim: true,
       maxlength: 40,
+      match: [/^[0-9]+(\.[0-9]+)?$/, "Unit should be only measured in numerals"],
+      validate: {
+        validator: (v) => !/https?:\/\/|www\./i.test(v),
+        message: "Unit cannot contain a URL",
+      },
     },
     maleMin: {
       type: Number,
@@ -89,6 +100,11 @@ export const TestDefinitionSchema = new mongoose.Schema(
       minlength: 2,
       maxlength: 120,
       index: true,
+      match: [/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/, "Test name contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\/|www\./i.test(v),
+        message: "Test name cannot contain a URL",
+      },
     },
     code: {
       type: String,
@@ -97,6 +113,11 @@ export const TestDefinitionSchema = new mongoose.Schema(
       maxlength: 30,
       unique: true,
       sparse: true,
+      match: [/^[A-Za-z0-9_-]+$/, "Code contains invalid characters"],
+      validate: {
+        validator: (v) => !v || !/https?:\/\/|www\./i.test(v),
+        message: "Code cannot contain a URL",
+      },
     },
     category: {
       type: mongoose.Schema.Types.ObjectId,
@@ -106,12 +127,20 @@ export const TestDefinitionSchema = new mongoose.Schema(
     },
     sampleType: {
       type: String,
+      required: true,
       trim: true,
       maxlength: 80,
+      match: [/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/, "Sample type contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\/|www\./i.test(v),
+        message: "Sample type cannot contain a URL",
+      },
     },
     price: {
       type: Number,
+      required: true,
       min: 0,
+      max: 999999999,
       default: 0,
     },
     parameters: {

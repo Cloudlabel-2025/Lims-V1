@@ -54,20 +54,47 @@ export async function POST(req) {
 
     const body = await req.json();
     const name = clean(body.name);
-    const price = Number(body.price) || 0;
     const tests = Array.isArray(body.tests) ? body.tests : [];
+
+    if (!name) return Response.json({ error: "Package name is required" }, { status: 400 });
+
+    if (!/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/.test(name)) {
+      return Response.json({ error: "Package name contains invalid characters" }, { status: 400 });
+    }
+
+    if (/https?:\/\/|www\./i.test(name)) {
+      return Response.json({ error: "Package name cannot contain a URL" }, { status: 400 });
+    }
+
+    const code = clean(body.code);
+    if (!code) return Response.json({ error: "Code is required" }, { status: 400 });
+
+    if (!/^[A-Za-z0-9_-]+$/.test(code)) {
+      return Response.json({ error: "Code contains invalid characters" }, { status: 400 });
+    }
+
+    if (/https?:\/\/|www\./i.test(code)) {
+      return Response.json({ error: "Code cannot contain a URL" }, { status: 400 });
+    }
+
+    const price = body.price === "" || body.price === null || body.price === undefined ? undefined : Number(body.price);
+    if (price === undefined || isNaN(price)) {
+      return Response.json({ error: "Package price is required" }, { status: 400 });
+    }
+    if (price > 999999999) {
+      return Response.json({ error: "Package price contains an invalid value" }, { status: 400 });
+    }
 
     if (price > 0 && !hasPermission(auth.session, "tests.price")) {
       return Response.json({ error: "tests.price permission is required to set package price" }, { status: 403 });
     }
 
-    if (!name) return Response.json({ error: "Package name is required" }, { status: 400 });
     if (tests.length === 0) return Response.json({ error: "At least one test must be included" }, { status: 400 });
 
     const { TestPackage } = await getTenantModels(auth.tenantId);
     const pkg = await TestPackage.create({
       name,
-      code: clean(body.code).toUpperCase() || undefined,
+      code: code.toUpperCase() || undefined,
       description: clean(body.description),
       price,
       tests,

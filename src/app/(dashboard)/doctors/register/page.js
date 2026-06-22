@@ -18,6 +18,7 @@ const EMPTY_FORM = {
   location: "",
   clinicAddress: "",
   commission: "0",
+  gender: "Male",
   doctorType: "Non-Investor",
   status: "Active",
 };
@@ -196,14 +197,41 @@ export default function DoctorRegistration() {
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Degree/Qualification <span className="required">*</span></label>
-                <input 
-                  name="degree" 
-                  className={`lims-input ${errors.degree ? 'invalid' : ''}`} 
-                  placeholder="Enter qualification" 
-                  value={form.degree} 
-                  onChange={handleChange} 
-                />
+                <select
+                  name="degree"
+                  className={`lims-select ${errors.degree ? 'invalid' : ''}`}
+                  value={form.degree}
+                  onChange={handleChange}
+                >
+                  <option value="">Select qualification</option>
+                  <option value="MBBS">MBBS</option>
+                  <option value="MD">MD</option>
+                  <option value="MS">MS</option>
+                  <option value="DM">DM</option>
+                  <option value="MCh">MCh</option>
+                  <option value="BDS">BDS</option>
+                  <option value="MDS">MDS</option>
+                  <option value="BAMS">BAMS</option>
+                  <option value="BHMS">BHMS</option>
+                  <option value="BUMS">BUMS</option>
+                  <option value="DNB">DNB</option>
+                  <option value="PhD">PhD</option>
+                  <option value="Other">Other</option>
+                </select>
                 {errors.degree && <div className="lims-error-text">{errors.degree}</div>}
+              </div>
+              <div className="col-md-4">
+                <label className="lims-label">Gender</label>
+                <select
+                  name="gender"
+                  className="lims-select"
+                  value={form.gender}
+                  onChange={handleChange}
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Experience (Years) <span className="required">*</span></label>
@@ -213,6 +241,8 @@ export default function DoctorRegistration() {
                   className={`lims-input ${errors.experience ? 'invalid' : ''}`} 
                   placeholder="Enter experience" 
                   value={form.experience} 
+                  min={0}
+                  max={80}
                   onChange={handleChange} 
                 />
                 {errors.experience && <div className="lims-error-text">{errors.experience}</div>}
@@ -299,17 +329,23 @@ export default function DoctorRegistration() {
               <div className="col-md-4">
                 <label className="lims-label">Commission Percentage (%)</label>
                 <div style={{ position: 'relative' }}>
-                  <input 
+                    <input 
                     name="commission" 
                     type="number"
                     className={`lims-input ${errors.commission ? 'invalid' : ''}`} 
                     placeholder="Enter commission" 
                     value={form.commission} 
+                    min={0}
                     max="40"
                     step="0.1"
                     onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (val > 40) {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setForm(prev => ({ ...prev, commission: "" }));
+                        return;
+                      }
+                      const val = parseFloat(raw);
+                      if (!isNaN(val) && val > 40) {
                         setForm(prev => ({ ...prev, commission: "40" }));
                       } else {
                         handleChange(e);

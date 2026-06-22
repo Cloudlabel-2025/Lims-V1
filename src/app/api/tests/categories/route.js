@@ -41,6 +41,14 @@ export async function POST(req) {
       return Response.json({ error: "Category name is required" }, { status: 400 });
     }
 
+    if (!/^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/.test(name)) {
+      return Response.json({ error: "Category name contains invalid characters" }, { status: 400 });
+    }
+
+    if (/https?:\/\/|www\./i.test(name)) {
+      return Response.json({ error: "Category name cannot contain a URL" }, { status: 400 });
+    }
+
     const { TestCategory } = await getTenantModels(auth.tenantId);
     const category = await TestCategory.create({
       name,

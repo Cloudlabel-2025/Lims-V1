@@ -3,11 +3,10 @@ import path from "node:path";
 import process from "node:process";
 import mongoose from "mongoose";
 import { hashPassword, validatePasswordPolicy } from "../src/app/lib/password.js";
-import { getDoctorModel } from "../src/app/models/doctor.js";
+import { getDoctorModel } from "../src/app/models/tenant/Doctor.js";
 import { getLabModel } from "../src/app/models/master/Lab.js";
 import { getRoleTemplateModel } from "../src/app/models/master/RoleTemplate.js";
-import { getPatientModel } from "../src/app/models/patient.js";
-import { getVisitModel } from "../src/app/models/visit.js";
+import { getPatientModel } from "../src/app/models/tenant/Patient.js";
 import { getBillingRecordModel } from "../src/app/models/tenant/BillingRecord.js";
 import { getRoleModel } from "../src/app/models/tenant/Role.js";
 import { getSampleModel } from "../src/app/models/tenant/Sample.js";
@@ -100,7 +99,6 @@ async function initializeTenantCollections(tenantConnection) {
     getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
     getSampleModel(tenantConnection).init(),
-    getVisitModel(tenantConnection).init(),
   ]);
 }
 

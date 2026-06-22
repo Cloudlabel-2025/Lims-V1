@@ -4,12 +4,12 @@ import { useMemo, useState } from "react";
 
 const statusColors = {
   draft: ["#f1f5f9", "#475569"],
-  completed: ["#eff6ff", "#1d4ed8"],
   verified: ["#f0fdf4", "#15803d"],
   released: ["#ecfdf5", "#047857"],
+  delivered: ["#eff6ff", "#1d4ed8"],
 };
 
-const STATUS_OPTIONS = ["all", "completed", "verified", "released", "draft"];
+const STATUS_OPTIONS = ["all", "draft", "verified", "released", "delivered"];
 
 export default function ReportList({ reports, setSelectedReport, selectedReport }) {
   const [search, setSearch] = useState("");

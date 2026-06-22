@@ -90,6 +90,10 @@ export default function AccountsPage() {
   const [expensePage, setExpensePage] = useState(1);
   const [ledgerPagination, setLedgerPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const [expensePagination, setExpensePagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [editingCorporate, setEditingCorporate] = useState(null);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [corporateFormEdit, setCorporateFormEdit] = useState(emptyCorporate);
+  const [expenseFormEdit, setExpenseFormEdit] = useState(emptyExpense);
 
   const accountById = useMemo(() => new Map(accounts.map((account) => [account._id, account])), [accounts]);
   const totals = useMemo(
@@ -174,6 +178,70 @@ export default function AccountsPage() {
     try {
       await fetchJson(`/api/accounting/accounts/${accountId}`, { method: "DELETE" });
       setSuccess("Account deleted successfully.");
+      await loadAccountsData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateCorporate(corporateId, payload) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await fetchJson(`/api/corporate-accounts/${corporateId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      setEditingCorporate(null);
+      setSuccess("Corporate account updated successfully.");
+      await loadAccountsData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteCorporate(corporateId, name) {
+    if (!confirm(`Delete corporate account "${name}"? This action cannot be undone.`)) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await fetchJson(`/api/corporate-accounts/${corporateId}`, { method: "DELETE" });
+      setSuccess("Corporate account deleted successfully.");
+      await loadAccountsData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateExpense(expenseId, payload) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await fetchJson(`/api/expenses/${expenseId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      setEditingExpense(null);
+      setSuccess("Expense updated successfully.");
+      await loadAccountsData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteExpense(expenseId) {
+    if (!confirm("Delete this expense? This action cannot be undone.")) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await fetchJson(`/api/expenses/${expenseId}`, { method: "DELETE" });
+      setSuccess("Expense deleted successfully.");
       await loadAccountsData();
     } catch (err) {
       setError(err.message);
@@ -349,57 +417,123 @@ export default function AccountsPage() {
           )}
 
           {activeTab === "expenses" && (
-            <TwoColumn
-              left={
-                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/expenses", expenseForm, () => setExpenseForm(emptyExpense), "Expense recorded successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
-                  <h5 style={{ margin: 0, fontSize: 16 }}>Record Expense</h5>
-                  <Field label="Category">
-                    <select className="lims-input" value={expenseForm.category} onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })} style={inputStyle()}>
-                      {["reagent", "staff", "equipment", "overhead"].map((category) => <option key={category} value={category}>{category}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Vendor"><input className="lims-input" value={expenseForm.vendorName} onChange={(event) => setExpenseForm({ ...expenseForm, vendorName: event.target.value })} style={inputStyle()} /></Field>
-                  <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseForm.amount} onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })} style={inputStyle()} /></Field>
-                  <Field label="Tax"><input className="lims-input" type="number" min="0" step="0.01" value={expenseForm.taxAmount} onChange={(event) => setExpenseForm({ ...expenseForm, taxAmount: event.target.value })} style={inputStyle()} /></Field>
-                  <Field label="Credit">
-                    <select className="lims-input" value={expenseForm.paidFrom} onChange={(event) => setExpenseForm({ ...expenseForm, paidFrom: event.target.value })} style={inputStyle()}>
-                      <option value="vendor-payable">Vendor Payable</option>
-                      <option value="cash">Cash</option>
-                      <option value="bank">Bank</option>
-                    </select>
-                  </Field>
-                  <Field label="Receipt URL"><input className="lims-input" value={expenseForm.attachmentUrl} onChange={(event) => setExpenseForm({ ...expenseForm, attachmentUrl: event.target.value })} style={inputStyle()} /></Field>
-                  <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Posting..." : "Record Expense"}</button>
-                </form>
-              }
-              right={
-                <div style={{ display: "grid", gap: 12 }}>
-                  <ExpensesTable expenses={expenses} />
-                  <PaginationControls pagination={expensePagination} loading={loading} onPageChange={setExpensePage} />
+            <div style={{ display: "grid", gap: 18 }}>
+              <TwoColumn
+                left={
+                  <form className="form-card" onSubmit={(event) => submitForm(event, "/api/expenses", expenseForm, () => setExpenseForm(emptyExpense), "Expense recorded successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                    <h5 style={{ margin: 0, fontSize: 16 }}>Record Expense</h5>
+                    <Field label="Category">
+                      <select className="lims-input" value={expenseForm.category} onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })} style={inputStyle()}>
+                        {["reagent", "staff", "equipment", "overhead"].map((category) => <option key={category} value={category}>{category}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Vendor"><input className="lims-input" value={expenseForm.vendorName} onChange={(event) => setExpenseForm({ ...expenseForm, vendorName: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseForm.amount} onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Tax"><input className="lims-input" type="number" min="0" step="0.01" value={expenseForm.taxAmount} onChange={(event) => setExpenseForm({ ...expenseForm, taxAmount: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Credit">
+                      <select className="lims-input" value={expenseForm.paidFrom} onChange={(event) => setExpenseForm({ ...expenseForm, paidFrom: event.target.value })} style={inputStyle()}>
+                        <option value="vendor-payable">Vendor Payable</option>
+                        <option value="cash">Cash</option>
+                        <option value="bank">Bank</option>
+                      </select>
+                    </Field>
+                    <Field label="Receipt URL"><input className="lims-input" value={expenseForm.attachmentUrl} onChange={(event) => setExpenseForm({ ...expenseForm, attachmentUrl: event.target.value })} style={inputStyle()} /></Field>
+                    <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Posting..." : "Record Expense"}</button>
+                  </form>
+                }
+                right={
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <ExpensesTable
+                      expenses={expenses}
+                      onEdit={(exp) => { setExpenseFormEdit(exp); setEditingExpense(exp._id); }}
+                      onDelete={deleteExpense}
+                    />
+                    <PaginationControls pagination={expensePagination} loading={loading} onPageChange={setExpensePage} />
+                  </div>
+                }
+              />
+              {editingExpense && (
+                <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "grid", placeItems: "center", zIndex: 1000 }} onClick={() => setEditingExpense(null)}>
+                  <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 440, width: "90%", display: "grid", gap: 12 }} onClick={(e) => e.stopPropagation()}>
+                    <h5 style={{ margin: 0, fontSize: 16 }}>Edit Expense</h5>
+                    <Field label="Category">
+                      <select className="lims-input" value={expenseFormEdit.category} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, category: e.target.value })} style={inputStyle()}>
+                        {["reagent", "staff", "equipment", "overhead"].map((category) => <option key={category} value={category}>{category}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Vendor"><input className="lims-input" value={expenseFormEdit.vendorName} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, vendorName: e.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseFormEdit.amount} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, amount: e.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Tax"><input className="lims-input" type="number" min="0" step="0.01" value={expenseFormEdit.taxAmount} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, taxAmount: e.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Credit">
+                      <select className="lims-input" value={expenseFormEdit.paidFrom} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, paidFrom: e.target.value })} style={inputStyle()}>
+                        <option value="vendor-payable">Vendor Payable</option>
+                        <option value="cash">Cash</option>
+                        <option value="bank">Bank</option>
+                      </select>
+                    </Field>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <button type="button" className="btn-lims-secondary" onClick={() => setEditingExpense(null)} style={{ flex: 1, height: 38 }}>Cancel</button>
+                      <button type="button" className="btn-lims-primary" disabled={saving} onClick={() => updateExpense(editingExpense, { category: expenseFormEdit.category, vendorName: expenseFormEdit.vendorName, amount: expenseFormEdit.amount, taxAmount: expenseFormEdit.taxAmount, paidFrom: expenseFormEdit.paidFrom })} style={{ flex: 1, height: 38 }}>{saving ? "Saving..." : "Save"}</button>
+                    </div>
+                  </div>
                 </div>
-              }
-            />
+              )}
+            </div>
           )}
 
           {activeTab === "corporate" && (
-            <TwoColumn
-              left={
-                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/corporate-accounts", corporateForm, () => setCorporateForm(emptyCorporate), "Corporate account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
-                  <h5 style={{ margin: 0, fontSize: 16 }}>Corporate Account</h5>
-                  <Field label="Name"><input required className="lims-input" value={corporateForm.name} onChange={(event) => setCorporateForm({ ...corporateForm, name: event.target.value })} style={inputStyle()} /></Field>
-                  <Field label="Contact Person"><input className="lims-input" value={corporateForm.contactPerson} onChange={(event) => setCorporateForm({ ...corporateForm, contactPerson: event.target.value })} style={inputStyle()} /></Field>
-                  <Field label="Credit Limit"><input className="lims-input" type="number" min="0" step="0.01" value={corporateForm.creditLimit} onChange={(event) => setCorporateForm({ ...corporateForm, creditLimit: event.target.value })} style={inputStyle()} /></Field>
-                  <Field label="Statement Cycle">
-                    <select className="lims-input" value={corporateForm.statementCycle} onChange={(event) => setCorporateForm({ ...corporateForm, statementCycle: event.target.value })} style={inputStyle()}>
-                      <option value="monthly">Monthly</option>
-                      <option value="weekly">Weekly</option>
-                    </select>
-                  </Field>
-                  <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Saving..." : "Create Corporate"}</button>
-                </form>
-              }
-              right={<CorporateTable corporates={corporates} />}
-            />
+            <div style={{ display: "grid", gap: 18 }}>
+              <TwoColumn
+                left={
+                  <form className="form-card" onSubmit={(event) => submitForm(event, "/api/corporate-accounts", corporateForm, () => setCorporateForm(emptyCorporate), "Corporate account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                    <h5 style={{ margin: 0, fontSize: 16 }}>Corporate Account</h5>
+                    <Field label="Name"><input required className="lims-input" value={corporateForm.name} onChange={(event) => setCorporateForm({ ...corporateForm, name: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Contact Person"><input className="lims-input" value={corporateForm.contactPerson} onChange={(event) => setCorporateForm({ ...corporateForm, contactPerson: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Credit Limit"><input className="lims-input" type="number" min="0" step="0.01" value={corporateForm.creditLimit} onChange={(event) => setCorporateForm({ ...corporateForm, creditLimit: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Statement Cycle">
+                      <select className="lims-input" value={corporateForm.statementCycle} onChange={(event) => setCorporateForm({ ...corporateForm, statementCycle: event.target.value })} style={inputStyle()}>
+                        <option value="monthly">Monthly</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </Field>
+                    <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Saving..." : "Create Corporate"}</button>
+                  </form>
+                }
+                right={
+                  <CorporateTable
+                    corporates={corporates}
+                    onEdit={(corp) => { setCorporateFormEdit(corp); setEditingCorporate(corp._id); }}
+                    onDelete={deleteCorporate}
+                  />
+                }
+              />
+              {editingCorporate && (
+                <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "grid", placeItems: "center", zIndex: 1000 }} onClick={() => setEditingCorporate(null)}>
+                  <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 440, width: "90%", display: "grid", gap: 12 }} onClick={(e) => e.stopPropagation()}>
+                    <h5 style={{ margin: 0, fontSize: 16 }}>Edit Corporate Account</h5>
+                    <Field label="Name">
+                      <input required className="lims-input" value={corporateFormEdit.name} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, name: e.target.value })} style={inputStyle()} />
+                    </Field>
+                    <Field label="Contact Person">
+                      <input className="lims-input" value={corporateFormEdit.contactPerson} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, contactPerson: e.target.value })} style={inputStyle()} />
+                    </Field>
+                    <Field label="Credit Limit">
+                      <input className="lims-input" type="number" min="0" step="0.01" value={corporateFormEdit.creditLimit} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, creditLimit: e.target.value })} style={inputStyle()} />
+                    </Field>
+                    <Field label="Statement Cycle">
+                      <select className="lims-input" value={corporateFormEdit.statementCycle} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, statementCycle: e.target.value })} style={inputStyle()}>
+                        <option value="monthly">Monthly</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </Field>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <button type="button" className="btn-lims-secondary" onClick={() => setEditingCorporate(null)} style={{ flex: 1, height: 38 }}>Cancel</button>
+                      <button type="button" className="btn-lims-primary" disabled={saving} onClick={() => updateCorporate(editingCorporate, { name: corporateFormEdit.name, contactPerson: corporateFormEdit.contactPerson, creditLimit: corporateFormEdit.creditLimit, statementCycle: corporateFormEdit.statementCycle })} style={{ flex: 1, height: 38 }}>{saving ? "Saving..." : "Save"}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
@@ -450,11 +584,11 @@ function LedgerTable({ entries }) {
   return <Table minWidth={900} headings={["Entry", "Date", "Account", "Debit", "Credit", "Source", "Description"]} rows={rows} empty="No journal entries found." />;
 }
 
-function ExpensesTable({ expenses }) {
+function ExpensesTable({ expenses, onEdit, onDelete }) {
   return (
     <Table
-      minWidth={760}
-      headings={["Date", "Category", "Vendor", "Amount", "Credit", "Journal"]}
+      minWidth={860}
+      headings={["Date", "Category", "Vendor", "Amount", "Credit", "Journal", "Action"]}
       empty="No expenses found."
       rows={expenses.map((expense) => [
         formatDate(expense.date),
@@ -463,16 +597,20 @@ function ExpensesTable({ expenses }) {
         `Rs ${money(Number(expense.amount || 0) + Number(expense.taxAmount || 0))}`,
         expense.paidFrom,
         expense.journalEntryId?.entryNumber || "-",
+        <div key="actions" style={{ display: "flex", gap: 4 }}>
+          <button type="button" className="btn-lims-secondary" onClick={() => onEdit(expense)} style={{ height: 30, padding: "0 9px", fontSize: 12 }}>{Icons.edit}</button>
+          <button type="button" className="btn-lims-secondary" onClick={() => onDelete(expense._id)} style={{ height: 30, padding: "0 9px", fontSize: 12, color: "#e11d48" }}>{Icons.trash}</button>
+        </div>,
       ])}
     />
   );
 }
 
-function CorporateTable({ corporates }) {
+function CorporateTable({ corporates, onEdit, onDelete }) {
   return (
     <Table
-      minWidth={680}
-      headings={["Name", "Contact", "Credit Limit", "Outstanding", "Cycle"]}
+      minWidth={780}
+      headings={["Name", "Contact", "Credit Limit", "Outstanding", "Cycle", "Action"]}
       empty="No corporate accounts found."
       rows={corporates.map((corporate) => [
         corporate.name,
@@ -480,6 +618,10 @@ function CorporateTable({ corporates }) {
         `Rs ${money(corporate.creditLimit)}`,
         `Rs ${money(corporate.outstandingBalance)}`,
         corporate.statementCycle,
+        <div key="actions" style={{ display: "flex", gap: 4 }}>
+          <button type="button" className="btn-lims-secondary" onClick={() => onEdit(corporate)} style={{ height: 30, padding: "0 9px", fontSize: 12 }}>{Icons.edit}</button>
+          <button type="button" className="btn-lims-secondary" onClick={() => onDelete(corporate._id, corporate.name)} style={{ height: 30, padding: "0 9px", fontSize: 12, color: "#e11d48" }}>{Icons.trash}</button>
+        </div>,
       ])}
     />
   );

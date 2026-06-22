@@ -48,6 +48,14 @@ export async function POST(req) {
       return Response.json({ error: "UH ID must be exactly 14 digits" }, { status: 400 });
     }
 
+    if (body.collectionTime && new Date(body.collectionTime) > new Date()) {
+      return Response.json({ error: "Collection Time cannot be in the future" }, { status: 400 });
+    }
+
+    if (body.receivedTime && new Date(body.receivedTime) > new Date()) {
+      return Response.json({ error: "Received Time cannot be in the future" }, { status: 400 });
+    }
+
     if (body.collectionTime && new Date(body.receivedTime) < new Date(body.collectionTime)) {
       return Response.json({ error: "Received Time cannot be earlier than Collection Time" }, { status: 400 });
     }

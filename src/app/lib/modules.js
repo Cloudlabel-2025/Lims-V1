@@ -177,7 +177,7 @@ export const notificationRules = [
 
 export const tenantActionPermissions = {
   samples: ["samples.collect", "samples.reject", "samples.view"],
-  reports: ["reports.verify", "reports.release", "reports.view"],
+  reports: ["reports.verify", "reports.release", "reports.view", "reports.edit"],
   billing: ["billing.collect", "billing.refund", "billing.view"],
   doctors: ["doctors.register", "doctors.edit", "doctors.delete"],
   patients: ["patients.register", "patients.edit", "patients.delete"],
