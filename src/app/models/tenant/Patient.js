@@ -31,7 +31,7 @@ const patientSchema = new mongoose.Schema({
     age: {
         type: Number,
         required: true,
-        min: [1, "Age must be at least 1"],
+        min: [0, "Age must be at least 0"],
         validate: {
             validator: Number.isInteger,
             message: "Age must be an integer"
@@ -72,9 +72,10 @@ const patientSchema = new mongoose.Schema({
     },
     uhId: {
         type: String,
+        required: true,
         validate: {
-            validator: (v) => !v || /^\d{14}$/.test(v),
-            message: "UH ID must be exactly 14 digits"
+            validator: (v) => /^[A-Za-z0-9]{14}$/.test(v),
+            message: "UH ID must be exactly 14 alphanumeric characters"
         }
     },
 
@@ -103,8 +104,13 @@ const patientSchema = new mongoose.Schema({
     },
     barcode: {
         type: String,
+        required: true,
         unique: true,
-        sparse: true
+        sparse: true,
+        validate: {
+            validator: (v) => /^[A-Za-z0-9-_]+$/.test(v) && !/https?:\/\/|www\./i.test(v),
+            message: "Invalid barcode format"
+        }
     }
 }, { timestamps: true });
 

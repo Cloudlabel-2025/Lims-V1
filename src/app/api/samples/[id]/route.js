@@ -57,11 +57,15 @@ export async function PUT(req, { params }) {
       }
       sample.status = "processing";
     } else if (action === "reject") {
-      sample.status = "rejected";
-      sample.rejectionReason = clean(body.rejectionReason);
-      if (!sample.rejectionReason) {
+      const reason = clean(body.rejectionReason);
+      if (!reason) {
         return Response.json({ error: "Rejection reason is required" }, { status: 400 });
       }
+      if (reason.length > 300) {
+        return Response.json({ error: "Rejection reason must be under 300 characters" }, { status: 400 });
+      }
+      sample.status = "rejected";
+      sample.rejectionReason = reason;
     } else {
       return Response.json({ error: "Invalid sample action" }, { status: 400 });
     }
@@ -69,17 +73,21 @@ export async function PUT(req, { params }) {
     await sample.save();
 
     if (billingRecord) {
-      const item = billingRecord.items.id(sample.billingItemId);
-      if (item) {
-        item.status =
-          sample.status === "collected"
-            ? "sample-collected"
-            : sample.status === "processing"
-              ? "processing"
-              : sample.status;
+      try {
+        const item = billingRecord.items.id(sample.billingItemId);
+        if (item) {
+          item.status =
+            sample.status === "collected"
+              ? "sample-collected"
+              : sample.status === "processing"
+                ? "processing"
+                : sample.status;
+        }
+        billingRecord.status = deriveBillingStatus(billingRecord.items);
+        await billingRecord.save();
+      } catch (billingErr) {
+        console.error(`Failed to update billing record ${billingRecord._id} for sample ${sample._id}:`, billingErr);
       }
-      billingRecord.status = deriveBillingStatus(billingRecord.items);
-      await billingRecord.save();
     }
 
     await writeAuditLog(req, auth, {

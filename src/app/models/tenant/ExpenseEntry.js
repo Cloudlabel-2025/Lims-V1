@@ -8,7 +8,19 @@ export const ExpenseEntrySchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    vendorName: { type: String, trim: true, maxlength: 160 },
+    vendorName: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Vendor name contains invalid characters"],
+      validate: {
+        validator: function (v) {
+          if (!v) return true;
+          return !/https?:\/\//.test(v);
+        },
+        message: "URLs are not allowed in vendor name",
+      },
+    },
     amount: { type: Number, required: true, min: 0.01 },
     taxAmount: { type: Number, default: 0, min: 0 },
     paidFrom: {

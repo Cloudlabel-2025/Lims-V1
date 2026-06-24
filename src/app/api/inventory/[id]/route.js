@@ -13,6 +13,19 @@ function numberValue(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function isValidName(value) {
+  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
+}
+
+function hasUrl(value) {
+  return /https?:\/\//.test(value);
+}
+
+function isExponential(value) {
+  if (value === undefined || value === null) return false;
+  return /[eE]/.test(String(value));
+}
+
 async function requireInventory(req, permission = "inventory.manage") {
   const auth = requireTenantSession(req, permission);
   if (auth.error) return { error: auth.error };
@@ -64,6 +77,60 @@ export async function PATCH(req, context) {
     if (body.reorderLevelBase !== undefined) item.reorderLevelBase = numberValue(body.reorderLevelBase, 0);
     if (body.maximumStockBase !== undefined) item.maximumStockBase = numberValue(body.maximumStockBase, 0);
     if (body.trackExpiry !== undefined) item.trackExpiry = Boolean(body.trackExpiry);
+
+    if (body.name !== undefined && body.name !== null && clean(body.name) && hasUrl(body.name)) {
+      return Response.json({ error: "URLs are not allowed in item name" }, { status: 400 });
+    }
+    if (body.name !== undefined && body.name !== null && clean(body.name) && !isValidName(clean(body.name))) {
+      return Response.json({ error: "Item name contains invalid characters" }, { status: 400 });
+    }
+    if (body.genericName !== undefined && clean(body.genericName) && hasUrl(body.genericName)) {
+      return Response.json({ error: "URLs are not allowed in generic name" }, { status: 400 });
+    }
+    if (body.genericName !== undefined && clean(body.genericName) && !isValidName(clean(body.genericName))) {
+      return Response.json({ error: "Generic name contains invalid characters" }, { status: 400 });
+    }
+    if (body.itemCode !== undefined) {
+      const code = clean(body.itemCode);
+      if (hasUrl(code)) return Response.json({ error: "URLs are not allowed in item code" }, { status: 400 });
+      if (!isValidName(code)) return Response.json({ error: "Item code contains invalid characters" }, { status: 400 });
+    }
+    if (body.preferredSupplier !== undefined && clean(body.preferredSupplier) && hasUrl(body.preferredSupplier)) {
+      return Response.json({ error: "URLs are not allowed in supplier" }, { status: 400 });
+    }
+    if (body.preferredSupplier !== undefined && clean(body.preferredSupplier) && !isValidName(clean(body.preferredSupplier))) {
+      return Response.json({ error: "Supplier contains invalid characters" }, { status: 400 });
+    }
+    if (body.manufacturer !== undefined && clean(body.manufacturer) && hasUrl(body.manufacturer)) {
+      return Response.json({ error: "URLs are not allowed in manufacturer" }, { status: 400 });
+    }
+    if (body.manufacturer !== undefined && clean(body.manufacturer) && !isValidName(clean(body.manufacturer))) {
+      return Response.json({ error: "Manufacturer contains invalid characters" }, { status: 400 });
+    }
+    if (body.storageCondition !== undefined && clean(body.storageCondition) && hasUrl(body.storageCondition)) {
+      return Response.json({ error: "URLs are not allowed in storage condition" }, { status: 400 });
+    }
+    if (body.storageCondition !== undefined && clean(body.storageCondition) && !isValidName(clean(body.storageCondition))) {
+      return Response.json({ error: "Storage condition contains invalid characters" }, { status: 400 });
+    }
+    if (body.defaultLocation !== undefined && clean(body.defaultLocation) && hasUrl(body.defaultLocation)) {
+      return Response.json({ error: "URLs are not allowed in location" }, { status: 400 });
+    }
+    if (body.defaultLocation !== undefined && clean(body.defaultLocation) && !isValidName(clean(body.defaultLocation))) {
+      return Response.json({ error: "Location contains invalid characters" }, { status: 400 });
+    }
+    if (body.purchaseToBaseFactor !== undefined && isExponential(body.purchaseToBaseFactor)) {
+      return Response.json({ error: "Exponential notation is not allowed in conversion factor" }, { status: 400 });
+    }
+    if (body.minimumStockBase !== undefined && isExponential(body.minimumStockBase)) {
+      return Response.json({ error: "Exponential notation is not allowed in min stock" }, { status: 400 });
+    }
+    if (body.reorderLevelBase !== undefined && isExponential(body.reorderLevelBase)) {
+      return Response.json({ error: "Exponential notation is not allowed in reorder level" }, { status: 400 });
+    }
+    if (body.maximumStockBase !== undefined && isExponential(body.maximumStockBase)) {
+      return Response.json({ error: "Exponential notation is not allowed in max stock" }, { status: 400 });
+    }
 
     await item.save();
 

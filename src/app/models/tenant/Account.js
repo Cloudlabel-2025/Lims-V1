@@ -4,10 +4,42 @@ export const accountTypes = ["asset", "liability", "equity", "revenue", "expense
 
 export const AccountSchema = new mongoose.Schema(
   {
-    code: { type: String, required: true, trim: true, maxlength: 20, index: true },
-    name: { type: String, required: true, trim: true, maxlength: 120 },
+    code: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 20,
+      index: true,
+      match: [/^[A-Za-z0-9_-]+$/, "Code must be alphanumeric with optional hyphens or underscores"],
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 120,
+      match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Name contains invalid characters"],
+      validate: {
+        validator: function (v) {
+          return !/https?:\/\//.test(v);
+        },
+        message: "URLs are not allowed in account name",
+      },
+    },
     type: { type: String, enum: accountTypes, required: true, index: true },
-    subtype: { type: String, trim: true, maxlength: 80, index: true },
+    subtype: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      index: true,
+      match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Subtype contains invalid characters"],
+      validate: {
+        validator: function (v) {
+          if (!v) return true;
+          return !/https?:\/\//.test(v);
+        },
+        message: "URLs are not allowed in subtype",
+      },
+    },
     tenantId: { type: String, required: true, trim: true, lowercase: true, index: true },
     isSystem: { type: Boolean, default: false, index: true },
     balance: { type: Number, default: 0 },

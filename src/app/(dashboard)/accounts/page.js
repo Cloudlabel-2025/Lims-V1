@@ -24,6 +24,18 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function isExponential(value) {
+  return typeof value === "string" && /[eE]/.test(value);
+}
+
+function hasUrl(value) {
+  return /https?:\/\//.test(value);
+}
+
+function isValidName(value) {
+  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
+}
+
 function inputStyle() {
   return { height: 38, fontSize: 13 };
 }
@@ -58,7 +70,7 @@ function StatCard({ label, value, icon }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 800 }}>{label}</div>
-          <div style={{ marginTop: 8, fontSize: 23, fontWeight: 900, color: "var(--text-primary)" }}>{value}</div>
+          <div style={{ marginTop: 8, fontSize: 23, fontWeight: 900, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
         </div>
         <div style={{ width: 42, height: 42, borderRadius: 8, display: "grid", placeItems: "center", border: "1px solid var(--border)", color: "var(--brand-action, var(--primary))" }}>
           {icon}
@@ -94,6 +106,10 @@ export default function AccountsPage() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [corporateFormEdit, setCorporateFormEdit] = useState(emptyCorporate);
   const [expenseFormEdit, setExpenseFormEdit] = useState(emptyExpense);
+  const [accountFormErrors, setAccountFormErrors] = useState({});
+  const [expenseFormErrors, setExpenseFormErrors] = useState({});
+  const [corporateFormErrors, setCorporateFormErrors] = useState({});
+  const [plError, setPlError] = useState("");
 
   const accountById = useMemo(() => new Map(accounts.map((account) => [account._id, account])), [accounts]);
   const totals = useMemo(
@@ -165,6 +181,7 @@ export default function AccountsPage() {
       setSuccess(successMessage);
       await loadAccountsData();
     } catch (err) {
+      console.error("Submit error:", err);
       setError(err.message);
     } finally {
       setSaving(false);
@@ -257,7 +274,19 @@ export default function AccountsPage() {
     }));
   }
 
+  function removeJournalLine(index) {
+    setJournalForm((current) => ({
+      ...current,
+      lines: current.lines.filter((_, i) => i !== index),
+    }));
+  }
+
   async function loadPl(from, to) {
+    setPlError("");
+    if (from && to && new Date(from) > new Date(to)) {
+      setPlError("To date must be after From date");
+      return;
+    }
     setPlLoading(true);
     try {
       const params = new URLSearchParams();
@@ -334,16 +363,25 @@ export default function AccountsPage() {
           {activeTab === "accounts" && (
             <TwoColumn
               left={
-                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/accounts", accountForm, () => setAccountForm(emptyAccount), "Account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/accounts", accountForm, () => { setAccountForm(emptyAccount); setAccountFormErrors({}); }, "Account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                   <h5 style={{ margin: 0, fontSize: 16 }}>Add Account</h5>
-                  <Field label="Code"><input required className="lims-input" value={accountForm.code} onChange={(event) => setAccountForm({ ...accountForm, code: event.target.value })} style={inputStyle()} /></Field>
-                  <Field label="Name"><input required className="lims-input" value={accountForm.name} onChange={(event) => setAccountForm({ ...accountForm, name: event.target.value })} style={inputStyle()} /></Field>
+                  <Field label="Code">
+                    <input required className="lims-input" value={accountForm.code} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setAccountFormErrors((p) => ({ ...p, code: "Exponential notation is not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, code: "Code contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, code: "" })); setAccountForm({ ...accountForm, code: v }); }} style={inputStyle()} />
+                    {accountFormErrors.code && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{accountFormErrors.code}</small>}
+                  </Field>
+                  <Field label="Name">
+                    <input required className="lims-input" value={accountForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setAccountFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, name: "" })); setAccountForm({ ...accountForm, name: v }); }} style={inputStyle()} />
+                    {accountFormErrors.name && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{accountFormErrors.name}</small>}
+                  </Field>
                   <Field label="Type">
                     <select className="lims-input" value={accountForm.type} onChange={(event) => setAccountForm({ ...accountForm, type: event.target.value })} style={inputStyle()}>
                       {["asset", "liability", "equity", "revenue", "expense"].map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
                   </Field>
-                  <Field label="Subtype"><input className="lims-input" value={accountForm.subtype} onChange={(event) => setAccountForm({ ...accountForm, subtype: event.target.value })} style={inputStyle()} /></Field>
+                  <Field label="Subtype">
+                    <input required className="lims-input" value={accountForm.subtype} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setAccountFormErrors((p) => ({ ...p, subtype: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, subtype: "Subtype contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, subtype: "" })); setAccountForm({ ...accountForm, subtype: v }); }} style={inputStyle()} />
+                    {accountFormErrors.subtype && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{accountFormErrors.subtype}</small>}
+                  </Field>
                   <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Saving..." : "Create Account"}</button>
                 </form>
               }
@@ -375,15 +413,16 @@ export default function AccountsPage() {
             <div style={{ display: "grid", gap: 14 }}>
               <div className="form-card" style={{ padding: 14, borderRadius: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, alignItems: "end" }}>
                 <Field label="From">
-                  <input type="date" className="lims-input" value={plFilter.from} onChange={(e) => setPlFilter({ ...plFilter, from: e.target.value })} style={inputStyle()} />
+                  <input type="date" className="lims-input" value={plFilter.from} onChange={(e) => { setPlFilter({ ...plFilter, from: e.target.value }); setPlError(""); }} style={inputStyle()} />
                 </Field>
                 <Field label="To">
-                  <input type="date" className="lims-input" value={plFilter.to} onChange={(e) => setPlFilter({ ...plFilter, to: e.target.value })} style={inputStyle()} />
+                  <input type="date" className="lims-input" value={plFilter.to} onChange={(e) => { setPlFilter({ ...plFilter, to: e.target.value }); setPlError(""); }} style={inputStyle()} />
                 </Field>
                 <button type="button" className="btn-lims-primary" onClick={() => loadPl(plFilter.from, plFilter.to)} style={{ height: 38 }}>
                   {plLoading ? "Loading..." : "Apply"}
                 </button>
               </div>
+              {plError && <div style={{ padding: "10px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>{plError}</div>}
               {pl && <PlStatement pl={pl} />}
             </div>
           )}
@@ -394,13 +433,16 @@ export default function AccountsPage() {
               <Field label="Description"><input required className="lims-input" value={journalForm.description} onChange={(event) => setJournalForm({ ...journalForm, description: event.target.value })} style={inputStyle()} /></Field>
               <div style={{ display: "grid", gap: 10 }}>
                 {journalForm.lines.map((line, index) => (
-                  <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 140px 140px", gap: 10 }}>
+                  <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 140px 140px 40px", gap: 10, alignItems: "center" }}>
                     <select required className="lims-input" value={line.accountId} onChange={(event) => updateJournalLine(index, { accountId: event.target.value })} style={inputStyle()}>
                       <option value="">Select account</option>
                       {accounts.map((account) => <option key={account._id} value={account._id}>{account.code} - {account.name}</option>)}
                     </select>
                     <input className="lims-input" type="number" min="0" step="0.01" placeholder="Debit" value={line.debit} onChange={(event) => updateJournalLine(index, { debit: event.target.value })} style={inputStyle()} />
                     <input className="lims-input" type="number" min="0" step="0.01" placeholder="Credit" value={line.credit} onChange={(event) => updateJournalLine(index, { credit: event.target.value })} style={inputStyle()} />
+                    {journalForm.lines.length > 2 && (
+                      <button type="button" onClick={() => removeJournalLine(index)} style={{ height: 30, width: 30, border: "none", background: "transparent", cursor: "pointer", color: "#e11d48", display: "grid", placeItems: "center", padding: 0 }}>{Icons.trash}</button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -420,16 +462,25 @@ export default function AccountsPage() {
             <div style={{ display: "grid", gap: 18 }}>
               <TwoColumn
                 left={
-                  <form className="form-card" onSubmit={(event) => submitForm(event, "/api/expenses", expenseForm, () => setExpenseForm(emptyExpense), "Expense recorded successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                  <form className="form-card" onSubmit={(event) => submitForm(event, "/api/expenses", expenseForm, () => { setExpenseForm(emptyExpense); setExpenseFormErrors({}); }, "Expense recorded successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                     <h5 style={{ margin: 0, fontSize: 16 }}>Record Expense</h5>
                     <Field label="Category">
                       <select className="lims-input" value={expenseForm.category} onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })} style={inputStyle()}>
                         {["reagent", "staff", "equipment", "overhead"].map((category) => <option key={category} value={category}>{category}</option>)}
                       </select>
                     </Field>
-                    <Field label="Vendor"><input className="lims-input" value={expenseForm.vendorName} onChange={(event) => setExpenseForm({ ...expenseForm, vendorName: event.target.value })} style={inputStyle()} /></Field>
-                    <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseForm.amount} onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })} style={inputStyle()} /></Field>
-                    <Field label="Tax"><input className="lims-input" type="number" min="0" step="0.01" value={expenseForm.taxAmount} onChange={(event) => setExpenseForm({ ...expenseForm, taxAmount: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Vendor">
+                      <input required className="lims-input" value={expenseForm.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setExpenseFormErrors((p) => ({ ...p, vendorName: "" })); setExpenseForm({ ...expenseForm, vendorName: v }); }} style={inputStyle()} />
+                      {expenseFormErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.vendorName}</small>}
+                    </Field>
+                    <Field label="Amount">
+                      <input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseForm.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, amount: "" })); setExpenseForm({ ...expenseForm, amount: v }); }} style={inputStyle()} />
+                      {expenseFormErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.amount}</small>}
+                    </Field>
+                    <Field label="Tax">
+                      <input required className="lims-input" type="number" min="0" step="0.01" value={expenseForm.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, taxAmount: "" })); setExpenseForm({ ...expenseForm, taxAmount: v }); }} style={inputStyle()} />
+                      {expenseFormErrors.taxAmount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.taxAmount}</small>}
+                    </Field>
                     <Field label="Credit">
                       <select className="lims-input" value={expenseForm.paidFrom} onChange={(event) => setExpenseForm({ ...expenseForm, paidFrom: event.target.value })} style={inputStyle()}>
                         <option value="vendor-payable">Vendor Payable</option>
@@ -461,9 +512,9 @@ export default function AccountsPage() {
                         {["reagent", "staff", "equipment", "overhead"].map((category) => <option key={category} value={category}>{category}</option>)}
                       </select>
                     </Field>
-                    <Field label="Vendor"><input className="lims-input" value={expenseFormEdit.vendorName} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, vendorName: e.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Vendor"><input required className="lims-input" value={expenseFormEdit.vendorName} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, vendorName: e.target.value })} style={inputStyle()} /></Field>
                     <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseFormEdit.amount} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, amount: e.target.value })} style={inputStyle()} /></Field>
-                    <Field label="Tax"><input className="lims-input" type="number" min="0" step="0.01" value={expenseFormEdit.taxAmount} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, taxAmount: e.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Tax"><input required className="lims-input" type="number" min="0" step="0.01" value={expenseFormEdit.taxAmount} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, taxAmount: e.target.value })} style={inputStyle()} /></Field>
                     <Field label="Credit">
                       <select className="lims-input" value={expenseFormEdit.paidFrom} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, paidFrom: e.target.value })} style={inputStyle()}>
                         <option value="vendor-payable">Vendor Payable</option>
@@ -485,11 +536,20 @@ export default function AccountsPage() {
             <div style={{ display: "grid", gap: 18 }}>
               <TwoColumn
                 left={
-                  <form className="form-card" onSubmit={(event) => submitForm(event, "/api/corporate-accounts", corporateForm, () => setCorporateForm(emptyCorporate), "Corporate account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
+                  <form className="form-card" onSubmit={(event) => submitForm(event, "/api/corporate-accounts", corporateForm, () => { setCorporateForm(emptyCorporate); setCorporateFormErrors({}); }, "Corporate account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                     <h5 style={{ margin: 0, fontSize: 16 }}>Corporate Account</h5>
-                    <Field label="Name"><input required className="lims-input" value={corporateForm.name} onChange={(event) => setCorporateForm({ ...corporateForm, name: event.target.value })} style={inputStyle()} /></Field>
-                    <Field label="Contact Person"><input className="lims-input" value={corporateForm.contactPerson} onChange={(event) => setCorporateForm({ ...corporateForm, contactPerson: event.target.value })} style={inputStyle()} /></Field>
-                    <Field label="Credit Limit"><input className="lims-input" type="number" min="0" step="0.01" value={corporateForm.creditLimit} onChange={(event) => setCorporateForm({ ...corporateForm, creditLimit: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Name">
+                      <input required className="lims-input" value={corporateForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, name: "" })); setCorporateForm({ ...corporateForm, name: v }); }} style={inputStyle()} />
+                      {corporateFormErrors.name && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.name}</small>}
+                    </Field>
+                    <Field label="Contact Person">
+                      <input required className="lims-input" value={corporateForm.contactPerson} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "Contact person contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, contactPerson: "" })); setCorporateForm({ ...corporateForm, contactPerson: v }); }} style={inputStyle()} />
+                      {corporateFormErrors.contactPerson && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.contactPerson}</small>}
+                    </Field>
+                    <Field label="Credit Limit">
+                      <input required className="lims-input" type="number" min="0" step="0.01" value={corporateForm.creditLimit} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setCorporateFormErrors((p) => ({ ...p, creditLimit: "Exponential notation is not allowed" })); return; } setCorporateFormErrors((p) => ({ ...p, creditLimit: "" })); setCorporateForm({ ...corporateForm, creditLimit: v }); }} style={inputStyle()} />
+                      {corporateFormErrors.creditLimit && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.creditLimit}</small>}
+                    </Field>
                     <Field label="Statement Cycle">
                       <select className="lims-input" value={corporateForm.statementCycle} onChange={(event) => setCorporateForm({ ...corporateForm, statementCycle: event.target.value })} style={inputStyle()}>
                         <option value="monthly">Monthly</option>
@@ -515,10 +575,10 @@ export default function AccountsPage() {
                       <input required className="lims-input" value={corporateFormEdit.name} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, name: e.target.value })} style={inputStyle()} />
                     </Field>
                     <Field label="Contact Person">
-                      <input className="lims-input" value={corporateFormEdit.contactPerson} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, contactPerson: e.target.value })} style={inputStyle()} />
+                      <input required className="lims-input" value={corporateFormEdit.contactPerson} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, contactPerson: e.target.value })} style={inputStyle()} />
                     </Field>
                     <Field label="Credit Limit">
-                      <input className="lims-input" type="number" min="0" step="0.01" value={corporateFormEdit.creditLimit} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, creditLimit: e.target.value })} style={inputStyle()} />
+                      <input required className="lims-input" type="number" min="0" step="0.01" value={corporateFormEdit.creditLimit} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, creditLimit: e.target.value })} style={inputStyle()} />
                     </Field>
                     <Field label="Statement Cycle">
                       <select className="lims-input" value={corporateFormEdit.statementCycle} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, statementCycle: e.target.value })} style={inputStyle()}>
@@ -635,15 +695,15 @@ function PlStatement({ pl }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         <div className="form-card" style={{ padding: 18, borderRadius: 8 }}>
           <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 800 }}>TOTAL REVENUE</div>
-          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 900, color: "#047857" }}>Rs {money(totalRevenue)}</div>
+          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 900, color: "#047857", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Rs {money(totalRevenue)}</div>
         </div>
         <div className="form-card" style={{ padding: 18, borderRadius: 8 }}>
           <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 800 }}>TOTAL EXPENSES</div>
-          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 900, color: "#b91c1c" }}>Rs {money(totalExpenses)}</div>
+          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 900, color: "#b91c1c", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Rs {money(totalExpenses)}</div>
         </div>
         <div className="form-card" style={{ padding: 18, borderRadius: 8, background: isProfit ? "#ecfdf5" : "#fef2f2" }}>
           <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 800 }}>NET {isProfit ? "PROFIT" : "LOSS"}</div>
-          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 900, color: isProfit ? "#047857" : "#b91c1c" }}>Rs {money(Math.abs(netProfit))}</div>
+          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 900, color: isProfit ? "#047857" : "#b91c1c", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Rs {money(Math.abs(netProfit))}</div>
         </div>
       </div>
 

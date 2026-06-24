@@ -20,6 +20,10 @@ export async function GET(req) {
     const from = dateValue(searchParams.get("from"));
     const to = dateValue(searchParams.get("to"));
 
+    if (from && to && from > to) {
+      return Response.json({ error: "From date must be before To date" }, { status: 400 });
+    }
+
     const { JournalEntry, Account } = await getTenantModels(auth.tenantId);
 
     const matchStage = { tenantId: auth.tenantId, isReversed: false };

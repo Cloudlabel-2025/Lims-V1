@@ -34,6 +34,19 @@ export default function AuditPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [resourceType, setResourceType] = useState("");
+  const [allResourceTypes, setAllResourceTypes] = useState([]);
+
+  const loadAllTypes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/audit?limit=500", { credentials: "include" });
+      const data = await res.json();
+      if (res.ok) {
+        const types = [...new Set((data.logs || []).map((l) => l.resourceType).filter(Boolean))];
+        setAllResourceTypes(types);
+      }
+    } catch {
+    }
+  }, []);
 
   const load = useCallback(async (rt = resourceType) => {
     setLoading(true);
@@ -52,9 +65,7 @@ export default function AuditPage() {
     }
   }, [resourceType]);
 
-  useEffect(() => { load(); }, [load]);
-
-  const resourceTypes = [...new Set(logs.map((l) => l.resourceType).filter(Boolean))];
+  useEffect(() => { loadAllTypes(); load(); }, [load, loadAllTypes]);
 
   return (
     <div style={{ width: "100%", paddingBottom: 40 }}>
@@ -72,7 +83,7 @@ export default function AuditPage() {
             onChange={(e) => { setResourceType(e.target.value); load(e.target.value); }}
           >
             <option value="">All resource types</option>
-            {resourceTypes.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
+            {allResourceTypes.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
           </select>
           <button className="dash-btn-secondary" onClick={() => load(resourceType)} style={{ height: 38 }}>
             {Icons.logo} Refresh
@@ -82,7 +93,7 @@ export default function AuditPage() {
 
       {error && <div className="module-alert">{error}</div>}
 
-      <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 10, overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>

@@ -111,11 +111,44 @@ export default function BillingPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        clearCachedApi("/api/tests/definitions?status=active");
+        clearCachedApi("/api/tests/packages");
+        loadData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [loadData]);
+
   async function createBill(event) {
     event.preventDefault();
     setSaving(true);
     setError("");
     setSuccess("");
+
+    if (discountAmount === "" || discountAmount === null || discountAmount === undefined) {
+      setError("Discount amount is required");
+      setSaving(false);
+      return;
+    }
+    if (taxAmount === "" || taxAmount === null || taxAmount === undefined) {
+      setError("Tax amount is required");
+      setSaving(false);
+      return;
+    }
+    if (/[eE]/.test(String(discountAmount))) {
+      setError("Invalid discount amount format");
+      setSaving(false);
+      return;
+    }
+    if (/[eE]/.test(String(taxAmount))) {
+      setError("Invalid tax amount format");
+      setSaving(false);
+      return;
+    }
 
     try {
       const response = await fetch("/api/billing", {
@@ -230,6 +263,7 @@ export default function BillingPage() {
       setSuccess(data.message || "Bill settlement completed successfully.");
     } catch (err) {
       setError(err.message);
+      setPayment({ cash: 0, card: 0, online: 0 });
     } finally {
       setClosing(false);
     }
@@ -237,6 +271,7 @@ export default function BillingPage() {
 
   const closeSettlementModal = useCallback(() => {
     setShowCloseModal(false);
+    setPayment({ cash: 0, card: 0, online: 0 });
   }, []);
 
   const updateSettlementPayment = useCallback((key, value) => {

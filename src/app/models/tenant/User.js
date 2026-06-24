@@ -37,12 +37,22 @@ export const UserSchema = new mongoose.Schema(
       trim: true,
       minlength: 2,
       maxlength: 60,
+      match: [/^[A-Za-z0-9 .&'\/,()@_-]+$/, "First name contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\//.test(v),
+        message: "URLs are not allowed in first name",
+      },
     },
     lastName: {
       type: String,
       required: true,
       trim: true,
       maxlength: 60,
+      match: [/^[A-Za-z0-9 .&'\/,()@_-]+$/, "Last name contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\//.test(v),
+        message: "URLs are not allowed in last name",
+      },
     },
     email: {
       type: String,
@@ -50,10 +60,16 @@ export const UserSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      validate: {
-        validator: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
-        message: "Invalid email format",
-      },
+      validate: [
+        {
+          validator: (value) => !/https?:\/\//.test(value),
+          message: "URLs are not allowed in email",
+        },
+        {
+          validator: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+          message: "Invalid email format",
+        },
+      ],
     },
     passwordHash: {
       type: String,

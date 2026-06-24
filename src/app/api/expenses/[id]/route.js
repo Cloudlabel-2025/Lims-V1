@@ -11,6 +11,19 @@ function money(value) {
   return Math.max(0, Math.round((Number(value) || 0) * 100) / 100);
 }
 
+function isExponentialNotation(value) {
+  if (typeof value === "string" && /[eE]/.test(value)) return true;
+  return false;
+}
+
+function hasUrl(value) {
+  return /https?:\/\//.test(value);
+}
+
+function isValidName(value) {
+  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
+}
+
 const expenseAccountByCategory = {
   reagent: "5001",
   staff: "5002",
@@ -65,13 +78,33 @@ export async function PUT(req, { params }) {
       }
       expense.category = clean(body.category);
     }
-    if (body.vendorName !== undefined) expense.vendorName = clean(body.vendorName);
+    if (body.vendorName !== undefined) {
+      const vn = clean(body.vendorName);
+      if (!vn) return Response.json({ error: "Vendor name is required" }, { status: 400 });
+      if (hasUrl(vn)) return Response.json({ error: "URLs are not allowed in vendor name" }, { status: 400 });
+      if (!isValidName(vn)) return Response.json({ error: "Vendor name contains invalid characters" }, { status: 400 });
+      expense.vendorName = vn;
+    }
     if (body.amount !== undefined) {
+      if (body.amount === null || body.amount === "") {
+        return Response.json({ error: "Amount is required" }, { status: 400 });
+      }
+      if (isExponentialNotation(String(body.amount))) {
+        return Response.json({ error: "Exponential notation is not allowed in amount" }, { status: 400 });
+      }
       const amount = money(body.amount);
       if (amount <= 0) return Response.json({ error: "Amount must be greater than zero" }, { status: 400 });
       expense.amount = amount;
     }
-    if (body.taxAmount !== undefined) expense.taxAmount = Math.max(0, money(body.taxAmount));
+    if (body.taxAmount !== undefined) {
+      if (body.taxAmount === null || body.taxAmount === "") {
+        return Response.json({ error: "Tax amount is required" }, { status: 400 });
+      }
+      if (isExponentialNotation(String(body.taxAmount))) {
+        return Response.json({ error: "Exponential notation is not allowed in tax amount" }, { status: 400 });
+      }
+      expense.taxAmount = Math.max(0, money(body.taxAmount));
+    }
     if (body.paidFrom !== undefined) {
       if (!["cash", "bank", "vendor-payable"].includes(body.paidFrom)) {
         return Response.json({ error: "Invalid paidFrom value" }, { status: 400 });

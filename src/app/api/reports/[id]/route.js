@@ -3,6 +3,15 @@ import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
+function clean(value) {
+  return String(value || "").trim();
+}
+
+function isExponentialNotation(value) {
+  if (typeof value === "string" && /[eE]/.test(value)) return true;
+  return false;
+}
+
 export async function GET(req, { params }) {
   try {
     const auth = requireTenantSession(req, "reports.view");
@@ -67,7 +76,22 @@ export async function PATCH(req, { params }) {
       if (report.status !== "draft") {
         return Response.json({ error: "Only draft reports can be edited" }, { status: 400 });
       }
-      if (body.results) report.results = body.results;
+      if (body.results) {
+        if (typeof body.results !== "object" || Array.isArray(body.results)) {
+          return Response.json({ error: "Results must be an object" }, { status: 400 });
+        }
+        for (const [key, rawValue] of Object.entries(body.results)) {
+          const textValue = clean(rawValue);
+          if (textValue === "") continue;
+          if (isExponentialNotation(textValue)) {
+            return Response.json({ error: `Exponential notation (${textValue}) is not allowed in result values` }, { status: 400 });
+          }
+          if (!Number.isFinite(Number(textValue))) {
+            return Response.json({ error: `Invalid numeric value "${textValue}" for result field` }, { status: 400 });
+          }
+        }
+        report.results = body.results;
+      }
       if (body.remarks !== undefined) report.remarks = body.remarks;
     } else {
       if (action === "deliver") {

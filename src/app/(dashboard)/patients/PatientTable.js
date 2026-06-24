@@ -4,7 +4,7 @@ import { memo } from "react";
 import { Icons } from "@/app/components/Icons";
 import { formatDate, getInitials } from "@/app/utils/patient-helpers";
 
-function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPatient }) {
+function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPatient, onDeletePatient }) {
   return (
     <div className="form-card" style={{ padding: "0", overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
@@ -88,7 +88,7 @@ function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPati
               <td style={{ padding: "12px 20px", color: "var(--text-muted)", fontSize: "12px" }}>
                 {formatDate(patient.createdAt)}
               </td>
-              <td style={{ padding: "12px 20px", textAlign: "center" }}>
+              <td style={{ padding: "12px 20px", textAlign: "center", whiteSpace: "nowrap" }}>
                 <button
                   style={{
                     border: "none",
@@ -109,9 +109,39 @@ function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPati
                   onMouseOut={(event) => {
                     event.currentTarget.style.color = "var(--text-muted)";
                   }}
+                  title="Edit Patient"
                 >
                   {Icons.edit}
                 </button>
+                {onDeletePatient && (
+                  <button
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "#b91c1c",
+                      cursor: "pointer",
+                      padding: "4px",
+                      borderRadius: "6px",
+                      transition: "all 0.2s",
+                      marginLeft: 4,
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (window.confirm(`Delete patient ${patient.patientId} (${patient.name})?`)) {
+                        onDeletePatient(patient._id);
+                      }
+                    }}
+                    onMouseOver={(event) => {
+                      event.currentTarget.style.opacity = "0.7";
+                    }}
+                    onMouseOut={(event) => {
+                      event.currentTarget.style.opacity = "1";
+                    }}
+                    title="Delete Patient"
+                  >
+                    {Icons.trashIcon || "🗑"}
+                  </button>
+                )}
               </td>
             </tr>
           ))}

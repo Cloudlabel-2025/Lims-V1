@@ -3,6 +3,9 @@ import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
 
+const URL_RE = /https?:\/\//;
+const SAFE_NAME = /^[A-Za-z0-9 .&'\/,()@_-]+$/;
+
 function clean(value) {
   return String(value || "").trim();
 }
@@ -66,6 +69,18 @@ export async function POST(req) {
 
     if (!firstName || firstName.length < 2) {
       return Response.json({ error: "User name is required" }, { status: 400 });
+    }
+
+    if (URL_RE.test(firstName) || URL_RE.test(lastName)) {
+      return Response.json({ error: "URLs are not allowed in user name" }, { status: 400 });
+    }
+
+    if (!SAFE_NAME.test(firstName) || !SAFE_NAME.test(lastName)) {
+      return Response.json({ error: "User name contains invalid characters" }, { status: 400 });
+    }
+
+    if (URL_RE.test(email)) {
+      return Response.json({ error: "URLs are not allowed in email" }, { status: 400 });
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -140,6 +155,18 @@ export async function PATCH(req) {
 
     if (!firstName || firstName.length < 2) {
       return Response.json({ error: "User name is required" }, { status: 400 });
+    }
+
+    if (URL_RE.test(firstName) || URL_RE.test(lastName)) {
+      return Response.json({ error: "URLs are not allowed in user name" }, { status: 400 });
+    }
+
+    if (!SAFE_NAME.test(firstName) || !SAFE_NAME.test(lastName)) {
+      return Response.json({ error: "User name contains invalid characters" }, { status: 400 });
+    }
+
+    if (URL_RE.test(email)) {
+      return Response.json({ error: "URLs are not allowed in email" }, { status: 400 });
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

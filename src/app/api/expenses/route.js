@@ -19,6 +19,19 @@ function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function isExponentialNotation(value) {
+  if (typeof value === "string" && /[eE]/.test(value)) return true;
+  return false;
+}
+
+function hasUrl(value) {
+  return /https?:\/\//.test(value);
+}
+
+function isValidName(value) {
+  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
+}
+
 function dateValue(value) {
   if (!value) return new Date();
   const parsed = new Date(value);
@@ -73,8 +86,34 @@ export async function POST(req) {
 
     const body = await req.json();
     const category = clean(body.category);
-    const amount = money(body.amount);
-    const taxAmount = Math.max(0, money(body.taxAmount));
+    const vendorName = clean(body.vendorName);
+    const rawAmount = body.amount;
+    const rawTaxAmount = body.taxAmount;
+
+    if (!vendorName) {
+      return Response.json({ error: "Vendor name is required" }, { status: 400 });
+    }
+    if (hasUrl(vendorName)) {
+      return Response.json({ error: "URLs are not allowed in vendor name" }, { status: 400 });
+    }
+    if (!isValidName(vendorName)) {
+      return Response.json({ error: "Vendor name contains invalid characters" }, { status: 400 });
+    }
+    if (rawAmount === undefined || rawAmount === null || rawAmount === "") {
+      return Response.json({ error: "Amount is required" }, { status: 400 });
+    }
+    if (isExponentialNotation(String(rawAmount))) {
+      return Response.json({ error: "Exponential notation is not allowed in amount" }, { status: 400 });
+    }
+    if (rawTaxAmount === undefined || rawTaxAmount === null || rawTaxAmount === "") {
+      return Response.json({ error: "Tax amount is required" }, { status: 400 });
+    }
+    if (isExponentialNotation(String(rawTaxAmount))) {
+      return Response.json({ error: "Exponential notation is not allowed in tax amount" }, { status: 400 });
+    }
+
+    const amount = money(rawAmount);
+    const taxAmount = Math.max(0, money(rawTaxAmount));
     const paidFrom = ["cash", "bank", "vendor-payable"].includes(body.paidFrom)
       ? body.paidFrom
       : "vendor-payable";
@@ -96,7 +135,7 @@ export async function POST(req) {
         [
           {
             category,
-            vendorName: clean(body.vendorName),
+            vendorName,
             amount,
             taxAmount,
             paidFrom,

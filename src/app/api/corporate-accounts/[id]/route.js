@@ -11,6 +11,19 @@ function money(value) {
   return Math.max(0, Math.round((Number(value) || 0) * 100) / 100);
 }
 
+function isExponentialNotation(value) {
+  if (typeof value === "string" && /[eE]/.test(value)) return true;
+  return false;
+}
+
+function hasUrl(value) {
+  return /https?:\/\//.test(value);
+}
+
+function isValidName(value) {
+  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
+}
+
 export async function GET(req, { params }) {
   try {
     const auth = requireTenantSession(req, "accounts.view");
@@ -50,9 +63,29 @@ export async function PUT(req, { params }) {
       return Response.json({ error: "Corporate account not found" }, { status: 404 });
     }
 
-    if (body.name !== undefined) corporateAccount.name = clean(body.name);
-    if (body.contactPerson !== undefined) corporateAccount.contactPerson = clean(body.contactPerson);
-    if (body.creditLimit !== undefined) corporateAccount.creditLimit = money(body.creditLimit);
+    if (body.name !== undefined) {
+      const name = clean(body.name);
+      if (!name) return Response.json({ error: "Corporate account name is required" }, { status: 400 });
+      if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in corporate name" }, { status: 400 });
+      if (!isValidName(name)) return Response.json({ error: "Name contains invalid characters" }, { status: 400 });
+      corporateAccount.name = name;
+    }
+    if (body.contactPerson !== undefined) {
+      const contactPerson = clean(body.contactPerson);
+      if (!contactPerson) return Response.json({ error: "Contact person is required" }, { status: 400 });
+      if (hasUrl(contactPerson)) return Response.json({ error: "URLs are not allowed in contact person" }, { status: 400 });
+      if (!isValidName(contactPerson)) return Response.json({ error: "Contact person contains invalid characters" }, { status: 400 });
+      corporateAccount.contactPerson = contactPerson;
+    }
+    if (body.creditLimit !== undefined) {
+      if (body.creditLimit === null || body.creditLimit === "") {
+        return Response.json({ error: "Credit limit is required" }, { status: 400 });
+      }
+      if (isExponentialNotation(String(body.creditLimit))) {
+        return Response.json({ error: "Exponential notation is not allowed in credit limit" }, { status: 400 });
+      }
+      corporateAccount.creditLimit = money(body.creditLimit);
+    }
     if (body.outstandingBalance !== undefined) corporateAccount.outstandingBalance = money(body.outstandingBalance);
     if (body.statementCycle !== undefined) {
       corporateAccount.statementCycle = body.statementCycle === "weekly" ? "weekly" : "monthly";

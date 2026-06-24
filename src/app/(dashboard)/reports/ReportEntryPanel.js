@@ -1,5 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
+function isExponential(value) {
+  return typeof value === "string" && /[eE]/.test(value);
+}
+
 function rangeText(result) {
   const hasMin = Number.isFinite(result.normalMin);
   const hasMax = Number.isFinite(result.normalMax);
@@ -37,6 +43,21 @@ export default function ReportEntryPanel({
   setRemarks,
   saveReport,
 }) {
+  const [resultsErrors, setResultsErrors] = useState({});
+
+  function handleResultChange(key, value) {
+    if (isExponential(value)) {
+      setResultsErrors((prev) => ({ ...prev, [key]: "Exponential notation (e.g. 1E+21) is not allowed" }));
+      return;
+    }
+    if (value !== "" && value !== "-" && value !== "." && !Number.isFinite(Number(value))) {
+      setResultsErrors((prev) => ({ ...prev, [key]: "Invalid numeric value" }));
+      return;
+    }
+    setResultsErrors((prev) => ({ ...prev, [key]: "" }));
+    setResults((current) => ({ ...current, [key]: value }));
+  }
+
   return (
     <section className="module-panel">
       <div className="module-panel-header">
@@ -109,12 +130,20 @@ export default function ReportEntryPanel({
                       {parameter.name}
                       {!parameter.required && <small>Optional</small>}
                     </span>
-                    <input
-                      value={results[parameter.key] || ""}
-                      onChange={(e) => setResults((current) => ({ ...current, [parameter.key]: e.target.value }))}
-                      required={parameter.required}
-                      placeholder="Enter value"
-                    />
+                    <div>
+                      <input
+                        value={results[parameter.key] || ""}
+                        onChange={(e) => handleResultChange(parameter.key, e.target.value)}
+                        required={parameter.required}
+                        placeholder="Enter value"
+                        style={resultsErrors[parameter.key] ? { borderColor: "var(--error)" } : {}}
+                      />
+                      {resultsErrors[parameter.key] && (
+                        <small style={{ color: "var(--error)", fontSize: "10px", display: "block", marginTop: "2px" }}>
+                          {resultsErrors[parameter.key]}
+                        </small>
+                      )}
+                    </div>
                     <span>{parameter.unit || "-"}</span>
                     <span>{rangeText(parameter)}</span>
                     <strong>{flag === "not-entered" ? "-" : flag}</strong>

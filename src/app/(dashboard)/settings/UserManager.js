@@ -1,6 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import PasswordField from "@/app/components/PasswordField";
+
+const SAFE_NAME = /^[A-Za-z0-9 .&'\/,()@_-]+$/;
+const URL_RE = /https?:\/\//;
+
+function validateUserName(v) {
+  if (!v || !v.trim()) return "User name is required";
+  if (URL_RE.test(v)) return "URLs are not allowed in user name";
+  if (!SAFE_NAME.test(v.trim())) return "User name contains invalid characters";
+  return "";
+}
+
+function validateUserEmail(v) {
+  const trimmed = (v || "").trim();
+  if (URL_RE.test(trimmed)) return "URLs are not allowed in email";
+  if (!trimmed) return "Login email is required";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "Valid login email is required";
+  return "";
+}
 
 export default function UserManager({
   newUser,
@@ -19,6 +38,54 @@ export default function UserManager({
   saveUserEdit,
   deleteUser,
 }) {
+  const [localErrors, setLocalErrors] = useState({});
+
+  function handleNewUserNameChange(value) {
+    setNewUser((current) => ({ ...current, name: value }));
+    const err = validateUserName(value);
+    setLocalErrors((prev) => ({ ...prev, newName: err }));
+  }
+
+  function handleNewUserEmailChange(value) {
+    setNewUser((current) => ({ ...current, email: value }));
+    const err = validateUserEmail(value);
+    setLocalErrors((prev) => ({ ...prev, newEmail: err }));
+  }
+
+  function handleEditNameChange(value) {
+    setEditingUser((current) => ({ ...current, name: value }));
+    const err = validateUserName(value);
+    setLocalErrors((prev) => ({ ...prev, editName: err }));
+  }
+
+  function handleEditEmailChange(value) {
+    setEditingUser((current) => ({ ...current, email: value }));
+    const err = validateUserEmail(value);
+    setLocalErrors((prev) => ({ ...prev, editEmail: err }));
+  }
+
+  function handleCreateUser() {
+    const nameErr = validateUserName(newUser.name);
+    const emailErr = validateUserEmail(newUser.email);
+    setLocalErrors({ newName: nameErr, newEmail: emailErr });
+    if (nameErr || emailErr) return;
+    createUser();
+  }
+
+  function handleSaveUserEdit() {
+    if (!editingUser) return;
+    const nameErr = validateUserName(editingUser.name);
+    const emailErr = validateUserEmail(editingUser.email);
+    setLocalErrors({ editName: nameErr, editEmail: emailErr });
+    if (nameErr || emailErr) return;
+    saveUserEdit();
+  }
+
+  function handleCancelEdit() {
+    setLocalErrors((prev) => ({ ...prev, editName: "", editEmail: "" }));
+    cancelEditUser();
+  }
+
   return (
     <>
       <section className="settings-panel">
@@ -30,21 +97,25 @@ export default function UserManager({
           <label>
             User Name
             <input
+              className={"lims-input" + (localErrors.newName ? " invalid" : "")}
               value={newUser.name}
-              onChange={(event) => setNewUser((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) => handleNewUserNameChange(event.target.value)}
               placeholder="Enter name"
             />
+            {localErrors.newName && <em style={{ color: "#b91c1c", fontSize: 11 }}>{localErrors.newName}</em>}
           </label>
           <label>
             Login Email
             <input
+              className={"lims-input" + (localErrors.newEmail ? " invalid" : "")}
               type="email"
               name="lab-settings-new-user-email"
               value={newUser.email}
-              onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))}
+              onChange={(event) => handleNewUserEmailChange(event.target.value)}
               placeholder="Enter email"
               autoComplete="section-lab-settings-new-user username"
             />
+            {localErrors.newEmail && <em style={{ color: "#b91c1c", fontSize: 11 }}>{localErrors.newEmail}</em>}
           </label>
           <label>
             Password
@@ -90,8 +161,8 @@ export default function UserManager({
           <button
             type="button"
             className="developer-primary-link"
-            onClick={createUser}
-            disabled={userSaving || rolesDirty || !canCreateUser}
+            onClick={handleCreateUser}
+            disabled={userSaving || rolesDirty || !canCreateUser || Boolean(localErrors.newName || localErrors.newEmail)}
           >
             {userSaving ? "Creating..." : "Create Lab User"}
           </button>
@@ -109,19 +180,23 @@ export default function UserManager({
             <label>
               User Name
               <input
+                className={"lims-input" + (localErrors.editName ? " invalid" : "")}
                 value={editingUser.name}
-                onChange={(event) => setEditingUser((current) => ({ ...current, name: event.target.value }))}
+                onChange={(event) => handleEditNameChange(event.target.value)}
                 placeholder="Enter name"
               />
+              {localErrors.editName && <em style={{ color: "#b91c1c", fontSize: 11 }}>{localErrors.editName}</em>}
             </label>
             <label>
               Login Email
               <input
+                className={"lims-input" + (localErrors.editEmail ? " invalid" : "")}
                 type="email"
                 value={editingUser.email}
-                onChange={(event) => setEditingUser((current) => ({ ...current, email: event.target.value }))}
+                onChange={(event) => handleEditEmailChange(event.target.value)}
                 placeholder="Enter email"
               />
+              {localErrors.editEmail && <em style={{ color: "#b91c1c", fontSize: 11 }}>{localErrors.editEmail}</em>}
             </label>
             <label>
               Role
@@ -171,10 +246,10 @@ export default function UserManager({
             </label>
           </div>
           <div className="developer-config-actions">
-            <button type="button" className="developer-primary-link" onClick={saveUserEdit} disabled={userSaving || rolesDirty}>
+            <button type="button" className="developer-primary-link" onClick={handleSaveUserEdit} disabled={userSaving || rolesDirty || Boolean(localErrors.editName || localErrors.editEmail)}>
               {userSaving ? "Saving..." : "Save User"}
             </button>
-            <button type="button" className="developer-primary-link" onClick={cancelEditUser} disabled={userSaving}>
+            <button type="button" className="developer-primary-link" onClick={handleCancelEdit} disabled={userSaving}>
               Cancel
             </button>
           </div>

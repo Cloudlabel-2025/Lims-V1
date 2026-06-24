@@ -3,6 +3,20 @@ import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
+const URL_RE = /https?:\/\//;
+const EXP_RE = /[eE]/;
+const SAFE_TEXT = /^[A-Za-z0-9 .&'\/,()@_-]*$/;
+
+function isValidName(v) {
+  return v && SAFE_TEXT.test(v);
+}
+function hasUrl(v) {
+  return v && URL_RE.test(v);
+}
+function isExponential(v) {
+  return v && EXP_RE.test(v);
+}
+
 export async function GET(req) {
   try {
     const auth = requireTenantSession(req, "quality.view");
@@ -41,6 +55,18 @@ export async function POST(req) {
     const sampleId = String(body.sample || "").trim();
     let testName = String(body.testName || "").trim();
 
+    if (!isValidName(testName)) return Response.json({ error: "Test name is required and must not contain special characters" }, { status: 400 });
+    if (hasUrl(testName)) return Response.json({ error: "URLs are not allowed in test name" }, { status: 400 });
+    if (instrument && hasUrl(instrument)) return Response.json({ error: "URLs are not allowed in instrument" }, { status: 400 });
+    if (instrument && !isValidName(instrument)) return Response.json({ error: "Instrument contains invalid characters" }, { status: 400 });
+    if (lotNumber && hasUrl(lotNumber)) return Response.json({ error: "URLs are not allowed in lot number" }, { status: 400 });
+    if (lotNumber && !isValidName(lotNumber)) return Response.json({ error: "Lot number contains invalid characters" }, { status: 400 });
+    if (value && isExponential(value)) return Response.json({ error: "Exponential notation is not allowed in observed value" }, { status: 400 });
+    if (expectedRange && isExponential(expectedRange)) return Response.json({ error: "Exponential notation is not allowed in expected range" }, { status: 400 });
+    if (!result) return Response.json({ error: "Result is required" }, { status: 400 });
+    if (!value) return Response.json({ error: "Observed value is required" }, { status: 400 });
+    if (!expectedRange) return Response.json({ error: "Expected range is required" }, { status: 400 });
+
     const { QcLog, Sample, BillingRecord } = await getTenantModels(auth.tenantId);
     let sample = null;
     if (sampleId) {
@@ -49,18 +75,17 @@ export async function POST(req) {
       testName = testName || sample.testSnapshot?.name || "";
     }
 
-    if (!testName) return Response.json({ error: "Test name is required" }, { status: 400 });
-    if (!result) return Response.json({ error: "Result is required" }, { status: 400 });
+    if (!type) return Response.json({ error: "Type is required" }, { status: 400 });
 
     const log = await QcLog.create({
-      type: type || "qc-run",
+      type,
       testName,
-      instrument: instrument?.trim(),
-      lotNumber: lotNumber?.trim(),
+      instrument,
+      lotNumber,
       result,
-      value: value?.trim(),
-      expectedRange: expectedRange?.trim(),
-      remarks: remarks?.trim(),
+      value,
+      expectedRange,
+      remarks,
       enteredBy: auth.session.email,
       sample: sample?._id,
       billingRecord: sample?.billingRecord,

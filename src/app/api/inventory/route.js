@@ -12,6 +12,23 @@ function numberValue(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function isValidName(value) {
+  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
+}
+
+function isLettersOnly(value) {
+  return /^[A-Za-z\s]*$/.test(value);
+}
+
+function hasUrl(value) {
+  return /https?:\/\//.test(value);
+}
+
+function isExponential(value) {
+  if (value === undefined || value === null) return false;
+  return /[eE]/.test(String(value));
+}
+
 function dateValue(value) {
   if (!value) return undefined;
   const parsed = new Date(value);
@@ -134,10 +151,17 @@ export async function POST(req) {
     if (action === "category") {
       const name = clean(body.name);
       if (!name) return Response.json({ error: "Category name is required" }, { status: 400 });
+      if (!isValidName(name)) return Response.json({ error: "Category name contains invalid characters" }, { status: 400 });
+      if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in category name" }, { status: 400 });
+
+      const code = clean(body.code);
+      if (!code) return Response.json({ error: "Category code is required" }, { status: 400 });
+      if (!isValidName(code)) return Response.json({ error: "Category code contains invalid characters" }, { status: 400 });
+      if (hasUrl(code)) return Response.json({ error: "URLs are not allowed in category code" }, { status: 400 });
 
       const category = await InventoryCategory.create({
         name,
-        code: clean(body.code) || undefined,
+        code,
         parentCategory: mongoose.Types.ObjectId.isValid(body.parentCategory) ? body.parentCategory : null,
         description: clean(body.description),
         status: body.status === "inactive" ? "inactive" : "active",
@@ -150,13 +174,30 @@ export async function POST(req) {
       const name = clean(body.name);
       const symbol = clean(body.symbol);
       if (!name || !symbol) return Response.json({ error: "UOM name and symbol are required" }, { status: 400 });
+      if (!isLettersOnly(name)) return Response.json({ error: "UOM name must contain only letters" }, { status: 400 });
+      if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in UOM name" }, { status: 400 });
+      if (!isValidName(symbol)) return Response.json({ error: "UOM symbol contains invalid characters" }, { status: 400 });
+      if (hasUrl(symbol)) return Response.json({ error: "URLs are not allowed in UOM symbol" }, { status: 400 });
+
+      const conv = body.conversionToBase;
+      if (conv === undefined || conv === null || conv === "") {
+        return Response.json({ error: "Conversion to base is required" }, { status: 400 });
+      }
+      if (isExponential(conv)) {
+        return Response.json({ error: "Exponential notation is not allowed in conversion factor" }, { status: 400 });
+      }
+
+      const baseSymbol = clean(body.baseSymbol);
+      if (!baseSymbol) return Response.json({ error: "Base symbol is required" }, { status: 400 });
+      if (!isValidName(baseSymbol)) return Response.json({ error: "Base symbol contains invalid characters" }, { status: 400 });
+      if (hasUrl(baseSymbol)) return Response.json({ error: "URLs are not allowed in base symbol" }, { status: 400 });
 
       const uom = await InventoryUom.create({
         name,
         symbol,
         type: clean(body.type) || "count",
         conversionToBase: numberValue(body.conversionToBase, 1),
-        baseSymbol: clean(body.baseSymbol) || symbol,
+        baseSymbol,
         status: body.status === "inactive" ? "inactive" : "active",
       });
 
@@ -169,38 +210,104 @@ export async function POST(req) {
       if (!itemCode || !name || !mongoose.Types.ObjectId.isValid(body.category) || !mongoose.Types.ObjectId.isValid(body.baseUom)) {
         return Response.json({ error: "Item code, name, category and base UOM are required" }, { status: 400 });
       }
+      if (!isValidName(itemCode)) return Response.json({ error: "Item code contains invalid characters" }, { status: 400 });
+      if (hasUrl(itemCode)) return Response.json({ error: "URLs are not allowed in item code" }, { status: 400 });
+      if (!isValidName(name)) return Response.json({ error: "Item name contains invalid characters" }, { status: 400 });
+      if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in item name" }, { status: 400 });
+
+      const genericName = clean(body.genericName);
+      if (!genericName) return Response.json({ error: "Generic name is required" }, { status: 400 });
+      if (!isValidName(genericName)) return Response.json({ error: "Generic name contains invalid characters" }, { status: 400 });
+      if (hasUrl(genericName)) return Response.json({ error: "URLs are not allowed in generic name" }, { status: 400 });
+
+      if (!body.subCategory || !mongoose.Types.ObjectId.isValid(body.subCategory)) {
+        return Response.json({ error: "Sub category is required" }, { status: 400 });
+      }
+      if (!body.purchaseUom || !mongoose.Types.ObjectId.isValid(body.purchaseUom)) {
+        return Response.json({ error: "Purchase UOM is required" }, { status: 400 });
+      }
+
+      if (body.purchaseToBaseFactor === undefined || body.purchaseToBaseFactor === null || body.purchaseToBaseFactor === "") {
+        return Response.json({ error: "Conversion factor is required" }, { status: 400 });
+      }
+      if (isExponential(body.purchaseToBaseFactor)) {
+        return Response.json({ error: "Exponential notation is not allowed in conversion factor" }, { status: 400 });
+      }
+      if (body.minimumStockBase === undefined || body.minimumStockBase === null || body.minimumStockBase === "") {
+        return Response.json({ error: "Min stock is required" }, { status: 400 });
+      }
+      if (isExponential(body.minimumStockBase)) {
+        return Response.json({ error: "Exponential notation is not allowed in min stock" }, { status: 400 });
+      }
+      if (body.reorderLevelBase === undefined || body.reorderLevelBase === null || body.reorderLevelBase === "") {
+        return Response.json({ error: "Reorder level is required" }, { status: 400 });
+      }
+      if (isExponential(body.reorderLevelBase)) {
+        return Response.json({ error: "Exponential notation is not allowed in reorder level" }, { status: 400 });
+      }
+      if (body.openingQuantityBase === undefined || body.openingQuantityBase === null || body.openingQuantityBase === "") {
+        return Response.json({ error: "Opening quantity is required" }, { status: 400 });
+      }
+      if (isExponential(body.openingQuantityBase)) {
+        return Response.json({ error: "Exponential notation is not allowed in opening quantity" }, { status: 400 });
+      }
+
+      const manufacturer = clean(body.manufacturer);
+      if (!manufacturer) return Response.json({ error: "Manufacturer is required" }, { status: 400 });
+      if (!isValidName(manufacturer)) return Response.json({ error: "Manufacturer contains invalid characters" }, { status: 400 });
+      if (hasUrl(manufacturer)) return Response.json({ error: "URLs are not allowed in manufacturer" }, { status: 400 });
+
+      const preferredSupplier = clean(body.preferredSupplier);
+      if (!preferredSupplier) return Response.json({ error: "Supplier is required" }, { status: 400 });
+      if (!isValidName(preferredSupplier)) return Response.json({ error: "Supplier contains invalid characters" }, { status: 400 });
+      if (hasUrl(preferredSupplier)) return Response.json({ error: "URLs are not allowed in supplier" }, { status: 400 });
+
+      const batchNo = clean(body.batchNo);
+      if (!batchNo) return Response.json({ error: "Batch No is required" }, { status: 400 });
+      if (!isValidName(batchNo)) return Response.json({ error: "Batch No contains invalid characters" }, { status: 400 });
+      if (hasUrl(batchNo)) return Response.json({ error: "URLs are not allowed in batch number" }, { status: 400 });
+
+      const defaultLocation = clean(body.defaultLocation);
+      if (!defaultLocation) return Response.json({ error: "Location is required" }, { status: 400 });
+      if (!isValidName(defaultLocation)) return Response.json({ error: "Location contains invalid characters" }, { status: 400 });
+      if (hasUrl(defaultLocation)) return Response.json({ error: "URLs are not allowed in location" }, { status: 400 });
+
+      const storageCondition = clean(body.storageCondition);
+      if (!storageCondition) return Response.json({ error: "Storage condition is required" }, { status: 400 });
+      if (!isValidName(storageCondition)) return Response.json({ error: "Storage condition contains invalid characters" }, { status: 400 });
+      if (hasUrl(storageCondition)) return Response.json({ error: "URLs are not allowed in storage condition" }, { status: 400 });
 
       const openingQty = numberValue(body.openingQuantityBase, 0);
       const openingBatch = openingQty > 0
         ? [{
-            batchNo: clean(body.batchNo) || "OPENING",
-            supplier: clean(body.preferredSupplier),
+            batchNo: batchNo || "OPENING",
+            supplier: preferredSupplier,
             receivedDate: dateValue(body.receivedDate) || new Date(),
             expiryDate: dateValue(body.expiryDate),
             quantityBase: openingQty,
             costPerBaseUnit: numberValue(body.costPerBaseUnit, 0),
-            location: clean(body.defaultLocation),
+            location: defaultLocation,
           }]
         : [];
 
       const item = await InventoryItem.create({
         itemCode,
         name,
-        genericName: clean(body.genericName),
+        genericName,
         category: body.category,
-        subCategory: mongoose.Types.ObjectId.isValid(body.subCategory) ? body.subCategory : null,
+        subCategory: body.subCategory,
         itemType: clean(body.itemType) || "reagent",
         baseUom: body.baseUom,
-        purchaseUom: mongoose.Types.ObjectId.isValid(body.purchaseUom) ? body.purchaseUom : body.baseUom,
+        purchaseUom: body.purchaseUom,
         purchaseToBaseFactor: numberValue(body.purchaseToBaseFactor, 1),
         stockOnHandBase: openingQty,
         minimumStockBase: numberValue(body.minimumStockBase, 0),
         reorderLevelBase: numberValue(body.reorderLevelBase, 0),
         maximumStockBase: numberValue(body.maximumStockBase, 0),
-        preferredSupplier: clean(body.preferredSupplier),
-        manufacturer: clean(body.manufacturer),
-        storageCondition: clean(body.storageCondition),
-        defaultLocation: clean(body.defaultLocation),
+        preferredSupplier,
+        manufacturer,
+        storageCondition,
+        defaultLocation,
         trackExpiry: body.trackExpiry !== false,
         notes: clean(body.notes),
         batches: openingBatch,
@@ -230,6 +337,32 @@ export async function POST(req) {
       const allowedTypes = new Set(["receipt", "issue", "adjustment", "transfer", "wastage", "expiry"]);
       if (!allowedTypes.has(movementType)) {
         return Response.json({ error: "Valid movement type is required" }, { status: 400 });
+      }
+
+      if (movementType === "receipt") {
+        const supplier = clean(body.supplier);
+        if (!supplier) return Response.json({ error: "Supplier is required for receipt" }, { status: 400 });
+        if (!isValidName(supplier)) return Response.json({ error: "Supplier contains invalid characters" }, { status: 400 });
+        if (hasUrl(supplier)) return Response.json({ error: "URLs are not allowed in supplier" }, { status: 400 });
+      } else {
+        const toLocation = clean(body.toLocation);
+        if (!toLocation) return Response.json({ error: "To location is required" }, { status: 400 });
+        if (!isValidName(toLocation)) return Response.json({ error: "Location contains invalid characters" }, { status: 400 });
+        if (hasUrl(toLocation)) return Response.json({ error: "URLs are not allowed in location" }, { status: 400 });
+      }
+
+      const referenceNo = clean(body.referenceNo);
+      if (!referenceNo) return Response.json({ error: "Reference No is required" }, { status: 400 });
+      if (!isValidName(referenceNo)) return Response.json({ error: "Reference No contains invalid characters" }, { status: 400 });
+      if (hasUrl(referenceNo)) return Response.json({ error: "URLs are not allowed in reference number" }, { status: 400 });
+
+      const reason = clean(body.reason);
+      if (!reason) return Response.json({ error: "Reason is required" }, { status: 400 });
+      if (!isValidName(reason)) return Response.json({ error: "Reason contains invalid characters" }, { status: 400 });
+      if (hasUrl(reason)) return Response.json({ error: "URLs are not allowed in reason" }, { status: 400 });
+
+      if (isExponential(body.quantityBase)) {
+        return Response.json({ error: "Exponential notation is not allowed in quantity" }, { status: 400 });
       }
 
       let quantityBase = numberValue(body.quantityBase, 0);

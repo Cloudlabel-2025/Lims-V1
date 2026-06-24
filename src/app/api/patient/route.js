@@ -30,10 +30,17 @@ export async function POST(req) {
     if (!clean(gender)) missing.push("Gender");
     if (!clean(phone)) missing.push("Mobile Number");
     if (!clean(address)) missing.push("Address");
+    if (!clean(body.barcode)) missing.push("Barcode");
+    if (!clean(body.uhId)) missing.push("UH ID");
     if (!receivedTime) missing.push("Received Time");
 
     if (missing.length > 0) {
       return Response.json({ error: `Missing required fields: ${missing.join(", ")}` }, { status: 400 });
+    }
+
+    const dobDate = new Date(dob);
+    if (isNaN(dobDate.getTime())) {
+      return Response.json({ error: "Invalid date of birth" }, { status: 400 });
     }
 
     if (gender === "Other" && !body.genderIdentity) {
@@ -44,8 +51,16 @@ export async function POST(req) {
       return Response.json({ error: "Mobile Number must be exactly 10 digits" }, { status: 400 });
     }
 
-    if (body.uhId && !/^\d{14}$/.test(String(body.uhId))) {
-      return Response.json({ error: "UH ID must be exactly 14 digits" }, { status: 400 });
+    if (!/^[A-Za-z0-9]{14}$/.test(String(body.uhId))) {
+      return Response.json({ error: "UH ID must be exactly 14 alphanumeric characters" }, { status: 400 });
+    }
+
+    const barcode = clean(body.barcode);
+    if (!/^[A-Za-z0-9-_]+$/.test(barcode)) {
+      return Response.json({ error: "Barcode: only letters, numbers, hyphens, and underscores allowed" }, { status: 400 });
+    }
+    if (/https?:\/\/|www\./i.test(barcode)) {
+      return Response.json({ error: "URLs not allowed in barcode" }, { status: 400 });
     }
 
     if (body.collectionTime && new Date(body.collectionTime) > new Date()) {
@@ -58,6 +73,13 @@ export async function POST(req) {
 
     if (body.collectionTime && new Date(body.receivedTime) < new Date(body.collectionTime)) {
       return Response.json({ error: "Received Time cannot be earlier than Collection Time" }, { status: 400 });
+    }
+
+    if (body.collectionTime && new Date(body.collectionTime) < new Date(dob)) {
+      return Response.json({ error: "Collection time cannot be before date of birth" }, { status: 400 });
+    }
+    if (body.receivedTime && new Date(body.receivedTime) < new Date(dob)) {
+      return Response.json({ error: "Received time cannot be before date of birth" }, { status: 400 });
     }
 
     if (!force) {

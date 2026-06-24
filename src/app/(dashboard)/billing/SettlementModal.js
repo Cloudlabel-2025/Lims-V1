@@ -1,7 +1,11 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+
+function isExponential(value) {
+  return typeof value === "string" && /[eE]/.test(value);
+}
 
 const paymentMethods = [
   { key: "cash", label: "Cash" },
@@ -20,6 +24,21 @@ function SettlementModal({
   onResultChange,
   onSubmit,
 }) {
+  const [resultsErrors, setResultsErrors] = useState({});
+
+  function handleResultChange(itemId, paramKey, value) {
+    if (isExponential(value)) {
+      setResultsErrors((prev) => ({ ...prev, [`${itemId}-${paramKey}`]: "Exponential notation (e.g. 1E+21) is not allowed" }));
+      return;
+    }
+    if (value !== "" && value !== "-" && value !== "." && !Number.isFinite(Number(value))) {
+      setResultsErrors((prev) => ({ ...prev, [`${itemId}-${paramKey}`]: "Invalid numeric value" }));
+      return;
+    }
+    setResultsErrors((prev) => ({ ...prev, [`${itemId}-${paramKey}`]: "" }));
+    onResultChange(itemId, paramKey, value);
+  }
+
   if (!billingRecord) return null;
 
   const netPayable = billingRecord.totalAmount || 0;
@@ -82,11 +101,32 @@ function SettlementModal({
                       className="lims-input"
                       style={{ height: "38px", fontWeight: "600" }}
                       value={payment[method.key]}
+                      min="0"
+                      max={remainingDue}
+                      step="0.01"
                       onChange={(event) => onPaymentChange(method.key, Number(event.target.value))}
                     />
                   </label>
                 ))}
               </div>
+              {remaining < 0 && (
+                <div style={{
+                  marginTop: "8px",
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#dc2626",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}>
+                  <span>⚠</span>
+                  <span>Overpaid by ₹{Math.abs(remaining)}. Payment cannot exceed remaining balance.</span>
+                </div>
+              )}
 
               <div style={{
                 marginTop: "12px",
@@ -131,14 +171,21 @@ function SettlementModal({
                               <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{param.normalMin ?? "—"} – {param.normalMax ?? "—"}</div>
                             )}
                           </div>
-                          <input
-                            type="text"
-                            className="lims-input"
-                            style={{ height: "30px", fontSize: "12px", fontWeight: "600", textAlign: "center", padding: "0 8px" }}
-                            placeholder="—"
-                            value={results[item._id]?.[param.key] || ""}
-                            onChange={(event) => onResultChange(item._id, param.key, event.target.value)}
-                          />
+                          <div>
+                            <input
+                              type="text"
+                              className="lims-input"
+                              style={Object.assign({ height: "30px", fontSize: "12px", fontWeight: "600", textAlign: "center", padding: "0 8px" }, resultsErrors[`${item._id}-${param.key}`] ? { borderColor: "var(--error)" } : {})}
+                              placeholder="—"
+                              value={results[item._id]?.[param.key] || ""}
+                              onChange={(event) => handleResultChange(item._id, param.key, event.target.value)}
+                            />
+                            {resultsErrors[`${item._id}-${param.key}`] && (
+                              <small style={{ color: "var(--error)", fontSize: "9px", display: "block", marginTop: "1px", lineHeight: 1.2 }}>
+                                {resultsErrors[`${item._id}-${param.key}`]}
+                              </small>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -6,6 +6,20 @@ import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { useCurrentUser } from "@/app/lib/use-current-user";
 
+const SAFE_TEXT = /^[A-Za-z0-9 .&'\/,()@_-]*$/;
+const URL_RE = /https?:\/\//;
+const EXP_RE = /[eE]/;
+
+function isValidName(v) {
+  return v && SAFE_TEXT.test(v);
+}
+function hasUrl(v) {
+  return v && URL_RE.test(v);
+}
+function isExponential(v) {
+  return v && EXP_RE.test(v);
+}
+
 const emptyForm = {
   type: "qc-run",
   testName: "",
@@ -58,6 +72,7 @@ export default function QualityPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [formErrors, setFormErrors] = useState({});
 
   const load = useCallback(async (tf = typeFilter, rf = resultFilter) => {
     setLoading(true);
@@ -79,8 +94,31 @@ export default function QualityPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function validateField(name, value) {
+    const trimmed = String(value).trim();
+    if (!trimmed && ["type", "testName", "instrument", "lotNumber", "value", "expectedRange"].includes(name)) return `${name} is required`;
+    if (["testName", "instrument", "lotNumber"].includes(name) && !isValidName(trimmed)) return "Invalid characters";
+    if (["testName", "instrument", "lotNumber", "remarks"].includes(name) && hasUrl(trimmed)) return "URLs are not allowed";
+    if (["value", "expectedRange"].includes(name) && isExponential(trimmed)) return "Exponential notation is not allowed";
+    return "";
+  }
+
+  function handleChange(name, value) {
+    setForm({ ...form, [name]: value });
+    const err = validateField(name, value);
+    setFormErrors((prev) => ({ ...prev, [name]: err }));
+  }
+
   async function submitLog(e) {
     e.preventDefault();
+    const errors = {};
+    for (const f of ["type", "testName", "instrument", "lotNumber", "value", "expectedRange"]) {
+      const err = validateField(f, form[f]);
+      if (err) errors[f] = err;
+    }
+    if (form.remarks && hasUrl(form.remarks)) errors.remarks = "URLs are not allowed";
+    setFormErrors(errors);
+    if (Object.keys(errors).length) { setSaving(false); return; }
     setSaving(true);
     setError("");
     setSuccess("");
@@ -95,6 +133,7 @@ export default function QualityPage() {
       if (!res.ok) throw new Error(data.error || "Unable to save QC log");
       setLogs((current) => [data.log, ...current]);
       setForm(emptyForm);
+      setFormErrors({});
       setSuccess("QC log recorded successfully.");
     } catch (err) {
       setError(err.message);
@@ -157,22 +196,27 @@ export default function QualityPage() {
           <form onSubmit={submitLog} style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 10, padding: 20, display: "grid", gap: 12 }}>
             <h5 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Record QC Log</h5>
             <Label text="Type">
-              <select className="lims-input" style={{ height: 38 }} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+              <select className="lims-input" style={{ height: 38 }} value={form.type} onChange={(e) => handleChange("type", e.target.value)}>
+                <option value="">Select type</option>
                 {Object.entries(typeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
+              {formErrors.type && <span style={{ color: "#b91c1c", fontSize: 11 }}>{formErrors.type}</span>}
             </Label>
             <Label text="Test / Instrument Name">
-              <input required className="lims-input" style={{ height: 38 }} value={form.testName} onChange={(e) => setForm({ ...form, testName: e.target.value })} placeholder="e.g. CBC, Glucose Analyser" />
+              <input className={"lims-input" + (formErrors.testName ? " invalid" : "")} style={{ height: 38 }} value={form.testName} onChange={(e) => handleChange("testName", e.target.value)} placeholder="e.g. CBC, Glucose Analyser" />
+              {formErrors.testName && <span style={{ color: "#b91c1c", fontSize: 11 }}>{formErrors.testName}</span>}
             </Label>
             <Label text="Instrument / Equipment">
-              <input className="lims-input" style={{ height: 38 }} value={form.instrument} onChange={(e) => setForm({ ...form, instrument: e.target.value })} placeholder="e.g. Sysmex XN-550" />
+              <input className={"lims-input" + (formErrors.instrument ? " invalid" : "")} style={{ height: 38 }} value={form.instrument} onChange={(e) => handleChange("instrument", e.target.value)} placeholder="e.g. Sysmex XN-550" />
+              {formErrors.instrument && <span style={{ color: "#b91c1c", fontSize: 11 }}>{formErrors.instrument}</span>}
             </Label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Label text="Lot / Batch No.">
-                <input className="lims-input" style={{ height: 38 }} value={form.lotNumber} onChange={(e) => setForm({ ...form, lotNumber: e.target.value })} />
+                <input className={"lims-input" + (formErrors.lotNumber ? " invalid" : "")} style={{ height: 38 }} value={form.lotNumber} onChange={(e) => handleChange("lotNumber", e.target.value)} />
+                {formErrors.lotNumber && <span style={{ color: "#b91c1c", fontSize: 11 }}>{formErrors.lotNumber}</span>}
               </Label>
               <Label text="Result">
-                <select className="lims-input" style={{ height: 38 }} value={form.result} onChange={(e) => setForm({ ...form, result: e.target.value })}>
+                <select className="lims-input" style={{ height: 38 }} value={form.result} onChange={(e) => handleChange("result", e.target.value)}>
                   <option value="pass">Pass</option>
                   <option value="fail">Fail</option>
                   <option value="warning">Warning</option>
@@ -182,14 +226,17 @@ export default function QualityPage() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Label text="Observed Value">
-                <input className="lims-input" style={{ height: 38 }} value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="e.g. 5.2" />
+                <input className={"lims-input" + (formErrors.value ? " invalid" : "")} style={{ height: 38 }} value={form.value} onChange={(e) => handleChange("value", e.target.value)} placeholder="e.g. 5.2" />
+                {formErrors.value && <span style={{ color: "#b91c1c", fontSize: 11 }}>{formErrors.value}</span>}
               </Label>
               <Label text="Expected Range">
-                <input className="lims-input" style={{ height: 38 }} value={form.expectedRange} onChange={(e) => setForm({ ...form, expectedRange: e.target.value })} placeholder="e.g. 4.5–5.5" />
+                <input className={"lims-input" + (formErrors.expectedRange ? " invalid" : "")} style={{ height: 38 }} value={form.expectedRange} onChange={(e) => handleChange("expectedRange", e.target.value)} placeholder="e.g. 4.5–5.5" />
+                {formErrors.expectedRange && <span style={{ color: "#b91c1c", fontSize: 11 }}>{formErrors.expectedRange}</span>}
               </Label>
             </div>
             <Label text="Remarks">
-              <textarea className="lims-input" style={{ height: 72, padding: "8px 11px", resize: "vertical" }} value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} placeholder="Optional notes or corrective action..." />
+              <textarea className={"lims-input" + (formErrors.remarks ? " invalid" : "")} style={{ height: 72, padding: "8px 11px", resize: "vertical" }} value={form.remarks} onChange={(e) => handleChange("remarks", e.target.value)} placeholder="Optional notes or corrective action..." />
+              {formErrors.remarks && <span style={{ color: "#b91c1c", fontSize: 11 }}>{formErrors.remarks}</span>}
             </Label>
             <button className="btn-lims-primary" disabled={saving} style={{ height: 40 }}>{saving ? "Saving..." : "Record Log"}</button>
           </form>

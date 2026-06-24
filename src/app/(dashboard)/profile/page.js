@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import { useTenantShell } from "@/app/lib/use-current-user";
+import SuccessDialog from "@/app/components/SuccessDialog";
 
 function getInitial(user) {
   const value = user?.name || user?.email || "A";
@@ -18,6 +20,62 @@ export default function ProfilePage() {
   const { theme, user } = useTenantShell();
   const displayName = user?.name || user?.email?.split("@")[0] || "Lab User";
   const tenantName = theme?.labName || "Tenant Lab";
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setError("All password fields are required");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Password and confirm password must match");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Unable to change password");
+        return;
+      }
+
+      setSuccess("Password changed successfully. Please log in again.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch {
+      setError("Unable to change password");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <section className="settings-page profile-page">
@@ -100,6 +158,106 @@ export default function ProfilePage() {
             <p className="developer-empty">No permissions available for this user.</p>
           )}
         </div>
+      </section>
+
+      <section className="settings-panel">
+        <div className="settings-panel-header">
+          <h2>Change Password</h2>
+          <p>Update your account password.</p>
+        </div>
+
+        {error && (
+          <div className="login-error">
+            {Icons.alertCircle} {error}
+          </div>
+        )}
+
+        <SuccessDialog message={success} onClose={() => setSuccess("")} />
+
+        <form className="login-form" onSubmit={handleChangePassword}>
+          <div className="login-field">
+            <label className="login-label" htmlFor="change-current-password">Current Password</label>
+            <div className="login-input-wrapper">
+              <span className="login-input-icon">{Icons.lock}</span>
+              <input
+                id="change-current-password"
+                type={showCurrent ? "text" : "password"}
+                className="login-input"
+                placeholder="Enter current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                className="login-toggle-pw"
+                onClick={() => setShowCurrent((v) => !v)}
+                aria-label={showCurrent ? "Hide password" : "Show password"}
+              >
+                {showCurrent ? Icons.eyeOff : Icons.eye}
+              </button>
+            </div>
+          </div>
+
+          <div className="login-field">
+            <label className="login-label" htmlFor="change-new-password">New Password</label>
+            <div className="login-input-wrapper">
+              <span className="login-input-icon">{Icons.lock}</span>
+              <input
+                id="change-new-password"
+                type={showNew ? "text" : "password"}
+                className="login-input"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                className="login-toggle-pw"
+                onClick={() => setShowNew((v) => !v)}
+                aria-label={showNew ? "Hide password" : "Show password"}
+              >
+                {showNew ? Icons.eyeOff : Icons.eye}
+              </button>
+            </div>
+          </div>
+
+          <div className="login-field">
+            <label className="login-label" htmlFor="change-confirm-password">Confirm New Password</label>
+            <div className="login-input-wrapper">
+              <span className="login-input-icon">{Icons.lock}</span>
+              <input
+                id="change-confirm-password"
+                type={showConfirm ? "text" : "password"}
+                className="login-input"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                className="login-toggle-pw"
+                onClick={() => setShowConfirm((v) => !v)}
+                aria-label={showConfirm ? "Hide password" : "Show password"}
+              >
+                {showConfirm ? Icons.eyeOff : Icons.eye}
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" className="login-submit" disabled={loading}>
+            {loading ? (
+              <><div className="login-spinner" />Updating...</>
+            ) : (
+              <>Update Password {Icons.arrowRight}</>
+            )}
+          </button>
+        </form>
       </section>
     </section>
   );

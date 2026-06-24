@@ -60,6 +60,7 @@ export default function ForgotPasswordPage() {
         return;
       }
 
+      setSuccess("OTP sent to your email. Check your inbox.");
       setStep("verify");
     } catch {
       setError("Unable to send OTP");

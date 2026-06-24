@@ -7,6 +7,19 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+function isExponentialNotation(value) {
+  if (typeof value === "string" && /[eE]/.test(value)) return true;
+  return false;
+}
+
+function hasUrl(value) {
+  return /https?:\/\//.test(value);
+}
+
+function isValidName(value) {
+  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
+}
+
 export async function GET(req) {
   try {
     const auth = requireTenantSession(req, "accounts.view");
@@ -46,6 +59,28 @@ export async function POST(req) {
 
     if (!code || !name || !accountTypes.includes(type)) {
       return Response.json({ error: "Code, name, and valid type are required" }, { status: 400 });
+    }
+
+    if (isExponentialNotation(code)) {
+      return Response.json({ error: "Exponential notation is not allowed in code" }, { status: 400 });
+    }
+    if (!isValidName(code)) {
+      return Response.json({ error: "Code contains invalid characters" }, { status: 400 });
+    }
+    if (hasUrl(name)) {
+      return Response.json({ error: "URLs are not allowed in account name" }, { status: 400 });
+    }
+    if (!isValidName(name)) {
+      return Response.json({ error: "Name contains invalid characters" }, { status: 400 });
+    }
+    if (!subtype) {
+      return Response.json({ error: "Subtype is required" }, { status: 400 });
+    }
+    if (hasUrl(subtype)) {
+      return Response.json({ error: "URLs are not allowed in subtype" }, { status: 400 });
+    }
+    if (!isValidName(subtype)) {
+      return Response.json({ error: "Subtype contains invalid characters" }, { status: 400 });
     }
 
     const { Account } = await getTenantModels(auth.tenantId);

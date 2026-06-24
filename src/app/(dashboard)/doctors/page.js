@@ -1,32 +1,14 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Icons } from "@/app/components/Icons";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
 
-/* ── Helpers ── */
-const getInitials = (name) => {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/).filter(p => !["Dr.", "Dr"].includes(p));
-  return parts.length >= 2
-    ? (parts[0][0] + parts[1][0]).toUpperCase()
-    : parts[0]?.[0]?.toUpperCase() || "?";
-};
-
-const formatDate = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-};
-
-const getStatusStyle = (status) => {
-  switch (status) {
-    case "Active": return { bg: "#ecfdf5", color: "#065f46", dot: "#10b981" };
-    case "On Leave": return { bg: "#fffbeb", color: "#92400e", dot: "#f59e0b" };
-    case "Inactive": return { bg: "#fff1f2", color: "#9f1239", dot: "#f43f5e" };
-    default: return { bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8" };
-  }
-};
+const DoctorSidebar = dynamic(() => import("./DoctorSidebar"), { ssr: false, loading: () => null });
+const DoctorGrid = dynamic(() => import("./DoctorGrid"), { ssr: false, loading: () => null });
+const DoctorTable = dynamic(() => import("./DoctorTable"), { ssr: false, loading: () => null });
 
 export default function DoctorList() {
   const user = useCurrentUser();
@@ -185,176 +167,25 @@ export default function DoctorList() {
     <div className="doctors-module">
       <div className={`sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={closeSidebar} />
 
-      {/* Doctor Detail Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         {selectedDoctor && (
-          <div className="sidebar-top">
-            <div className="sidebar-header">
-              <div className="sidebar-logo-flower">{Icons.logo}</div>
-              <span className="sidebar-header-title">Doctor Details</span>
-              <button className="sidebar-close-menu" onClick={closeSidebar}>{Icons.close}</button>
-            </div>
-            <div className="sidebar-photo-section">
-              <div className="patient-photo-card">
-                <div className="patient-photo-initials-large">{getInitials(selectedDoctor.name)}</div>
-              </div>
-              <div className="patient-name-header">
-                <div className="patient-name-text">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{selectedDoctor.name}</span>
-                  </div>
-                  <div className="patient-tag-id" style={{ marginTop: '4px' }}>{selectedDoctor.doctorId}</div>
-                </div>
-              </div>
-
-              <div className="teal-brand-card" style={{ marginBottom: '24px', width: '100%' }}>
-                <div className="brand-header-mini">
-                  <div className="brand-logo-mini">{Icons.logo}</div>
-                  <div className="brand-name-mini">UTHIRAM LIMS</div>
-                </div>
-                
-                <div className="brand-patient-info">
-                  <div className="brand-patient-name">{selectedDoctor.name}</div>
-                  <div className="brand-patient-id-mini">{selectedDoctor.doctorId}</div>
-                </div>
-
-                <div style={{ margin: '12px 0 20px', padding: '14px 16px', background: 'rgba(255,255,255,0.12)', borderRadius: '14px', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '10px' }}>
-                    <div style={{ fontSize: '11px', opacity: 0.9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.04em' }}>speciality</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{selectedDoctor.speciality}</div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '10px' }}>
-                    <div style={{ fontSize: '11px', opacity: 0.9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Qualification</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{selectedDoctor.degree}</div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ fontSize: '11px', opacity: 0.9, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Experience</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{selectedDoctor.experience} Years</div>
-                  </div>
-                </div>
-
-                <div className="vitals-grid-mini" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-                  <div className="vital-mini-box">
-                    <div className="vital-mini-label" style={{ fontSize: '10px', opacity: 1, fontWeight: '600' }}>COMMISSION</div>
-                    <div className="vital-mini-value" style={{ fontSize: '15px', fontWeight: '700' }}>{selectedDoctor.commission || 0}%</div>
-                  </div>
-                  <div className="vital-mini-box" style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                    <div className="vital-mini-label" style={{ fontSize: '10px', opacity: 1, fontWeight: '600' }}>PENDING</div>
-                    <div className="vital-mini-value" style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>₹{selectedDoctor.pendingPayout || 0}</div>
-                  </div>
-                  <div className="vital-mini-box">
-                    <div className="vital-mini-label" style={{ fontSize: '10px', opacity: 1, fontWeight: '600' }}>STATUS</div>
-                    <div className="vital-mini-value" style={{ fontSize: '15px', fontWeight: '700' }}>{selectedDoctor.status}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="patient-contact-grid">
-                <div className="contact-row"><span className="contact-icon-mini">{Icons.phone}</span><span>+91 {selectedDoctor.phone}</span></div>
-                <div className="contact-row"><span className="contact-icon-mini">{Icons.mail}</span><span className="text-truncate-1">{selectedDoctor.email || "—"}</span></div>
-                <div className="contact-row"><span className="contact-icon-mini">{Icons.mapPin}</span><span className="text-truncate-2">{selectedDoctor.clinicAddress}</span></div>
-              </div>
-            </div>
-
-            <div className="sidebar-detail-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div className="detail-item"><div className="detail-value">{selectedDoctor.mciNumber}</div><div className="detail-label">MCI Registration No.</div></div>
-              <div className="detail-item"><div className="detail-value">{selectedDoctor.clinicName}</div><div className="detail-label">Clinic / Hospital</div></div>
-              <div className="detail-item"><div className="detail-value">{selectedDoctor.location}</div><div className="detail-label">Practice Location</div></div>
-              <div className="detail-item"><div className="detail-value">{formatDate(selectedDoctor.createdAt)}</div><div className="detail-label">Registered On</div></div>
-            </div>
-
-            <div style={{ padding: '0 24px 20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Payout</div>
-              {selectedDoctor.pendingPayout > 0 ? (
-                payoutConfirm ? (
-                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '14px' }}>
-                    <p style={{ fontSize: '13px', color: '#92400e', margin: '0 0 10px', fontWeight: '600' }}>
-                      Release ₹{selectedDoctor.pendingPayout} to {selectedDoctor.name}?
-                    </p>
-                    <select
-                      value={payoutMethod}
-                      onChange={(e) => setPayoutMethod(e.target.value)}
-                      style={{ width: '100%', height: '36px', marginBottom: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', padding: '0 10px', background: '#fff' }}
-                    >
-                      <option value="cash">Cash</option>
-                      <option value="bank">Bank Transfer</option>
-                    </select>
-                    {actionError && <p style={{ color: '#e11d48', fontSize: '12px', margin: '0 0 8px', fontWeight: '600' }}>{actionError}</p>}
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => { setPayoutConfirm(false); setActionError(''); }}
-                        style={{ flex: 1, height: '36px', border: '1px solid var(--border)', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handlePayout}
-                        disabled={paying}
-                        style={{ flex: 1, height: '36px', border: 'none', borderRadius: '8px', background: '#10b981', color: '#fff', cursor: paying ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '600', opacity: paying ? 0.7 : 1 }}
-                      >
-                        {paying ? 'Releasing...' : 'Confirm Release'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '14px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <span style={{ fontSize: '13px', color: '#7f1d1d', fontWeight: '600' }}>Pending Payout</span>
-                      <span style={{ fontSize: '18px', fontWeight: '800', color: '#dc2626' }}>₹{selectedDoctor.pendingPayout}</span>
-                    </div>
-                    <button
-                      onClick={() => { setPayoutConfirm(true); setActionError(''); }}
-                      style={{ width: '100%', height: '38px', border: 'none', borderRadius: '8px', background: '#10b981', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}
-                    >
-                      Release Payout
-                    </button>
-                  </div>
-                )
-              ) : (
-                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '16px' }}>✓</span>
-                  <span style={{ fontSize: '13px', color: '#065f46', fontWeight: '600' }}>No pending payout</span>
-                </div>
-              )}
-              <button
-                onClick={() => { loadPayoutHistory(selectedDoctor._id); setShowPayoutHistory(true); }}
-                style={{ width: '100%', height: '34px', marginTop: '8px', border: '1px solid var(--border)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}
-              >
-                View Payout History
-              </button>
-            </div>
-
-            {(canEditDoctors || canDeleteDoctors) && (
-            <div style={{ padding: '20px 24px', display: 'flex', gap: '12px' }}>
-              {canEditDoctors && (
-              <button 
-                className="btn-lims-primary" 
-                style={{ flex: 1, height: '42px', fontSize: '13px' }}
-                onClick={() => { closeSidebar(); router.push(`/doctors/edit/${selectedDoctor._id}`); }}
-              >
-                {Icons.edit} Edit Profile
-              </button>
-              )}
-              {canDeleteDoctors && (
-              <button 
-                style={{ 
-                  flex: 1, height: '42px', fontSize: '13px', 
-                  border: '1.5px solid #f43f5e', borderRadius: '10px',
-                  background: '#fff1f2', color: '#e11d48', 
-                  cursor: 'pointer', fontWeight: '600',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#e11d48'; e.currentTarget.style.color = '#fff'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#fff1f2'; e.currentTarget.style.color = '#e11d48'; }}
-                onClick={() => openDeleteModal(selectedDoctor)}
-              >
-                {Icons.trash} Delete
-              </button>
-              )}
-            </div>
-            )}
-          </div>
+          <DoctorSidebar
+            doctor={selectedDoctor}
+            onClose={closeSidebar}
+            paying={paying}
+            payoutConfirm={payoutConfirm}
+            payoutMethod={payoutMethod}
+            actionError={actionError}
+            onPayoutConfirmChange={setPayoutConfirm}
+            onPayoutMethodChange={setPayoutMethod}
+            onActionErrorChange={setActionError}
+            onPayout={handlePayout}
+            onViewPayoutHistory={() => { loadPayoutHistory(selectedDoctor._id); setShowPayoutHistory(true); }}
+            canEditDoctors={canEditDoctors}
+            canDeleteDoctors={canDeleteDoctors}
+            onEdit={() => { closeSidebar(); router.push(`/doctors/edit/${selectedDoctor._id}`); }}
+            onDeleteClick={(doctor) => openDeleteModal(doctor)}
+          />
         )}
       </aside>
 
@@ -495,175 +326,25 @@ export default function DoctorList() {
 
         {allDoctors.length > 0 ? (
           viewType === "grid" ? (
-            <div className="doctor-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-              {allDoctors.map((doc) => {
-                const statusStyle = getStatusStyle(doc.status);
-                return (
-                  <div key={doc._id} className={`form-card ${selectedDoctor?._id === doc._id ? "selected" : ""}`} onClick={() => handleSelectDoctor(doc)} style={{ padding: "20px", marginBottom: "0", cursor: "pointer", position: "relative", border: selectedDoctor?._id === doc._id ? "2px solid var(--brand-action, var(--primary))" : "1.5px solid var(--border)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-                      <div className="patient-photo-card" style={{ width: "60px", height: "60px", margin: "0", background: "var(--primary-50)" }}>
-                        <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--brand-action, var(--primary))" }}>
-                          {getInitials(doc.name)}
-                        </div>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>{doc.name}</div>
-                        <div style={{ fontSize: "12px", color: "var(--brand-action, var(--primary))", fontWeight: "600" }}>{doc.doctorId}</div>
-                      </div>
-                    </div>
-                    <div style={{ marginTop: "15px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--text-secondary)" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <span><strong>{doc.speciality}</strong></span>
-                        <span style={{ opacity: 0.8 }}>{doc.experience} Yrs Exp</span>
-                      </div>
-                      <span style={{ 
-                        padding: "2px 8px", 
-                        borderRadius: "4px", 
-                        background: statusStyle.bg,
-                        color: statusStyle.color,
-                        fontWeight: "600"
-                      }}>
-                        {doc.status}
-                      </span>
-                    </div>
-
-                    <div style={{ marginTop: "12px", background: "var(--surface)", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" }}>PENDING PAYOUT</span>
-                        <strong style={{ fontSize: "14px", color: doc.pendingPayout > 0 ? "var(--danger)" : "var(--success)" }}>₹{doc.pendingPayout || 0}</strong>
-                    </div>
-                    
-                    <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-light)", fontSize: "10px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span>Clinic: {doc.clinicName || "Private"}</span>
-                      {(canEditDoctors || canDeleteDoctors || selectedDoctor?._id === doc._id) && (
-                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        {selectedDoctor?._id === doc._id && <span style={{ color: "var(--brand-action, var(--primary))", fontWeight: "700" }}>SELECTED</span>}
-                        {canEditDoctors && (
-                        <button 
-                          title="Edit"
-                          style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--brand-action, var(--primary))"; e.currentTarget.style.background = "var(--primary-50)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
-                          onClick={(e) => { e.stopPropagation(); router.push(`/doctors/edit/${doc._id}`); }}
-                        >
-                          {Icons.edit}
-                        </button>
-                        )}
-                        {canDeleteDoctors && (
-                        <button 
-                          title="Delete"
-                          style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = "#e11d48"; e.currentTarget.style.background = "#fff1f2"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
-                          onClick={(e) => openDeleteModal(doc, e)}
-                        >
-                          {Icons.trash}
-                        </button>
-                        )}
-                      </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <DoctorGrid
+              doctors={allDoctors}
+              selectedDoctorId={selectedDoctor?._id}
+              onSelectDoctor={handleSelectDoctor}
+              canEditDoctors={canEditDoctors}
+              canDeleteDoctors={canDeleteDoctors}
+              onEditDoctor={(id) => router.push(`/doctors/edit/${id}`)}
+              onDeleteDoctor={(doc) => openDeleteModal(doc)}
+            />
           ) : (
-            <div className="form-card" style={{ padding: "0", overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                <thead>
-                  <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
-                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Doctor Details</th>
-                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>speciality</th>
-                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Experience</th>
-                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Pending Payout</th>
-                    <th style={{ padding: "12px 20px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>Status</th>
-                    <th style={{ padding: "12px 20px", textAlign: "center", color: "var(--text-secondary)", fontWeight: "600" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allDoctors.map((doc) => {
-                    const statusStyle = getStatusStyle(doc.status);
-                    return (
-                      <tr 
-                        key={doc._id} 
-                        onClick={() => handleSelectDoctor(doc)}
-                        style={{ 
-                          borderBottom: "1px solid var(--border-light)", 
-                          cursor: "pointer",
-                          background: selectedDoctor?._id === doc._id ? "var(--primary-50)" : "transparent",
-                          transition: "background 0.2s"
-                        }}
-                      >
-                        <td style={{ padding: "12px 20px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <div style={{ 
-                              width: "36px", 
-                              height: "36px", 
-                              borderRadius: "10px", 
-                              background: "var(--primary-50)", 
-                              display: "flex", 
-                              alignItems: "center", 
-                              justifyContent: "center",
-                              fontSize: "13px",
-                              fontWeight: "700",
-                              color: "var(--brand-action, var(--primary))"
-                            }}>
-                              {getInitials(doc.name)}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: "600", color: "var(--text-primary)" }}>{doc.name}</div>
-                              <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>ID: {doc.doctorId}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{doc.speciality}</td>
-                        <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{doc.experience} Yrs</td>
-                        <td style={{ padding: "12px 20px" }}>
-                          <strong style={{ color: doc.pendingPayout > 0 ? "var(--danger)" : "var(--text-muted)" }}>₹{doc.pendingPayout || 0}</strong>
-                        </td>
-                        <td style={{ padding: "12px 20px" }}>
-                          <span style={{ 
-                            padding: "2px 8px", 
-                            borderRadius: "4px", 
-                            fontSize: "11px",
-                            background: statusStyle.bg,
-                            color: statusStyle.color,
-                            fontWeight: "600"
-                          }}>
-                            {doc.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: "12px 20px", textAlign: "center" }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
-                            {canEditDoctors && (
-                            <button 
-                              title="Edit"
-                              style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
-                              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--brand-action, var(--primary))"; e.currentTarget.style.background = "var(--primary-50)"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
-                              onClick={(e) => { e.stopPropagation(); router.push(`/doctors/edit/${doc._id}`); }}
-                            >
-                              {Icons.edit}
-                            </button>
-                            )}
-                            {canDeleteDoctors && (
-                            <button 
-                              title="Delete"
-                              style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: "4px", borderRadius: "6px", display: "flex", alignItems: "center", transition: "all 0.2s" }}
-                              onMouseEnter={(e) => { e.currentTarget.style.color = "#e11d48"; e.currentTarget.style.background = "#fff1f2"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
-                              onClick={(e) => openDeleteModal(doc, e)}
-                            >
-                              {Icons.trash}
-                            </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DoctorTable
+              doctors={allDoctors}
+              selectedDoctorId={selectedDoctor?._id}
+              onSelectDoctor={handleSelectDoctor}
+              canEditDoctors={canEditDoctors}
+              canDeleteDoctors={canDeleteDoctors}
+              onEditDoctor={(id) => router.push(`/doctors/edit/${id}`)}
+              onDeleteDoctor={(doc) => openDeleteModal(doc)}
+            />
           )
         ) : (
           <div style={{ textAlign: "center", padding: "60px", background: "#fff", borderRadius: "16px", border: "1px solid var(--border)" }}>

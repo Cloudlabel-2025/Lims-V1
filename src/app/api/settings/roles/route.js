@@ -8,6 +8,9 @@ import {
   normalizeRolePermissions,
 } from "@/app/lib/rbac";
 
+const SAFE_NAME = /^[A-Za-z0-9 .&'\/,()@_-]+$/;
+const URL_RE = /https?:\/\//;
+
 function clean(value) {
   return String(value || "").trim();
 }
@@ -112,6 +115,8 @@ export async function PATCH(req) {
     for (const item of incomingRoles) {
       const name = clean(item.name).slice(0, 80);
       if (!name || name.length < 2) continue;
+      if (URL_RE.test(name)) return Response.json({ error: "URLs are not allowed in role name" }, { status: 400 });
+      if (!SAFE_NAME.test(name)) return Response.json({ error: "Role name contains invalid characters" }, { status: 400 });
 
       const permissions = normalizePermissions(item.permissions, allowedPermissionKeys, enabledModules);
       const description = clean(item.description || "Custom lab role.").slice(0, 500);

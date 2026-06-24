@@ -7,6 +7,11 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+function isExponentialNotation(value) {
+  if (typeof value === "string" && /[eE]/.test(value)) return true;
+  return false;
+}
+
 function getFlag(parameter, rawValue) {
   if (rawValue === "" || rawValue === null || rawValue === undefined) return "not-entered";
 
@@ -106,6 +111,18 @@ export async function POST(req) {
     }
 
     const values = body.results || {};
+
+    for (const [key, rawValue] of Object.entries(values)) {
+      const textValue = clean(rawValue);
+      if (textValue === "") continue;
+      if (isExponentialNotation(textValue)) {
+        return Response.json({ error: `Exponential notation (${textValue}) is not allowed in result values` }, { status: 400 });
+      }
+      if (!Number.isFinite(Number(textValue))) {
+        return Response.json({ error: `Invalid numeric value "${textValue}" for result field` }, { status: 400 });
+      }
+    }
+
     const missingRequired = [];
     const results = test.parameters
       .sort((a, b) => a.sortOrder - b.sortOrder)

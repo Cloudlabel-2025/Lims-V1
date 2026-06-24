@@ -1,5 +1,15 @@
 "use client";
 
+function formatPaymentMode(breakdown) {
+  if (!breakdown) return "—";
+  const modes = [];
+  if (Number(breakdown.cash) > 0) modes.push("Cash");
+  if (Number(breakdown.card) > 0) modes.push("Card");
+  if (Number(breakdown.online) > 0) modes.push("UPI");
+  if (Number(breakdown.corporate) > 0) modes.push("Corporate");
+  return modes.length > 0 ? modes.join(" + ") : "—";
+}
+
 export default function BillingHistoryTab({ billingRecords, pagination, loading, onPageChange }) {
   return (
     <div className="form-card" style={{ padding: "0", overflowX: "auto" }}>
@@ -8,7 +18,7 @@ export default function BillingHistoryTab({ billingRecords, pagination, loading,
         <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>All laboratory bills and payment statuses.</p>
       </div>
       <div className="lims-table-container" style={{ overflowX: "auto" }}>
-        <table className="lims-table" style={{ width: "100%", minWidth: "700px", borderCollapse: "collapse" }}>
+        <table className="lims-table" style={{ width: "100%", minWidth: "900px", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill ID</th>
@@ -16,6 +26,8 @@ export default function BillingHistoryTab({ billingRecords, pagination, loading,
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Date</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Investigation(s)</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill Amount</th>
+              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Paid On</th>
+              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Payment Mode</th>
               <th style={{ padding: "14px 20px", textAlign: "center", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Status</th>
             </tr>
           </thead>
@@ -41,6 +53,14 @@ export default function BillingHistoryTab({ billingRecords, pagination, loading,
                 </td>
                 <td style={{ padding: "14px 20px" }}>
                   <strong style={{ color: "var(--text-primary)", fontSize: "14px" }}>₹{billingRecord.totalAmount || 0}</strong>
+                </td>
+                <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                  {billingRecord.billingStatus === "paid" || billingRecord.billingStatus === "partial"
+                    ? new Date(billingRecord.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                    : "—"}
+                </td>
+                <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
+                  {formatPaymentMode(billingRecord.paymentBreakdown)}
                 </td>
                 <td style={{ padding: "14px 20px", textAlign: "center" }}>
                   <span style={{

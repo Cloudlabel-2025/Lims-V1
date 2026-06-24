@@ -45,6 +45,11 @@ export const RoleSchema = new mongoose.Schema(
       trim: true,
       minlength: 2,
       maxlength: 80,
+      match: [/^[A-Za-z0-9 .&'\/,()@_-]+$/, "Role name contains invalid characters"],
+      validate: {
+        validator: (v) => !/https?:\/\//.test(v),
+        message: "URLs are not allowed in role name",
+      },
     },
     description: {
       type: String,

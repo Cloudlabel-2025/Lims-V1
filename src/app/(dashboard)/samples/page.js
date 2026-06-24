@@ -51,11 +51,13 @@ export default function SamplesPage() {
     } catch { setError("Failed to load label data"); }
   }
 
-  const loadSamples = useCallback(async (nextStatus = status) => {
+  const loadSamples = useCallback(async (nextStatus = status, collector = collectorName) => {
     setLoading(true);
     setError("");
     try {
-      const { response, data } = await cachedJsonFetch(`/api/samples?status=${nextStatus}`, { ttl: 10_000 });
+      const params = new URLSearchParams({ status: nextStatus });
+      if (collector?.trim()) params.set("collectorName", collector.trim());
+      const { response, data } = await cachedJsonFetch(`/api/samples?${params}`, { ttl: 10_000 });
       if (!response.ok) throw new Error(data.error || "Unable to load samples");
       setSamples(data.samples || []);
     } catch (err) {
@@ -63,11 +65,11 @@ export default function SamplesPage() {
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, collectorName]);
 
   useEffect(() => {
-    loadSamples(status);
-  }, [status, loadSamples]);
+    loadSamples(status, collectorName);
+  }, [status, collectorName, loadSamples]);
 
   async function updateSample(sampleId, action) {
     setUpdatingId(sampleId);
@@ -80,8 +82,8 @@ export default function SamplesPage() {
         credentials: "include",
         body: JSON.stringify({
           action,
-          collectorName,
-          rejectionReason,
+          collectorName: action === "collect" ? collectorName : undefined,
+          rejectionReason: action === "reject" ? rejectionReason : undefined,
         }),
       });
       const data = await response.json();
@@ -102,7 +104,8 @@ export default function SamplesPage() {
       }[action] || "updated";
       setSuccess(`Sample ${data.sample?.sampleId || ""} ${actionLabel} successfully.`);
     } catch (err) {
-      setError(err.message);
+      console.error("Update sample error:", err);
+      setError(err.message || "Unable to update sample");
     } finally {
       setUpdatingId("");
     }
@@ -180,7 +183,14 @@ export default function SamplesPage() {
                 <span>{sample.patient?.name}<small>{sample.patient?.patientId}</small></span>
                 <span>{sample.testSnapshot?.name}<small>{sample.testSnapshot?.sampleType || "-"}</small></span>
                 <span>{sample.billingRecord?.billId}<small>{sample.billingRecord?.priority}</small></span>
-                <span><em>{sample.status}</em></span>
+                <span>
+                  <em>{sample.status}</em>
+                  {sample.status === "rejected" && sample.rejectionReason && (
+                    <small style={{ display: "block", color: "var(--error)", fontSize: "11px", marginTop: "2px" }}>
+                      Reason: {sample.rejectionReason}
+                    </small>
+                  )}
+                </span>
                 {canActOnSamples && (
                   <span className="sample-actions">
                     {canViewSamples && (

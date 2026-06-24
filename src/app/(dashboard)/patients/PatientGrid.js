@@ -4,7 +4,7 @@ import { memo } from "react";
 import { Icons } from "@/app/components/Icons";
 import { formatDate, getInitials } from "@/app/utils/patient-helpers";
 
-function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatient }) {
+function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatient, onDeletePatient }) {
   return (
     <div
       className="patient-list-grid"
@@ -75,6 +75,21 @@ function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatie
               >
                 {Icons.edit}
               </button>
+              {onDeletePatient && (
+                <button
+                  className="patient-list-edit-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (window.confirm(`Delete patient ${patient.patientId} (${patient.name})?`)) {
+                      onDeletePatient(patient._id);
+                    }
+                  }}
+                  style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}
+                  title="Delete Patient"
+                >
+                  {Icons.trashIcon || "🗑"}
+                </button>
+              )}
             </div>
           </div>
 

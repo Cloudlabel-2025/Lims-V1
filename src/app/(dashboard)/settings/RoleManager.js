@@ -1,6 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { Icons } from "@/app/components/Icons";
+
+const SAFE_NAME = /^[A-Za-z0-9 .&'\/,()@_-]+$/;
+const URL_RE = /https?:\/\//;
+
+function validateRoleName(v) {
+  if (!v || !v.trim()) return "Role name is required";
+  if (URL_RE.test(v)) return "URLs are not allowed in role name";
+  if (!SAFE_NAME.test(v.trim())) return "Role name contains invalid characters";
+  return "";
+}
 
 export default function RoleManager({
   roles,
@@ -15,6 +26,21 @@ export default function RoleManager({
   cancelRoleChanges,
   saveRoleConfiguration,
 }) {
+  const [newRoleError, setNewRoleError] = useState("");
+
+  function handleRoleNameChange(value) {
+    setNewRoleName(value);
+    setNewRoleError(validateRoleName(value));
+  }
+
+  function handleAddRole() {
+    const err = validateRoleName(newRoleName);
+    setNewRoleError(err);
+    if (err) return;
+    addRole();
+    setNewRoleError("");
+  }
+
   return (
     <section className="settings-panel">
       <div className="settings-panel-header">
@@ -48,12 +74,16 @@ export default function RoleManager({
       </div>
 
       <div className="settings-inline-form">
-        <input
-          value={newRoleName}
-          onChange={(event) => setNewRoleName(event.target.value)}
-          placeholder="Enter role name"
-        />
-        <button type="button" onClick={addRole}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          <input
+            className={"lims-input" + (newRoleError ? " invalid" : "")}
+            value={newRoleName}
+            onChange={(event) => handleRoleNameChange(event.target.value)}
+            placeholder="Enter role name"
+          />
+          {newRoleError && <em style={{ color: "#b91c1c", fontSize: 11 }}>{newRoleError}</em>}
+        </div>
+        <button type="button" onClick={handleAddRole} disabled={roleSaving}>
           {Icons.plus} Add Roles
         </button>
       </div>

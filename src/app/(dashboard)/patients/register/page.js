@@ -59,7 +59,11 @@ export default function PatientRegistration() {
           cachedJsonFetch("/api/tests/packages", { ttl: 30_000 })
         ]);
 
-        if (docRes.response.ok) setDoctors(Array.isArray(docRes.data) ? docRes.data : docRes.data.doctors || []);
+        if (docRes.response.ok) {
+          setDoctors(Array.isArray(docRes.data) ? docRes.data : docRes.data.doctors || []);
+        } else if (docRes.response.status === 403) {
+          console.warn("Doctor access denied — referring doctor dropdown disabled");
+        }
         if (testRes.response.ok) setAvailableTests(testRes.data.tests || []);
         if (pkgRes.response.ok) setAvailablePackages(pkgRes.data.packages || []);
       } catch (err) {
@@ -100,21 +104,39 @@ export default function PatientRegistration() {
     if (!form.gender) newErrors.gender = "Gender is required";
     if (form.gender === "Other" && !form.genderIdentity) newErrors.genderIdentity = "Gender identity is required";
     if (!form.dob) newErrors.dob = "Date of Birth is required";
-    else if (new Date(form.dob) > new Date()) newErrors.dob = "Date of Birth cannot be in the future";
+    else {
+      const dobDate = new Date(form.dob);
+      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1900) newErrors.dob = "Invalid date of birth";
+      else if (dobDate > new Date()) newErrors.dob = "Date of Birth cannot be in the future";
+    }
     if (!form.age && form.age !== 0) newErrors.age = "Age is required";
     else if (parseInt(form.age) < 0) newErrors.age = "Invalid age";
     if (!form.phone?.trim()) newErrors.phone = "Mobile number is required";
     else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
     if (!form.address?.trim()) newErrors.address = "Address is required";
+    else if (!/^[A-Za-z0-9 .,/#-]+$/.test(form.address)) newErrors.address = "Only letters, numbers, spaces, and . , / # - allowed";
+    else if (/https?:\/\/|www\./i.test(form.address)) newErrors.address = "URLs not allowed in address";
     if (!form.receivedTime) newErrors.receivedTime = "Received time is required";
+    else if (isNaN(new Date(form.receivedTime).getTime())) newErrors.receivedTime = "Invalid received time";
+    if (form.collectionTime && isNaN(new Date(form.collectionTime).getTime())) newErrors.collectionTime = "Invalid collection time";
     if (form.collectionTime && form.receivedTime) {
       if (new Date(form.receivedTime) < new Date(form.collectionTime)) {
         newErrors.receivedTime = "Received time cannot be earlier than collection time";
         newErrors.collectionTime = "Collection time must be before received time";
       }
     }
+    if (form.dob && form.collectionTime && new Date(form.collectionTime) < new Date(form.dob)) {
+      newErrors.collectionTime = "Collection time cannot be before date of birth";
+    }
+    if (form.dob && form.receivedTime && new Date(form.receivedTime) < new Date(form.dob)) {
+      newErrors.receivedTime = "Received time cannot be before date of birth";
+    }
+    if (!form.barcode?.trim()) newErrors.barcode = "Barcode is required";
+    else if (!/^[A-Za-z0-9-_]+$/.test(form.barcode)) newErrors.barcode = "Only letters, numbers, hyphens, and underscores allowed";
+    else if (/https?:\/\/|www\./i.test(form.barcode)) newErrors.barcode = "URLs not allowed in barcode";
     if (hasRefDoctor && !form.refDoctorName?.trim()) newErrors.refDoctorName = "Referring doctor name is required";
-    if (form.uhId && form.uhId.toString().length !== 14) newErrors.uhId = "UHID must be exactly 14 digits";
+    if (!form.uhId?.trim()) newErrors.uhId = "UH ID is required";
+    else if (!/^[A-Za-z0-9]{14}$/.test(String(form.uhId))) newErrors.uhId = "UH ID must be exactly 14 alphanumeric characters";
     if (!form.selectedTests || form.selectedTests.length === 0) newErrors.selectedTests = "At least one test or package must be selected";
     return newErrors;
   };
@@ -141,9 +163,7 @@ export default function PatientRegistration() {
     const payload = { ...form };
     if (!payload.collectionTime) delete payload.collectionTime;
     if (!payload.genderIdentity) delete payload.genderIdentity;
-    if (!payload.uhId) delete payload.uhId;
     if (!hasRefDoctor) delete payload.refDoctorName;
-    if (!payload.barcode) delete payload.barcode;
     if (!payload.reportType) delete payload.reportType;
 
     if (payload.barcode) {
@@ -183,18 +203,47 @@ export default function PatientRegistration() {
       });
       const data = await res.json();
       if (res.ok) {
+        let billId = null;
+        try {
+          const billingRes = await fetch("/api/billing", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              patient: data._id,
+              tests: payload.selectedTests,
+              priority: "routine",
+              notes: "",
+              discountAmount: 0,
+              taxAmount: 0,
+            }),
+          });
+          const billingData = await billingRes.json();
+          if (billingRes.ok) {
+            billId = billingData.billingRecord?.billId;
+          } else {
+            console.warn("Auto-bill creation failed:", billingData.error);
+          }
+        } catch (billErr) {
+          console.warn("Auto-bill creation error:", billErr);
+        }
+
         clearCachedApi("/api/patient");
         clearCachedApi("/api/billing");
         clearCachedApi("/api/samples?status=all");
         clearCachedApi("/api/dashboard/stats");
-        setStatus({ 
-          type: "success", 
-          message: `Patient registered successfully. Patient ID: ${data.patientId}. A pending bill has been generated in the Billing Center.`
+
+        const billMsg = billId
+          ? `Bill ${billId} has been generated.`
+          : "Note: Bill could not be auto-generated. Please create it manually in Billing Center.";
+
+        setStatus({
+          type: "success",
+          message: `Patient registered successfully. Patient ID: ${data.patientId}. ${billMsg}`,
         });
         setForm(getEmptyForm());
         setHasRefDoctor(false);
         setShowErrors(false);
-        // Optionally redirect after a short delay
         setTimeout(() => router.push("/billing"), 5000);
       } else {
         setStatus({ type: "danger", message: data.error || "Something went wrong." });
@@ -261,7 +310,7 @@ export default function PatientRegistration() {
                 </select>
               </div>
               <div className="col-md-4">
-                <label className="lims-label">Barcode <span className="optional">(optional)</span></label>
+                <label className="lims-label">Barcode <span className="required">*</span></label>
                 <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="Enter barcode" value={form.barcode} onChange={handleChange} />
                 {errors.barcode && <div className="lims-error-text">{errors.barcode}</div>}
               </div>
@@ -282,8 +331,8 @@ export default function PatientRegistration() {
                 </div>
               )}
               <div className="col-md-4">
-                <label className="lims-label">UH ID <span className="optional">(optional)</span></label>
-                <input type="number" name="uhId" className={`lims-input ${errors.uhId ? 'invalid' : ''}`} placeholder="Enter UH ID" value={form.uhId} onChange={(e) => e.target.value.length <= 14 && handleChange(e)} />
+                <label className="lims-label">UH ID <span className="required">*</span></label>
+                <input type="text" name="uhId" className={`lims-input ${errors.uhId ? 'invalid' : ''}`} placeholder="Enter UH ID" value={form.uhId} maxLength={14} onChange={handleChange} />
                 {errors.uhId && <div className="lims-error-text">{errors.uhId}</div>}
               </div>
             </div>
@@ -403,7 +452,35 @@ export default function PatientRegistration() {
                 try {
                   const res = await fetch("/api/patient", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ ...pendingPayload, force: true }) });
                   const data = await res.json();
-                  if (res.ok) { clearCachedApi("/api/patient"); clearCachedApi("/api/billing"); clearCachedApi("/api/samples?status=all"); clearCachedApi("/api/dashboard/stats"); setStatus({ type: "success", message: `Patient registered successfully. Patient ID: ${data.patientId}.` }); setForm(getEmptyForm()); setHasRefDoctor(false); }
+                  if (res.ok) {
+                    let billId = null;
+                    try {
+                      const billingRes = await fetch("/api/billing", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({
+                          patient: data._id,
+                          tests: pendingPayload.selectedTests,
+                          priority: "routine",
+                          notes: "",
+                          discountAmount: 0,
+                          taxAmount: 0,
+                        }),
+                      });
+                      const billingData = await billingRes.json();
+                      if (billingRes.ok) {
+                        billId = billingData.billingRecord?.billId;
+                      } else {
+                        console.warn("Auto-bill creation failed:", billingData.error);
+                      }
+                    } catch (billErr) {
+                      console.warn("Auto-bill creation error:", billErr);
+                    }
+                    clearCachedApi("/api/patient"); clearCachedApi("/api/billing"); clearCachedApi("/api/samples?status=all"); clearCachedApi("/api/dashboard/stats");
+                    const billMsg = billId ? ` Bill ${billId} has been generated.` : "";
+                    setStatus({ type: "success", message: `Patient registered successfully. Patient ID: ${data.patientId}.${billMsg}` }); setForm(getEmptyForm()); setHasRefDoctor(false);
+                  }
                   else setStatus({ type: "danger", message: data.error || "Failed" });
                 } catch { setStatus({ type: "danger", message: "Network error" }); }
                 finally { setLoading(false); }

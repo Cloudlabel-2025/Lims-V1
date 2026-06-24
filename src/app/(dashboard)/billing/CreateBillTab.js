@@ -73,7 +73,7 @@ export default function CreateBillTab({
 
           <div className="module-form-grid">
             <label>
-              Discount (₹)
+              Discount (₹) <span className="required">*</span>
               <input
                 type="number"
                 className="lims-input"
@@ -84,7 +84,7 @@ export default function CreateBillTab({
               />
             </label>
             <label>
-              Tax (₹)
+              Tax (₹) <span className="required">*</span>
               <input
                 type="number"
                 className="lims-input"

@@ -24,6 +24,7 @@ export default function PatientList() {
   const router = useRouter();
   const user = useCurrentUser();
   const canCreatePatient = hasPermission(user, "patients.register");
+  const canDeletePatient = hasPermission(user, "patients.delete");
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -98,6 +99,20 @@ export default function PatientList() {
     },
     [router]
   );
+
+  const deletePatient = useCallback(async (patientId) => {
+    try {
+      const res = await fetch(`/api/patient/${patientId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to delete patient");
+      setAllPatients((prev) => prev.filter((p) => p._id !== patientId));
+    } catch (err) {
+      alert(err.message);
+    }
+  }, []);
 
   if (!mounted) return null;
 
@@ -275,6 +290,7 @@ export default function PatientList() {
             selectedPatientId={selectedPatient?._id}
             onSelectPatient={handleSelectPatient}
             onEditPatient={goToEditPatient}
+            onDeletePatient={canDeletePatient ? deletePatient : null}
           />
         ) : (
           <PatientTable
@@ -282,6 +298,7 @@ export default function PatientList() {
             selectedPatientId={selectedPatient?._id}
             onSelectPatient={handleSelectPatient}
             onEditPatient={goToEditPatient}
+            onDeletePatient={canDeletePatient ? deletePatient : null}
           />
         )}
         <PaginationControls pagination={pagination} loading={listLoading} onPageChange={setCurrentPage} />

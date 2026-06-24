@@ -12,8 +12,12 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const collectorName = searchParams.get("collectorName");
     const query = {};
     if (status && status !== "all") query.status = status;
+    if (collectorName) {
+      query.collectorName = { $regex: collectorName, $options: "i" };
+    }
 
     const { Sample } = await getTenantModels(auth.tenantId);
     const samples = await Sample.find(query)

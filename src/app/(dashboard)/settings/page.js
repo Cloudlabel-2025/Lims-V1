@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import SuccessDialog from "@/app/components/SuccessDialog";
 import { cachedJsonFetch, clearCachedApi, useTenantShell } from "@/app/lib/use-current-user";
@@ -22,6 +22,15 @@ const PermissionMatrix = dynamic(() => import("./PermissionMatrix"), {
   loading: () => (
     <section className="settings-panel">
       <p className="developer-empty">Loading permissions...</p>
+    </section>
+  ),
+});
+
+const UserManager = dynamic(() => import("./UserManager"), {
+  ssr: false,
+  loading: () => (
+    <section className="settings-panel">
+      <p className="developer-empty">Loading users...</p>
     </section>
   ),
 });
@@ -80,6 +89,36 @@ export default function LabAdminSettingsPage() {
   const [settingsError, setSettingsError] = useState("");
   const [roleMessage, setRoleMessage] = useState("");
 
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [savingUser, setSavingUser] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [newUser, setNewUser] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    roleId: "",
+  });
+
+  const canManageUsers = hasPermission(user, "users.manage");
+
+  const newUserErrors = useMemo(() => {
+    const errors = {};
+    if (newUser.password && newUser.password.length < 8) {
+      errors.password = "Password must be at least 8 characters.";
+    }
+    if (newUser.password && !newUser.confirmPassword) {
+      errors.confirmPassword = "Confirm password is required.";
+    } else if (newUser.password && newUser.password !== newUser.confirmPassword) {
+      errors.confirmPassword = "Password and confirm password must match.";
+    }
+    return errors;
+  }, [newUser.confirmPassword, newUser.password]);
+
+  const canCreateUser =
+    Boolean(newUser.password && newUser.confirmPassword) && Object.keys(newUserErrors).length === 0;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -93,13 +132,23 @@ export default function LabAdminSettingsPage() {
           return;
         }
 
-        const { response, data } = await cachedJsonFetch("/api/settings/roles", { ttl: 10_000 });
-        if (!response.ok) throw new Error(data.error || data.details || "Unable to load roles");
+        const [roleRes, userRes] = await Promise.all([
+          cachedJsonFetch("/api/settings/roles", { ttl: 10_000 }),
+          canManageUsers ? cachedJsonFetch("/api/settings/users", { ttl: 10_000 }) : { response: { ok: true }, data: { users: [] } },
+        ]);
+
+        if (!roleRes.response.ok) throw new Error(roleRes.data.error || roleRes.data.details || "Unable to load roles");
 
         if (!cancelled) {
-          const loadedRoles = data.roles || [];
+          const loadedRoles = roleRes.data.roles || [];
           setRoles(loadedRoles);
           setSavedRoles(loadedRoles);
+          setUsers(userRes.data.users || []);
+          setLoadingUsers(false);
+          setNewUser((current) => ({
+            ...current,
+            roleId: current.roleId || loadedRoles[0]?.id || "",
+          }));
         }
       } catch (err) {
         if (!cancelled) setSettingsError(err.message);
@@ -214,6 +263,97 @@ export default function LabAdminSettingsPage() {
     setSettingsError("");
   }
 
+  async function createUser() {
+    setSavingUser(true);
+    setRoleMessage("");
+    setSettingsError("");
+    try {
+      const res = await fetch("/api/settings/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(newUser),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.details || "Unable to create user");
+      clearCachedApi("/api/settings/users");
+      setUsers((current) => [data.user, ...current]);
+      setRoleMessage(`User created successfully. Login User ID: ${data.user.userId}.`);
+      setNewUser({ name: "", email: "", password: "", confirmPassword: "", roleId: roles[0]?.id || "" });
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
+  function startEditUser(userRecord) {
+    setRoleMessage("");
+    setSettingsError("");
+    setEditingUser({
+      id: userRecord.id,
+      name: [userRecord.firstName, userRecord.lastName].filter(Boolean).join(" "),
+      email: userRecord.email || "",
+      roleId: userRecord.role?.id || roles[0]?.id || "",
+      status: userRecord.status || "active",
+      password: "",
+      confirmPassword: "",
+    });
+  }
+
+  function cancelEditUser() {
+    setEditingUser(null);
+    setRoleMessage("");
+  }
+
+  async function saveUserEdit() {
+    if (!editingUser) return;
+    setSavingUser(true);
+    setRoleMessage("");
+    setSettingsError("");
+    try {
+      const res = await fetch("/api/settings/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(editingUser),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.details || "Unable to update user");
+      clearCachedApi("/api/settings/users");
+      setUsers((current) => current.map((item) => (item.id === data.user.id ? data.user : item)));
+      setEditingUser(null);
+      setRoleMessage(`User ${data.user.userId} updated successfully.`);
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
+  async function deleteUser(userRecord) {
+    if (!window.confirm(`Delete user ${userRecord.userId || userRecord.email}?`)) return;
+    setSavingUser(true);
+    setRoleMessage("");
+    setSettingsError("");
+    try {
+      const res = await fetch(`/api/settings/users?id=${encodeURIComponent(userRecord.id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.details || "Unable to delete user");
+      clearCachedApi("/api/settings/users");
+      setUsers((current) => current.filter((item) => item.id !== userRecord.id));
+      if (editingUser?.id === userRecord.id) setEditingUser(null);
+      setRoleMessage(`User ${userRecord.userId} deleted successfully.`);
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
   async function deleteRole(role, index) {
     setRoleMessage("");
     setSettingsError("");
@@ -311,8 +451,8 @@ export default function LabAdminSettingsPage() {
           <strong>{enabledModules.length}</strong>
         </article>
         <article>
-          <span>Allowed Permissions</span>
-          <strong>{labPermissions.length}</strong>
+          <span>Active Role Permissions</span>
+          <strong>{activePermissionSet.size}</strong>
         </article>
         <article>
           <span>Lab Roles</span>
@@ -349,6 +489,26 @@ export default function LabAdminSettingsPage() {
             cancelRoleChanges={cancelRoleChanges}
             saveRoleConfiguration={saveRoleConfiguration}
           />
+
+          {canManageUsers && (
+            <UserManager
+              newUser={newUser}
+              setNewUser={setNewUser}
+              newUserErrors={newUserErrors}
+              roles={roles}
+              createUser={createUser}
+              userSaving={savingUser}
+              rolesDirty={rolesDirty}
+              canCreateUser={canCreateUser}
+              users={users}
+              editingUser={editingUser}
+              setEditingUser={setEditingUser}
+              startEditUser={startEditUser}
+              cancelEditUser={cancelEditUser}
+              saveUserEdit={saveUserEdit}
+              deleteUser={deleteUser}
+            />
+          )}
         </>
       ) : (
         <section className="settings-panel">

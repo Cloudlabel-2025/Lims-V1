@@ -94,32 +94,34 @@ export async function POST(req) {
       resetTenantId = resolved.tenantId;
     }
 
-    if (user) {
-      const { otp, otpHash } = generateOtp();
-      const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+    if (!user) {
+      return Response.json({ error: "No account found with this email address." }, { status: 404 });
+    }
 
-      user.passwordResetTokenHash = otpHash;
-      user.passwordResetExpiresAt = expiresAt;
-      await user.save();
+    const { otp, otpHash } = generateOtp();
+    const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-      let emailResult = null;
-      try {
-        emailResult = await sendPasswordResetEmail({ to: email, otp, expiresAt });
-      } catch (emailError) {
-        console.error("Password reset OTP email failed:", emailError.message);
-        emailResult = { sent: false, reason: emailError.message };
-      }
+    user.passwordResetTokenHash = otpHash;
+    user.passwordResetExpiresAt = expiresAt;
+    await user.save();
 
-      if (process.env.NODE_ENV !== "production") {
-        if (!emailResult?.sent) {
-          console.warn("[forgot-password] OTP not sent via email.", emailResult?.reason);
-          console.info(`[forgot-password] DEV OTP for ${email}: ${otp}`);
-        }
+    let emailResult = null;
+    try {
+      emailResult = await sendPasswordResetEmail({ to: email, otp, expiresAt });
+    } catch (emailError) {
+      console.error("Password reset OTP email failed:", emailError.message);
+      emailResult = { sent: false, reason: emailError.message };
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      if (!emailResult?.sent) {
+        console.warn("[forgot-password] OTP not sent via email.", emailResult?.reason);
+        console.info(`[forgot-password] DEV OTP for ${email}: ${otp}`);
       }
     }
 
     return Response.json({
-      message: "If the account exists, a 6-digit OTP has been sent to your email.",
+      message: "OTP sent to your email. Check your inbox.",
     });
   } catch (error) {
     return jsonError("Unable to start password reset", error, 500);

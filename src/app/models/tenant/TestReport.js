@@ -1,5 +1,9 @@
 import mongoose from "mongoose";
 
+function isExponentialNotation(value) {
+  return typeof value === "string" && /[eE]/.test(value);
+}
+
 function getCounterModel(connection) {
   return (
     connection.models.Counter ||
@@ -102,6 +106,20 @@ export const TestReportSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+TestReportSchema.pre("validate", function validateResults() {
+  if (this.results && Array.isArray(this.results)) {
+    for (let i = 0; i < this.results.length; i++) {
+      const tv = this.results[i].textValue;
+      if (!tv || tv === "") continue;
+      if (isExponentialNotation(tv)) {
+        this.invalidate(`results.${i}.textValue`, `Exponential notation is not allowed: "${tv}"`);
+      } else if (!Number.isFinite(Number(tv))) {
+        this.invalidate(`results.${i}.textValue`, `Invalid numeric value: "${tv}"`);
+      }
+    }
+  }
+});
 
 TestReportSchema.index({ createdAt: -1 });
 TestReportSchema.index({ status: 1, createdAt: -1 });
