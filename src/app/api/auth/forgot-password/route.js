@@ -113,11 +113,18 @@ export async function POST(req) {
       emailResult = { sent: false, reason: emailError.message };
     }
 
-    if (process.env.NODE_ENV !== "production") {
-      if (!emailResult?.sent) {
-        console.warn("[forgot-password] OTP not sent via email.", emailResult?.reason);
+    if (!emailResult?.sent) {
+      if (process.env.NODE_ENV !== "production") {
         console.info(`[forgot-password] DEV OTP for ${email}: ${otp}`);
+        return Response.json(
+          { error: `Failed to send OTP email. ${emailResult?.reason || "Please try again."}` },
+          { status: 500 }
+        );
       }
+      return Response.json(
+        { error: "Unable to send OTP email. Please try again later." },
+        { status: 500 }
+      );
     }
 
     return Response.json({

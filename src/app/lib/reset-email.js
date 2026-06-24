@@ -1,16 +1,39 @@
-const RESEND_API = "https://api.resend.com/emails";
+import nodemailer from "nodemailer";
+
+function cleanEnv(name) {
+  return String(process.env[name] || "").trim();
+}
+
+function getSmtpConfig() {
+  return {
+    host: cleanEnv("SMTP_HOST"),
+    port: parseInt(cleanEnv("SMTP_PORT") || "587", 10),
+    user: cleanEnv("SMTP_USER"),
+    pass: cleanEnv("SMTP_PASS"),
+    from: cleanEnv("SMTP_FROM"),
+  };
+}
+
+let transporter = null;
+
+function getTransporter(config) {
+  if (transporter) return transporter;
+  transporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.port === 465,
+    auth: { user: config.user, pass: config.pass },
+  });
+  return transporter;
+}
 
 export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from =
-    process.env.RESET_EMAIL_FROM?.trim() ||
-    process.env.RESEND_FROM?.trim() ||
-    "LIMS <noreply@yourdomain.com>";
+  const config = getSmtpConfig();
 
-  if (!apiKey) {
+  if (!config.host || !config.user || !config.pass || !config.from) {
     return {
       sent: false,
-      reason: "Resend is not configured. Set RESEND_API_KEY.",
+      reason: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM.",
     };
   }
 
@@ -38,30 +61,16 @@ export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
       </div>
       <p>This OTP expires at <strong>${expiresText}</strong>. Do not share it with anyone.</p>
       <p>If you did not request this, you can ignore this email.</p>
-    </div>
-  `;
+    </div>`;
 
   try {
-    const response = await fetch(RESEND_API, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to,
-        subject: "Your LIMS password reset OTP",
-        text: textBody,
-        html: htmlBody,
-      }),
+    await getTransporter(config).sendMail({
+      from: config.from,
+      to,
+      subject: "Your LIMS password reset OTP",
+      text: textBody,
+      html: htmlBody,
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      throw new Error(errorData?.message || `Resend API error: ${response.status}`);
-    }
-
     return { sent: true };
   } catch (error) {
     throw new Error(error.message || "Unable to send reset email");
