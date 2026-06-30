@@ -66,7 +66,7 @@ export const UserSchema = new mongoose.Schema(
           message: "URLs are not allowed in email",
         },
         {
-          validator: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+          validator: (value) => /^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(value),
           message: "Invalid email format",
         },
       ],

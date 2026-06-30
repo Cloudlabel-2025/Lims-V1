@@ -101,6 +101,7 @@ export default function DeveloperEditLabPage({ params }) {
   const { id } = use(params);
   const [form, setForm] = useState(emptyForm);
   const [customHighlight, setCustomHighlight] = useState("");
+  const [highlightError, setHighlightError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -210,17 +211,36 @@ export default function DeveloperEditLabPage({ params }) {
 
   function addCustomHighlight() {
     const highlight = customHighlight.trim();
-    if (!highlight) return;
+    if (!highlight) {
+      setHighlightError("Highlight text cannot be empty");
+      return;
+    }
+    if (highlight.length < 2) {
+      setHighlightError("Highlight must be at least 2 characters");
+      return;
+    }
+    if (!/^[A-Za-z0-9 .&'\/,()@_-]+$/.test(highlight)) {
+      setHighlightError("Highlight contains invalid characters");
+      return;
+    }
 
     setForm((current) => {
-      if (current.loginHighlights.includes(highlight)) return current;
+      if (current.loginHighlights.includes(highlight)) {
+        setHighlightError("Highlight already added");
+        return current;
+      }
+      if (current.loginHighlights.length >= 6) {
+        setHighlightError("Maximum 6 highlights allowed");
+        return current;
+      }
 
       return {
         ...current,
-        loginHighlights: [...current.loginHighlights, highlight].slice(0, 6),
+        loginHighlights: [...current.loginHighlights, highlight],
       };
     });
     setCustomHighlight("");
+    setHighlightError("");
     setSuccess("");
   }
 
@@ -511,14 +531,16 @@ export default function DeveloperEditLabPage({ params }) {
             <div className="developer-highlight-custom">
               <input
                 value={customHighlight}
-                onChange={(event) => setCustomHighlight(event.target.value)}
+                onChange={(event) => { setCustomHighlight(event.target.value); setHighlightError(""); }}
                 placeholder="Enter login highlight"
                 maxLength={80}
+                className={highlightError ? "invalid" : ""}
               />
               <button type="button" onClick={addCustomHighlight}>
                 Add
               </button>
             </div>
+            {highlightError && <small style={{ color: "var(--error)", fontSize: 11, display: "block", marginTop: 4 }}>{highlightError}</small>}
             {form.loginHighlights.length > 0 && (
               <div className="developer-highlight-selected">
                 {form.loginHighlights.map((highlight) => (

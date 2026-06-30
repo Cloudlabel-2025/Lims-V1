@@ -23,10 +23,11 @@ export async function GET(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "dashboard.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Patient, Doctor, TestReport } = await getTenantModels(tenantId);
+    const { Patient, Doctor, TestReport, QcLog } = await getTenantModels(tenantId);
     const canViewPatients = hasPermission(auth.session, "patients.view");
     const canViewDoctors = hasPermission(auth.session, "doctors.view");
     const canViewReports = hasPermission(auth.session, "reports.view");
+    const canViewQuality = hasPermission(auth.session, "quality.view");
 
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -39,6 +40,7 @@ export async function GET(req) {
       reportsReady,
       pendingReports,
       pendingPayouts,
+      pendingQc,
     ] = await Promise.all([
       canViewPatients ? Patient.countDocuments({}) : Promise.resolve(null),
       canViewPatients
@@ -59,6 +61,7 @@ export async function GET(req) {
             { $group: { _id: null, total: { $sum: { $ifNull: ["$pendingPayout", 0] } } } },
           ])
         : Promise.resolve([]),
+      canViewQuality ? QcLog.countDocuments({ result: "pending" }) : Promise.resolve(null),
     ]);
 
     debugRequestLog("ok", {
@@ -74,11 +77,13 @@ export async function GET(req) {
       reportsReady,
       pendingReports,
       pendingPayouts: pendingPayouts[0]?.total || 0,
+      pendingQc,
       recentPatients,
       permissions: {
         patients: canViewPatients,
         doctors: canViewDoctors,
         reports: canViewReports,
+        quality: canViewQuality,
       },
     });
 

@@ -121,6 +121,8 @@ async function loginDeveloper({ req, email, password, rememberMe }) {
     { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null } }
   );
 
+  await resetRateLimit("login:developer", `${email}:${ip}`);
+
   const token = createSessionToken({
     userType: "developer",
     userId: String(user._id),
@@ -217,6 +219,8 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     { _id: user._id },
     { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null } }
   );
+
+  await resetRateLimit(`login:tenant:${tenantId}`, `${loginId}:${ip}`);
 
   const permissions = role?.permissions || [];
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();

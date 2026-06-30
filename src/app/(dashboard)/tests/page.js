@@ -129,6 +129,7 @@ export default function TestsPage() {
   }, [tests]);
 
   const canEditTests = hasPermission(user, "tests.edit");
+  const canDeleteTests = hasPermission(user, "tests.delete");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -198,10 +199,10 @@ export default function TestsPage() {
     }));
   }
 
-  async function createCategory(event) {
+  async function saveCategory(event) {
     event.preventDefault();
     const name = categoryName.trim();
-    if (!name) return;
+    if (!name) { setError("Category name is required"); return; }
     if (!isValidField(name, NAME_PATTERN)) {
       setError("Category name contains invalid characters");
       return;
@@ -213,20 +214,27 @@ export default function TestsPage() {
 
     setError("");
     try {
-      const response = await fetch("/api/tests/categories", {
-        method: "POST",
+      const method = editingCategoryId ? "PUT" : "POST";
+      const url = editingCategoryId ? `/api/tests/categories/${editingCategoryId}` : "/api/tests/categories";
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ name: categoryName }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to create category");
+      if (!response.ok) throw new Error(data.error || (editingCategoryId ? "Unable to update category" : "Unable to create category"));
 
       clearCachedApi("/api/tests/categories");
-      setCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
-      setForm((current) => ({ ...current, category: data.category._id }));
+      if (editingCategoryId) {
+        setCategories((current) => current.map((c) => (c._id === data.category._id ? data.category : c)));
+        setEditingCategoryId("");
+      } else {
+        setCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
+        setForm((current) => ({ ...current, category: data.category._id }));
+      }
       setCategoryName("");
-      setSuccess(`Category "${data.category.name}" created successfully.`);
+      setSuccess(`Category "${data.category.name}" ${editingCategoryId ? "updated" : "created"} successfully.`);
     } catch (err) {
       setError(err.message);
     }
@@ -235,6 +243,9 @@ export default function TestsPage() {
   async function saveTest(event) {
     event.preventDefault();
     setError("");
+
+    if (!form.name || !form.name.trim()) { setError("Test name is required"); return; }
+    if (!form.code || !form.code.trim()) { setError("Test code is required"); return; }
 
     if (!isValidField(form.name, NAME_PATTERN)) {
       setError("Test name contains invalid characters");
@@ -349,6 +360,10 @@ export default function TestsPage() {
     event.preventDefault();
     setError("");
 
+    if (!packageForm.name || !packageForm.name.trim()) { setError("Package name is required"); return; }
+    if (!packageForm.code || !packageForm.code.trim()) { setError("Package code is required"); return; }
+    if (!packageForm.tests || packageForm.tests.length === 0) { setError("At least one test must be selected"); return; }
+
     if (!isValidField(packageForm.name, NAME_PATTERN)) {
       setError("Package name contains invalid characters");
       return;
@@ -417,7 +432,7 @@ export default function TestsPage() {
       name: pkg.name || "",
       code: pkg.code || "",
       description: pkg.description || "",
-      price: pkg.price || "",
+      price: pkg.price ?? "",
       status: pkg.status || "active",
       tests: pkg.tests?.map(t => t._id || t) || [],
     });
@@ -458,6 +473,63 @@ export default function TestsPage() {
       category: categories[0]?._id || "",
       parameters: [{ ...blankParameter }],
     });
+  }
+
+  async function deleteCategory(categoryId) {
+    if (!confirm("Delete this category? This action cannot be undone.")) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/tests/categories/${categoryId}`, { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to delete category");
+      clearCachedApi("/api/tests/categories");
+      setCategories((prev) => prev.filter((c) => c._id !== categoryId));
+      setSuccess("Category deleted successfully.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteTest(testId) {
+    if (!confirm("Delete this test? This action cannot be undone.")) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/tests/definitions/${testId}`, { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to delete test");
+      clearCachedApi("/api/tests/definitions");
+      setTests((prev) => prev.filter((t) => t._id !== testId));
+      setSuccess("Test deleted successfully.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deletePackage(packageId) {
+    if (!confirm("Delete this package? This action cannot be undone.")) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/tests/packages/${packageId}`, { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to delete package");
+      clearCachedApi("/api/tests/packages");
+      setPackages((prev) => prev.filter((p) => p._id !== packageId));
+      setSuccess("Package deleted successfully.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) return <div className="module-page">Loading tests...</div>;
@@ -558,13 +630,17 @@ export default function TestsPage() {
         <CategoriesTab
           canEditTests={canEditTests}
           editingCategoryId={editingCategoryId}
-          createCategory={createCategory}
+          saveCategory={saveCategory}
           categoryName={categoryName}
           setCategoryName={setCategoryName}
           saving={saving}
           categories={categories}
           categoryUsageCounts={categoryUsageCounts}
           showList={false}
+          canDeleteTests={canDeleteTests}
+          onDeleteCategory={canDeleteTests ? deleteCategory : null}
+          onEditCategory={(cat) => { setEditingCategoryId(cat._id); setCategoryName(cat.name); }}
+          onCancelEdit={() => { setEditingCategoryId(""); setCategoryName(""); }}
         />
       )}
 
@@ -581,7 +657,7 @@ export default function TestsPage() {
               <div className="module-form-grid">
                 <label>
                   Test Name
-                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*" title="Only letters, numbers, spaces, and . &amp; ' / , - allowed" />
+                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required maxLength={100} pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*" title="Only letters, numbers, spaces, and . &amp; ' / , - allowed" />
                 </label>
                 <label>
                   Code
@@ -754,6 +830,8 @@ export default function TestsPage() {
           packages={packages}
           editPackage={editPackage}
           showList={false}
+          canDeleteTests={canDeleteTests}
+          onDeletePackage={canDeleteTests ? deletePackage : null}
         />
       )}
 
@@ -768,6 +846,10 @@ export default function TestsPage() {
           editingPackageId={editingPackageId}
           editTest={editTest}
           editPackage={editPackage}
+          canDeleteTests={canDeleteTests}
+          onDeleteCategory={canDeleteTests ? deleteCategory : null}
+          onDeleteTest={canDeleteTests ? deleteTest : null}
+          onDeletePackage={canDeleteTests ? deletePackage : null}
         />
       )}
     </div>

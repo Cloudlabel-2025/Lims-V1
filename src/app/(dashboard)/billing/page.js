@@ -45,6 +45,10 @@ export default function BillingPage() {
   const [payment, setPayment] = useState({ cash: 0, card: 0, online: 0 });
   const [results, setResults] = useState({}); // { [billingItemId]: { [paramKey]: value } }
   const [testDetails, setTestDetails] = useState({}); // { [testDefId]: parameters }
+  const [editingBill, setEditingBill] = useState(null);
+  const [editDiscount, setEditDiscount] = useState("");
+  const [editTax, setEditTax] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   const pendingBills = useMemo(
     () => billingRecords.filter((billingRecord) => billingRecord.billingStatus !== "paid"),
@@ -73,6 +77,10 @@ export default function BillingPage() {
   );
 
   const canCreateBilling = hasPermission(user, "billing.create");
+  const canCollectBilling = hasPermission(user, "billing.collect");
+  const canDiscountBilling = hasPermission(user, "billing.discount");
+  const canCancelBilling = hasPermission(user, "billing.cancel");
+  const canUpdateBilling = hasPermission(user, "billing.update");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -112,15 +120,21 @@ export default function BillingPage() {
   }, [loadData]);
 
   useEffect(() => {
+    function refreshTestCache() {
+      clearCachedApi("/api/tests/definitions?status=active");
+      clearCachedApi("/api/tests/packages");
+      loadData();
+    }
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        clearCachedApi("/api/tests/definitions?status=active");
-        clearCachedApi("/api/tests/packages");
-        loadData();
-      }
+      if (document.visibilityState === "visible") refreshTestCache();
     };
+    const handleFocus = () => refreshTestCache();
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [loadData]);
 
   async function createBill(event) {
@@ -129,18 +143,20 @@ export default function BillingPage() {
     setError("");
     setSuccess("");
 
-    if (discountAmount === "" || discountAmount === null || discountAmount === undefined) {
-      setError("Discount amount is required");
-      setSaving(false);
-      return;
+    if (canDiscountBilling) {
+      if (discountAmount === "" || discountAmount === null || discountAmount === undefined) {
+        setError("Discount amount is required");
+        setSaving(false);
+        return;
+      }
+      if (/[eE]/.test(String(discountAmount))) {
+        setError("Invalid discount amount format");
+        setSaving(false);
+        return;
+      }
     }
     if (taxAmount === "" || taxAmount === null || taxAmount === undefined) {
       setError("Tax amount is required");
-      setSaving(false);
-      return;
-    }
-    if (/[eE]/.test(String(discountAmount))) {
-      setError("Invalid discount amount format");
       setSaving(false);
       return;
     }
@@ -285,6 +301,84 @@ export default function BillingPage() {
     }));
   }, []);
 
+  function openEditBill(billingRecord) {
+    setEditingBill(billingRecord);
+    setEditDiscount(billingRecord.discountAmount || "");
+    setEditTax(billingRecord.taxAmount || "");
+    setEditNotes(billingRecord.notes || "");
+  }
+
+  function closeEditBill() {
+    setEditingBill(null);
+    setEditDiscount("");
+    setEditTax("");
+    setEditNotes("");
+  }
+
+  async function updateBill(billingRecordId) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const payload = {};
+      if (canDiscountBilling) payload.discountAmount = Number(editDiscount) || 0;
+      payload.taxAmount = Number(editTax) || 0;
+      payload.notes = editNotes;
+      const res = await fetch(`/api/billing/${billingRecordId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "update", ...payload }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to update bill");
+      clearCachedApi("/api/billing");
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
+      clearCachedApi("/api/dashboard/stats");
+      setBillingRecords((current) =>
+        current.map((br) =>
+          br._id === billingRecordId ? { ...br, ...data.billingRecord } : br
+        )
+      );
+      closeEditBill();
+      setSuccess(data.message || "Bill updated successfully.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function cancelBill(billingRecordId) {
+    if (!confirm("Cancel this bill? This action cannot be undone.")) return;
+    setClosing(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/billing/${billingRecordId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "cancel" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to cancel bill");
+      clearCachedApi("/api/billing");
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
+      clearCachedApi("/api/dashboard/stats");
+      setBillingRecords((current) =>
+        current.map((br) =>
+          br._id === billingRecordId ? { ...br, billingStatus: "cancelled" } : br
+        )
+      );
+      setSuccess(data.message || "Bill cancelled successfully.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setClosing(false);
+    }
+  }
+
   if (loading) return <div className="module-page">Loading...</div>;
 
   return (
@@ -426,14 +520,37 @@ export default function BillingPage() {
                           <small style={{ color: "var(--text-muted)", display: "block" }}>Total Amount</small>
                           <strong style={{ fontSize: "18px", color: "var(--brand-action, var(--primary))" }}>₹{billingRecord.totalAmount || 0}</strong>
                         </div>
-                        <button 
-                          className="dash-btn-primary" 
-                          onClick={() => openCloseModal(billingRecord)}
-                          disabled={closing}
-                          style={{ padding: "8px 20px" }}
-                        >
-                          {closing ? "Processing..." : "Close Bill"}
-                        </button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {canUpdateBilling && billingRecord.billingStatus !== "paid" && billingRecord.billingStatus !== "cancelled" && (
+                            <button
+                              className="dash-btn-secondary"
+                              onClick={() => openEditBill(billingRecord)}
+                              style={{ padding: "8px 20px" }}
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {canCancelBilling && billingRecord.billingStatus !== "paid" && (
+                            <button
+                              className="dash-btn-secondary"
+                              onClick={() => cancelBill(billingRecord._id)}
+                              disabled={closing}
+                              style={{ padding: "8px 20px", color: "var(--error)", borderColor: "var(--error)" }}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                          {canCollectBilling && (
+                            <button 
+                              className="dash-btn-primary" 
+                              onClick={() => openCloseModal(billingRecord)}
+                              disabled={closing}
+                              style={{ padding: "8px 20px" }}
+                            >
+                              {closing ? "Processing..." : "Close Bill"}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -464,6 +581,7 @@ export default function BillingPage() {
           saving={saving}
           createBill={createBill}
           billingRecords={billingRecords}
+          canDiscountBilling={canDiscountBilling}
         />
       )}
 
@@ -487,6 +605,59 @@ export default function BillingPage() {
           onResultChange={updateSettlementResult}
           onSubmit={handleCloseBill}
         />
+      )}
+
+      {editingBill && (
+        <div className="modal-overlay" onClick={closeEditBill}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3>Edit Bill — {editingBill.billId}</h3>
+              <button className="modal-close" onClick={closeEditBill}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ display: "grid", gap: 16, padding: 20 }}>
+              {canDiscountBilling && (
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Discount (₹)</span>
+                  <input
+                    className="lims-input"
+                    type="number"
+                    min="0"
+                    value={editDiscount}
+                    onChange={(e) => setEditDiscount(e.target.value)}
+                    placeholder="0"
+                  />
+                </label>
+              )}
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Tax (₹)</span>
+                <input
+                  className="lims-input"
+                  type="number"
+                  min="0"
+                  value={editTax}
+                  onChange={(e) => setEditTax(e.target.value)}
+                  placeholder="0"
+                />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Notes</span>
+                <textarea
+                  className="lims-input"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Enter notes"
+                />
+              </label>
+            </div>
+            <div className="modal-footer" style={{ display: "flex", gap: 8, justifyContent: "flex-end", padding: "12px 20px", borderTop: "1px solid var(--border-light)" }}>
+              <button className="dash-btn-secondary" onClick={closeEditBill} disabled={saving}>Cancel</button>
+              <button className="dash-btn-primary" onClick={() => updateBill(editingBill._id)} disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

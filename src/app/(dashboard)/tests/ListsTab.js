@@ -12,6 +12,10 @@ export default function ListsTab({
   editingPackageId,
   editTest,
   editPackage,
+  canDeleteTests = false,
+  onDeleteCategory = null,
+  onDeleteTest = null,
+  onDeletePackage = null,
 }) {
   const [activeListTab, setActiveListTab] = useState("categories");
 
@@ -62,6 +66,9 @@ export default function ListsTab({
                   <h3>{cat.name}</h3>
                   <span>Used in {categoryUsageCounts.get(cat._id) || 0} tests</span>
                 </div>
+                {onDeleteCategory && (
+                  <button type="button" className="test-card-delete" onClick={() => onDeleteCategory(cat._id)} title="Delete category">🗑</button>
+                )}
               </article>
             ))}
           </div>
@@ -85,7 +92,12 @@ export default function ListsTab({
                   <h3>{test.name}</h3>
                   <span>{test.category?.name || "Uncategorized"} · {test.parameters?.length || 0} parameters</span>
                 </div>
-                <strong>{test.status}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong>{test.status}</strong>
+                  {onDeleteTest && (
+                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeleteTest(test._id); }} title="Delete test">🗑</button>
+                  )}
+                </div>
               </article>
             ))}
           </div>
@@ -109,7 +121,12 @@ export default function ListsTab({
                   <h3>{pkg.name}</h3>
                   <span>{pkg.tests?.length || 0} tests included · ₹{pkg.price}</span>
                 </div>
-                <strong>{pkg.status}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong>{pkg.status}</strong>
+                  {onDeletePackage && (
+                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeletePackage(pkg._id); }} title="Delete package">🗑</button>
+                  )}
+                </div>
               </article>
             ))}
           </div>

@@ -54,7 +54,7 @@ export default function PatientRegistration() {
     async function fetchData() {
       try {
         const [docRes, testRes, pkgRes] = await Promise.all([
-          cachedJsonFetch("/api/doctor", { ttl: 15_000 }),
+          cachedJsonFetch("/api/doctor?status=Active", { ttl: 15_000 }),
           cachedJsonFetch("/api/tests/definitions", { ttl: 30_000 }),
           cachedJsonFetch("/api/tests/packages", { ttl: 30_000 })
         ]);
@@ -350,7 +350,7 @@ export default function PatientRegistration() {
               </div>
               <div className="col-md-8">
                 <label className="lims-label">Address <span className="required">*</span></label>
-                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" value={form.address} onChange={handleChange} />
+                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" maxLength={200} value={form.address} onChange={handleChange} />
                 {errors.address && <div className="lims-error-text">{errors.address}</div>}
               </div>
             </div>

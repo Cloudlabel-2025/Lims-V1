@@ -33,11 +33,48 @@ export async function PATCH(req, { params }) {
     const body = await req.json();
     const action = String(body.action || "");
 
+    if (action === "update") {
+      const auth = requireTenantSession(req, "billing.update");
+      if (auth.error) return auth.error;
+
+      const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "billing.view");
+      if (moduleAuth.error) return moduleAuth.error;
+
+      const { BillingRecord } = await getTenantModels(auth.tenantId);
+      const billingRecord = await BillingRecord.findById(id);
+      if (!billingRecord) return Response.json({ error: "Billing record not found" }, { status: 404 });
+      if (billingRecord.billingStatus === "paid" || billingRecord.billingStatus === "cancelled") {
+        return Response.json({ error: "Cannot edit a paid or cancelled bill" }, { status: 400 });
+      }
+
+      if (body.discountAmount !== undefined) {
+        if (hasPermission(auth.session, "billing.discount")) {
+          billingRecord.discountAmount = Number(body.discountAmount) || 0;
+        } else {
+          return Response.json({ error: "No permission to apply discounts" }, { status: 403 });
+        }
+      }
+      if (body.taxAmount !== undefined) billingRecord.taxAmount = Number(body.taxAmount) || 0;
+      if (body.notes !== undefined) billingRecord.notes = body.notes;
+
+      billingRecord.totalAmount = Math.max(0, (billingRecord.itemsSubtotal || 0) - (billingRecord.discountAmount || 0) + (billingRecord.taxAmount || 0));
+      await billingRecord.save();
+
+      await writeAuditLog(req, auth, {
+        action: "billing.updated",
+        resourceType: "BillingRecord",
+        resourceId: billingRecord._id,
+        metadata: { discountAmount: billingRecord.discountAmount, taxAmount: billingRecord.taxAmount },
+      });
+
+      return Response.json({ billingRecord, message: "Bill updated successfully" });
+    }
+
     if (action !== "cancel") {
       return Response.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    const auth = requireTenantSession(req, "billing.collect");
+    const auth = requireTenantSession(req, "billing.cancel");
     if (auth.error) return auth.error;
 
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "billing.view");

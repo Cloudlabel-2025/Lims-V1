@@ -186,6 +186,9 @@ export async function POST(req) {
       if (isExponential(conv)) {
         return Response.json({ error: "Exponential notation is not allowed in conversion factor" }, { status: 400 });
       }
+      if (Number(conv) <= 0) {
+        return Response.json({ error: "Conversion factor must be greater than 0" }, { status: 400 });
+      }
 
       const baseSymbol = clean(body.baseSymbol);
       if (!baseSymbol) return Response.json({ error: "Base symbol is required" }, { status: 400 });
@@ -233,11 +236,17 @@ export async function POST(req) {
       if (isExponential(body.purchaseToBaseFactor)) {
         return Response.json({ error: "Exponential notation is not allowed in conversion factor" }, { status: 400 });
       }
+      if (Number(body.purchaseToBaseFactor) <= 0) {
+        return Response.json({ error: "Conversion factor must be greater than 0" }, { status: 400 });
+      }
       if (body.minimumStockBase === undefined || body.minimumStockBase === null || body.minimumStockBase === "") {
         return Response.json({ error: "Min stock is required" }, { status: 400 });
       }
       if (isExponential(body.minimumStockBase)) {
         return Response.json({ error: "Exponential notation is not allowed in min stock" }, { status: 400 });
+      }
+      if (Number(body.minimumStockBase) < 0) {
+        return Response.json({ error: "Min stock cannot be negative" }, { status: 400 });
       }
       if (body.reorderLevelBase === undefined || body.reorderLevelBase === null || body.reorderLevelBase === "") {
         return Response.json({ error: "Reorder level is required" }, { status: 400 });
@@ -245,11 +254,20 @@ export async function POST(req) {
       if (isExponential(body.reorderLevelBase)) {
         return Response.json({ error: "Exponential notation is not allowed in reorder level" }, { status: 400 });
       }
+      if (Number(body.reorderLevelBase) < 0) {
+        return Response.json({ error: "Reorder level cannot be negative" }, { status: 400 });
+      }
+      if (Number(body.minimumStockBase) > Number(body.reorderLevelBase)) {
+        return Response.json({ error: "Min stock cannot exceed reorder level" }, { status: 400 });
+      }
       if (body.openingQuantityBase === undefined || body.openingQuantityBase === null || body.openingQuantityBase === "") {
         return Response.json({ error: "Opening quantity is required" }, { status: 400 });
       }
       if (isExponential(body.openingQuantityBase)) {
         return Response.json({ error: "Exponential notation is not allowed in opening quantity" }, { status: 400 });
+      }
+      if (Number(body.openingQuantityBase) < 0) {
+        return Response.json({ error: "Opening quantity cannot be negative" }, { status: 400 });
       }
 
       const manufacturer = clean(body.manufacturer);

@@ -25,6 +25,7 @@ const emptyItem = {
   batchNo: "",
   expiryDate: "",
   costPerBaseUnit: 0,
+  trackExpiry: true,
   notes: "",
 };
 
@@ -204,46 +205,58 @@ export default function InventoryPage() {
 
   async function saveItem(event) {
     event.preventDefault();
+
+    const errors = {};
+    if (!itemForm.itemCode) errors.itemCode = "Item code is required";
+    else if (!isValidName(itemForm.itemCode)) errors.itemCode = "Item code contains invalid characters";
+    if (hasUrl(itemForm.itemCode)) errors.itemCode = "URLs are not allowed";
+    if (!itemForm.name) errors.name = "Item name is required";
+    else if (!isValidName(itemForm.name)) errors.name = "Name contains invalid characters";
+    if (hasUrl(itemForm.name)) errors.name = "URLs are not allowed";
+    if (!itemForm.genericName) errors.genericName = "Generic name is required";
+    else if (!isValidName(itemForm.genericName)) errors.genericName = "Generic name contains invalid characters";
+    if (hasUrl(itemForm.genericName)) errors.genericName = "URLs are not allowed";
+    if (!itemForm.category) errors.category = "Category is required";
+    if (!itemForm.subCategory) errors.subCategory = "Sub category is required";
+    if (!itemForm.baseUom) errors.baseUom = "Base UOM is required";
+    if (!itemForm.purchaseUom) errors.purchaseUom = "Purchase UOM is required";
+    if (itemForm.purchaseToBaseFactor === "" || itemForm.purchaseToBaseFactor === undefined || itemForm.purchaseToBaseFactor === null) errors.purchaseToBaseFactor = "Conversion factor is required";
+    else if (isExponential(itemForm.purchaseToBaseFactor)) errors.purchaseToBaseFactor = "Exponential notation is not allowed";
+    else if (Number(itemForm.purchaseToBaseFactor) <= 0) errors.purchaseToBaseFactor = "Must be greater than 0";
+    if (itemForm.minimumStockBase === "" || itemForm.minimumStockBase === undefined || itemForm.minimumStockBase === null) errors.minimumStockBase = "Min stock is required";
+    else if (isExponential(itemForm.minimumStockBase)) errors.minimumStockBase = "Exponential notation is not allowed";
+    else if (Number(itemForm.minimumStockBase) < 0) errors.minimumStockBase = "Cannot be negative";
+    if (itemForm.reorderLevelBase === "" || itemForm.reorderLevelBase === undefined || itemForm.reorderLevelBase === null) errors.reorderLevelBase = "Reorder level is required";
+    else if (isExponential(itemForm.reorderLevelBase)) errors.reorderLevelBase = "Exponential notation is not allowed";
+    else if (Number(itemForm.reorderLevelBase) < 0) errors.reorderLevelBase = "Cannot be negative";
+    if (itemForm.minimumStockBase !== "" && itemForm.minimumStockBase !== undefined && itemForm.minimumStockBase !== null &&
+        itemForm.reorderLevelBase !== "" && itemForm.reorderLevelBase !== undefined && itemForm.reorderLevelBase !== null) {
+      if (Number(itemForm.minimumStockBase) > Number(itemForm.reorderLevelBase)) {
+        errors.reorderLevelBase = "Reorder level should be >= Min stock";
+      }
+    }
+    if (itemForm.openingQuantityBase === "" || itemForm.openingQuantityBase === undefined || itemForm.openingQuantityBase === null) errors.openingQuantityBase = "Opening quantity is required";
+    else if (isExponential(itemForm.openingQuantityBase)) errors.openingQuantityBase = "Exponential notation is not allowed";
+    else if (Number(itemForm.openingQuantityBase) < 0) errors.openingQuantityBase = "Cannot be negative";
+    if (!itemForm.manufacturer) errors.manufacturer = "Manufacturer is required";
+    else if (!isValidName(itemForm.manufacturer)) errors.manufacturer = "Manufacturer contains invalid characters";
+    if (hasUrl(itemForm.manufacturer)) errors.manufacturer = "URLs are not allowed";
+    if (!itemForm.preferredSupplier) errors.preferredSupplier = "Supplier is required";
+    else if (!isValidName(itemForm.preferredSupplier)) errors.preferredSupplier = "Supplier contains invalid characters";
+    if (hasUrl(itemForm.preferredSupplier)) errors.preferredSupplier = "URLs are not allowed";
+    if (!itemForm.batchNo) errors.batchNo = "Batch No is required";
+    else if (!isValidName(itemForm.batchNo)) errors.batchNo = "Batch No contains invalid characters";
+    if (hasUrl(itemForm.batchNo)) errors.batchNo = "URLs are not allowed";
+    if (!itemForm.defaultLocation) errors.defaultLocation = "Location is required";
+    else if (!isValidName(itemForm.defaultLocation)) errors.defaultLocation = "Location contains invalid characters";
+    if (hasUrl(itemForm.defaultLocation)) errors.defaultLocation = "URLs are not allowed";
+    if (!itemForm.storageCondition) errors.storageCondition = "Storage condition is required";
+    else if (!isValidName(itemForm.storageCondition)) errors.storageCondition = "Storage condition contains invalid characters";
+    if (hasUrl(itemForm.storageCondition)) errors.storageCondition = "URLs are not allowed";
+    setItemFormErrors(errors);
+    if (Object.keys(errors).length) return;
+
     if (!editingItemId) {
-      const errors = {};
-      if (!itemForm.itemCode) errors.itemCode = "Item code is required";
-      else if (!isValidName(itemForm.itemCode)) errors.itemCode = "Item code contains invalid characters";
-      if (hasUrl(itemForm.itemCode)) errors.itemCode = "URLs are not allowed";
-      if (!itemForm.name) errors.name = "Item name is required";
-      else if (!isValidName(itemForm.name)) errors.name = "Name contains invalid characters";
-      if (hasUrl(itemForm.name)) errors.name = "URLs are not allowed";
-      if (!itemForm.genericName) errors.genericName = "Generic name is required";
-      else if (!isValidName(itemForm.genericName)) errors.genericName = "Generic name contains invalid characters";
-      if (hasUrl(itemForm.genericName)) errors.genericName = "URLs are not allowed";
-      if (!itemForm.category) errors.category = "Category is required";
-      if (!itemForm.subCategory) errors.subCategory = "Sub category is required";
-      if (!itemForm.baseUom) errors.baseUom = "Base UOM is required";
-      if (!itemForm.purchaseUom) errors.purchaseUom = "Purchase UOM is required";
-      if (itemForm.purchaseToBaseFactor === "" || itemForm.purchaseToBaseFactor === undefined || itemForm.purchaseToBaseFactor === null) errors.purchaseToBaseFactor = "Conversion factor is required";
-      else if (isExponential(itemForm.purchaseToBaseFactor)) errors.purchaseToBaseFactor = "Exponential notation is not allowed";
-      if (itemForm.minimumStockBase === "" || itemForm.minimumStockBase === undefined || itemForm.minimumStockBase === null) errors.minimumStockBase = "Min stock is required";
-      else if (isExponential(itemForm.minimumStockBase)) errors.minimumStockBase = "Exponential notation is not allowed";
-      if (itemForm.reorderLevelBase === "" || itemForm.reorderLevelBase === undefined || itemForm.reorderLevelBase === null) errors.reorderLevelBase = "Reorder level is required";
-      else if (isExponential(itemForm.reorderLevelBase)) errors.reorderLevelBase = "Exponential notation is not allowed";
-      if (itemForm.openingQuantityBase === "" || itemForm.openingQuantityBase === undefined || itemForm.openingQuantityBase === null) errors.openingQuantityBase = "Opening quantity is required";
-      else if (isExponential(itemForm.openingQuantityBase)) errors.openingQuantityBase = "Exponential notation is not allowed";
-      if (!itemForm.manufacturer) errors.manufacturer = "Manufacturer is required";
-      else if (!isValidName(itemForm.manufacturer)) errors.manufacturer = "Manufacturer contains invalid characters";
-      if (hasUrl(itemForm.manufacturer)) errors.manufacturer = "URLs are not allowed";
-      if (!itemForm.preferredSupplier) errors.preferredSupplier = "Supplier is required";
-      else if (!isValidName(itemForm.preferredSupplier)) errors.preferredSupplier = "Supplier contains invalid characters";
-      if (hasUrl(itemForm.preferredSupplier)) errors.preferredSupplier = "URLs are not allowed";
-      if (!itemForm.batchNo) errors.batchNo = "Batch No is required";
-      else if (!isValidName(itemForm.batchNo)) errors.batchNo = "Batch No contains invalid characters";
-      if (hasUrl(itemForm.batchNo)) errors.batchNo = "URLs are not allowed";
-      if (!itemForm.defaultLocation) errors.defaultLocation = "Location is required";
-      else if (!isValidName(itemForm.defaultLocation)) errors.defaultLocation = "Location contains invalid characters";
-      if (hasUrl(itemForm.defaultLocation)) errors.defaultLocation = "URLs are not allowed";
-      if (!itemForm.storageCondition) errors.storageCondition = "Storage condition is required";
-      else if (!isValidName(itemForm.storageCondition)) errors.storageCondition = "Storage condition contains invalid characters";
-      if (hasUrl(itemForm.storageCondition)) errors.storageCondition = "URLs are not allowed";
-      setItemFormErrors(errors);
-      if (Object.keys(errors).length) return;
       await postInventory({ action: "item", ...itemForm }, (data) => {
         setItemForm(emptyItem);
         setItemFormErrors({});
@@ -294,6 +307,7 @@ export default function InventoryPage() {
       manufacturer: item.manufacturer || "",
       storageCondition: item.storageCondition || "",
       defaultLocation: item.defaultLocation || "",
+      trackExpiry: item.trackExpiry !== false,
       notes: item.notes || "",
     });
     setActiveTab("items");
@@ -436,6 +450,20 @@ export default function InventoryPage() {
                     <ErrorMsg message={itemFormErrors.reorderLevelBase} />
                   </Field>
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Track Expiry">
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", height: 38 }}>
+                      <input type="checkbox" checked={itemForm.trackExpiry !== false} onChange={(e) => setItemForm({ ...itemForm, trackExpiry: e.target.checked })} style={{ width: 16, height: 16 }} />
+                      Enable expiry tracking
+                    </label>
+                  </Field>
+                  {itemForm.trackExpiry !== false && !editingItemId && (
+                    <Field label="Expiry Date">
+                      <input className="lims-input" type="date" value={itemForm.expiryDate || ""} onChange={(e) => setItemForm({ ...itemForm, expiryDate: e.target.value })} style={inputStyle()} />
+                    </Field>
+                  )}
+                  {itemForm.trackExpiry === false && <div />}
+                </div>
                 {!editingItemId && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <Field label="Opening Qty">
@@ -539,6 +567,7 @@ export default function InventoryPage() {
                 if (hasUrl(uomForm.symbol)) errors.symbol = "URLs are not allowed";
                 if (!uomForm.conversionToBase && uomForm.conversionToBase !== 0) errors.conversionToBase = "Conversion to base is required";
                 else if (isExponential(uomForm.conversionToBase)) errors.conversionToBase = "Exponential notation is not allowed";
+                else if (Number(uomForm.conversionToBase) <= 0) errors.conversionToBase = "Must be greater than 0";
                 if (!uomForm.baseSymbol) errors.baseSymbol = "Base symbol is required";
                 else if (!isValidName(uomForm.baseSymbol)) errors.baseSymbol = "Base symbol contains invalid characters";
                 if (hasUrl(uomForm.baseSymbol)) errors.baseSymbol = "URLs are not allowed";

@@ -24,7 +24,7 @@ const statusBadge = {
   released: ["#ecfdf5", "#047857"],
 };
 
-export default function ReportPreview({ selectedReport, canPrintReports, canVerifyReports, canReleaseReports, onReportUpdated, onSuccess }) {
+export default function ReportPreview({ selectedReport, canPrintReports, canVerifyReports, canReleaseReports, canDeleteReports, onReportUpdated, onSuccess, onEdit, onDelete }) {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,6 +70,15 @@ export default function ReportPreview({ selectedReport, canPrintReports, canVeri
           <span style={{ background: badgeBg, color: badgeColor, borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 800 }}>
             {selectedReport.status}
           </span>
+          {selectedReport.status === "draft" && canEditReports && (
+            <button
+              type="button"
+              onClick={() => onEdit?.(selectedReport)}
+              style={{ height: 36, padding: "0 14px", border: "1px solid var(--border)", borderRadius: 8, background: "#fff", color: "var(--text)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+            >
+              Edit
+            </button>
+          )}
           {canAct && flow && (
             <button
               type="button"
@@ -83,6 +92,15 @@ export default function ReportPreview({ selectedReport, canPrintReports, canVeri
           {canPrintReports && (
             <button className="dash-btn-secondary" type="button" onClick={() => window.print()} style={{ height: 36 }}>
               {Icons.report} Print
+            </button>
+          )}
+          {canDeleteReports && selectedReport.status === "draft" && (
+            <button
+              type="button"
+              onClick={() => onDelete?.(selectedReport._id)}
+              style={{ height: 36, padding: "0 14px", border: "1px solid var(--error)", borderRadius: 8, background: "#fff", color: "var(--error)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+            >
+              Delete
             </button>
           )}
         </div>

@@ -19,7 +19,8 @@ export default function SamplesPage() {
   const canCollectSamples = hasPermission(user, "samples.collect");
   const canUpdateSamples = hasPermission(user, "samples.update");
   const canRejectSamples = hasPermission(user, "samples.reject");
-  const canActOnSamples = canCollectSamples || canUpdateSamples || canRejectSamples;
+  const canDeleteSamples = hasPermission(user, "samples.delete");
+  const canActOnSamples = canCollectSamples || canUpdateSamples || canRejectSamples || canDeleteSamples;
   const canViewSamples = hasPermission(user, "samples.view");
 
   async function printLabel(sampleId) {
@@ -106,6 +107,30 @@ export default function SamplesPage() {
     } catch (err) {
       console.error("Update sample error:", err);
       setError(err.message || "Unable to update sample");
+    } finally {
+      setUpdatingId("");
+    }
+  }
+
+  async function deleteSample(sampleId) {
+    if (!confirm("Delete this sample? This action cannot be undone.")) return;
+    setUpdatingId(sampleId);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/samples/${sampleId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to delete sample");
+      clearCachedApi(`/api/samples?status=${status}`);
+      clearCachedApi("/api/samples?status=all");
+      clearCachedApi("/api/dashboard/stats");
+      setSamples((current) => current.filter((s) => s._id !== sampleId));
+      setSuccess("Sample deleted successfully.");
+    } catch (err) {
+      setError(err.message);
     } finally {
       setUpdatingId("");
     }
@@ -204,6 +229,9 @@ export default function SamplesPage() {
                     )}
                     {canRejectSamples && (
                       <button disabled={updatingId === sample._id || sample.status === "reported"} onClick={() => updateSample(sample._id, "reject")}>Reject</button>
+                    )}
+                    {canDeleteSamples && sample.status !== "reported" && (
+                      <button disabled={updatingId === sample._id} onClick={() => deleteSample(sample._id)} style={{ color: "var(--error)" }}>Delete</button>
                     )}
                   </span>
                 )}

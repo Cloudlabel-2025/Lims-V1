@@ -83,7 +83,7 @@ export async function POST(req) {
       return Response.json({ error: "URLs are not allowed in email" }, { status: 400 });
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
       return Response.json({ error: "Valid login email is required" }, { status: 400 });
     }
 
@@ -169,7 +169,7 @@ export async function PATCH(req) {
       return Response.json({ error: "URLs are not allowed in email" }, { status: 400 });
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
       return Response.json({ error: "Valid login email is required" }, { status: 400 });
     }
 

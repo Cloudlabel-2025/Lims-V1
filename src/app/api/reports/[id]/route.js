@@ -130,3 +130,32 @@ export async function PATCH(req, { params }) {
     return jsonError("Unable to update report", error, 500);
   }
 }
+
+export async function DELETE(req, { params }) {
+  try {
+    const auth = requireTenantSession(req, "reports.delete");
+    if (auth.error) return auth.error;
+
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "reports.view");
+    if (moduleAuth.error) return moduleAuth.error;
+
+    const { id } = await params;
+    const { TestReport } = await getTenantModels(auth.tenantId);
+    const report = await TestReport.findById(id);
+    if (!report) return Response.json({ error: "Report not found" }, { status: 404 });
+    if (report.status !== "draft") return Response.json({ error: "Only draft reports can be deleted" }, { status: 400 });
+
+    await TestReport.findByIdAndDelete(id);
+
+    await writeAuditLog(req, auth, {
+      action: "reports.deleted",
+      resourceType: "TestReport",
+      resourceId: id,
+      metadata: { status: report.status },
+    });
+
+    return Response.json({ success: true });
+  } catch (error) {
+    return jsonError("Unable to delete report", error, 500);
+  }
+}

@@ -189,6 +189,7 @@ export default function AccountsPage() {
   }
 
   async function deleteAccount(accountId) {
+    if (!confirm("Delete this account? This action cannot be undone.")) return;
     setSaving(true);
     setError("");
     setSuccess("");
@@ -512,9 +513,9 @@ export default function AccountsPage() {
                         {["reagent", "staff", "equipment", "overhead"].map((category) => <option key={category} value={category}>{category}</option>)}
                       </select>
                     </Field>
-                    <Field label="Vendor"><input required className="lims-input" value={expenseFormEdit.vendorName} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, vendorName: e.target.value })} style={inputStyle()} /></Field>
-                    <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseFormEdit.amount} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, amount: e.target.value })} style={inputStyle()} /></Field>
-                    <Field label="Tax"><input required className="lims-input" type="number" min="0" step="0.01" value={expenseFormEdit.taxAmount} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, taxAmount: e.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Vendor"><input required className="lims-input" value={expenseFormEdit.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setExpenseFormErrors((p) => ({ ...p, vendorName: "" })); setExpenseFormEdit({ ...expenseFormEdit, vendorName: v }); }} style={inputStyle()} />{expenseFormErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.vendorName}</small>}</Field>
+                    <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseFormEdit.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, amount: "" })); setExpenseFormEdit({ ...expenseFormEdit, amount: v }); }} style={inputStyle()} />{expenseFormErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.amount}</small>}</Field>
+                    <Field label="Tax"><input required className="lims-input" type="number" min="0" step="0.01" value={expenseFormEdit.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, taxAmount: "" })); setExpenseFormEdit({ ...expenseFormEdit, taxAmount: v }); }} style={inputStyle()} />{expenseFormErrors.taxAmount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.taxAmount}</small>}</Field>
                     <Field label="Credit">
                       <select className="lims-input" value={expenseFormEdit.paidFrom} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, paidFrom: e.target.value })} style={inputStyle()}>
                         <option value="vendor-payable">Vendor Payable</option>
@@ -524,7 +525,7 @@ export default function AccountsPage() {
                     </Field>
                     <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                       <button type="button" className="btn-lims-secondary" onClick={() => setEditingExpense(null)} style={{ flex: 1, height: 38 }}>Cancel</button>
-                      <button type="button" className="btn-lims-primary" disabled={saving} onClick={() => updateExpense(editingExpense, { category: expenseFormEdit.category, vendorName: expenseFormEdit.vendorName, amount: expenseFormEdit.amount, taxAmount: expenseFormEdit.taxAmount, paidFrom: expenseFormEdit.paidFrom })} style={{ flex: 1, height: 38 }}>{saving ? "Saving..." : "Save"}</button>
+                      <button type="button" className="btn-lims-primary" disabled={saving} onClick={() => { const errs = {}; if (!expenseFormEdit.vendorName) errs.vendorName = "Vendor is required"; else if (hasUrl(expenseFormEdit.vendorName)) errs.vendorName = "URLs are not allowed"; else if (!isValidName(expenseFormEdit.vendorName)) errs.vendorName = "Vendor name contains invalid characters"; if (expenseFormEdit.amount === "" || expenseFormEdit.amount === undefined || expenseFormEdit.amount === null) errs.amount = "Amount is required"; else if (isExponential(expenseFormEdit.amount)) errs.amount = "Exponential notation is not allowed"; if (expenseFormEdit.taxAmount === "" || expenseFormEdit.taxAmount === undefined || expenseFormEdit.taxAmount === null) errs.taxAmount = "Tax is required"; else if (isExponential(expenseFormEdit.taxAmount)) errs.taxAmount = "Exponential notation is not allowed"; setExpenseFormErrors((p) => ({ ...p, ...errs })); if (Object.keys(errs).length) return; updateExpense(editingExpense, { category: expenseFormEdit.category, vendorName: expenseFormEdit.vendorName, amount: expenseFormEdit.amount, taxAmount: expenseFormEdit.taxAmount, paidFrom: expenseFormEdit.paidFrom }); }} style={{ flex: 1, height: 38 }}>{saving ? "Saving..." : "Save"}</button>
                     </div>
                   </div>
                 </div>
@@ -572,13 +573,16 @@ export default function AccountsPage() {
                   <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 440, width: "90%", display: "grid", gap: 12 }} onClick={(e) => e.stopPropagation()}>
                     <h5 style={{ margin: 0, fontSize: 16 }}>Edit Corporate Account</h5>
                     <Field label="Name">
-                      <input required className="lims-input" value={corporateFormEdit.name} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, name: e.target.value })} style={inputStyle()} />
+                      <input required className="lims-input" value={corporateFormEdit.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, name: "" })); setCorporateFormEdit({ ...corporateFormEdit, name: v }); }} style={inputStyle()} />
+                      {corporateFormErrors.name && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.name}</small>}
                     </Field>
                     <Field label="Contact Person">
-                      <input required className="lims-input" value={corporateFormEdit.contactPerson} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, contactPerson: e.target.value })} style={inputStyle()} />
+                      <input required className="lims-input" value={corporateFormEdit.contactPerson} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "Contact person contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, contactPerson: "" })); setCorporateFormEdit({ ...corporateFormEdit, contactPerson: v }); }} style={inputStyle()} />
+                      {corporateFormErrors.contactPerson && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.contactPerson}</small>}
                     </Field>
                     <Field label="Credit Limit">
-                      <input required className="lims-input" type="number" min="0" step="0.01" value={corporateFormEdit.creditLimit} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, creditLimit: e.target.value })} style={inputStyle()} />
+                      <input required className="lims-input" type="number" min="0" step="0.01" value={corporateFormEdit.creditLimit} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setCorporateFormErrors((p) => ({ ...p, creditLimit: "Exponential notation is not allowed" })); return; } setCorporateFormErrors((p) => ({ ...p, creditLimit: "" })); setCorporateFormEdit({ ...corporateFormEdit, creditLimit: v }); }} style={inputStyle()} />
+                      {corporateFormErrors.creditLimit && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.creditLimit}</small>}
                     </Field>
                     <Field label="Statement Cycle">
                       <select className="lims-input" value={corporateFormEdit.statementCycle} onChange={(e) => setCorporateFormEdit({ ...corporateFormEdit, statementCycle: e.target.value })} style={inputStyle()}>
@@ -588,7 +592,7 @@ export default function AccountsPage() {
                     </Field>
                     <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                       <button type="button" className="btn-lims-secondary" onClick={() => setEditingCorporate(null)} style={{ flex: 1, height: 38 }}>Cancel</button>
-                      <button type="button" className="btn-lims-primary" disabled={saving} onClick={() => updateCorporate(editingCorporate, { name: corporateFormEdit.name, contactPerson: corporateFormEdit.contactPerson, creditLimit: corporateFormEdit.creditLimit, statementCycle: corporateFormEdit.statementCycle })} style={{ flex: 1, height: 38 }}>{saving ? "Saving..." : "Save"}</button>
+                      <button type="button" className="btn-lims-primary" disabled={saving} onClick={() => { const errs = {}; if (!corporateFormEdit.name) errs.name = "Name is required"; else if (hasUrl(corporateFormEdit.name)) errs.name = "URLs are not allowed"; else if (!isValidName(corporateFormEdit.name)) errs.name = "Name contains invalid characters"; if (!corporateFormEdit.contactPerson) errs.contactPerson = "Contact person is required"; else if (hasUrl(corporateFormEdit.contactPerson)) errs.contactPerson = "URLs are not allowed"; else if (!isValidName(corporateFormEdit.contactPerson)) errs.contactPerson = "Contact person contains invalid characters"; if (corporateFormEdit.creditLimit === "" || corporateFormEdit.creditLimit === undefined || corporateFormEdit.creditLimit === null) errs.creditLimit = "Credit limit is required"; else if (isExponential(corporateFormEdit.creditLimit)) errs.creditLimit = "Exponential notation is not allowed"; setCorporateFormErrors((p) => ({ ...p, ...errs })); if (Object.keys(errs).length) return; updateCorporate(editingCorporate, { name: corporateFormEdit.name, contactPerson: corporateFormEdit.contactPerson, creditLimit: corporateFormEdit.creditLimit, statementCycle: corporateFormEdit.statementCycle }); }} style={{ flex: 1, height: 38 }}>{saving ? "Saving..." : "Save"}</button>
                     </div>
                   </div>
                 </div>

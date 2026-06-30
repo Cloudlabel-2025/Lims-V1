@@ -181,6 +181,7 @@ export default function DeveloperCreateLabPage() {
   const [createdLab, setCreatedLab] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
   const [customHighlight, setCustomHighlight] = useState("");
+  const [highlightError, setHighlightError] = useState("");
   const [copiedLoginUrl, setCopiedLoginUrl] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [logoInputTouched, setLogoInputTouched] = useState(false);
@@ -271,17 +272,36 @@ export default function DeveloperCreateLabPage() {
 
   function addCustomHighlight() {
     const highlight = customHighlight.trim();
-    if (!highlight) return;
+    if (!highlight) {
+      setHighlightError("Highlight text cannot be empty");
+      return;
+    }
+    if (highlight.length < 2) {
+      setHighlightError("Highlight must be at least 2 characters");
+      return;
+    }
+    if (!/^[A-Za-z0-9 .&'\/,()@_-]+$/.test(highlight)) {
+      setHighlightError("Highlight contains invalid characters");
+      return;
+    }
 
     setForm((current) => {
-      if (current.loginHighlights.includes(highlight)) return current;
+      if (current.loginHighlights.includes(highlight)) {
+        setHighlightError("Highlight already added");
+        return current;
+      }
+      if (current.loginHighlights.length >= 6) {
+        setHighlightError("Maximum 6 highlights allowed");
+        return current;
+      }
 
       return {
         ...current,
-        loginHighlights: [...current.loginHighlights, highlight].slice(0, 6),
+        loginHighlights: [...current.loginHighlights, highlight],
       };
     });
     setCustomHighlight("");
+    setHighlightError("");
   }
 
   function getStepErrors(index = activeStep) {
@@ -697,14 +717,16 @@ export default function DeveloperCreateLabPage() {
             <div className="developer-highlight-custom">
               <input
                 value={customHighlight}
-                onChange={(e) => setCustomHighlight(e.target.value)}
+                onChange={(e) => { setCustomHighlight(e.target.value); setHighlightError(""); }}
                 placeholder="Enter login highlight"
                 maxLength={80}
+                className={highlightError ? "invalid" : ""}
               />
               <button type="button" onClick={addCustomHighlight}>
                 Add
               </button>
             </div>
+            {highlightError && <small style={{ color: "var(--error)", fontSize: 11, display: "block", marginTop: 4 }}>{highlightError}</small>}
             {form.loginHighlights.length > 0 && (
               <div className="developer-highlight-selected">
                 {form.loginHighlights.map((highlight) => (

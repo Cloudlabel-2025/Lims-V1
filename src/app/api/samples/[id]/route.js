@@ -110,3 +110,29 @@ export async function PUT(req, { params }) {
     return jsonError("Unable to update sample", error, 500);
   }
 }
+
+export async function DELETE(req, { params }) {
+  try {
+    const auth = requireTenantSession(req, "samples.delete");
+    if (auth.error) return auth.error;
+
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "samples.view");
+    if (moduleAuth.error) return moduleAuth.error;
+
+    const { id } = await params;
+    const { Sample } = await getTenantModels(auth.tenantId);
+    const sample = await Sample.findByIdAndDelete(id);
+    if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
+
+    await writeAuditLog(req, auth, {
+      action: "samples.deleted",
+      resourceType: "Sample",
+      resourceId: id,
+      metadata: { sampleId: sample.sampleId },
+    });
+
+    return Response.json({ success: true });
+  } catch (error) {
+    return jsonError("Failed to delete sample", error, 500);
+  }
+}

@@ -26,6 +26,7 @@ export default function CreateBillTab({
   saving,
   createBill,
   billingRecords,
+  canDiscountBilling = true,
 }) {
   const netPayable = Math.max(0, selectedTotal - Number(discountAmount || 0) + Number(taxAmount || 0));
   return (
@@ -72,17 +73,19 @@ export default function CreateBillTab({
           </label>
 
           <div className="module-form-grid">
-            <label>
-              Discount (₹) <span className="required">*</span>
-              <input
-                type="number"
-                className="lims-input"
-                min="0"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                placeholder="0"
-              />
-            </label>
+            {canDiscountBilling && (
+              <label>
+                Discount (₹) <span className="required">*</span>
+                <input
+                  type="number"
+                  className="lims-input"
+                  min="0"
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(e.target.value)}
+                  placeholder="0"
+                />
+              </label>
+            )}
             <label>
               Tax (₹) <span className="required">*</span>
               <input

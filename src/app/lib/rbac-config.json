@@ -404,6 +404,23 @@
                             "sortOrder":  123
                         },
                         {
+                            "name":  "Delete Samples",
+                            "key":  "samples.delete",
+                            "module":  "samples",
+                            "action":  "delete",
+                            "category":  "samples",
+                            "dependencies":  [
+                                                 "samples.view"
+                                             ],
+                            "description":  "Delete sample records.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                       "professional",
+                                                       "enterprise"
+                                                   ],
+                            "sortOrder":  124
+                        },
+                        {
                             "name":  "View Reports",
                             "key":  "reports.view",
                             "module":  "reports",
@@ -463,6 +480,23 @@
                                              ],
                             "description":  "Print or download patient reports.",
                             "sortOrder":  133
+                        },
+                        {
+                            "name":  "Delete Reports",
+                            "key":  "reports.delete",
+                            "module":  "reports",
+                            "action":  "delete",
+                            "category":  "reporting",
+                            "dependencies":  [
+                                                 "reports.view"
+                                             ],
+                            "description":  "Delete report records.",
+                            "isDangerous":  true,
+                            "availableForPlans":  [
+                                                       "professional",
+                                                       "enterprise"
+                                                   ],
+                            "sortOrder":  134
                         },
                         {
                             "name":  "Collect Payments",

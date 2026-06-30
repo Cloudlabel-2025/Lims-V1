@@ -48,7 +48,7 @@ export default function EditPatient({ params }) {
 
     async function fetchDoctors() {
       try {
-        const { response: res, data } = await cachedJsonFetch("/api/doctor", { ttl: 15_000 });
+        const { response: res, data } = await cachedJsonFetch("/api/doctor?status=Active", { ttl: 15_000 });
         if (res.ok) setDoctors(Array.isArray(data) ? data : data.doctors || []);
       } catch (err) {
         console.error("Failed to fetch doctors:", err);
@@ -75,17 +75,41 @@ export default function EditPatient({ params }) {
     const newErrors = {};
     if (!form.name?.trim()) newErrors.name = "Patient name is required";
     else if (form.name.trim().length < 2) newErrors.name = "Name must be at least 2 characters";
+    else if (form.name.trim().length > 20) newErrors.name = "Name must be at most 20 characters";
+    else if (!/^[A-Za-z\s.]+$/.test(form.name.trim())) newErrors.name = "Name: only letters, spaces, and periods allowed";
     if (!form.gender) newErrors.gender = "Gender is required";
+    if (form.gender === "Other" && !form.genderIdentity) newErrors.genderIdentity = "Gender Identity is required when Gender is 'Other'";
     if (!form.dob) newErrors.dob = "Date of Birth is required";
+    else {
+      const dobDate = new Date(form.dob);
+      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1900) newErrors.dob = "Invalid date of birth";
+      else if (dobDate > new Date()) newErrors.dob = "Date of birth cannot be in the future";
+    }
+    if ((form.age === undefined || form.age === null || form.age === "") && form.dob) {
+      newErrors.age = "Age is required";
+    } else if (Number(form.age) < 0) newErrors.age = "Age cannot be negative";
     if (!form.phone?.trim()) newErrors.phone = "Mobile number is required";
     else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
     if (!form.address?.trim()) newErrors.address = "Address is required";
+    else if (/https?:\/\/|www\./i.test(form.address)) newErrors.address = "URLs not allowed in address";
+    if (form.barcode) {
+      if (!/^[A-Za-z0-9_-]+$/.test(form.barcode)) newErrors.barcode = "Barcode: only letters, numbers, hyphens, and underscores allowed";
+      else if (/https?:\/\/|www\./i.test(form.barcode)) newErrors.barcode = "URLs not allowed in barcode";
+    }
+    if (form.uhId && !/^[A-Za-z0-9]{14}$/.test(form.uhId)) newErrors.uhId = "UH ID must be exactly 14 alphanumeric characters";
     if (!form.receivedTime) newErrors.receivedTime = "Received time is required";
-    
-    // Cross-validation for Received vs Collection
+    else if (new Date(form.receivedTime) > new Date()) newErrors.receivedTime = "Received time cannot be in the future";
+    if (form.collectionTime && new Date(form.collectionTime) > new Date()) newErrors.collectionTime = "Collection time cannot be in the future";
     if (form.collectionTime && form.receivedTime && new Date(form.receivedTime) < new Date(form.collectionTime)) {
       newErrors.receivedTime = "Received time cannot be earlier than collection time";
     }
+    if (form.dob && form.collectionTime && new Date(form.collectionTime) < new Date(form.dob)) {
+      newErrors.collectionTime = "Collection time cannot be before date of birth";
+    }
+    if (form.dob && form.receivedTime && new Date(form.receivedTime) < new Date(form.dob)) {
+      newErrors.receivedTime = "Received time cannot be before date of birth";
+    }
+    if (hasRefDoctor && !form.refDoctorName?.trim()) newErrors.refDoctorName = "Referring doctor is required";
 
     return newErrors;
   };
@@ -177,7 +201,8 @@ export default function EditPatient({ params }) {
               </div>
               <div className="col-md-1">
                 <label className="lims-label">Age</label>
-                <input className="lims-input" value={`${form.age} Yrs`} disabled />
+                <input className={`lims-input ${errors.age ? 'invalid' : ''}`} value={`${form.age || ''} Yrs`} disabled />
+                {errors.age && <div className="lims-error-text">{errors.age}</div>}
               </div>
 
               <div className="col-md-4">
@@ -189,9 +214,10 @@ export default function EditPatient({ params }) {
               {form.gender === "Other" && (
                 <div className="col-md-4">
                   <label className="lims-label">Gender Identity <span className="required">*</span></label>
-                  <select name="genderIdentity" className="lims-select" value={form.genderIdentity} onChange={handleChange}>
-                    <option value="Transwomen">Transwomen</option><option value="Transman">Transman</option>
+                  <select name="genderIdentity" className={`lims-select ${errors.genderIdentity ? 'invalid' : ''}`} value={form.genderIdentity} onChange={handleChange}>
+                    <option value="">Select...</option><option value="Transwomen">Transwomen</option><option value="Transman">Transman</option>
                   </select>
+                  {errors.genderIdentity && <div className="lims-error-text">{errors.genderIdentity}</div>}
                 </div>
               )}
 
@@ -204,12 +230,14 @@ export default function EditPatient({ params }) {
 
               <div className="col-md-4">
                 <label className="lims-label">Barcode</label>
-                <input name="barcode" className="lims-input" placeholder="Enter barcode" value={form.barcode || ""} onChange={handleChange} />
+                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="Enter barcode" value={form.barcode || ""} onChange={handleChange} />
+                {errors.barcode && <div className="lims-error-text">{errors.barcode}</div>}
               </div>
 
               <div className="col-md-4">
                 <label className="lims-label">UH ID</label>
-                <input type="number" name="uhId" className="lims-input" placeholder="Enter UH ID" value={form.uhId || ""} onChange={(e) => e.target.value.length <= 14 && handleChange(e)} />
+                <input type="text" inputMode="numeric" name="uhId" className={`lims-input ${errors.uhId ? 'invalid' : ''}`} placeholder="Enter UH ID (14 characters)" value={form.uhId || ""} onChange={(e) => e.target.value.length <= 14 && handleChange(e)} />
+                {errors.uhId && <div className="lims-error-text">{errors.uhId}</div>}
               </div>
             </div>
           </div>
@@ -227,7 +255,7 @@ export default function EditPatient({ params }) {
               </div>
               <div className="col-md-8">
                 <label className="lims-label">Address <span className="required">*</span></label>
-                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" value={form.address} onChange={handleChange} />
+                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" maxLength={200} value={form.address} onChange={handleChange} />
                 {errors.address && <div className="lims-error-text">{errors.address}</div>}
               </div>
             </div>
@@ -241,7 +269,8 @@ export default function EditPatient({ params }) {
             <div className="row g-3">
               <div className="col-md-6">
                 <label className="lims-label">Collection Time</label>
-                <input type="datetime-local" name="collectionTime" className="lims-input" value={form.collectionTime} onChange={handleChange} />
+                <input type="datetime-local" name="collectionTime" className={`lims-input ${errors.collectionTime ? 'invalid' : ''}`} value={form.collectionTime} onChange={handleChange} />
+                {errors.collectionTime && <div className="lims-error-text">{errors.collectionTime}</div>}
               </div>
               <div className="col-md-6">
                 <label className="lims-label">Received Time <span className="required">*</span></label>

@@ -20,6 +20,8 @@ export default function PackagesTab({
   packages,
   editPackage,
   showList = true,
+  canDeleteTests = false,
+  onDeletePackage = null,
 }) {
   return (
     <div className="module-grid">
@@ -138,7 +140,19 @@ export default function PackagesTab({
                   <h3>{pkg.name}</h3>
                   <span>{pkg.tests?.length || 0} tests included · ₹{pkg.price}</span>
                 </div>
-                <strong>{pkg.status}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong>{pkg.status}</strong>
+                  {onDeletePackage && (
+                    <button
+                      type="button"
+                      className="test-card-delete"
+                      onClick={(e) => { e.stopPropagation(); onDeletePackage(pkg._id); }}
+                      title="Delete package"
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
               </article>
             ))}
           </div>

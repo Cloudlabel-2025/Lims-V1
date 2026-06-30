@@ -28,6 +28,12 @@ const sections = [
       { label: "Deleted Labs", href: "/developer/labs/deleted", icon: Icons.trash },
     ],
   },
+  {
+    label: "Account",
+    items: [
+      { label: "Profile", href: "/developer/profile", icon: Icons.user },
+    ],
+  },
 ];
 
 function getPageTitle(pathname) {
@@ -140,10 +146,10 @@ export default function DeveloperLayout({ children }) {
             <p className="developer-kicker">Developer Access</p>
             <h1>{pageTitle}</h1>
           </div>
-          <div className="developer-user-pill">
+          <Link href="/developer/profile" className="developer-user-pill">
             {Icons.shield}
             <span>{user?.email}</span>
-          </div>
+          </Link>
         </header>
 
         <main className="developer-content">{children}</main>

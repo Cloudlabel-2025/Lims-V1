@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import { useTenantShell } from "@/app/lib/use-current-user";
+import { cachedJsonFetch, useTenantShell } from "@/app/lib/use-current-user";
 import { hasPermission } from "@/app/lib/client-rbac";
 
 const getInitials = (name) => {
@@ -37,47 +37,10 @@ const getTimeAgo = (date) => {
   return new Date(date).toLocaleDateString();
 };
 
-const statsCache = {
-  key: "",
-  value: null,
-  expiresAt: 0,
-  promise: null,
-};
-
-function getStatsCacheKey() {
-  if (typeof window === "undefined") return "";
-  return window.location.origin;
-}
-
 async function loadDashboardStats() {
-  const cacheKey = getStatsCacheKey();
-  const now = Date.now();
-
-  if (statsCache.key === cacheKey && statsCache.value && statsCache.expiresAt > now) {
-    return statsCache.value;
-  }
-
-  if (statsCache.key === cacheKey && statsCache.promise) {
-    return statsCache.promise;
-  }
-
-  statsCache.key = cacheKey;
-  statsCache.promise = (async () => {
-    const statsResponse = await fetch("/api/dashboard/stats", { credentials: "include" });
-    const statsData = await statsResponse.json();
-
-    if (!statsResponse.ok) {
-      throw new Error(statsData.error || "Unable to load dashboard stats");
-    }
-
-    statsCache.value = statsData;
-    statsCache.expiresAt = Date.now() + 15_000;
-    return statsData;
-  })().finally(() => {
-    statsCache.promise = null;
-  });
-
-  return statsCache.promise;
+  const { response, data } = await cachedJsonFetch("/api/dashboard/stats", { ttl: 15_000 });
+  if (!response.ok) throw new Error(data.error || "Unable to load dashboard stats");
+  return data;
 }
 
 export default function DashboardPage() {

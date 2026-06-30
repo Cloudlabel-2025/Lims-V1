@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { formatDate, getInitials } from "@/app/utils/patient-helpers";
 
@@ -14,6 +15,7 @@ const DetailRow = memo(function DetailRow({ icon, value, truncate = false }) {
 });
 
 function PatientSidebar({ patient, onClose }) {
+  const router = useRouter();
   if (!patient) return null;
 
   const lastUpdated = patient.updatedAt || patient.createdAt;
@@ -23,9 +25,19 @@ function PatientSidebar({ patient, onClose }) {
       <div className="sidebar-header">
         <div className="sidebar-logo-flower">{Icons.logo}</div>
         <span className="sidebar-header-title">Patient Details</span>
-        <button className="sidebar-close-menu" onClick={onClose}>
-          {Icons.close}
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            className="sidebar-close-menu"
+            onClick={() => router.push(`/billing?patientId=${patient._id}`)}
+            title="New Visit"
+            style={{ fontSize: 13, fontWeight: 600, padding: "0 10px" }}
+          >
+            + New Visit
+          </button>
+          <button className="sidebar-close-menu" onClick={onClose}>
+            {Icons.close}
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-photo-section">

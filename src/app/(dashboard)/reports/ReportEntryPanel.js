@@ -36,12 +36,14 @@ export default function ReportEntryPanel({
   test,
   sortedParameters,
   saving,
+  editing,
   updateSample,
   updateTest,
   setSelectedPatient,
   setResults,
   setRemarks,
   saveReport,
+  onCancelEdit,
 }) {
   const [resultsErrors, setResultsErrors] = useState({});
 
@@ -61,8 +63,13 @@ export default function ReportEntryPanel({
   return (
     <section className="module-panel">
       <div className="module-panel-header">
-        <h2>Result Entry</h2>
+        <h2>{editing ? "Edit Report" : "Result Entry"}</h2>
         <p>Fields below change automatically based on selected test.</p>
+        {editing && (
+          <button type="button" className="dash-btn-secondary" onClick={onCancelEdit} style={{ marginTop: 8 }}>
+            Cancel Editing
+          </button>
+        )}
       </div>
 
       <form className="module-form" onSubmit={saveReport}>
@@ -73,7 +80,7 @@ export default function ReportEntryPanel({
               <option value="">Manual entry without sample</option>
               {samples.map((sample) => (
                 <option key={sample._id} value={sample._id}>
-                  {sample.sampleId} Â· {sample.patient?.name} Â· {sample.testSnapshot?.name}
+                  {sample.sampleId} · {sample.patient?.name} · {sample.testSnapshot?.name}
                 </option>
               ))}
             </select>
@@ -89,7 +96,7 @@ export default function ReportEntryPanel({
               <option value="">Select patient</option>
               {patients.map((patient) => (
                 <option key={patient._id} value={patient._id}>
-                  {patient.name} Â· {patient.patientId}
+                  {patient.name} · {patient.patientId}
                 </option>
               ))}
             </select>
@@ -100,7 +107,7 @@ export default function ReportEntryPanel({
               <option value="">Select test</option>
               {tests.map((item) => (
                 <option key={item._id} value={item._id}>
-                  {item.name} Â· {item.category?.name || "General"}
+                  {item.name} · {item.category?.name || "General"}
                 </option>
               ))}
             </select>
@@ -111,7 +118,7 @@ export default function ReportEntryPanel({
           <>
             <div className="result-test-summary">
               <strong>{test.name}</strong>
-              <span>{test.category?.name} Â· {test.sampleType || "Sample not specified"}</span>
+              <span>{test.category?.name} · {test.sampleType || "Sample not specified"}</span>
             </div>
 
             <div className="result-entry-table">
@@ -159,8 +166,10 @@ export default function ReportEntryPanel({
           </>
         )}
 
+        {!selectedPatient && <small style={{ color: "var(--error)", display: "block", marginTop: 8 }}>Please select a patient before saving.</small>}
+        {!selectedTest && <small style={{ color: "var(--error)", display: "block", marginTop: 8 }}>Please select a test before saving.</small>}
         <button className="dash-btn-primary module-save" type="submit" disabled={!selectedPatient || !selectedTest || saving}>
-          {saving ? "Saving..." : "Save Report"}
+          {saving ? "Saving..." : editing ? "Update Report" : "Save Report"}
         </button>
       </form>
     </section>

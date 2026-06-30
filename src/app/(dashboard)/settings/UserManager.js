@@ -17,7 +17,7 @@ function validateUserEmail(v) {
   const trimmed = (v || "").trim();
   if (URL_RE.test(trimmed)) return "URLs are not allowed in email";
   if (!trimmed) return "Login email is required";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "Valid login email is required";
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(trimmed)) return "Valid login email is required";
   return "";
 }
 
@@ -67,8 +67,10 @@ export default function UserManager({
   function handleCreateUser() {
     const nameErr = validateUserName(newUser.name);
     const emailErr = validateUserEmail(newUser.email);
-    setLocalErrors({ newName: nameErr, newEmail: emailErr });
-    if (nameErr || emailErr) return;
+    const passwordErr = !newUser.password ? "Password is required" : "";
+    const confirmErr = !newUser.password ? "" : (newUser.password !== newUser.confirmPassword ? "Passwords do not match" : "");
+    setLocalErrors({ newName: nameErr, newEmail: emailErr, newPassword: passwordErr, newConfirm: confirmErr });
+    if (nameErr || emailErr || passwordErr || confirmErr) return;
     createUser();
   }
 
@@ -117,31 +119,31 @@ export default function UserManager({
             />
             {localErrors.newEmail && <em style={{ color: "#b91c1c", fontSize: 11 }}>{localErrors.newEmail}</em>}
           </label>
-          <label>
+            <label>
             Password
             <PasswordField
               name="lab-settings-new-user-password"
               value={newUser.password}
-              onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
+              onChange={(event) => { setNewUser((current) => ({ ...current, password: event.target.value })); setLocalErrors((p) => ({ ...p, newPassword: "" })); }}
               placeholder="Enter password"
               autoComplete="section-lab-settings-new-user new-password"
-              invalid={Boolean(newUserErrors.password)}
+              invalid={Boolean(newUserErrors.password || localErrors.newPassword)}
               toggleLabel="user password"
             />
-            {newUserErrors.password && <em>{newUserErrors.password}</em>}
+            {(localErrors.newPassword || newUserErrors.password) && <em style={{ color: "#b91c1c", fontSize: 11 }}>{localErrors.newPassword || newUserErrors.password}</em>}
           </label>
           <label>
             Confirm Password
             <PasswordField
               name="lab-settings-new-user-confirm-password"
               value={newUser.confirmPassword}
-              onChange={(event) => setNewUser((current) => ({ ...current, confirmPassword: event.target.value }))}
+              onChange={(event) => { setNewUser((current) => ({ ...current, confirmPassword: event.target.value })); setLocalErrors((p) => ({ ...p, newConfirm: "" })); }}
               placeholder="Enter confirm password"
               autoComplete="section-lab-settings-new-user new-password"
-              invalid={Boolean(newUserErrors.confirmPassword)}
+              invalid={Boolean(newUserErrors.confirmPassword || localErrors.newConfirm)}
               toggleLabel="confirm user password"
             />
-            {newUserErrors.confirmPassword && <em>{newUserErrors.confirmPassword}</em>}
+            {(localErrors.newConfirm || newUserErrors.confirmPassword) && <em style={{ color: "#b91c1c", fontSize: 11 }}>{localErrors.newConfirm || newUserErrors.confirmPassword}</em>}
           </label>
           <label>
             Role

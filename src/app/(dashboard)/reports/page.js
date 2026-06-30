@@ -34,6 +34,7 @@ export default function ReportsPage() {
   const [results, setResults] = useState({});
   const [remarks, setRemarks] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
+  const [editingReport, setEditingReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -48,6 +49,7 @@ export default function ReportsPage() {
   const canPrintReports = hasPermission(user, "reports.print");
   const canVerifyReports = hasPermission(user, "reports.verify");
   const canReleaseReports = hasPermission(user, "reports.release");
+  const canDeleteReports = hasPermission(user, "reports.delete");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -108,6 +110,46 @@ export default function ReportsPage() {
     setSelectedReport(updatedReport);
   }
 
+  function handleEditReport(report) {
+    setSelectedReport(null);
+    setEditingReport(report);
+    setSelectedPatient(report.patient?._id || "");
+    setSelectedTest(report.testDefinition || "");
+    setResults(report.results || {});
+    setRemarks(report.remarks || "");
+    setSelectedSample(report.sample || "");
+  }
+
+  function cancelEdit() {
+    setEditingReport(null);
+    setSelectedPatient("");
+    setSelectedTest("");
+    setResults({});
+    setRemarks("");
+    setSelectedSample("");
+  }
+
+  async function handleDeleteReport(reportId) {
+    if (!confirm("Delete this report? This action cannot be undone.")) return;
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/reports/${reportId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to delete report");
+      clearCachedApi("/api/reports");
+      clearCachedApi("/api/dashboard/stats");
+      setReports((current) => current.filter((r) => r._id !== reportId));
+      if (selectedReport?._id === reportId) setSelectedReport(null);
+      setSuccess("Report deleted successfully.");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function saveReport(event) {
     event.preventDefault();
     setSaving(true);
@@ -115,31 +157,48 @@ export default function ReportsPage() {
     setSuccess("");
 
     try {
-      const response = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          patient: selectedPatient,
-          testDefinition: selectedTest,
-          sample: selectedSample || undefined,
-          results,
-          remarks,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.details || "Unable to save report");
+      let response, data;
+      if (editingReport) {
+        response = await fetch(`/api/reports/${editingReport._id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action: "save", results, remarks }),
+        });
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || data.details || "Unable to update report");
+        clearCachedApi("/api/reports");
+        clearCachedApi("/api/dashboard/stats");
+        setReports((current) => current.map((r) => (r._id === editingReport._id ? data.report : r)));
+        setSelectedReport(data.report);
+        setEditingReport(null);
+        setSuccess(`Report ${data.report?.reportId || ""} updated successfully.`);
+      } else {
+        response = await fetch("/api/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            patient: selectedPatient,
+            testDefinition: selectedTest,
+            sample: selectedSample || undefined,
+            results,
+            remarks,
+          }),
+        });
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || data.details || "Unable to save report");
 
-      clearCachedApi("/api/reports");
-      clearCachedApi("/api/samples?status=all");
-      clearCachedApi("/api/dashboard/stats");
-      setReports((current) => [data.report, ...current]);
-      setSelectedReport(data.report);
-      setSamples((current) => current.filter((sample) => sample._id !== selectedSample));
+        clearCachedApi("/api/reports");
+        clearCachedApi("/api/samples?status=all");
+        clearCachedApi("/api/dashboard/stats");
+        setReports((current) => [data.report, ...current]);
+        setSelectedReport(data.report);
+        setSamples((current) => current.filter((sample) => sample._id !== selectedSample));
+      }
       setSelectedSample("");
       setResults({});
       setRemarks("");
-      setSuccess(`Report ${data.report?.reportId || ""} saved successfully.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -166,7 +225,7 @@ export default function ReportsPage() {
       <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
       <div className="module-grid">
-        {canEditReports && (
+        {(canEditReports || editingReport) && (
           <ReportEntryPanel
             patients={patients}
             tests={tests}
@@ -179,12 +238,14 @@ export default function ReportsPage() {
             test={test}
             sortedParameters={sortedParameters}
             saving={saving}
+            editing={!!editingReport}
             updateSample={updateSample}
             updateTest={updateTest}
             setSelectedPatient={setSelectedPatient}
             setResults={setResults}
             setRemarks={setRemarks}
             saveReport={saveReport}
+            onCancelEdit={cancelEdit}
           />
         )}
 
@@ -194,11 +255,15 @@ export default function ReportsPage() {
       {selectedReport && (
         <ReportPreview
           selectedReport={selectedReport}
+          canEditReports={canEditReports}
           canPrintReports={canPrintReports}
           canVerifyReports={canVerifyReports}
           canReleaseReports={canReleaseReports}
+          canDeleteReports={canDeleteReports}
           onReportUpdated={handleReportUpdated}
           onSuccess={setSuccess}
+          onEdit={handleEditReport}
+          onDelete={handleDeleteReport}
         />
       )}
     </div>

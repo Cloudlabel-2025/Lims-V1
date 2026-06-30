@@ -100,6 +100,8 @@ export default function QualityPage() {
     if (["testName", "instrument", "lotNumber"].includes(name) && !isValidName(trimmed)) return "Invalid characters";
     if (["testName", "instrument", "lotNumber", "remarks"].includes(name) && hasUrl(trimmed)) return "URLs are not allowed";
     if (["value", "expectedRange"].includes(name) && isExponential(trimmed)) return "Exponential notation is not allowed";
+    if (name === "value" && trimmed && !/^-?\d*\.?\d*$/.test(trimmed)) return "Only numeric values are allowed";
+    if (name === "expectedRange" && trimmed && !/^[\d.\-\s\u2013]*$/.test(trimmed)) return "Only numeric values and ranges are allowed";
     return "";
   }
 
