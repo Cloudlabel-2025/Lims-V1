@@ -39,6 +39,12 @@ function SettlementModal({
     onResultChange(itemId, paramKey, value);
   }
 
+  function stepResult(itemId, paramKey, currentValue, delta) {
+    const num = currentValue === "" || currentValue === "-" || currentValue === "." ? 0 : Number(currentValue);
+    const newVal = Number.isFinite(num) ? num + delta : delta;
+    onResultChange(itemId, paramKey, String(newVal));
+  }
+
   if (!billingRecord) return null;
 
   const netPayable = billingRecord.totalAmount || 0;
@@ -77,11 +83,11 @@ function SettlementModal({
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", color: "var(--text-secondary)" }}>
                       <span>Already Paid</span>
-                      <strong>Rs {alreadyPaid}</strong>
+                      <strong>₹{alreadyPaid}</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", color: "var(--text-primary)" }}>
                       <span>Remaining Due</span>
-                      <strong>Rs {remainingDue}</strong>
+                      <strong>₹{remainingDue}</strong>
                     </div>
                   </>
                 )}
@@ -104,7 +110,11 @@ function SettlementModal({
                       min="0"
                       max={remainingDue}
                       step="0.01"
-                      onChange={(event) => onPaymentChange(method.key, Number(event.target.value))}
+                      onChange={(event) => {
+                        const val = Number(event.target.value);
+                        if (val < 0) return;
+                        onPaymentChange(method.key, val);
+                      }}
                     />
                   </label>
                 ))}
@@ -171,21 +181,31 @@ function SettlementModal({
                               <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{param.normalMin ?? "—"} – {param.normalMax ?? "—"}</div>
                             )}
                           </div>
-                          <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                            <button
+                              type="button"
+                              onClick={() => stepResult(item._id, param.key, results[item._id]?.[param.key] || "", -1)}
+                              style={{ width: "24px", height: "30px", border: "1px solid var(--border)", borderRadius: "4px 0 0 4px", background: "var(--surface)", cursor: "pointer", fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)", padding: 0, lineHeight: 1 }}
+                            >−</button>
                             <input
                               type="text"
                               className="lims-input"
-                              style={Object.assign({ height: "30px", fontSize: "12px", fontWeight: "600", textAlign: "center", padding: "0 8px" }, resultsErrors[`${item._id}-${param.key}`] ? { borderColor: "var(--error)" } : {})}
+                              style={Object.assign({ height: "30px", fontSize: "12px", fontWeight: "600", textAlign: "center", padding: "0 4px", borderRadius: "0", width: "64px" }, resultsErrors[`${item._id}-${param.key}`] ? { borderColor: "var(--error)" } : {})}
                               placeholder="—"
                               value={results[item._id]?.[param.key] || ""}
                               onChange={(event) => handleResultChange(item._id, param.key, event.target.value)}
                             />
-                            {resultsErrors[`${item._id}-${param.key}`] && (
-                              <small style={{ color: "var(--error)", fontSize: "9px", display: "block", marginTop: "1px", lineHeight: 1.2 }}>
-                                {resultsErrors[`${item._id}-${param.key}`]}
-                              </small>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => stepResult(item._id, param.key, results[item._id]?.[param.key] || "", 1)}
+                              style={{ width: "24px", height: "30px", border: "1px solid var(--border)", borderRadius: "0 4px 4px 0", background: "var(--surface)", cursor: "pointer", fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)", padding: 0, lineHeight: 1 }}
+                            >+</button>
                           </div>
+                          {resultsErrors[`${item._id}-${param.key}`] && (
+                            <small style={{ color: "var(--error)", fontSize: "9px", display: "block", marginTop: "1px", lineHeight: 1.2 }}>
+                              {resultsErrors[`${item._id}-${param.key}`]}
+                            </small>
+                          )}
                         </div>
                       ))}
                     </div>

@@ -73,6 +73,7 @@ const patientSchema = new mongoose.Schema({
     uhId: {
         type: String,
         required: true,
+        unique: true,
         validate: {
             validator: (v) => /^[A-Za-z0-9]{14}$/.test(v),
             message: "UH ID must be exactly 14 alphanumeric characters"

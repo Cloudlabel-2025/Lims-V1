@@ -1,6 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+
+const PAGE_SIZE = 20;
+
+function PaginationControls({ page, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginTop: "18px", flexWrap: "wrap" }}>
+      <span style={{ color: "var(--text-muted)", fontSize: "13px", fontWeight: 600 }}>
+        Page {page} of {totalPages}
+      </span>
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button type="button" className="btn-lims-secondary"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}>
+          Previous
+        </button>
+        <button type="button" className="btn-lims-secondary"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}>
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ListsTab({
   categories,
@@ -18,6 +43,26 @@ export default function ListsTab({
   onDeletePackage = null,
 }) {
   const [activeListTab, setActiveListTab] = useState("categories");
+  const [page, setPage] = useState({ categories: 1, tests: 1, packages: 1 });
+
+  const paginatedCategories = useMemo(
+    () => categories.slice((page.categories - 1) * PAGE_SIZE, page.categories * PAGE_SIZE),
+    [categories, page.categories]
+  );
+  const paginatedTests = useMemo(
+    () => tests.slice((page.tests - 1) * PAGE_SIZE, page.tests * PAGE_SIZE),
+    [tests, page.tests]
+  );
+  const paginatedPackages = useMemo(
+    () => packages.slice((page.packages - 1) * PAGE_SIZE, page.packages * PAGE_SIZE),
+    [packages, page.packages]
+  );
+
+  const totalPages = {
+    categories: Math.max(1, Math.ceil(categories.length / PAGE_SIZE)),
+    tests: Math.max(1, Math.ceil(tests.length / PAGE_SIZE)),
+    packages: Math.max(1, Math.ceil(packages.length / PAGE_SIZE)),
+  };
 
   const tabStyle = (isActive) => ({
     padding: "12px 4px",
@@ -42,13 +87,13 @@ export default function ListsTab({
       </div>
 
       <div style={{ display: "flex", gap: "24px", marginBottom: "28px", borderBottom: "1px solid var(--border-light)", padding: "0 4px" }}>
-        <button onClick={() => setActiveListTab("categories")} style={tabStyle(activeListTab === "categories")}>
+        <button onClick={() => { setActiveListTab("categories"); setPage({ categories: 1, tests: 1, packages: 1 }); }} style={tabStyle(activeListTab === "categories")}>
           Categories List
         </button>
-        <button onClick={() => setActiveListTab("tests")} style={tabStyle(activeListTab === "tests")}>
+        <button onClick={() => { setActiveListTab("tests"); setPage({ categories: 1, tests: 1, packages: 1 }); }} style={tabStyle(activeListTab === "tests")}>
           Tests List
         </button>
-        <button onClick={() => setActiveListTab("packages")} style={tabStyle(activeListTab === "packages")}>
+        <button onClick={() => { setActiveListTab("packages"); setPage({ categories: 1, tests: 1, packages: 1 }); }} style={tabStyle(activeListTab === "packages")}>
           Packages List
         </button>
       </div>
@@ -60,7 +105,7 @@ export default function ListsTab({
             <p>{categories.length} categories available</p>
           </div>
           <div className="test-card-list">
-            {categories.map((cat) => (
+            {paginatedCategories.map((cat) => (
               <article key={cat._id} className="test-card">
                 <div>
                   <h3>{cat.name}</h3>
@@ -72,6 +117,7 @@ export default function ListsTab({
               </article>
             ))}
           </div>
+          <PaginationControls page={page.categories} totalPages={totalPages.categories} onPageChange={(p) => setPage((prev) => ({ ...prev, categories: p }))} />
         </aside>
       )}
 
@@ -82,7 +128,7 @@ export default function ListsTab({
             <p>{tests.length} tests configured</p>
           </div>
           <div className="test-card-list">
-            {tests.map((test) => (
+            {paginatedTests.map((test) => (
               <article
                 key={test._id}
                 className={`test-card ${editingId === test._id ? 'active' : ''}`}
@@ -101,6 +147,7 @@ export default function ListsTab({
               </article>
             ))}
           </div>
+          <PaginationControls page={page.tests} totalPages={totalPages.tests} onPageChange={(p) => setPage((prev) => ({ ...prev, tests: p }))} />
         </aside>
       )}
 
@@ -111,7 +158,7 @@ export default function ListsTab({
             <p>{packages.length} packages configured</p>
           </div>
           <div className="test-card-list">
-            {packages.map((pkg) => (
+            {paginatedPackages.map((pkg) => (
               <article
                 key={pkg._id}
                 className={`test-card ${editingPackageId === pkg._id ? 'active' : ''}`}
@@ -130,6 +177,7 @@ export default function ListsTab({
               </article>
             ))}
           </div>
+          <PaginationControls page={page.packages} totalPages={totalPages.packages} onPageChange={(p) => setPage((prev) => ({ ...prev, packages: p }))} />
         </aside>
       )}
     </div>

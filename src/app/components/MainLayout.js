@@ -47,12 +47,26 @@ function getShellCacheKey() {
   return window.location.origin;
 }
 
+export function clearShellCache() {
+  shellCache.value = null;
+  shellCache.expiresAt = 0;
+  shellCache.promise = null;
+}
+
+if (typeof window !== "undefined") {
+  window.__clearShellCache = clearShellCache;
+}
+
 async function loadTenantShellData() {
   const cacheKey = getShellCacheKey();
   const now = Date.now();
 
   if (shellCache.key === cacheKey && shellCache.value && shellCache.expiresAt > now) {
-    return shellCache.value;
+    if (typeof window !== "undefined" && window.__shellInvalidateAt && shellCache.value._loadedAt < window.__shellInvalidateAt) {
+      clearShellCache();
+    } else {
+      return shellCache.value;
+    }
   }
 
   if (shellCache.key === cacheKey && shellCache.promise) {
@@ -74,6 +88,7 @@ async function loadTenantShellData() {
     const value = {
       user: data.user,
       theme: themeResponse.ok ? themeData.theme : null,
+      _loadedAt: Date.now(),
     };
 
     shellCache.value = value;

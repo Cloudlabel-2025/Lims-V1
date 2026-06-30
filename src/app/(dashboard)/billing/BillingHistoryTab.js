@@ -26,6 +26,8 @@ export default function BillingHistoryTab({ billingRecords, pagination, loading,
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Date</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Investigation(s)</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill Amount</th>
+              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Paid Amount</th>
+              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Remaining</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Paid On</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Payment Mode</th>
               <th style={{ padding: "14px 20px", textAlign: "center", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Status</th>
@@ -53,6 +55,31 @@ export default function BillingHistoryTab({ billingRecords, pagination, loading,
                 </td>
                 <td style={{ padding: "14px 20px" }}>
                   <strong style={{ color: "var(--text-primary)", fontSize: "14px" }}>₹{billingRecord.totalAmount || 0}</strong>
+                </td>
+                <td style={{ padding: "14px 20px" }}>
+                  <span style={{ color: "var(--success)", fontSize: "14px", fontWeight: "600" }}>
+                    ₹
+                    {(() => {
+                      const pb = billingRecord.paymentBreakdown || {};
+                      const paid = Number(pb.cash || 0) + Number(pb.card || 0) + Number(pb.online || 0) + Number(pb.corporate || 0);
+                      return paid || 0;
+                    })()}
+                  </span>
+                </td>
+                <td style={{ padding: "14px 20px" }}>
+                  <span style={{
+                    color: billingRecord.billingStatus === "paid" ? "var(--success)" : "var(--warning-700)",
+                    fontSize: "14px",
+                    fontWeight: "600"
+                  }}>
+                    ₹
+                    {(() => {
+                      const pb = billingRecord.paymentBreakdown || {};
+                      const paid = Number(pb.cash || 0) + Number(pb.card || 0) + Number(pb.online || 0) + Number(pb.corporate || 0);
+                      const remaining = Math.max(0, Number(billingRecord.totalAmount || 0) - paid);
+                      return remaining;
+                    })()}
+                  </span>
                 </td>
                 <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
                   {billingRecord.billingStatus === "paid" || billingRecord.billingStatus === "partial"

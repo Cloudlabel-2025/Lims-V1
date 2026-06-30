@@ -299,6 +299,10 @@ export default function DeveloperEditLabPage({ params }) {
       clearCachedApi("/api/developer/labs");
       clearCachedApi(`/api/developer/labs/${encodeURIComponent(id)}`);
       clearCachedApi(`/api/developer/labs/${data.lab.tenantId}/access`);
+      if (typeof window !== "undefined") {
+        window.__shellInvalidateAt = Date.now();
+        window.__clearShellCache?.();
+      }
       setSuccess("Lab updated successfully.");
     } catch (err) {
       setError(err.message);

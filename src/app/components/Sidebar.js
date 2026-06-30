@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import { getAllowedNavItems, hasAnyPermission } from "@/app/lib/client-rbac";
+import { getAllowedNavItems, hasAnyPermission, hasPermission } from "@/app/lib/client-rbac";
 
 export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout, theme, user }) {
   const pathname = usePathname();
@@ -110,6 +110,17 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
 
       {/* Bottom */}
       <div className="dash-sidebar-bottom">
+        {user?.doctorId && hasPermission(user, "doctors.view") && (
+          <Link
+            href="/doctor/profile"
+            className={`dash-nav-item ${pathname === "/doctor/profile" ? "active" : ""}`}
+            onClick={() => setMobileOpen && setMobileOpen(false)}
+          >
+            <span className="dash-nav-icon">{Icons.stethoscope}</span>
+            {!collapsed && <span className="dash-nav-label">My Profile</span>}
+            {pathname === "/doctor/profile" && <div className="dash-nav-indicator" />}
+          </Link>
+        )}
         <button className="dash-nav-item logout" onClick={onLogout}>
           <span className="dash-nav-icon">{Icons.logout}</span>
           {!collapsed && <span className="dash-nav-label">Logout</span>}

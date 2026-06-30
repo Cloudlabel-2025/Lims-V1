@@ -49,6 +49,12 @@ export async function PUT(req, { params }) {
     if (body.uhId && !/^[A-Za-z0-9]{14}$/.test(String(body.uhId))) {
       return Response.json({ error: "UH ID must be exactly 14 alphanumeric characters" }, { status: 400 });
     }
+    if (body.uhId) {
+      const duplicateUhId = await Patient.findOne({ uhId: String(body.uhId), _id: { $ne: id } });
+      if (duplicateUhId) {
+        return Response.json({ error: "UH ID already exists" }, { status: 400 });
+      }
+    }
 
     if (body.name && !clean(body.name)) {
       return Response.json({ error: "Full Name is required" }, { status: 400 });
@@ -71,8 +77,14 @@ export async function PUT(req, { params }) {
     if (body.age !== undefined && body.age !== null && (Number(body.age) < 0 || isNaN(Number(body.age)))) {
       return Response.json({ error: "Age must be a valid number" }, { status: 400 });
     }
-    if (body.address && /https?:\/\/|www\./i.test(body.address)) {
-      return Response.json({ error: "URLs not allowed in address" }, { status: 400 });
+    if (body.address) {
+      const addr = clean(body.address);
+      if (!/^[A-Za-z0-9 .,/#-]+$/.test(addr)) {
+        return Response.json({ error: "Only letters, numbers, spaces, and . , / # - allowed in address" }, { status: 400 });
+      }
+      if (/https?:\/\/|www\./i.test(addr)) {
+        return Response.json({ error: "URLs not allowed in address" }, { status: 400 });
+      }
     }
     if (body.barcode) {
       if (!/^[A-Za-z0-9_-]+$/.test(body.barcode)) {

@@ -104,6 +104,7 @@ export async function GET(req) {
         roleId: session.roleId || null,
         roleName: session.roleName || (session.isSystemOwner ? "System Owner" : null),
         permissions: session.permissions || [],
+        doctorId: session.doctorId || null,
       },
     });
   } catch (error) {

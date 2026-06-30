@@ -50,8 +50,8 @@ export default function MultiSelect({
         className={`lims-input ${error ? 'invalid' : ''}`} 
         style={{ 
           height: "auto", 
-          minHeight: "42px", 
-          padding: "6px 12px", 
+          minHeight: "48px", 
+          padding: "9px 14px", 
           display: "flex", 
           flexWrap: "wrap", 
           gap: "6px", 

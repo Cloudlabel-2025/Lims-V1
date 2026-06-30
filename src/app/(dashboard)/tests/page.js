@@ -634,12 +634,6 @@ export default function TestsPage() {
           categoryName={categoryName}
           setCategoryName={setCategoryName}
           saving={saving}
-          categories={categories}
-          categoryUsageCounts={categoryUsageCounts}
-          showList={false}
-          canDeleteTests={canDeleteTests}
-          onDeleteCategory={canDeleteTests ? deleteCategory : null}
-          onEditCategory={(cat) => { setEditingCategoryId(cat._id); setCategoryName(cat.name); }}
           onCancelEdit={() => { setEditingCategoryId(""); setCategoryName(""); }}
         />
       )}

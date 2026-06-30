@@ -139,7 +139,7 @@ body {
   align-items: center;
   justify-content: center;
   color: var(--on-primary, #fff);
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .top-bar-title {
@@ -202,7 +202,7 @@ body {
 .search-input:focus {
   border-color: var(--brand-action, var(--primary));
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1), var(--shadow-sm);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent), var(--shadow-sm);
 }
 
 .search-input:focus ~ .search-icon {
@@ -586,13 +586,13 @@ body {
 }
 
 .teal-brand-card {
-  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  background: linear-gradient(135deg, var(--primary, #14b8a6) 0%, var(--primary-dark, #0d9488) 100%);
   border-radius: 20px;
   padding: 20px;
   color: #fff;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 10px 25px rgba(13, 148, 136, 0.2);
+  box-shadow: 0 10px 25px color-mix(in srgb, var(--primary, #14b8a6) 20%, transparent);
 }
 
 .teal-brand-card::before {
@@ -822,7 +822,7 @@ body {
   align-items: center;
   justify-content: center;
   color: var(--on-primary, #fff);
-  box-shadow: 0 3px 12px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .page-header-text h4 {
@@ -978,14 +978,14 @@ body {
 
 .patient-list-card:hover {
   border-color: var(--primary-light);
-  box-shadow: var(--shadow-md), 0 0 0 3px rgba(13, 148, 136, 0.06);
+  box-shadow: var(--shadow-md), 0 0 0 3px color-mix(in srgb, var(--primary) 6%, transparent);
   transform: translateY(-1px);
 }
 
 .patient-list-card.selected {
   border-color: var(--brand-action, var(--primary));
   background: var(--primary-50);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .patient-list-card-avatar {
@@ -1203,7 +1203,7 @@ body {
 .lims-input:focus,
 .lims-select:focus {
   border-color: var(--brand-action, var(--primary));
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.08);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .lims-input:disabled {
@@ -1300,12 +1300,12 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
   transition: all var(--duration-fast) var(--ease-out);
 }
 
 .btn-lims-primary:hover:not(:disabled) {
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 40%, transparent);
   transform: translateY(-1px);
 }
 
@@ -1527,7 +1527,7 @@ body {
 .page-switcher-btn.active {
   color: var(--on-primary, #fff);
   background: var(--brand-action, var(--primary));
-  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--primary) 40%, transparent);
 }
 
 /* ============================================
@@ -1919,7 +1919,7 @@ body {
 .login-access-option.active {
   color: var(--on-primary, #fff);
   background: var(--brand-action, var(--primary));
-  box-shadow: 0 8px 18px rgba(13, 148, 136, 0.22);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .login-input-wrapper {
@@ -1959,7 +1959,7 @@ body {
 .login-input:focus {
   border-color: var(--login-action, var(--primary));
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 .login-input:focus ~ .login-input-icon,
@@ -2070,13 +2070,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 30%, transparent);
   transition: all 0.3s ease;
   margin-top: 4px;
 }
 
 .login-submit:hover:not(:disabled) {
-  box-shadow: 0 6px 24px rgba(13, 148, 136, 0.45);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--primary) 45%, transparent);
   transform: translateY(-1px);
 }
 
@@ -2246,7 +2246,7 @@ body {
   justify-content: center;
   color: var(--on-primary, #fff);
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .dash-logo-text {
@@ -2437,7 +2437,7 @@ body {
 .dash-search-input:focus {
   border-color: var(--brand-action, var(--primary));
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .dash-search-input::placeholder {
@@ -2593,7 +2593,7 @@ body {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 .dash-menu-dropdown {
@@ -2693,12 +2693,12 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
   transition: all 0.2s;
 }
 
 .dash-btn-primary:hover {
-  box-shadow: 0 6px 20px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 40%, transparent);
   transform: translateY(-1px);
 }
 
@@ -3234,13 +3234,13 @@ body {
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent);
   transition: all 0.2s;
 }
 
 .btn-modal-confirm:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 40%, transparent);
 }
 
 @keyframes fadeIn {
@@ -3987,7 +3987,7 @@ body {
 .password-toggle-button:hover,
 .password-toggle-button:focus-visible {
   color: var(--brand-action, var(--primary));
-  background: rgba(13, 148, 136, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .developer-form-grid input.invalid,
@@ -4041,7 +4041,7 @@ body {
 .developer-form-grid input:focus,
 .developer-form-grid select:focus {
   border-color: var(--brand-action, var(--primary));
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .developer-colors {
@@ -5068,7 +5068,7 @@ body {
 
 .developer-highlight-custom input:focus {
   border-color: var(--brand-action, var(--primary));
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .developer-highlight-custom input.invalid {
@@ -5111,7 +5111,7 @@ body {
 
 .developer-inline-form input:focus {
   border-color: var(--brand-action, var(--primary));
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .developer-inline-form button {
@@ -5250,8 +5250,8 @@ body {
 
 .developer-domain-mode-grid button.active {
   border-color: var(--brand-action, var(--primary));
-  background: rgba(13, 148, 136, 0.08);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .developer-domain-mode-grid strong {
@@ -5381,7 +5381,7 @@ body {
 
 .tenant-onboarding-form input:focus {
   border-color: var(--brand-action, var(--primary));
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .tenant-onboarding-status {
@@ -5784,7 +5784,7 @@ body {
 .parameter-row input:focus,
 .result-entry-row input:focus {
   border-color: var(--brand-action, var(--primary));
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .module-subhead,

@@ -1,9 +1,10 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { formatDate, getInitials } from "@/app/utils/patient-helpers";
+import { cachedJsonFetch } from "@/app/lib/use-current-user";
 
 const DetailRow = memo(function DetailRow({ icon, value, truncate = false }) {
   return (
@@ -16,6 +17,23 @@ const DetailRow = memo(function DetailRow({ icon, value, truncate = false }) {
 
 function PatientSidebar({ patient, onClose }) {
   const router = useRouter();
+  const [visitCount, setVisitCount] = useState(null);
+
+  useEffect(() => {
+    if (!patient) return;
+    let cancelled = false;
+    async function loadVisitCount() {
+      try {
+        const { response, data } = await cachedJsonFetch(`/api/patient/${patient._id}/billing`, { ttl: 10_000 });
+        if (!cancelled && response.ok) {
+          setVisitCount((data.billingRecords || []).length);
+        }
+      } catch {}
+    }
+    loadVisitCount();
+    return () => { cancelled = true; };
+  }, [patient?._id]);
+
   if (!patient) return null;
 
   const lastUpdated = patient.updatedAt || patient.createdAt;
@@ -28,7 +46,7 @@ function PatientSidebar({ patient, onClose }) {
         <div style={{ display: "flex", gap: 6 }}>
           <button
             className="sidebar-close-menu"
-            onClick={() => router.push(`/billing?patientId=${patient._id}`)}
+            onClick={() => router.push(`/patients/${patient._id}/new-visit`)}
             title="New Visit"
             style={{ fontSize: 13, fontWeight: 600, padding: "0 10px" }}
           >
@@ -179,6 +197,23 @@ function PatientSidebar({ patient, onClose }) {
           <div className="detail-value">{patient.refDoctorName || "Not assigned"}</div>
           <div className="detail-label">Referral Doctor</div>
         </div>
+      </div>
+
+      <div style={{ padding: "16px", borderTop: "1px solid var(--border-light)", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <button
+          className="dash-btn-primary"
+          onClick={() => router.push(`/patients/${patient._id}/new-visit`)}
+          style={{ height: "42px", fontSize: "13px", fontWeight: 700, borderRadius: "8px", border: "none", cursor: "pointer", background: "var(--brand-action, var(--primary))", color: "#fff", width: "100%" }}
+        >
+          + New Visit
+        </button>
+        <button
+          className="btn-lims-secondary"
+          onClick={() => router.push(`/patients/${patient._id}/visits`)}
+          style={{ height: "42px", fontSize: "13px", fontWeight: 600, borderRadius: "8px", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+        >
+          {Icons.list} Visit History{visitCount !== null ? ` (${visitCount})` : ""}
+        </button>
       </div>
     </div>
   );

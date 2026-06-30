@@ -11,21 +11,30 @@ const statusColors = {
 
 const STATUS_OPTIONS = ["all", "draft", "verified", "released", "delivered"];
 
-export default function ReportList({ reports, setSelectedReport, selectedReport }) {
+export default function ReportList({ reports, setSelectedReport, selectedReport, dateFrom, dateTo, onDateFromChange, onDateToChange }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? new Date(dateTo) : null;
+    if (to) to.setHours(23, 59, 59, 999);
     return reports.filter((r) => {
       const matchStatus = statusFilter === "all" || r.status === statusFilter;
       const matchSearch = !q ||
         r.patient?.name?.toLowerCase().includes(q) ||
         r.testSnapshot?.name?.toLowerCase().includes(q) ||
         r.reportId?.toLowerCase().includes(q);
-      return matchStatus && matchSearch;
+      let matchDate = true;
+      if (from || to) {
+        const rDate = new Date(r.createdAt);
+        if (from && rDate < from) matchDate = false;
+        if (to && rDate > to) matchDate = false;
+      }
+      return matchStatus && matchSearch && matchDate;
     });
-  }, [reports, search, statusFilter]);
+  }, [reports, search, statusFilter, dateFrom, dateTo]);
 
   return (
     <aside className="module-panel">
@@ -34,13 +43,29 @@ export default function ReportList({ reports, setSelectedReport, selectedReport 
         <p>{filtered.length} of {reports.length} reports</p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input
           className="lims-input"
-          style={{ flex: 1, height: 34, fontSize: 12 }}
+          style={{ flex: 1, minWidth: 120, height: 34, fontSize: 12 }}
           placeholder="Search patient, test, ID..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+        />
+        <input
+          type="date"
+          className="lims-input"
+          style={{ height: 34, fontSize: 12, width: 130 }}
+          value={dateFrom || ""}
+          onChange={(e) => onDateFromChange?.(e.target.value)}
+          title="From date"
+        />
+        <input
+          type="date"
+          className="lims-input"
+          style={{ height: 34, fontSize: 12, width: 130 }}
+          value={dateTo || ""}
+          onChange={(e) => onDateToChange?.(e.target.value)}
+          title="To date"
         />
         <select
           className="lims-input"

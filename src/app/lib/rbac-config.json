@@ -855,20 +855,26 @@
                           {
                               "name":  "Front Desk Receptionist",
                               "description":  "Handles registration, patient lookup, and billing lookup.",
-                              "permissions":  [
-                                                  "dashboard.view",
-                                                  "patients.view",
-                                                  "patients.register",
-                                                  "patients.edit",
-                                                  "doctors.view",
-                                                  "tests.view",
-                                                  "billing.view",
-                                                  "billing.create",
-                                                  "billing.collect",
-                                                  "reports.view",
-                                                  "reports.print"
-                                              ],
-                              "category":  "front-desk",
+                    "permissions": [
+                        "dashboard.view",
+                        "patients.view",
+                        "patients.register",
+                        "patients.edit",
+                        "doctors.view",
+                        "tests.view",
+                        "tests.create",
+                        "tests.delete",
+                        "billing.view",
+                        "billing.create",
+                        "billing.collect",
+                        "samples.view",
+                        "samples.collect",
+                        "samples.update",
+                        "reports.view",
+                        "reports.edit",
+                        "reports.print"
+                    ],
+                    "category": "front-desk",
                               "sortOrder":  30
                           },
                           {
@@ -920,7 +926,9 @@
                               "permissions":  [
                                                   "dashboard.view",
                                                   "analytics.view",
-                                                  "doctors.view"
+                                                  "accounts.view",
+                                                  "doctors.view",
+                                                  "doctors.edit"
                                               ],
                               "category":  "doctor",
                               "availableForPlans":  [
@@ -935,7 +943,9 @@
                               "permissions":  [
                                                   "dashboard.view",
                                                   "patients.view",
-                                                  "reports.view"
+                                                  "samples.view",
+                                                  "reports.view",
+                                                  "doctors.edit"
                                               ],
                               "category":  "doctor",
                               "sortOrder":  50

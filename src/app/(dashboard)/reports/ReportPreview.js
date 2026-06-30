@@ -24,6 +24,71 @@ const statusBadge = {
   released: ["#ecfdf5", "#047857"],
 };
 
+function downloadAsPdf(report) {
+  const rows = report.results?.map((r) => {
+    const flag = r.flag === "normal" ? "Normal" : r.flag;
+    const range = Number.isFinite(r.normalMin) && Number.isFinite(r.normalMax)
+      ? `${r.normalMin} - ${r.normalMax}`
+      : Number.isFinite(r.normalMin) ? `>= ${r.normalMin}`
+      : Number.isFinite(r.normalMax) ? `<= ${r.normalMax}`
+      : "-";
+    return `<tr${flag !== "Normal" ? ` style="background:#fff3f3"` : ""}>
+      <td style="padding:6px 10px;border:1px solid #ddd">${r.name}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd;font-weight:700">${r.textValue || r.value || "-"}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd">${r.unit || "-"}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd">${range}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd">${flag}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>${report.reportId}</title>
+<style>
+  body { font-family:Arial,sans-serif; margin:32px; color:#222; }
+  .header { text-align:center; margin-bottom:24px; }
+  .header h1 { margin:0; font-size:20px; }
+  .header span { color:#666; font-size:13px; }
+  .info { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:20px; }
+  .info div span { font-size:11px; color:#888; display:block; }
+  .info div strong { font-size:14px; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#1a56db; color:#fff; padding:8px 10px; text-align:left; font-size:12px; }
+  td { font-size:13px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>${report.testSnapshot?.name || "Test Report"}</h1>
+    <span>${report.reportId}</span>
+  </div>
+  <div class="info">
+    <div><span>Patient</span><strong>${report.patient?.name}</strong></div>
+    <div><span>Patient ID</span><strong>${report.patient?.patientId}</strong></div>
+    <div><span>Age / Gender</span><strong>${report.patient?.age || ""} / ${report.patient?.gender || ""}</strong></div>
+    <div><span>Sample</span><strong>${report.testSnapshot?.sampleType || "-"}</strong></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Parameter</th><th>Result</th><th>Unit</th><th>Normal Range</th><th>Flag</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  ${report.remarks ? `<p style="margin-top:16px;font-style:italic;color:#555">${report.remarks}</p>` : ""}
+  <p style="margin-top:32px;font-size:11px;color:#999;text-align:center">Generated on ${new Date().toLocaleString()}</p>
+</body></html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${report.reportId || "report"}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export default function ReportPreview({ selectedReport, canPrintReports, canVerifyReports, canReleaseReports, canDeleteReports, onReportUpdated, onSuccess, onEdit, onDelete }) {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
@@ -90,9 +155,19 @@ export default function ReportPreview({ selectedReport, canPrintReports, canVeri
             </button>
           )}
           {canPrintReports && (
-            <button className="dash-btn-secondary" type="button" onClick={() => window.print()} style={{ height: 36 }}>
-              {Icons.report} Print
-            </button>
+            <>
+              <button className="dash-btn-secondary" type="button" onClick={() => window.print()} style={{ height: 36 }}>
+                {Icons.report} Print
+              </button>
+              <button className="dash-btn-secondary" type="button" onClick={() => downloadAsPdf(selectedReport)} style={{ height: 36 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Download PDF
+              </button>
+            </>
           )}
           {canDeleteReports && selectedReport.status === "draft" && (
             <button

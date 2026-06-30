@@ -42,6 +42,12 @@ export async function POST(req) {
     if (isNaN(dobDate.getTime())) {
       return Response.json({ error: "Invalid date of birth" }, { status: 400 });
     }
+    if (dobDate.getFullYear() < 1900) {
+      return Response.json({ error: "Invalid date of birth" }, { status: 400 });
+    }
+    if (dobDate > new Date()) {
+      return Response.json({ error: "Date of birth cannot be in the future" }, { status: 400 });
+    }
 
     if (gender === "Other" && !body.genderIdentity) {
       return Response.json({ error: "Gender Identity is required when Gender is 'Other'" }, { status: 400 });
@@ -51,8 +57,21 @@ export async function POST(req) {
       return Response.json({ error: "Mobile Number must be exactly 10 digits" }, { status: 400 });
     }
 
+    const addr = clean(body.address);
+    if (!/^[A-Za-z0-9 .,/#-]+$/.test(addr)) {
+      return Response.json({ error: "Only letters, numbers, spaces, and . , / # - allowed in address" }, { status: 400 });
+    }
+    if (/https?:\/\/|www\./i.test(addr)) {
+      return Response.json({ error: "URLs not allowed in address" }, { status: 400 });
+    }
+
     if (!/^[A-Za-z0-9]{14}$/.test(String(body.uhId))) {
       return Response.json({ error: "UH ID must be exactly 14 alphanumeric characters" }, { status: 400 });
+    }
+
+    const existingUhId = await Patient.findOne({ uhId: String(body.uhId) });
+    if (existingUhId) {
+      return Response.json({ error: "UH ID already exists" }, { status: 400 });
     }
 
     const barcode = clean(body.barcode);
@@ -125,6 +144,9 @@ export async function GET(req) {
     const { Patient } = await getTenantModels(tenantId);
     const { searchParams } = new URL(req.url);
     const search = clean(searchParams.get("search"));
+    const gender = clean(searchParams.get("gender"));
+    const ageMin = clean(searchParams.get("ageMin"));
+    const ageMax = clean(searchParams.get("ageMax"));
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
 
@@ -132,6 +154,14 @@ export async function GET(req) {
     if (search) {
       const regex = new RegExp(escapeRegex(search), "i");
       query = { $or: [{ name: regex }, { phone: regex }, { patientId: regex }, { barcode: regex }] };
+    }
+    if (gender && ["Male", "Female", "Other"].includes(gender)) {
+      query.gender = gender;
+    }
+    if (ageMin !== "" || ageMax !== "") {
+      query.age = {};
+      if (ageMin !== "") query.age.$gte = Number(ageMin);
+      if (ageMax !== "") query.age.$lte = Number(ageMax);
     }
 
     const [patients, total] = await Promise.all([

@@ -32,8 +32,19 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const patientId = clean(searchParams.get("patientId"));
+    const dateFrom = clean(searchParams.get("dateFrom"));
+    const dateTo = clean(searchParams.get("dateTo"));
     const query = {};
     if (patientId) query.patient = patientId;
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
 
     // Doctor Regular: scope reports to patients referred by this doctor only
     if (auth.session.userType === "tenant" && auth.session.doctorId) {

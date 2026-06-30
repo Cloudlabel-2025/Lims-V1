@@ -46,6 +46,7 @@ export function getRequiredPermissionsForPath(pathname) {
   if (pathname.startsWith("/doctors/register")) return ["doctors.register"];
   if (pathname.startsWith("/doctors/edit")) return ["doctors.edit"];
   if (pathname === "/doctors" || pathname.startsWith("/doctors/")) return ["doctors.view"];
+  if (pathname === "/doctor/profile") return ["doctors.view", "doctors.edit"];
 
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return ["dashboard.view"];
 

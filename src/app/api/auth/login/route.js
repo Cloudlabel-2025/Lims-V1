@@ -13,6 +13,7 @@ import { verifyPassword } from "@/app/lib/password";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getUserModel } from "@/app/models/tenant/User";
+import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { checkRateLimit, resetRateLimit, getClientIp } from "@/app/lib/rate-limit";
 
 function resolveTenantId(req, bodyTenantId) {
@@ -224,6 +225,16 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
 
   const permissions = role?.permissions || [];
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+
+  let doctorId = null;
+  try {
+    const Doctor = getDoctorModel(tenantConnection);
+    const doctorRecord = await Doctor.findOne({ email: user.email.toLowerCase() }).select("_id").lean();
+    if (doctorRecord) doctorId = String(doctorRecord._id);
+  } catch {
+    // doctor association is optional
+  }
+
   const token = createSessionToken({
     userType: "tenant",
     tenantId,
@@ -234,6 +245,7 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     roleId: role ? String(role._id) : null,
     roleName: role?.name || null,
     permissions,
+    doctorId,
   });
 
   writeAuditLog(req, { tenantId, session: { userId: String(user._id) } }, {

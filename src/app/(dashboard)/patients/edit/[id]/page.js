@@ -91,6 +91,7 @@ export default function EditPatient({ params }) {
     if (!form.phone?.trim()) newErrors.phone = "Mobile number is required";
     else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
     if (!form.address?.trim()) newErrors.address = "Address is required";
+    else if (!/^[A-Za-z0-9 .,/#-]+$/.test(form.address)) newErrors.address = "Only letters, numbers, spaces, and . , / # - allowed";
     else if (/https?:\/\/|www\./i.test(form.address)) newErrors.address = "URLs not allowed in address";
     if (form.barcode) {
       if (!/^[A-Za-z0-9_-]+$/.test(form.barcode)) newErrors.barcode = "Barcode: only letters, numbers, hyphens, and underscores allowed";

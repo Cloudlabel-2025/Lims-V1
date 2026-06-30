@@ -35,6 +35,8 @@ export default function ReportsPage() {
   const [remarks, setRemarks] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
   const [editingReport, setEditingReport] = useState(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -59,7 +61,7 @@ export default function ReportsPage() {
         canEditReports ? cachedJsonFetch("/api/patient", { ttl: 15_000 }) : Promise.resolve(null),
         canEditReports ? cachedJsonFetch("/api/tests/definitions?status=active", { ttl: 30_000 }) : Promise.resolve(null),
         canEditReports ? cachedJsonFetch("/api/samples?status=all", { ttl: 10_000 }) : Promise.resolve(null),
-        cachedJsonFetch("/api/reports", { ttl: 10_000 }),
+        cachedJsonFetch(`/api/reports${dateFrom || dateTo ? `?dateFrom=${dateFrom}&dateTo=${dateTo}` : ""}`, { ttl: 10_000 }),
       ]);
       const patientData = patientResponse ? patientResponse.data : [];
       const testData = testResponse ? testResponse.data : { tests: [] };
@@ -80,7 +82,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [canEditReports]);
+  }, [canEditReports, dateFrom, dateTo]);
 
   useEffect(() => {
     loadData();
@@ -249,7 +251,15 @@ export default function ReportsPage() {
           />
         )}
 
-        <ReportList reports={reports} setSelectedReport={setSelectedReport} selectedReport={selectedReport} />
+        <ReportList
+          reports={reports}
+          setSelectedReport={setSelectedReport}
+          selectedReport={selectedReport}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+        />
       </div>
 
       {selectedReport && (

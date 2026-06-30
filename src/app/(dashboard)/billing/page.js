@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
@@ -22,13 +23,16 @@ const SettlementModal = dynamic(() => import("./SettlementModal"), {
 
 export default function BillingPage() {
   const user = useCurrentUser();
-  const [activeTab, setActiveTab] = useState("pending");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("patientId") ? "create" : "pending");
   const [patients, setPatients] = useState([]);
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
   const [billingRecords, setBillingRecords] = useState([]);
   const [billingPage, setBillingPage] = useState(1);
-  const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  const [pendingPage, setPendingPage] = useState(1);
+  const pendingLimit = 15;
   const [patient, setPatient] = useState("");
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState("routine");
@@ -53,6 +57,11 @@ export default function BillingPage() {
   const pendingBills = useMemo(
     () => billingRecords.filter((billingRecord) => billingRecord.billingStatus !== "paid"),
     [billingRecords]
+  );
+  const pendingTotalPages = Math.max(1, Math.ceil(pendingBills.length / pendingLimit));
+  const paginatedPendingBills = useMemo(
+    () => pendingBills.slice((pendingPage - 1) * pendingLimit, pendingPage * pendingLimit),
+    [pendingBills, pendingPage]
   );
   
   const selectedTotal = useMemo(() => {
@@ -90,7 +99,7 @@ export default function BillingPage() {
         cachedJsonFetch("/api/patient", { ttl: 15_000 }),
         cachedJsonFetch("/api/tests/definitions?status=active", { ttl: 30_000 }),
         cachedJsonFetch("/api/tests/packages", { ttl: 30_000 }),
-        cachedJsonFetch(`/api/billing?page=${billingPage}&limit=50`, { ttl: 10_000 }),
+        cachedJsonFetch(`/api/billing?page=${billingPage}&limit=20`, { ttl: 10_000 }),
       ]);
 
       const patientData = patientRes.data;
@@ -120,6 +129,17 @@ export default function BillingPage() {
   }, [loadData]);
 
   useEffect(() => {
+    const patientId = searchParams.get("patientId");
+    if (patientId && patients.length > 0) {
+      const match = patients.find(p => p._id === patientId);
+      if (match) {
+        setPatient(patientId);
+        setActiveTab("create");
+      }
+    }
+  }, [searchParams, patients]);
+
+  useEffect(() => {
     function refreshTestCache() {
       clearCachedApi("/api/tests/definitions?status=active");
       clearCachedApi("/api/tests/packages");
@@ -136,6 +156,10 @@ export default function BillingPage() {
       window.removeEventListener("focus", handleFocus);
     };
   }, [loadData]);
+
+  useEffect(() => {
+    setPendingPage(1);
+  }, [pendingBills.length]);
 
   async function createBill(event) {
     event.preventDefault();
@@ -176,7 +200,7 @@ export default function BillingPage() {
       if (!response.ok) throw new Error(data.error || "Unable to create bill");
 
       clearCachedApi("/api/billing");
-      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
       clearCachedApi("/api/dashboard/stats");
       clearCachedApi("/api/samples?status=all");
       setBillingRecords((current) => [data.billingRecord, ...current]);
@@ -264,7 +288,7 @@ export default function BillingPage() {
       if (!res.ok) throw new Error(data.error || "Failed to close bill");
 
       clearCachedApi("/api/billing");
-      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
       clearCachedApi("/api/dashboard/stats");
       clearCachedApi("/api/samples?status=all");
       clearCachedApi("/api/reports");
@@ -333,7 +357,7 @@ export default function BillingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to update bill");
       clearCachedApi("/api/billing");
-      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
       clearCachedApi("/api/dashboard/stats");
       setBillingRecords((current) =>
         current.map((br) =>
@@ -364,7 +388,7 @@ export default function BillingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to cancel bill");
       clearCachedApi("/api/billing");
-      clearCachedApi(`/api/billing?page=${billingPage}&limit=50`);
+      clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
       clearCachedApi("/api/dashboard/stats");
       setBillingRecords((current) =>
         current.map((br) =>
@@ -453,7 +477,7 @@ export default function BillingPage() {
                 <p style={{ marginTop: "12px" }}>No pending payments. All clear!</p>
               </div>
             ) : (
-              pendingBills.map((billingRecord) => (
+              paginatedPendingBills.map((billingRecord) => (
                 <article key={billingRecord._id} className="form-card" style={{ padding: "0", overflow: "hidden" }}>
                   <div className="form-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
                     <div>
@@ -558,6 +582,48 @@ export default function BillingPage() {
               ))
             )}
           </div>
+
+          {pendingBills.length > pendingLimit && (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "12px", marginTop: "24px" }}>
+              <button
+                onClick={() => setPendingPage(p => Math.max(1, p - 1))}
+                disabled={pendingPage === 1}
+                style={{
+                  padding: "8px 18px",
+                  border: "1.5px solid var(--border)",
+                  borderRadius: "8px",
+                  background: pendingPage === 1 ? "var(--surface)" : "#fff",
+                  color: pendingPage === 1 ? "var(--text-muted)" : "var(--text-primary)",
+                  cursor: pendingPage === 1 ? "not-allowed" : "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  fontFamily: "var(--font-main)",
+                }}
+              >
+                ← Prev
+              </button>
+              <span style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: 500 }}>
+                Page {pendingPage} of {pendingTotalPages}
+              </span>
+              <button
+                onClick={() => setPendingPage(p => Math.min(pendingTotalPages, p + 1))}
+                disabled={pendingPage === pendingTotalPages}
+                style={{
+                  padding: "8px 18px",
+                  border: "1.5px solid var(--border)",
+                  borderRadius: "8px",
+                  background: pendingPage === pendingTotalPages ? "var(--surface)" : "#fff",
+                  color: pendingPage === pendingTotalPages ? "var(--text-muted)" : "var(--text-primary)",
+                  cursor: pendingPage === pendingTotalPages ? "not-allowed" : "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  fontFamily: "var(--font-main)",
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -580,7 +646,6 @@ export default function BillingPage() {
           setTaxAmount={setTaxAmount}
           saving={saving}
           createBill={createBill}
-          billingRecords={billingRecords}
           canDiscountBilling={canDiscountBilling}
         />
       )}

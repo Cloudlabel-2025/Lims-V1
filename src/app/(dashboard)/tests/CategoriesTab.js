@@ -7,13 +7,7 @@ export default function CategoriesTab({
   categoryName,
   setCategoryName,
   saving,
-  categories,
-  categoryUsageCounts,
-  showList = true,
-  canDeleteTests = false,
-  onDeleteCategory = null,
-  onEditCategory = null,
-  onCancelEdit = null,
+  onCancelEdit,
 }) {
   return (
     <div className="module-grid">
@@ -52,45 +46,6 @@ export default function CategoriesTab({
           </form>
         </section>
       )}
-
-      <aside className="module-panel">
-        <div className="module-panel-header">
-          <h2>Department Categories</h2>
-          <p>{categories.length} categories available</p>
-        </div>
-        <div className="test-card-list">
-          {categories.map((cat) => (
-            <article
-              key={cat._id}
-              className={`test-card ${editingCategoryId === cat._id ? "active" : ""}`}
-              onClick={() => { if (canEditTests && onEditCategory) onEditCategory(cat); }}
-              style={{ cursor: canEditTests && onEditCategory ? "pointer" : "default" }}
-            >
-              <div>
-                <h3>{cat.name}</h3>
-                <span>Used in {categoryUsageCounts.get(cat._id) || 0} tests</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {canEditTests && onEditCategory && (
-                  <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onEditCategory(cat); }} title="Edit category" style={{ fontSize: 13 }}>
-                    ✏️
-                  </button>
-                )}
-                {onDeleteCategory && (
-                  <button
-                    type="button"
-                    className="test-card-delete"
-                    onClick={(e) => { e.stopPropagation(); onDeleteCategory(cat._id); }}
-                    title="Delete category"
-                  >
-                    🗑
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
-      </aside>
     </div>
   );
 }

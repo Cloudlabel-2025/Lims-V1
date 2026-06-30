@@ -118,7 +118,9 @@ export default function PatientRegistration() {
     else if (/https?:\/\/|www\./i.test(form.address)) newErrors.address = "URLs not allowed in address";
     if (!form.receivedTime) newErrors.receivedTime = "Received time is required";
     else if (isNaN(new Date(form.receivedTime).getTime())) newErrors.receivedTime = "Invalid received time";
+    else if (new Date(form.receivedTime) > new Date()) newErrors.receivedTime = "Received time cannot be in the future";
     if (form.collectionTime && isNaN(new Date(form.collectionTime).getTime())) newErrors.collectionTime = "Invalid collection time";
+    if (form.collectionTime && new Date(form.collectionTime) > new Date()) newErrors.collectionTime = "Collection time cannot be in the future";
     if (form.collectionTime && form.receivedTime) {
       if (new Date(form.receivedTime) < new Date(form.collectionTime)) {
         newErrors.receivedTime = "Received time cannot be earlier than collection time";

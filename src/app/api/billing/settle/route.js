@@ -48,6 +48,10 @@ export async function POST(req) {
       return Response.json({ error: "Payment amount must be greater than zero" }, { status: 400 });
     }
 
+    if (payment && (payment.cash < 0 || payment.card < 0 || payment.online < 0 || payment.corporate < 0)) {
+      return Response.json({ error: "Negative payment values are not allowed" }, { status: 400 });
+    }
+
     const result = await connection.transaction(async (session) => {
       const lockedBillingRecord = await BillingRecord.findOne({ _id: billingRecordId, tenantId }).session(session);
       if (!lockedBillingRecord) throw new Error("Billing record not found");

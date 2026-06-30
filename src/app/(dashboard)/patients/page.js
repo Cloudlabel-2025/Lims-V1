@@ -26,6 +26,9 @@ export default function PatientList() {
   const canCreatePatient = hasPermission(user, "patients.register");
   const canDeletePatient = hasPermission(user, "patients.delete");
   const [searchQuery, setSearchQuery] = useState("");
+  const [genderFilter, setGenderFilter] = useState("");
+  const [ageMinFilter, setAgeMinFilter] = useState("");
+  const [ageMaxFilter, setAgeMaxFilter] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [allPatients, setAllPatients] = useState([]);
@@ -36,24 +39,21 @@ export default function PatientList() {
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const debounceRef = useRef(null);
 
-  const fetchAllPatients = useCallback(async (page = 1) => {
-    setListLoading(true);
-    try {
-      const { data } = await cachedJsonFetch(`/api/patient?page=${page}&limit=50`, { ttl: 15_000 });
-      setAllPatients(Array.isArray(data) ? data : data.patients || []);
-      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
-    } catch {
-      setAllPatients([]);
-      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
-    } finally {
-      setListLoading(false);
-    }
-  }, []);
+  function buildQuery(page) {
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("limit", "50");
+    if (searchQuery.trim()) params.set("search", searchQuery.trim());
+    if (genderFilter) params.set("gender", genderFilter);
+    if (ageMinFilter) params.set("ageMin", ageMinFilter);
+    if (ageMaxFilter) params.set("ageMax", ageMaxFilter);
+    return params.toString();
+  }
 
-  const doSearch = useCallback(async (query, page = 1) => {
+  const fetchPatients = useCallback(async (page = 1) => {
     setListLoading(true);
     try {
-      const { data } = await cachedJsonFetch(`/api/patient?search=${encodeURIComponent(query)}&page=${page}&limit=50`, { ttl: 5_000 });
+      const { data } = await cachedJsonFetch(`/api/patient?${buildQuery(page)}`, { ttl: 15_000 });
       setAllPatients(Array.isArray(data) ? data : data.patients || []);
       setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
     } catch {
@@ -62,25 +62,24 @@ export default function PatientList() {
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [searchQuery, genderFilter, ageMinFilter, ageMaxFilter]);
 
   useEffect(() => {
     setMounted(true);
-    fetchAllPatients(1);
-  }, [fetchAllPatients]);
+    fetchPatients(1);
+  }, [fetchPatients]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!mounted) return;
 
-    if (!searchQuery.trim()) {
-      fetchAllPatients(currentPage);
-      return;
+    if (searchQuery.trim()) {
+      debounceRef.current = setTimeout(() => fetchPatients(currentPage), 350);
+    } else {
+      fetchPatients(currentPage);
     }
-
-    debounceRef.current = setTimeout(() => doSearch(searchQuery, currentPage), 350);
     return () => clearTimeout(debounceRef.current);
-  }, [currentPage, doSearch, fetchAllPatients, mounted, searchQuery]);
+  }, [currentPage, fetchPatients, mounted, searchQuery, genderFilter, ageMinFilter, ageMaxFilter]);
 
   const handleSelectPatient = useCallback((patient) => {
     setSelectedPatient(patient);
@@ -230,6 +229,38 @@ export default function PatientList() {
             />
           </div>
 
+          <select
+            className="lims-input"
+            value={genderFilter}
+            onChange={(e) => { setGenderFilter(e.target.value); setCurrentPage(1); }}
+            style={{ height: "40px", fontSize: "12px", width: "100px" }}
+          >
+            <option value="">All Genders</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+
+          <input
+            type="number"
+            className="lims-input"
+            placeholder="Min Age"
+            value={ageMinFilter}
+            onChange={(e) => { setAgeMinFilter(e.target.value); setCurrentPage(1); }}
+            style={{ height: "40px", fontSize: "12px", width: "80px" }}
+            min="0"
+          />
+
+          <input
+            type="number"
+            className="lims-input"
+            placeholder="Max Age"
+            value={ageMaxFilter}
+            onChange={(e) => { setAgeMaxFilter(e.target.value); setCurrentPage(1); }}
+            style={{ height: "40px", fontSize: "12px", width: "80px" }}
+            min="0"
+          />
+
           {canCreatePatient && (
           <button
             className="btn-lims-primary"
@@ -249,7 +280,7 @@ export default function PatientList() {
           </span>
           <button
             className="btn-refresh"
-            onClick={() => fetchAllPatients(currentPage)}
+            onClick={() => fetchPatients(currentPage)}
             style={{
               display: "flex",
               alignItems: "center",

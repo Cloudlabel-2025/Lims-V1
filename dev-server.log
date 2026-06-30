@@ -1,0 +1,17 @@
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.10.14:3000
+- Environments: .env.local
+✓ Ready in 1100ms
+
+[request:proxy] no-tenant pathname=/ hostname=localhost
+○ Compiling / ...
+[request:home] {
+  hostname: 'localhost',
+  rootDomain: 'lims.store',
+  onTenantSubdomain: false,
+  middlewareTenantId: null,
+  hostTenantId: '',
+  initialUserType: 'developer'
+}
+[?25h
