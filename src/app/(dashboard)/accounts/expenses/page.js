@@ -11,7 +11,7 @@ const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxAmoun
 
 function TwoColumn({ left, right }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 400px) 1fr", gap: 18, alignItems: "start" }}>
+    <div className="two-col-form">
       {left}
       {right}
     </div>
@@ -32,7 +32,7 @@ function ExpensesTable({ expenses, onEdit, onDelete }) {
         expense.paidFrom,
         expense.journalEntryId?.entryNumber || "-",
         <div key="actions" style={{ display: "flex", gap: 4 }}>
-          <button type="button" className="btn-lims-secondary" onClick={() => onEdit(expense)} style={{ height: 30, padding: "0 9px", fontSize: 12 }}>{Icons.edit}</button>
+          <button type="button" className="btn-lims-secondary" onClick={() => onEdit(expense)} style={{ height: 36, padding: "0 10px", fontSize: 12 }}>{Icons.edit}</button>
           <button type="button" className="btn-icon-delete" onClick={() => onDelete(expense._id)}>{Icons.trash}</button>
         </div>,
       ])}

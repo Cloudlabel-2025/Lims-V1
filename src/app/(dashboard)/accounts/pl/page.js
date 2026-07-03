@@ -24,7 +24,7 @@ function PlStatement({ pl }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div className="pl-grid">
         <div className="form-card" style={{ padding: 0, borderRadius: 8, overflow: "hidden" }}>
           <div style={{ padding: "12px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)", fontSize: 13, fontWeight: 800 }}>Revenue</div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>

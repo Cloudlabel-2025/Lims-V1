@@ -90,7 +90,7 @@ export default function ManualPage() {
 
       <div style={{ display: "grid", gap: 10 }}>
         {form.lines.map((line, index) => (
-          <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 140px 140px 40px", gap: 10, alignItems: "center" }}>
+          <div key={index} className="journal-line-grid">
             <select required className="lims-input" value={line.accountId} onChange={(e) => updateLine(index, { accountId: e.target.value })} style={inputStyle()}>
               <option value="">Select account</option>
               {accounts.map((a) => <option key={a._id} value={a._id}>{a.code} - {a.name}</option>)}

@@ -1,6 +1,6 @@
 export default function Table({ headings, rows, empty, minWidth = 700 }) {
   return (
-    <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
+    <div className="form-card table-scroll-hint" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth }}>
         <thead>
           <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
