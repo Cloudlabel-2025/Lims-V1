@@ -138,6 +138,8 @@ export default function InventoryPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [inventory, setInventory] = useState({ categories: [], uoms: [], items: [], movements: [], stats: {} });
+  const [itemPage, setItemPage] = useState(1);
+  const [itemPagination, setItemPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryForm, setCategoryForm] = useState({ name: "", code: "", parentCategory: "", description: "" });
   const [categoryFormErrors, setCategoryFormErrors] = useState({});
@@ -163,14 +165,19 @@ export default function InventoryPage() {
     );
   }, [inventory.items, searchQuery]);
 
-  async function loadInventory() {
+  async function loadInventory(page) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/inventory", { cache: "no-store" });
+      const params = new URLSearchParams();
+      if (page) params.set("page", page);
+      params.set("limit", "20");
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      const response = await fetch(`/api/inventory?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load inventory");
       setInventory(data);
+      setItemPagination(data.pagination || { page: page || 1, limit: 20, total: data.items?.length || 0, totalPages: 1 });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -179,8 +186,12 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    loadInventory();
+    loadInventory(1);
   }, []);
+
+  useEffect(() => {
+    loadInventory(itemPage);
+  }, [itemPage]);
 
   async function postInventory(payload, success) {
     setSaving(true);
@@ -195,7 +206,8 @@ export default function InventoryPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to save inventory");
       success?.(data);
-      await loadInventory();
+      setItemPage(1);
+      await loadInventory(1);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -279,7 +291,8 @@ export default function InventoryPage() {
       setEditingItemId("");
       setItemForm(emptyItem);
       setSuccessMessage(`Inventory item "${data.item?.name || itemForm.name}" updated successfully.`);
-      await loadInventory();
+      setItemPage(1);
+      await loadInventory(1);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -338,7 +351,8 @@ export default function InventoryPage() {
 
         <div style={{ position: "relative", minWidth: 280, flex: "0 1 360px" }}>
           <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>{Icons.search}</span>
-          <input className="lims-input" maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
+          <input className="lims-input" maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setItemPage(1); loadInventory(1); } }} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
+          <button type="button" className="btn-lims-primary" onClick={() => { setItemPage(1); loadInventory(1); }} style={{ height: 38, padding: "0 10px", fontSize: 12, marginLeft: 6 }}>{Icons.search}</button>
         </div>
       </div>
 
@@ -499,7 +513,10 @@ export default function InventoryPage() {
                   {editingItemId && <button type="button" className="btn-lims-secondary" onClick={() => { setEditingItemId(""); setItemForm(emptyItem); }} style={{ height: 38 }}>Cancel</button>}
                 </div>
               </form>
-              <InventoryTable items={filteredItems} onEdit={editItem} />
+              <div style={{ display: "grid", gap: 12 }}>
+                <InventoryTable items={filteredItems} onEdit={editItem} />
+                <PaginationControls pagination={itemPagination} loading={loading} onPageChange={setItemPage} />
+              </div>
             </div>
           )}
 
@@ -856,5 +873,21 @@ function MovementLedger({ movements }) {
         movement.reason || "-",
       ])}
     />
+  );
+}
+
+function PaginationControls({ pagination, loading, onPageChange }) {
+  if (!pagination || pagination.totalPages <= 1) return null;
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <span style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 700 }}>
+        Page {pagination.page} of {pagination.totalPages}
+      </span>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page <= 1} onClick={() => onPageChange(Math.max(1, pagination.page - 1))} style={{ height: 34, padding: "0 12px" }}>Previous</button>
+        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page >= pagination.totalPages} onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))} style={{ height: 34, padding: "0 12px" }}>Next</button>
+      </div>
+    </div>
   );
 }

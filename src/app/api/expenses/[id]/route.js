@@ -81,6 +81,8 @@ export async function PUT(req, { params }) {
     if (body.vendorName !== undefined) {
       const vn = clean(body.vendorName);
       if (!vn) return Response.json({ error: "Vendor name is required" }, { status: 400 });
+      if (vn.length < 3) return Response.json({ error: "Vendor name must be at least 3 characters" }, { status: 400 });
+      if (vn.length > 30) return Response.json({ error: "Vendor name must be 30 characters or less" }, { status: 400 });
       if (hasUrl(vn)) return Response.json({ error: "URLs are not allowed in vendor name" }, { status: 400 });
       if (!isValidName(vn)) return Response.json({ error: "Vendor name contains invalid characters" }, { status: 400 });
       expense.vendorName = vn;
@@ -94,6 +96,8 @@ export async function PUT(req, { params }) {
       }
       const amount = money(body.amount);
       if (amount <= 0) return Response.json({ error: "Amount must be greater than zero" }, { status: 400 });
+      const maxAllowed = 9999999;
+      if (amount > maxAllowed) return Response.json({ error: `Amount cannot exceed Rs ${maxAllowed.toLocaleString("en-IN")}` }, { status: 400 });
       expense.amount = amount;
     }
     if (body.taxAmount !== undefined) {
@@ -145,6 +149,10 @@ export async function DELETE(req, { params }) {
     const expense = await ExpenseEntry.findById(id);
     if (!expense) {
       return Response.json({ error: "Expense not found" }, { status: 404 });
+    }
+
+    if (expense.journalEntryId) {
+      return Response.json({ error: "Cannot delete expense with linked journal entry. Reverse it instead." }, { status: 400 });
     }
 
     await ExpenseEntry.deleteOne({ _id: id });

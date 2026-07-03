@@ -32,7 +32,7 @@ export default function BillingPage() {
   const [billingPage, setBillingPage] = useState(1);
   const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [pendingPage, setPendingPage] = useState(1);
-  const pendingLimit = 15;
+  const pendingLimit = 20;
   const [patient, setPatient] = useState("");
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState("routine");
@@ -116,7 +116,7 @@ export default function BillingPage() {
       setTests(testData.tests || []);
       setPackages(pkgData.packages || []);
       setBillingRecords(billingData.billingRecords || []);
-      setBillingPagination(billingData.pagination || { page: billingPage, limit: 50, total: billingData.billingRecords?.length || 0, totalPages: 1 });
+      setBillingPagination(billingData.pagination || { page: billingPage, limit: 20, total: billingData.billingRecords?.length || 0, totalPages: 1 });
     } catch (err) {
       setError("Failed to load data. Please refresh.");
     } finally {

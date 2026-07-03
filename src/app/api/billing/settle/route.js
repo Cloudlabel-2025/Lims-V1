@@ -44,8 +44,12 @@ export async function POST(req) {
     const paymentParts = getPaymentParts(payment);
     const receivedAmount = money(paymentParts.reduce((sum, part) => sum + part.amount, 0));
 
+    const maxAllowed = 9999999;
     if (payment && receivedAmount <= 0) {
       return Response.json({ error: "Payment amount must be greater than zero" }, { status: 400 });
+    }
+    if (payment && receivedAmount > maxAllowed) {
+      return Response.json({ error: `Payment amount cannot exceed Rs ${maxAllowed.toLocaleString("en-IN")}` }, { status: 400 });
     }
 
     if (payment && (payment.cash < 0 || payment.card < 0 || payment.online < 0 || payment.corporate < 0)) {
@@ -144,7 +148,11 @@ export async function POST(req) {
         if (!corporateAccountId) throw new Error("Corporate account ID is required for corporate payment");
         const corporateAccount = await CorporateAccount.findById(corporateAccountId).session(session);
         if (!corporateAccount) throw new Error("Corporate account not found");
-        corporateAccount.outstandingBalance = money(corporateAccount.outstandingBalance + corporateAmount);
+        const newBalance = money(corporateAccount.outstandingBalance + corporateAmount);
+        if (corporateAccount.creditLimit > 0 && newBalance > corporateAccount.creditLimit) {
+          throw new Error("Corporate payment exceeds credit limit");
+        }
+        corporateAccount.outstandingBalance = newBalance;
         await corporateAccount.save({ session });
       }
 
@@ -233,7 +241,7 @@ export async function POST(req) {
     });
 
   } catch (error) {
-    if (["Billing record not found", "Bill is already paid", "Payment amount cannot exceed bill balance"].includes(error.message)) {
+    if (["Billing record not found", "Bill is already paid", "Payment amount cannot exceed bill balance", "Corporate payment exceeds credit limit"].includes(error.message)) {
       return Response.json(
         { error: error.message },
         { status: error.message === "Billing record not found" ? 404 : 400 }

@@ -37,7 +37,7 @@ export const JournalEntrySchema = new mongoose.Schema(
   {
     entryNumber: { type: String, unique: true, immutable: true, index: true },
     date: { type: Date, required: true, default: Date.now, index: true },
-    description: { type: String, required: true, trim: true, maxlength: 300 },
+    description: { type: String, required: true, trim: true, maxlength: 150 },
     sourceType: {
       type: String,
       enum: ["billing", "payment", "refund", "commission", "expense", "manual"],

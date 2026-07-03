@@ -13,6 +13,7 @@
   "dependencies": {
     "bootstrap": "^5.3.8",
     "cloudinary": "^2.10.0",
+    "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "mongoose": "^9.4.1",

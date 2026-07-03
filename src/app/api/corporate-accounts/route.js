@@ -58,6 +58,12 @@ export async function POST(req) {
     if (!name) {
       return Response.json({ error: "Corporate account name is required" }, { status: 400 });
     }
+    if (name.length < 3) {
+      return Response.json({ error: "Corporate account name must be at least 3 characters" }, { status: 400 });
+    }
+    if (name.length > 30) {
+      return Response.json({ error: "Corporate account name must be 30 characters or less" }, { status: 400 });
+    }
     if (hasUrl(name)) {
       return Response.json({ error: "URLs are not allowed in corporate name" }, { status: 400 });
     }
@@ -66,6 +72,12 @@ export async function POST(req) {
     }
     if (!contactPerson) {
       return Response.json({ error: "Contact person is required" }, { status: 400 });
+    }
+    if (contactPerson.length < 3) {
+      return Response.json({ error: "Contact person must be at least 3 characters" }, { status: 400 });
+    }
+    if (contactPerson.length > 30) {
+      return Response.json({ error: "Contact person must be 30 characters or less" }, { status: 400 });
     }
     if (hasUrl(contactPerson)) {
       return Response.json({ error: "URLs are not allowed in contact person" }, { status: 400 });

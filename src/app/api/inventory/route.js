@@ -77,6 +77,8 @@ async function loadInventory(auth, req) {
   const search = clean(searchParams.get("search"));
   const status = clean(searchParams.get("status"));
   const category = clean(searchParams.get("category"));
+  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+  const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
 
   const { InventoryCategory, InventoryItem, InventoryMovement, InventoryUom } = await getTenantModels(auth.tenantId);
   const itemQuery = {};
@@ -88,7 +90,7 @@ async function loadInventory(auth, req) {
     itemQuery.$or = [{ name: regex }, { itemCode: regex }, { genericName: regex }, { manufacturer: regex }];
   }
 
-  const [categories, uoms, items, movements] = await Promise.all([
+  const [categories, uoms, items, total, movements] = await Promise.all([
     InventoryCategory.find({}).populate("parentCategory", "name code").sort({ parentCategory: 1, name: 1 }).lean(),
     InventoryUom.find({}).sort({ type: 1, name: 1 }).lean(),
     InventoryItem.find(itemQuery)
@@ -97,8 +99,10 @@ async function loadInventory(auth, req) {
       .populate("baseUom", "name symbol type conversionToBase")
       .populate("purchaseUom", "name symbol type conversionToBase")
       .sort({ updatedAt: -1 })
-      .limit(250)
+      .skip((page - 1) * limit)
+      .limit(limit)
       .lean(),
+    InventoryItem.countDocuments(itemQuery),
     InventoryMovement.find({})
       .populate("item", "name itemCode")
       .sort({ movementDate: -1, createdAt: -1 })
@@ -107,24 +111,27 @@ async function loadInventory(auth, req) {
   ]);
 
   const decoratedItems = items.map((item) => ({ ...item, ...expiryState(item) }));
-  const stats = decoratedItems.reduce(
-    (acc, item) => {
-      acc.totalItems += 1;
-      acc.totalStock += item.stockOnHandBase || 0;
-      if (item.stockOnHandBase <= item.minimumStockBase) acc.lowStock += 1;
-      if (item.reorderLevelBase && item.stockOnHandBase <= item.reorderLevelBase) acc.reorderDue += 1;
-      acc.expiredBatches += item.expiredBatches;
-      acc.nearExpiryBatches += item.nearExpiryBatches;
-      acc.inventoryValue += (item.batches || []).reduce(
-        (sum, batch) => sum + (batch.quantityBase || 0) * (batch.costPerBaseUnit || 0),
-        0
-      );
-      return acc;
-    },
-    { totalItems: 0, totalStock: 0, lowStock: 0, reorderDue: 0, expiredBatches: 0, nearExpiryBatches: 0, inventoryValue: 0 }
-  );
+  const stats = {
+    totalItems: total,
+    totalStock: decoratedItems.reduce((acc, item) => acc + (item.stockOnHandBase || 0), 0),
+    lowStock: decoratedItems.filter((item) => item.stockOnHandBase <= item.minimumStockBase).length,
+    reorderDue: decoratedItems.filter((item) => item.reorderLevelBase && item.stockOnHandBase <= item.reorderLevelBase).length,
+    expiredBatches: decoratedItems.reduce((acc, item) => acc + item.expiredBatches, 0),
+    nearExpiryBatches: decoratedItems.reduce((acc, item) => acc + item.nearExpiryBatches, 0),
+    inventoryValue: decoratedItems.reduce(
+      (acc, item) => acc + (item.batches || []).reduce((sum, batch) => sum + (batch.quantityBase || 0) * (batch.costPerBaseUnit || 0), 0),
+      0
+    ),
+  };
 
-  return { categories, uoms, items: decoratedItems, movements, stats };
+  return {
+    categories,
+    uoms,
+    items: decoratedItems,
+    movements,
+    stats,
+    pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+  };
 }
 
 export async function GET(req) {

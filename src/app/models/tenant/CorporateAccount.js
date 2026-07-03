@@ -6,7 +6,8 @@ export const CorporateAccountSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 160,
+      minlength: 3,
+      maxlength: 30,
       match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Name contains invalid characters"],
       validate: {
         validator: function (v) {
@@ -19,7 +20,8 @@ export const CorporateAccountSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 120,
+      minlength: 3,
+      maxlength: 30,
       match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Contact person contains invalid characters"],
       validate: {
         validator: function (v) {

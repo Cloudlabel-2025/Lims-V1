@@ -37,13 +37,13 @@ export default function PatientList() {
   const [mounted, setMounted] = useState(false);
   const [viewState, setViewState] = useState("grid");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
   const debounceRef = useRef(null);
 
   function buildQuery(page) {
     const params = new URLSearchParams();
     params.set("page", String(page));
-    params.set("limit", "50");
+    params.set("limit", "15");
     if (searchQuery.trim()) params.set("search", searchQuery.trim());
     if (genderFilter) params.set("gender", genderFilter);
     if (ageMinFilter) params.set("ageMin", ageMinFilter);
@@ -56,10 +56,10 @@ export default function PatientList() {
     try {
       const { data } = await cachedJsonFetch(`/api/patient?${buildQuery(page)}`, { ttl: 15_000 });
       setAllPatients(Array.isArray(data) ? data : data.patients || []);
-      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
+      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 15, total: 0, totalPages: 1 });
     } catch {
       setAllPatients([]);
-      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
+      setPagination({ page, limit: 15, total: 0, totalPages: 1 });
     } finally {
       setListLoading(false);
     }

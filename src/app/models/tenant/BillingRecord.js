@@ -82,7 +82,7 @@ export const BillingRecordSchema = new mongoose.Schema(
     notes: {
       type: String,
       trim: true,
-      maxlength: 500,
+      maxlength: 150,
     },
     referralDoctor: {
       type: mongoose.Schema.Types.ObjectId,
@@ -91,6 +91,7 @@ export const BillingRecordSchema = new mongoose.Schema(
     totalAmount: {
       type: Number,
       default: 0,
+      max: 9999999,
     },
     subtotalAmount: {
       type: Number,
@@ -160,7 +161,7 @@ export const BillingRecordSchema = new mongoose.Schema(
     cancellationReason: {
       type: String,
       trim: true,
-      maxlength: 500,
+      maxlength: 150,
     },
   },
   { timestamps: true }

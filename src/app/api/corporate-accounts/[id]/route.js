@@ -66,6 +66,8 @@ export async function PUT(req, { params }) {
     if (body.name !== undefined) {
       const name = clean(body.name);
       if (!name) return Response.json({ error: "Corporate account name is required" }, { status: 400 });
+      if (name.length < 3) return Response.json({ error: "Corporate account name must be at least 3 characters" }, { status: 400 });
+      if (name.length > 30) return Response.json({ error: "Corporate account name must be 30 characters or less" }, { status: 400 });
       if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in corporate name" }, { status: 400 });
       if (!isValidName(name)) return Response.json({ error: "Name contains invalid characters" }, { status: 400 });
       corporateAccount.name = name;
@@ -73,6 +75,8 @@ export async function PUT(req, { params }) {
     if (body.contactPerson !== undefined) {
       const contactPerson = clean(body.contactPerson);
       if (!contactPerson) return Response.json({ error: "Contact person is required" }, { status: 400 });
+      if (contactPerson.length < 3) return Response.json({ error: "Contact person must be at least 3 characters" }, { status: 400 });
+      if (contactPerson.length > 30) return Response.json({ error: "Contact person must be 30 characters or less" }, { status: 400 });
       if (hasUrl(contactPerson)) return Response.json({ error: "URLs are not allowed in contact person" }, { status: 400 });
       if (!isValidName(contactPerson)) return Response.json({ error: "Contact person contains invalid characters" }, { status: 400 });
       corporateAccount.contactPerson = contactPerson;
@@ -118,7 +122,7 @@ export async function DELETE(req, { params }) {
     if (moduleAuth.error) return moduleAuth.error;
 
     const { id } = await params;
-    const { CorporateAccount } = await getTenantModels(auth.tenantId);
+    const { CorporateAccount, BillingRecord, PaymentReceipt } = await getTenantModels(auth.tenantId);
 
     const corporateAccount = await CorporateAccount.findById(id);
     if (!corporateAccount) {
@@ -127,6 +131,16 @@ export async function DELETE(req, { params }) {
 
     if (corporateAccount.outstandingBalance > 0) {
       return Response.json({ error: "Cannot delete corporate account with outstanding balance" }, { status: 400 });
+    }
+
+    // Check for active invoices linked to this corporate account
+    const activeCorporateBills = await BillingRecord.countDocuments({
+      tenantId: auth.tenantId,
+      "paymentBreakdown.corporate": { $gt: 0 },
+      billingStatus: { $in: ["unpaid", "partial"] },
+    });
+    if (activeCorporateBills > 0) {
+      return Response.json({ error: "Cannot delete corporate account with active invoices" }, { status: 400 });
     }
 
     await CorporateAccount.deleteOne({ _id: id });

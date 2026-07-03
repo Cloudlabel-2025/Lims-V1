@@ -22,7 +22,7 @@ export default function DoctorList() {
   const debounceRef = useRef(null);
   const [viewType, setViewType] = useState("grid"); // 'grid' or 'list'
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [deleteModal, setDeleteModal] = useState({ open: false, doctor: null });
   const [deleting, setDeleting] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -39,12 +39,12 @@ export default function DoctorList() {
   const fetchAllDoctors = useCallback(async (page = 1) => {
     setListLoading(true);
     try {
-      const { data } = await cachedJsonFetch(`/api/doctor?page=${page}&limit=50`, { ttl: 15_000 });
+      const { data } = await cachedJsonFetch(`/api/doctor?page=${page}&limit=20`, { ttl: 15_000 });
       setAllDoctors(Array.isArray(data) ? data : data.doctors || []);
-      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
+      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 20, total: 0, totalPages: 1 });
     } catch {
       setAllDoctors([]);
-      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
+      setPagination({ page, limit: 20, total: 0, totalPages: 1 });
     } finally {
       setListLoading(false);
     }
@@ -58,12 +58,12 @@ export default function DoctorList() {
   const doSearch = useCallback(async (query, page = 1) => {
     setListLoading(true);
     try {
-      const { data } = await cachedJsonFetch(`/api/doctor?search=${encodeURIComponent(query)}&page=${page}&limit=50`, { ttl: 5_000 });
+      const { data } = await cachedJsonFetch(`/api/doctor?search=${encodeURIComponent(query)}&page=${page}&limit=20`, { ttl: 5_000 });
       setAllDoctors(Array.isArray(data) ? data : data.doctors || []);
-      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 50, total: 0, totalPages: 1 });
+      setPagination(Array.isArray(data) ? { page: 1, limit: data.length, total: data.length, totalPages: 1 } : data.pagination || { page, limit: 20, total: 0, totalPages: 1 });
     } catch {
       setAllDoctors([]);
-      setPagination({ page, limit: 50, total: 0, totalPages: 1 });
+      setPagination({ page, limit: 20, total: 0, totalPages: 1 });
     } finally {
       setListLoading(false);
     }
@@ -151,7 +151,7 @@ export default function DoctorList() {
   const loadPayoutHistory = useCallback(async (doctorId) => {
     setPayoutHistoryLoading(true);
     try {
-      const res = await fetch(`/api/doctor/payout?doctorId=${doctorId}&limit=50`);
+      const res = await fetch(`/api/doctor/payout?doctorId=${doctorId}&limit=20`);
       const data = await res.json();
       if (res.ok) setPayoutHistory(data.payouts || []);
     } catch {

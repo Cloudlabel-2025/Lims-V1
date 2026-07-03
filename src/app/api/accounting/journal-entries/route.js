@@ -84,6 +84,20 @@ export async function POST(req) {
     if (!description || lines.length < 2) {
       return Response.json({ error: "Description and at least two journal lines are required" }, { status: 400 });
     }
+    if (description.length > 150) {
+      return Response.json({ error: "Description must be 150 characters or less" }, { status: 400 });
+    }
+    if (lines.length > 20) {
+      return Response.json({ error: "Journal entry cannot exceed 20 lines" }, { status: 400 });
+    }
+    if (body.date) {
+      const entryDate = new Date(body.date);
+      const tomorrow = new Date();
+      tomorrow.setHours(23, 59, 59, 999);
+      if (!Number.isNaN(entryDate.getTime()) && entryDate > tomorrow) {
+        return Response.json({ error: "Date cannot be in the future" }, { status: 400 });
+      }
+    }
 
     const normalizedLines = lines.map((line) => ({
       accountId: clean(line.accountId),
@@ -93,6 +107,13 @@ export async function POST(req) {
 
     if (normalizedLines.some((line) => !mongoose.Types.ObjectId.isValid(line.accountId))) {
       return Response.json({ error: "Every line must have a valid account" }, { status: 400 });
+    }
+
+    const hasInvalidLine = normalizedLines.some(
+      (line) => (line.debit > 0 && line.credit > 0) || (line.debit === 0 && line.credit === 0)
+    );
+    if (hasInvalidLine) {
+      return Response.json({ error: "Each journal line must have either debit or credit (not both)" }, { status: 400 });
     }
 
     const debitTotal = money(normalizedLines.reduce((sum, line) => sum + line.debit, 0));

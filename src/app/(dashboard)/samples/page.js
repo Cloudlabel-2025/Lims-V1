@@ -6,7 +6,7 @@ import { Icons } from "@/app/components/Icons";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { cachedJsonFetch, useCurrentUser } from "@/app/lib/use-current-user";
 
-const STATUS_OPTIONS = ["all", "registered", "collected", "processing", "completed", "released", "rejected"];
+const STATUS_OPTIONS = ["all", "registered", "processing", "rejected"];
 
 const statusColors = {
   registered: ["#f1f5f9", "#475569"],
@@ -24,6 +24,8 @@ export default function SamplesPage() {
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [samplePage, setSamplePage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [rejecting, setRejecting] = useState({ id: null, reason: "", saving: false });
   const canCreateSamples = hasPermission(user, "samples.create");
   const canViewSamples = hasPermission(user, "samples.view");
@@ -51,14 +53,17 @@ export default function SamplesPage() {
     }
   };
 
-  const loadSamples = useCallback(async () => {
+  const loadSamples = useCallback(async (page) => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ status });
+      params.set("page", String(page || 1));
+      params.set("limit", "20");
       const { response, data } = await cachedJsonFetch(`/api/samples?${params}`, { ttl: 10_000 });
       if (!response.ok) throw new Error(data.error || "Unable to load samples");
       setSamples(data.samples || []);
+      setPagination(data.pagination || { page: page || 1, limit: 20, total: data.samples?.length || 0, totalPages: 1 });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -67,8 +72,12 @@ export default function SamplesPage() {
   }, [status]);
 
   useEffect(() => {
-    loadSamples();
+    loadSamples(1);
   }, [loadSamples]);
+
+  useEffect(() => {
+    loadSamples(samplePage);
+  }, [samplePage]);
 
   return (
     <div className="module-page">
@@ -96,7 +105,7 @@ export default function SamplesPage() {
         <div className="sample-toolbar">
           <label>
             Status
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select value={status} onChange={(e) => { setStatus(e.target.value); setSamplePage(1); }}>
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
@@ -183,6 +192,18 @@ export default function SamplesPage() {
           </div>
         )}
       </section>
+
+      {pagination.totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 18, flexWrap: "wrap" }}>
+          <span style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 600 }}>
+            Page {pagination.page} of {pagination.totalPages}
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page <= 1} onClick={() => setSamplePage(Math.max(1, pagination.page - 1))} style={{ height: 36, padding: "0 12px" }}>Previous</button>
+            <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page >= pagination.totalPages} onClick={() => setSamplePage(Math.min(pagination.totalPages, pagination.page + 1))} style={{ height: 36, padding: "0 12px" }}>Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

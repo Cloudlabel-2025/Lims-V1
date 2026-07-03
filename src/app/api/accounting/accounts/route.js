@@ -31,13 +31,21 @@ export async function GET(req) {
     const { Account } = await getTenantModels(auth.tenantId);
     const { searchParams } = new URL(req.url);
     const type = clean(searchParams.get("type"));
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
     const query = { tenantId: auth.tenantId };
 
     if (type && type !== "all") query.type = type;
 
-    const accounts = await Account.find(query).sort({ code: 1 }).lean();
+    const [accounts, total] = await Promise.all([
+      Account.find(query).sort({ code: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Account.countDocuments(query),
+    ]);
 
-    return Response.json({ accounts });
+    return Response.json({
+      accounts,
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    });
   } catch (error) {
     return jsonError("Unable to load accounts", error, 500);
   }
@@ -59,6 +67,13 @@ export async function POST(req) {
 
     if (!code || !name || !accountTypes.includes(type)) {
       return Response.json({ error: "Code, name, and valid type are required" }, { status: 400 });
+    }
+
+    if (name.length < 3) {
+      return Response.json({ error: "Account name must be at least 3 characters" }, { status: 400 });
+    }
+    if (name.length > 30) {
+      return Response.json({ error: "Account name must be 30 characters or less" }, { status: 400 });
     }
 
     if (isExponentialNotation(code)) {

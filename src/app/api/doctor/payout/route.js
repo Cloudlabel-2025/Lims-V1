@@ -82,6 +82,10 @@ export async function POST(req) {
     if (amountCleared <= 0) {
       return Response.json({ error: "No pending payout to clear" }, { status: 400 });
     }
+    const maxAllowed = 9999999;
+    if (amountCleared > maxAllowed) {
+      return Response.json({ error: `Payout amount cannot exceed Rs ${maxAllowed.toLocaleString("en-IN")}` }, { status: 400 });
+    }
 
     // Ensure chart of accounts is seeded (handles tenants created before seeding was added)
     await seedSystemChartOfAccounts(connection, tenantId);

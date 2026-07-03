@@ -114,6 +114,25 @@ export async function POST(req) {
 
     const amount = money(rawAmount);
     const taxAmount = Math.max(0, money(rawTaxAmount));
+
+    const maxAllowed = 9999999;
+    if (amount > maxAllowed) {
+      return Response.json({ error: `Amount cannot exceed Rs ${maxAllowed.toLocaleString("en-IN")}` }, { status: 400 });
+    }
+    if (vendorName.length > 30) {
+      return Response.json({ error: "Vendor name must be 30 characters or less" }, { status: 400 });
+    }
+    if (vendorName.length < 3) {
+      return Response.json({ error: "Vendor name must be at least 3 characters" }, { status: 400 });
+    }
+    if (body.date) {
+      const expenseDate = dateValue(body.date);
+      const tomorrow = new Date();
+      tomorrow.setHours(23, 59, 59, 999);
+      if (expenseDate > tomorrow) {
+        return Response.json({ error: "Date cannot be in the future" }, { status: 400 });
+      }
+    }
     const paidFrom = ["cash", "bank", "vendor-payable"].includes(body.paidFrom)
       ? body.paidFrom
       : "vendor-payable";

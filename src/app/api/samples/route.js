@@ -12,17 +12,26 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
     const query = {};
     if (status && status !== "all") query.status = status;
 
     const { Sample } = await getTenantModels(auth.tenantId);
-    const samples = await Sample.find(query)
-      .populate("patient", "name patientId age gender phone")
-      .populate("billingRecord", "billId priority status")
-      .sort({ createdAt: -1 })
-      .limit(150);
+    const [samples, total] = await Promise.all([
+      Sample.find(query)
+        .populate("patient", "name patientId age gender phone")
+        .populate("billingRecord", "billId priority status")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Sample.countDocuments(query),
+    ]);
 
-    return Response.json({ samples });
+    return Response.json({
+      samples,
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    });
   } catch (error) {
     return jsonError("Unable to load samples", error, 500);
   }

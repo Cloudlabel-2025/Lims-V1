@@ -23,7 +23,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
     const query = { tenantId: auth.tenantId };
     if (status && status !== "all") query.status = status;
 
@@ -178,6 +178,11 @@ export async function POST(req) {
 
     if (billingItems.length === 0) {
       return Response.json({ error: "No valid tests selected" }, { status: 400 });
+    }
+
+    const maxAllowed = 9999999;
+    if (totalAmount > maxAllowed) {
+      return Response.json({ error: `Total amount cannot exceed Rs ${maxAllowed.toLocaleString("en-IN")}` }, { status: 400 });
     }
 
     const subtotalAmount = money(totalAmount);

@@ -16,7 +16,8 @@ export const AccountSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 120,
+      minlength: 3,
+      maxlength: 30,
       match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Name contains invalid characters"],
       validate: {
         validator: function (v) {
@@ -50,13 +51,10 @@ export const AccountSchema = new mongoose.Schema(
 AccountSchema.index({ tenantId: 1, code: 1 }, { unique: true });
 AccountSchema.index({ tenantId: 1, subtype: 1 });
 
-AccountSchema.pre("deleteOne", { document: true, query: false }, function preventSystemDelete(next) {
+AccountSchema.pre("deleteOne", { document: true }, async function preventSystemDelete() {
   if (this.isSystem) {
-    next(new Error("System accounts cannot be deleted"));
-    return;
+    throw new Error("System accounts cannot be deleted");
   }
-
-  next();
 });
 
 export function getAccountModel(connection = mongoose) {
