@@ -99,8 +99,8 @@ export default function PatientRegistration() {
     const newErrors = {};
     if (!form.name?.trim()) newErrors.name = "Patient name is required";
     else if (form.name.trim().length < 2) newErrors.name = "Name must be at least 2 characters";
-    else if (form.name.length > 20) newErrors.name = "Name must not exceed 20 characters";
-    else if (!/^[A-Za-z .]+$/.test(form.name)) newErrors.name = "Only letters, spaces, and periods allowed";
+    else if (form.name.trim().length > 20) newErrors.name = "Name must be at most 20 characters";
+    else if (!/^[A-Za-z .]+$/.test(form.name.trim())) newErrors.name = "Only letters, spaces, and periods allowed";
     if (!form.gender) newErrors.gender = "Gender is required";
     if (form.gender === "Other" && !form.genderIdentity) newErrors.genderIdentity = "Gender identity is required";
     if (!form.dob) newErrors.dob = "Date of Birth is required";
@@ -179,7 +179,9 @@ export default function PatientRegistration() {
           setLoading(false);
           return;
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("Barcode duplication check failed:", err);
+      }
     }
 
     try {
@@ -194,7 +196,9 @@ export default function PatientRegistration() {
         setLoading(false);
         return;
       }
-    } catch (err) {}
+      } catch (err) {
+        console.error("Duplicate phone check failed:", err);
+      }
 
     try {
       const res = await fetch("/api/patient", {
@@ -292,7 +296,7 @@ export default function PatientRegistration() {
               <div className="col-md-4"><label className="lims-label">Patient ID</label><input className="lims-input" value="Auto-generated" disabled /></div>
               <div className="col-md-4">
                 <label className="lims-label">Full Name <span className="required">*</span></label>
-                <input name="name" className={`lims-input ${errors.name ? 'invalid' : ''}`} placeholder="Enter full name" value={form.name} maxLength={20} onChange={handleChange} />
+                <input name="name" className={`lims-input ${errors.name ? 'invalid' : ''}`} placeholder="Enter full name" value={form.name} minLength={2} maxLength={35} onChange={handleChange} />
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
               </div>
               <div className="col-md-3">
@@ -313,7 +317,7 @@ export default function PatientRegistration() {
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Barcode <span className="required">*</span></label>
-                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="Enter barcode" value={form.barcode} onChange={handleChange} />
+                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="Enter barcode" maxLength={35} value={form.barcode} onChange={handleChange} />
                 {errors.barcode && <div className="lims-error-text">{errors.barcode}</div>}
               </div>
               <div className="col-md-4">
@@ -347,12 +351,12 @@ export default function PatientRegistration() {
             <div className="row g-3">
               <div className="col-md-4">
                 <label className="lims-label">Mobile Number <span className="required">*</span></label>
-                <input name="phone" className={`lims-input ${errors.phone ? 'invalid' : ''}`} placeholder="Enter mobile number" maxLength={10} value={form.phone} onChange={handleChange} />
+                <input name="phone" className={`lims-input ${errors.phone ? 'invalid' : ''}`} placeholder="Enter mobile number" minLength={10} maxLength={10} value={form.phone} onChange={handleChange} />
                 {errors.phone && <div className="lims-error-text">{errors.phone}</div>}
               </div>
               <div className="col-md-8">
                 <label className="lims-label">Address <span className="required">*</span></label>
-                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" maxLength={200} value={form.address} onChange={handleChange} />
+                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" maxLength={150} value={form.address} onChange={handleChange} />
                 {errors.address && <div className="lims-error-text">{errors.address}</div>}
               </div>
             </div>

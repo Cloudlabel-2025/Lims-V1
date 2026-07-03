@@ -138,7 +138,8 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.name ? 'invalid' : ''}`} 
                   placeholder="Enter doctor name"
                   value={form.name} 
-                  maxLength={50}
+                  minLength={2}
+                  maxLength={35}
                   onChange={handleChange} 
                 />
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
@@ -150,6 +151,9 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.mciNumber ? 'invalid' : ''}`} 
                   placeholder="Enter medical council ID"
                   value={form.mciNumber} 
+                  minLength={5}
+                  maxLength={20}
+                  pattern="[A-Za-z0-9\s/-]+"
                   onChange={handleChange} 
                 />
                 {errors.mciNumber && <div className="lims-error-text">{errors.mciNumber}</div>}
@@ -251,6 +255,7 @@ export default function EditDoctor({ params }) {
                   name="phone" 
                   className={`lims-input ${errors.phone ? 'invalid' : ''}`} 
                   placeholder="Enter mobile number"
+                  minLength={10}
                   maxLength={10} 
                   value={form.phone} 
                   onChange={handleChange} 
@@ -265,6 +270,7 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.email ? 'invalid' : ''}`} 
                   placeholder="Enter email"
                   value={form.email || ""} 
+                  maxLength={100}
                   onChange={handleChange} 
                 />
                 {errors.email && <div className="lims-error-text">{errors.email}</div>}
@@ -276,6 +282,7 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.clinicName ? 'invalid' : ''}`} 
                   placeholder="Enter clinic or hospital name"
                   value={form.clinicName} 
+                  maxLength={35}
                   onChange={handleChange} 
                 />
                 {errors.clinicName && <div className="lims-error-text">{errors.clinicName}</div>}
@@ -287,6 +294,7 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.location ? 'invalid' : ''}`} 
                   placeholder="Enter location"
                   value={form.location} 
+                  maxLength={35}
                   onChange={handleChange} 
                 />
                 {errors.location && <div className="lims-error-text">{errors.location}</div>}
@@ -298,6 +306,7 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.clinicAddress ? 'invalid' : ''}`} 
                   placeholder="Enter practice address"
                   value={form.clinicAddress} 
+                  maxLength={150}
                   onChange={handleChange} 
                 />
                 {errors.clinicAddress && <div className="lims-error-text">{errors.clinicAddress}</div>}

@@ -33,6 +33,7 @@ export default function PatientList() {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [allPatients, setAllPatients] = useState([]);
   const [listLoading, setListLoading] = useState(false);
+  const [status, setStatus] = useState("");
   const [mounted, setMounted] = useState(false);
   const [viewState, setViewState] = useState("grid");
   const [currentPage, setCurrentPage] = useState(1);
@@ -109,7 +110,7 @@ export default function PatientList() {
       if (!res.ok) throw new Error(data.error || "Unable to delete patient");
       setAllPatients((prev) => prev.filter((p) => p._id !== patientId));
     } catch (err) {
-      alert(err.message);
+      setStatus(err.message);
     }
   }, []);
 
@@ -122,6 +123,13 @@ export default function PatientList() {
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <PatientSidebar patient={selectedPatient} onClose={closeSidebar} />
       </aside>
+
+      {status && (
+        <div className="lims-alert danger" role="alert" style={{ marginBottom: "16px" }}>
+          <span>{status}</span>
+          <button className="lims-alert-close" onClick={() => setStatus("")}>×</button>
+        </div>
+      )}
 
       <div
         className="page-header"
@@ -279,28 +287,14 @@ export default function PatientList() {
             {listLoading ? "Loading..." : `${pagination.total || allPatients.length} patients`}
           </span>
           <button
-            className="btn-refresh"
+            className="dash-btn-secondary"
             onClick={() => fetchPatients(currentPage)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              cursor: "pointer",
-              border: "none",
-              background: "transparent",
-              color: "var(--brand-action, var(--primary))",
-              fontWeight: "600",
-              fontSize: "13px",
-            }}
+            disabled={listLoading}
+            style={{ height: 34, padding: "0 14px", fontSize: 12 }}
           >
-            <div
-              style={{
-                transform: listLoading ? "rotate(360deg)" : "none",
-                transition: "transform 0.5s",
-              }}
-            >
-              {Icons.logo}
-            </div>
+            <span className={listLoading ? "icon-spin" : ""}>
+              {Icons.refresh}
+            </span>
             Refresh
           </button>
         </div>

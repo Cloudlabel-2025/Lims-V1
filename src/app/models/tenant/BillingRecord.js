@@ -13,13 +13,11 @@ function getCounterModel(connection) {
   );
 }
 
-async function getNextSequence(connection, name) {
+async function getNextSequence(connection, name, session) {
   const Counter = getCounterModel(connection);
-  const counter = await Counter.findOneAndUpdate(
-    { name },
-    { $inc: { seq: 1 } },
-    { returnDocument: "after", upsert: true }
-  );
+  const options = { returnDocument: "after", upsert: true };
+  if (session) options.session = session;
+  const counter = await Counter.findOneAndUpdate({ name }, { $inc: { seq: 1 } }, options);
 
   return counter.seq;
 }
@@ -176,7 +174,7 @@ BillingRecordSchema.index({ status: 1, createdAt: -1 });
 BillingRecordSchema.pre("save", async function generateBillId() {
   if (this.billId) return;
 
-  const seq = await getNextSequence(this.constructor.db, "billingRecordId");
+  const seq = await getNextSequence(this.constructor.db, "billingRecordId", this.$session());
   this.billId = `BILL-${String(seq).padStart(6, "0")}`;
 });
 

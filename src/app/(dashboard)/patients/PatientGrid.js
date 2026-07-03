@@ -77,17 +77,16 @@ function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatie
               </button>
               {onDeletePatient && (
                 <button
-                  className="patient-list-edit-btn"
+                  className="btn-icon-delete"
                   onClick={(event) => {
                     event.stopPropagation();
                     if (window.confirm(`Delete patient ${patient.patientId} (${patient.name})?`)) {
                       onDeletePatient(patient._id);
                     }
                   }}
-                  style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}
                   title="Delete Patient"
                 >
-                  {Icons.trashIcon || "🗑"}
+                  {Icons.trash}
                 </button>
               )}
             </div>

@@ -46,18 +46,18 @@ export async function GET(req) {
     }
 
     if (canViewSamples) {
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const staleSamples = await Sample.countDocuments({
-        status: "collected",
-        collectedAt: { $lte: twentyFourHoursAgo },
+        status: "in-testing",
+        createdAt: { $lte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       });
       if (staleSamples > 0) {
         notifications.push({
           id: "stale-samples",
-          title: "Stale collected samples",
-          detail: `${staleSamples} sample(s) collected over 24 hours ago without results.`,
+          title: "Stale testing samples",
+          detail: `${staleSamples} sample(s) in testing for over 24 hours.`,
           href: "/samples",
-          priority: staleSamples > 5 ? "critical" : "high",
+          priority: "normal",
+          permissionAny: ["samples.view"],
         });
       }
     }

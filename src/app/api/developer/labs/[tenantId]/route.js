@@ -87,6 +87,7 @@ function serializeLab(lab, req) {
     accentColor: lab.branding?.accentColor || "#f59e0b",
     logoUrl: lab.branding?.logo?.url || null,
     logoAltText: lab.branding?.logo?.altText || `${lab.name} logo`,
+    reportHeaderUrl: lab.branding?.reportHeader?.url || null,
     loginHighlights: lab.branding?.loginHighlights || [],
     enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultLabModules,
     loginUrl: buildLabLoginUrl(req, lab.tenantId),

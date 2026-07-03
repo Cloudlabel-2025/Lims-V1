@@ -16,8 +16,7 @@ const loginHighlightOptions = [
   "Sample Collection Workflow",
   "Report Generation",
   "Billing & Payments",
-  "Inventory Management",
-  "Quality Control",
+    "Inventory Management",
 ];
 
 const emptyForm = {

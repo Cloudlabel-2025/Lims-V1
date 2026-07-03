@@ -47,6 +47,18 @@ const ResultParameterSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const PreviousVersionSchema = new mongoose.Schema(
+  {
+    version: { type: Number, required: true },
+    status: { type: String, required: true },
+    results: { type: [ResultParameterSchema], default: [] },
+    remarks: { type: String, trim: true },
+    createdAt: { type: Date },
+    updatedAt: { type: Date },
+  },
+  { _id: false }
+);
+
 export const TestReportSchema = new mongoose.Schema(
   {
     reportId: {
@@ -72,6 +84,11 @@ export const TestReportSchema = new mongoose.Schema(
       ref: "Sample",
       index: true,
     },
+    sampleId: {
+      type: String,
+      trim: true,
+      index: true,
+    },
     billingRecord: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "BillingRecord",
@@ -95,7 +112,7 @@ export const TestReportSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["draft", "verified", "released", "delivered"],
+      enum: ["draft", "reviewed", "approved", "released"],
       default: "draft",
       index: true,
     },
@@ -103,6 +120,25 @@ export const TestReportSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    version: {
+      type: Number,
+      default: 1,
+    },
+    previousVersions: {
+      type: [PreviousVersionSchema],
+      default: [],
+    },
+    template: {
+      type: String,
+      enum: ["coa", "test-report", "summary"],
+      default: "test-report",
+    },
+    reviewedAt: { type: Date },
+    reviewedBy: { type: String, trim: true },
+    approvedAt: { type: Date },
+    approvedBy: { type: String, trim: true },
+    releasedAt: { type: Date },
+    releasedBy: { type: String, trim: true },
   },
   { timestamps: true }
 );
@@ -131,6 +167,18 @@ TestReportSchema.pre("save", async function generateReportId() {
   const seq = await getNextSequence(this.constructor.db, "testReportId");
   this.reportId = `RPT-${String(seq).padStart(6, "0")}`;
 });
+
+TestReportSchema.methods.createNewVersion = function () {
+  this.previousVersions.push({
+    version: this.version,
+    status: this.status,
+    results: this.results.map((r) => ({ ...r })),
+    remarks: this.remarks,
+    createdAt: this.createdAt,
+    updatedAt: new Date(),
+  });
+  this.version = (this.version || 0) + 1;
+};
 
 export function getTestReportModel(connection = mongoose) {
   return connection.models.TestReport || connection.model("TestReport", TestReportSchema);

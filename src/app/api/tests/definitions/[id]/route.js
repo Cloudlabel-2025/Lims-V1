@@ -73,10 +73,16 @@ function normalizeParameters(parameters, errors) {
         return null;
       }
 
+      const maleMin = parameter.maleMin === "" || parameter.maleMin === null ? undefined : Number(parameter.maleMin);
+      const maleMax = parameter.maleMax === "" || parameter.maleMax === null ? undefined : Number(parameter.maleMax);
+      const femaleMin = parameter.femaleMin === "" || parameter.femaleMin === null ? undefined : Number(parameter.femaleMin);
+      const femaleMax = parameter.femaleMax === "" || parameter.femaleMax === null ? undefined : Number(parameter.femaleMax);
       const normalMin = parameter.normalMin === "" || parameter.normalMin === null ? undefined : Number(parameter.normalMin);
       const normalMax = parameter.normalMax === "" || parameter.normalMax === null ? undefined : Number(parameter.normalMax);
 
-      if (isExponentialNotation(parameter.normalMin) || isExponentialNotation(parameter.normalMax)) {
+      if (isExponentialNotation(parameter.maleMin) || isExponentialNotation(parameter.maleMax) ||
+          isExponentialNotation(parameter.femaleMin) || isExponentialNotation(parameter.femaleMax) ||
+          isExponentialNotation(parameter.normalMin) || isExponentialNotation(parameter.normalMax)) {
         errors.push(`Parameter ${index + 1} range contains an invalid value`);
         return null;
       }
@@ -85,6 +91,10 @@ function normalizeParameters(parameters, errors) {
         key: slug(parameter.key || name, `parameter-${index + 1}`),
         name,
         unit,
+        maleMin: Number.isFinite(maleMin) ? maleMin : undefined,
+        maleMax: Number.isFinite(maleMax) ? maleMax : undefined,
+        femaleMin: Number.isFinite(femaleMin) ? femaleMin : undefined,
+        femaleMax: Number.isFinite(femaleMax) ? femaleMax : undefined,
         normalMin: Number.isFinite(normalMin) ? normalMin : undefined,
         normalMax: Number.isFinite(normalMax) ? normalMax : undefined,
         required: parameter.required !== false,

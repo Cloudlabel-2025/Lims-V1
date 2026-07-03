@@ -328,8 +328,8 @@ export default function AccountsPage() {
             <small style={{ color: "var(--text-muted)" }}>Chart of accounts, journals, expenses, and corporate ledgers</small>
           </div>
         </div>
-        <button type="button" className="btn-lims-secondary" onClick={loadAccountsData} style={{ height: 38, padding: "0 14px", borderRadius: 8 }}>
-          Refresh
+        <button type="button" className="dash-btn-secondary" onClick={loadAccountsData} style={{ height: 38, padding: "0 14px", borderRadius: 8 }}>
+          {Icons.refresh} Refresh
         </button>
       </div>
 
@@ -367,11 +367,11 @@ export default function AccountsPage() {
                 <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/accounts", accountForm, () => { setAccountForm(emptyAccount); setAccountFormErrors({}); }, "Account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                   <h5 style={{ margin: 0, fontSize: 16 }}>Add Account</h5>
                   <Field label="Code">
-                    <input required className="lims-input" value={accountForm.code} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setAccountFormErrors((p) => ({ ...p, code: "Exponential notation is not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, code: "Code contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, code: "" })); setAccountForm({ ...accountForm, code: v }); }} style={inputStyle()} />
+                     <input required className="lims-input" maxLength={35} value={accountForm.code} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setAccountFormErrors((p) => ({ ...p, code: "Exponential notation is not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, code: "Code contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, code: "" })); setAccountForm({ ...accountForm, code: v }); }} style={inputStyle()} />
                     {accountFormErrors.code && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{accountFormErrors.code}</small>}
                   </Field>
                   <Field label="Name">
-                    <input required className="lims-input" value={accountForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setAccountFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, name: "" })); setAccountForm({ ...accountForm, name: v }); }} style={inputStyle()} />
+                     <input required className="lims-input" minLength={2} maxLength={35} value={accountForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setAccountFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, name: "" })); setAccountForm({ ...accountForm, name: v }); }} style={inputStyle()} />
                     {accountFormErrors.name && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{accountFormErrors.name}</small>}
                   </Field>
                   <Field label="Type">
@@ -380,7 +380,7 @@ export default function AccountsPage() {
                     </select>
                   </Field>
                   <Field label="Subtype">
-                    <input required className="lims-input" value={accountForm.subtype} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setAccountFormErrors((p) => ({ ...p, subtype: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, subtype: "Subtype contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, subtype: "" })); setAccountForm({ ...accountForm, subtype: v }); }} style={inputStyle()} />
+                     <input required className="lims-input" maxLength={35} value={accountForm.subtype} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setAccountFormErrors((p) => ({ ...p, subtype: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setAccountFormErrors((p) => ({ ...p, subtype: "Subtype contains invalid characters" })); return; } setAccountFormErrors((p) => ({ ...p, subtype: "" })); setAccountForm({ ...accountForm, subtype: v }); }} style={inputStyle()} />
                     {accountFormErrors.subtype && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{accountFormErrors.subtype}</small>}
                   </Field>
                   <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Saving..." : "Create Account"}</button>
@@ -431,7 +431,7 @@ export default function AccountsPage() {
           {activeTab === "manual" && (
             <form className="form-card" onSubmit={(event) => submitForm(event, "/api/accounting/journal-entries", journalForm, () => setJournalForm(emptyJournal), "Manual journal posted successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 14 }}>
               <h5 style={{ margin: 0, fontSize: 16 }}>Manual Journal</h5>
-              <Field label="Description"><input required className="lims-input" value={journalForm.description} onChange={(event) => setJournalForm({ ...journalForm, description: event.target.value })} style={inputStyle()} /></Field>
+               <Field label="Description"><input required className="lims-input" maxLength={150} value={journalForm.description} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setError("URLs are not allowed in description"); return; } setJournalForm({ ...journalForm, description: v }); }} style={inputStyle()} /></Field>
               <div style={{ display: "grid", gap: 10 }}>
                 {journalForm.lines.map((line, index) => (
                   <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 140px 140px 40px", gap: 10, alignItems: "center" }}>
@@ -439,8 +439,8 @@ export default function AccountsPage() {
                       <option value="">Select account</option>
                       {accounts.map((account) => <option key={account._id} value={account._id}>{account.code} - {account.name}</option>)}
                     </select>
-                    <input className="lims-input" type="number" min="0" step="0.01" placeholder="Debit" value={line.debit} onChange={(event) => updateJournalLine(index, { debit: event.target.value })} style={inputStyle()} />
-                    <input className="lims-input" type="number" min="0" step="0.01" placeholder="Credit" value={line.credit} onChange={(event) => updateJournalLine(index, { credit: event.target.value })} style={inputStyle()} />
+                     <input className="lims-input" type="number" min="0" max="9999999999" step="0.01" placeholder="Debit" value={line.debit} onChange={(event) => updateJournalLine(index, { debit: event.target.value })} style={inputStyle()} />
+                    <input className="lims-input" type="number" min="0" max="9999999999" step="0.01" placeholder="Credit" value={line.credit} onChange={(event) => updateJournalLine(index, { credit: event.target.value })} style={inputStyle()} />
                     {journalForm.lines.length > 2 && (
                       <button type="button" onClick={() => removeJournalLine(index)} style={{ height: 30, width: 30, border: "none", background: "transparent", cursor: "pointer", color: "#e11d48", display: "grid", placeItems: "center", padding: 0 }}>{Icons.trash}</button>
                     )}
@@ -471,15 +471,15 @@ export default function AccountsPage() {
                       </select>
                     </Field>
                     <Field label="Vendor">
-                      <input required className="lims-input" value={expenseForm.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setExpenseFormErrors((p) => ({ ...p, vendorName: "" })); setExpenseForm({ ...expenseForm, vendorName: v }); }} style={inputStyle()} />
+                       <input required className="lims-input" maxLength={35} value={expenseForm.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setExpenseFormErrors((p) => ({ ...p, vendorName: "" })); setExpenseForm({ ...expenseForm, vendorName: v }); }} style={inputStyle()} />
                       {expenseFormErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.vendorName}</small>}
                     </Field>
                     <Field label="Amount">
-                      <input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseForm.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, amount: "" })); setExpenseForm({ ...expenseForm, amount: v }); }} style={inputStyle()} />
+                       <input required className="lims-input" type="number" min="0.01" max="9999999999" step="0.01" value={expenseForm.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, amount: "" })); setExpenseForm({ ...expenseForm, amount: v }); }} style={inputStyle()} />
                       {expenseFormErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.amount}</small>}
                     </Field>
                     <Field label="Tax">
-                      <input required className="lims-input" type="number" min="0" step="0.01" value={expenseForm.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, taxAmount: "" })); setExpenseForm({ ...expenseForm, taxAmount: v }); }} style={inputStyle()} />
+                       <input required className="lims-input" type="number" min="0" max="9999999999" step="0.01" value={expenseForm.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, taxAmount: "" })); setExpenseForm({ ...expenseForm, taxAmount: v }); }} style={inputStyle()} />
                       {expenseFormErrors.taxAmount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.taxAmount}</small>}
                     </Field>
                     <Field label="Credit">
@@ -489,7 +489,7 @@ export default function AccountsPage() {
                         <option value="bank">Bank</option>
                       </select>
                     </Field>
-                    <Field label="Receipt URL"><input className="lims-input" value={expenseForm.attachmentUrl} onChange={(event) => setExpenseForm({ ...expenseForm, attachmentUrl: event.target.value })} style={inputStyle()} /></Field>
+                    <Field label="Receipt URL"><input className="lims-input" maxLength={500} value={expenseForm.attachmentUrl} onChange={(event) => setExpenseForm({ ...expenseForm, attachmentUrl: event.target.value })} style={inputStyle()} /></Field>
                     <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Posting..." : "Record Expense"}</button>
                   </form>
                 }
@@ -513,9 +513,9 @@ export default function AccountsPage() {
                         {["reagent", "staff", "equipment", "overhead"].map((category) => <option key={category} value={category}>{category}</option>)}
                       </select>
                     </Field>
-                    <Field label="Vendor"><input required className="lims-input" value={expenseFormEdit.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setExpenseFormErrors((p) => ({ ...p, vendorName: "" })); setExpenseFormEdit({ ...expenseFormEdit, vendorName: v }); }} style={inputStyle()} />{expenseFormErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.vendorName}</small>}</Field>
-                    <Field label="Amount"><input required className="lims-input" type="number" min="0.01" step="0.01" value={expenseFormEdit.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, amount: "" })); setExpenseFormEdit({ ...expenseFormEdit, amount: v }); }} style={inputStyle()} />{expenseFormErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.amount}</small>}</Field>
-                    <Field label="Tax"><input required className="lims-input" type="number" min="0" step="0.01" value={expenseFormEdit.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, taxAmount: "" })); setExpenseFormEdit({ ...expenseFormEdit, taxAmount: v }); }} style={inputStyle()} />{expenseFormErrors.taxAmount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.taxAmount}</small>}</Field>
+                    <Field label="Vendor"><input required className="lims-input" maxLength={35} value={expenseFormEdit.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setExpenseFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setExpenseFormErrors((p) => ({ ...p, vendorName: "" })); setExpenseFormEdit({ ...expenseFormEdit, vendorName: v }); }} style={inputStyle()} />{expenseFormErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.vendorName}</small>}</Field>
+                    <Field label="Amount"><input required className="lims-input" type="number" min="0.01" max="9999999999" step="0.01" value={expenseFormEdit.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, amount: "" })); setExpenseFormEdit({ ...expenseFormEdit, amount: v }); }} style={inputStyle()} />{expenseFormErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.amount}</small>}</Field>
+                    <Field label="Tax"><input required className="lims-input" type="number" min="0" max="9999999999" step="0.01" value={expenseFormEdit.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setExpenseFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setExpenseFormErrors((p) => ({ ...p, taxAmount: "" })); setExpenseFormEdit({ ...expenseFormEdit, taxAmount: v }); }} style={inputStyle()} />{expenseFormErrors.taxAmount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{expenseFormErrors.taxAmount}</small>}</Field>
                     <Field label="Credit">
                       <select className="lims-input" value={expenseFormEdit.paidFrom} onChange={(e) => setExpenseFormEdit({ ...expenseFormEdit, paidFrom: e.target.value })} style={inputStyle()}>
                         <option value="vendor-payable">Vendor Payable</option>
@@ -540,15 +540,15 @@ export default function AccountsPage() {
                   <form className="form-card" onSubmit={(event) => submitForm(event, "/api/corporate-accounts", corporateForm, () => { setCorporateForm(emptyCorporate); setCorporateFormErrors({}); }, "Corporate account created successfully.")} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 12 }}>
                     <h5 style={{ margin: 0, fontSize: 16 }}>Corporate Account</h5>
                     <Field label="Name">
-                      <input required className="lims-input" value={corporateForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, name: "" })); setCorporateForm({ ...corporateForm, name: v }); }} style={inputStyle()} />
+                       <input required className="lims-input" maxLength={35} value={corporateForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, name: "" })); setCorporateForm({ ...corporateForm, name: v }); }} style={inputStyle()} />
                       {corporateFormErrors.name && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.name}</small>}
                     </Field>
                     <Field label="Contact Person">
-                      <input required className="lims-input" value={corporateForm.contactPerson} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "Contact person contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, contactPerson: "" })); setCorporateForm({ ...corporateForm, contactPerson: v }); }} style={inputStyle()} />
+                       <input required className="lims-input" maxLength={35} value={corporateForm.contactPerson} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "Contact person contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, contactPerson: "" })); setCorporateForm({ ...corporateForm, contactPerson: v }); }} style={inputStyle()} />
                       {corporateFormErrors.contactPerson && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.contactPerson}</small>}
                     </Field>
                     <Field label="Credit Limit">
-                      <input required className="lims-input" type="number" min="0" step="0.01" value={corporateForm.creditLimit} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setCorporateFormErrors((p) => ({ ...p, creditLimit: "Exponential notation is not allowed" })); return; } setCorporateFormErrors((p) => ({ ...p, creditLimit: "" })); setCorporateForm({ ...corporateForm, creditLimit: v }); }} style={inputStyle()} />
+                      <input required className="lims-input" type="number" min="0" max="9999999999" step="0.01" value={corporateForm.creditLimit} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setCorporateFormErrors((p) => ({ ...p, creditLimit: "Exponential notation is not allowed" })); return; } setCorporateFormErrors((p) => ({ ...p, creditLimit: "" })); setCorporateForm({ ...corporateForm, creditLimit: v }); }} style={inputStyle()} />
                       {corporateFormErrors.creditLimit && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.creditLimit}</small>}
                     </Field>
                     <Field label="Statement Cycle">
@@ -573,15 +573,15 @@ export default function AccountsPage() {
                   <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 440, width: "90%", display: "grid", gap: 12 }} onClick={(e) => e.stopPropagation()}>
                     <h5 style={{ margin: 0, fontSize: 16 }}>Edit Corporate Account</h5>
                     <Field label="Name">
-                      <input required className="lims-input" value={corporateFormEdit.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, name: "" })); setCorporateFormEdit({ ...corporateFormEdit, name: v }); }} style={inputStyle()} />
+                      <input required className="lims-input" maxLength={35} value={corporateFormEdit.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, name: "" })); setCorporateFormEdit({ ...corporateFormEdit, name: v }); }} style={inputStyle()} />
                       {corporateFormErrors.name && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.name}</small>}
                     </Field>
                     <Field label="Contact Person">
-                      <input required className="lims-input" value={corporateFormEdit.contactPerson} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "Contact person contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, contactPerson: "" })); setCorporateFormEdit({ ...corporateFormEdit, contactPerson: v }); }} style={inputStyle()} />
+                      <input required className="lims-input" maxLength={35} value={corporateFormEdit.contactPerson} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCorporateFormErrors((p) => ({ ...p, contactPerson: "Contact person contains invalid characters" })); return; } setCorporateFormErrors((p) => ({ ...p, contactPerson: "" })); setCorporateFormEdit({ ...corporateFormEdit, contactPerson: v }); }} style={inputStyle()} />
                       {corporateFormErrors.contactPerson && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.contactPerson}</small>}
                     </Field>
                     <Field label="Credit Limit">
-                      <input required className="lims-input" type="number" min="0" step="0.01" value={corporateFormEdit.creditLimit} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setCorporateFormErrors((p) => ({ ...p, creditLimit: "Exponential notation is not allowed" })); return; } setCorporateFormErrors((p) => ({ ...p, creditLimit: "" })); setCorporateFormEdit({ ...corporateFormEdit, creditLimit: v }); }} style={inputStyle()} />
+                      <input required className="lims-input" type="number" min="0" max="9999999999" step="0.01" value={corporateFormEdit.creditLimit} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setCorporateFormErrors((p) => ({ ...p, creditLimit: "Exponential notation is not allowed" })); return; } setCorporateFormErrors((p) => ({ ...p, creditLimit: "" })); setCorporateFormEdit({ ...corporateFormEdit, creditLimit: v }); }} style={inputStyle()} />
                       {corporateFormErrors.creditLimit && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{corporateFormErrors.creditLimit}</small>}
                     </Field>
                     <Field label="Statement Cycle">
@@ -627,7 +627,7 @@ function AccountsTable({ accounts, onDelete }) {
         account.subtype || "-",
         `Rs ${money(account.balance)}`,
         <Badge key="system" tone={account.isSystem ? "info" : "neutral"}>{account.isSystem ? "System" : "Custom"}</Badge>,
-        account.isSystem ? "-" : <button key="delete" type="button" className="btn-lims-secondary" onClick={() => onDelete(account._id)} style={{ height: 30, padding: "0 9px" }}>{Icons.trash}</button>,
+        account.isSystem ? "-" : <button key="delete" type="button" className="btn-icon-delete" onClick={() => onDelete(account._id)}>{Icons.trash}</button>,
       ])}
     />
   );
@@ -663,7 +663,7 @@ function ExpensesTable({ expenses, onEdit, onDelete }) {
         expense.journalEntryId?.entryNumber || "-",
         <div key="actions" style={{ display: "flex", gap: 4 }}>
           <button type="button" className="btn-lims-secondary" onClick={() => onEdit(expense)} style={{ height: 30, padding: "0 9px", fontSize: 12 }}>{Icons.edit}</button>
-          <button type="button" className="btn-lims-secondary" onClick={() => onDelete(expense._id)} style={{ height: 30, padding: "0 9px", fontSize: 12, color: "#e11d48" }}>{Icons.trash}</button>
+          <button type="button" className="btn-icon-delete" onClick={() => onDelete(expense._id)}>{Icons.trash}</button>
         </div>,
       ])}
     />
@@ -684,7 +684,7 @@ function CorporateTable({ corporates, onEdit, onDelete }) {
         corporate.statementCycle,
         <div key="actions" style={{ display: "flex", gap: 4 }}>
           <button type="button" className="btn-lims-secondary" onClick={() => onEdit(corporate)} style={{ height: 30, padding: "0 9px", fontSize: 12 }}>{Icons.edit}</button>
-          <button type="button" className="btn-lims-secondary" onClick={() => onDelete(corporate._id, corporate.name)} style={{ height: 30, padding: "0 9px", fontSize: 12, color: "#e11d48" }}>{Icons.trash}</button>
+          <button type="button" className="btn-icon-delete" onClick={() => onDelete(corporate._id, corporate.name)}>{Icons.trash}</button>
         </div>,
       ])}
     />

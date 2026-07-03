@@ -197,7 +197,7 @@ export default function BillingPage() {
         body: JSON.stringify({ patient, tests: selectedTests, priority, notes, discountAmount: Number(discountAmount) || 0, taxAmount: Number(taxAmount) || 0 }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to create bill");
+      if (!response.ok) throw new Error(data.details || data.error || "Unable to create bill");
 
       clearCachedApi("/api/billing");
       clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
@@ -687,6 +687,7 @@ export default function BillingPage() {
                     className="lims-input"
                     type="number"
                     min="0"
+                    max="9999999999"
                     value={editDiscount}
                     onChange={(e) => setEditDiscount(e.target.value)}
                     placeholder="0"
@@ -699,6 +700,7 @@ export default function BillingPage() {
                   className="lims-input"
                   type="number"
                   min="0"
+                  max="9999999999"
                   value={editTax}
                   onChange={(e) => setEditTax(e.target.value)}
                   placeholder="0"
@@ -711,6 +713,7 @@ export default function BillingPage() {
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
                   rows={3}
+                  maxLength={150}
                   placeholder="Enter notes"
                 />
               </label>

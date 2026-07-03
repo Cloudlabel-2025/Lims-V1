@@ -47,7 +47,12 @@ export async function PATCH(req, { params }) {
     const body = await req.json();
     const action = String(body.action || "");
 
-    const permissionMap = { save: "reports.edit", verify: "reports.verify", release: "reports.release", deliver: "reports.print" };
+    const permissionMap = {
+      save: "reports.edit",
+      review: "reports.verify",
+      approve: "reports.verify",
+      release: "reports.release",
+    };
     const permission = permissionMap[action];
     if (!permission) return Response.json({ error: "Invalid action" }, { status: 400 });
 
@@ -57,20 +62,9 @@ export async function PATCH(req, { params }) {
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "reports.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const isLabAdmin =
-      auth.session?.permissions?.includes("*") ||
-      ["admin", "lab admin"].includes(String(auth.session?.roleName || "").trim().toLowerCase());
-    if ((action === "verify" || action === "release") && !isLabAdmin) {
-      return Response.json({ error: "Only Lab Admin can verify or release reports" }, { status: 403 });
-    }
-
-    const { TestReport, BillingRecord } = await getTenantModels(auth.tenantId);
+    const { TestReport } = await getTenantModels(auth.tenantId);
     const report = await TestReport.findById(id);
     if (!report) return Response.json({ error: "Report not found" }, { status: 404 });
-
-    if (action === "verify" && (!report.results || report.results.length === 0)) {
-      return Response.json({ error: "Draft results are required before verification" }, { status: 400 });
-    }
 
     if (action === "save") {
       if (report.status !== "draft") {
@@ -93,36 +87,62 @@ export async function PATCH(req, { params }) {
         report.results = body.results;
       }
       if (body.remarks !== undefined) report.remarks = body.remarks;
+      if (body.template !== undefined) report.template = body.template;
     } else {
-      if (action === "deliver") {
-        const billingRecord = report.billingRecord ? await BillingRecord.findById(report.billingRecord) : null;
-        if (!billingRecord || billingRecord.billingStatus !== "paid") {
-          return Response.json({ error: "Bill must be paid before report delivery" }, { status: 400 });
-        }
+      const transitions = {
+        review: { from: "draft", to: "reviewed" },
+        approve: { from: "reviewed", to: "approved" },
+        release: { from: "approved", to: "released" },
+      };
+
+      const transition = transitions[action];
+      if (!transition) return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
+
+      if (report.status !== transition.from) {
+        return Response.json({
+          error: `Report must be in '${transition.from}' status to ${action}`,
+        }, { status: 400 });
       }
 
-      const transitions = { verify: ["draft", "verified"], release: ["verified", "released"], deliver: ["released", "delivered"] };
-      const [from, to] = transitions[action];
-      if (report.status !== from) {
-        return Response.json({ error: `Report must be in '${from}' status to ${action}` }, { status: 400 });
+      if (action === "review" && (!report.results || report.results.length === 0)) {
+        return Response.json({ error: "Results are required before review" }, { status: 400 });
       }
 
-      report.status = to;
+      // Create a version snapshot before status transition (except initial save)
+      report.createNewVersion();
+
+      report.status = transition.to;
+
+      // Record the action timestamp and user
+      const now = new Date();
+      const userName = auth.session.email || auth.session.name || "Unknown";
+      if (action === "review") {
+        report.reviewedAt = now;
+        report.reviewedBy = userName;
+      } else if (action === "approve") {
+        report.approvedAt = now;
+        report.approvedBy = userName;
+      } else if (action === "release") {
+        report.releasedAt = now;
+        report.releasedBy = userName;
+      }
     }
+
     await report.save();
     await report.populate("patient", "name patientId age gender phone");
 
-    const auditAction =
-      action === "save" ? "reports.saved" :
-      action === "verify" ? "reports.verified" :
-      action === "release" ? "reports.released" :
-      "reports.delivered";
+    const auditActionMap = {
+      save: "reports.saved",
+      review: "reports.reviewed",
+      approve: "reports.approved",
+      release: "reports.released",
+    };
 
     await writeAuditLog(req, auth, {
-      action: auditAction,
+      action: auditActionMap[action] || "reports.updated",
       resourceType: "TestReport",
       resourceId: report._id,
-      metadata: { status: report.status, billingRecordId: report.billingRecord },
+      metadata: { status: report.status, version: report.version },
     });
 
     return Response.json({ report });

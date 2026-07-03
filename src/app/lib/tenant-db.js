@@ -20,7 +20,7 @@ import { getInventoryCategoryModel } from "@/app/models/tenant/InventoryCategory
 import { getInventoryItemModel } from "@/app/models/tenant/InventoryItem";
 import { getInventoryMovementModel } from "@/app/models/tenant/InventoryMovement";
 import { getInventoryUomModel } from "@/app/models/tenant/InventoryUom";
-import { getQcLogModel } from "@/app/models/tenant/QcLog";
+
 
 const tenantDbCache = globalThis.tenantDbCache || new Map();
 globalThis.tenantDbCache = tenantDbCache;
@@ -85,7 +85,6 @@ export async function getTenantModels(tenantId) {
     JournalEntry: getJournalEntryModel(connection),
     Patient: getPatientModel(connection, { patientPrefix: lab?.numbering?.patientPrefix }),
     PaymentReceipt: getPaymentReceiptModel(connection),
-    QcLog: getQcLogModel(connection),
     Role: getRoleModel(connection),
     Sample: getSampleModel(connection),
     TestCategory: getTestCategoryModel(connection),

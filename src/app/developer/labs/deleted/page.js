@@ -9,7 +9,7 @@ const LABS_PER_PAGE = 10;
 
 function formatDate(value) {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-US", {
+  return new Date(value).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",

@@ -46,9 +46,23 @@ export const getInitials = (name) => {
 export const formatDate = (d) => {
   if (!d) return "—";
   const date = new Date(d);
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
+  });
+};
+
+export const formatDateTime = (d) => {
+  if (!d) return "—";
+  const date = new Date(d);
+  return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   });
 };

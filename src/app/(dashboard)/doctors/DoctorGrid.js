@@ -128,20 +128,8 @@ function DoctorGrid({
                   )}
                   {canDeleteDoctors && (
                     <button
+                      className="btn-icon-delete"
                       title="Delete"
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        color: "var(--text-muted)",
-                        cursor: "pointer",
-                        padding: "4px",
-                        borderRadius: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        transition: "all 0.2s",
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = "#e11d48"; e.currentTarget.style.background = "#fff1f2"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
                       onClick={(e) => { e.stopPropagation(); onDeleteDoctor(doc); }}
                     >
                       {Icons.trash}

@@ -8,7 +8,7 @@ export const getInitials = (name) => {
 
 export const formatDate = (d) => {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 };
 
 export const getStatusStyle = (status) => {

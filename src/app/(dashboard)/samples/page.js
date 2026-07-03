@@ -1,63 +1,61 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
-import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
+import { cachedJsonFetch, useCurrentUser } from "@/app/lib/use-current-user";
+
+const STATUS_OPTIONS = ["all", "registered", "collected", "processing", "completed", "released", "rejected"];
+
+const statusColors = {
+  registered: ["#f1f5f9", "#475569"],
+  collected: ["#fff7ed", "#c2410c"],
+  processing: ["#eff6ff", "#1d4ed8"],
+  completed: ["#f0fdf4", "#15803d"],
+  released: ["#ecfdf5", "#047857"],
+  rejected: ["#fef2f2", "#dc2626"],
+};
 
 export default function SamplesPage() {
+  const router = useRouter();
   const user = useCurrentUser();
   const [samples, setSamples] = useState([]);
   const [status, setStatus] = useState("all");
-  const [collectorName, setCollectorName] = useState("");
-  const [rejectionReason, setRejectionReason] = useState("");
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const canCollectSamples = hasPermission(user, "samples.collect");
-  const canUpdateSamples = hasPermission(user, "samples.update");
-  const canRejectSamples = hasPermission(user, "samples.reject");
-  const canDeleteSamples = hasPermission(user, "samples.delete");
-  const canActOnSamples = canCollectSamples || canUpdateSamples || canRejectSamples || canDeleteSamples;
+  const [rejecting, setRejecting] = useState({ id: null, reason: "", saving: false });
+  const canCreateSamples = hasPermission(user, "samples.create");
   const canViewSamples = hasPermission(user, "samples.view");
 
-  async function printLabel(sampleId) {
+  const handleReject = async (sampleId) => {
+    if (!rejecting.reason.trim()) return;
+    setRejecting((prev) => ({ ...prev, saving: true }));
     try {
-      const resp = await fetch(`/api/samples/${sampleId}/barcode`, { credentials: "include" });
-      const data = await resp.json();
-      if (!resp.ok) { setError(data.error || "Unable to fetch label data"); return; }
-      const printWin = window.open("", "_blank", "width=400,height=300");
-      if (!printWin) { setError("Popup blocked. Please allow popups for this site."); return; }
-      printWin.document.write(`
-        <html><head><title>Sample Label</title>
-        <style>
-          body { font-family: monospace; text-align: center; padding: 20px; }
-          .label { border: 2px solid #000; padding: 16px; display: inline-block; }
-          h2 { margin: 4px 0; } p { margin: 2px 0; }
-          @media print { body { padding: 0; } }
-        </style></head><body>
-        <div class="label">
-          <h2>${data.sampleId}</h2>
-          <p><strong>${data.barcode || ""}</strong></p>
-          <p>${data.patientName || ""}${data.patientId ? ` (${data.patientId})` : ""}</p>
-          <p>${data.type || ""}</p>
-          <p>${data.collectedAt ? new Date(data.collectedAt).toLocaleDateString() : ""}</p>
-        </div>
-        <p style="margin-top:20px"><button onclick="window.print()">Print</button></p>
-        </body></html>
-      `);
-      printWin.document.close();
-    } catch { setError("Failed to load label data"); }
-  }
+      const res = await fetch(`/api/samples/${sampleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject", reason: rejecting.reason.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSamples((prev) => prev.map((s) => (s._id === sampleId ? { ...s, status: "rejected", rejectionReason: rejecting.reason.trim() } : s)));
+        setRejecting({ id: null, reason: "", saving: false });
+      } else {
+        setError(data.error || "Failed to reject sample");
+        setRejecting((prev) => ({ ...prev, saving: false }));
+      }
+    } catch {
+      setError("Network error");
+      setRejecting((prev) => ({ ...prev, saving: false }));
+    }
+  };
 
-  const loadSamples = useCallback(async (nextStatus = status, collector = collectorName) => {
+  const loadSamples = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ status: nextStatus });
-      if (collector?.trim()) params.set("collectorName", collector.trim());
+      const params = new URLSearchParams({ status });
       const { response, data } = await cachedJsonFetch(`/api/samples?${params}`, { ttl: 10_000 });
       if (!response.ok) throw new Error(data.error || "Unable to load samples");
       setSamples(data.samples || []);
@@ -66,75 +64,11 @@ export default function SamplesPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, collectorName]);
+  }, [status]);
 
   useEffect(() => {
-    loadSamples(status, collectorName);
-  }, [status, collectorName, loadSamples]);
-
-  async function updateSample(sampleId, action) {
-    setUpdatingId(sampleId);
-    setError("");
-    setSuccess("");
-    try {
-      const response = await fetch(`/api/samples/${sampleId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          action,
-          collectorName: action === "collect" ? collectorName : undefined,
-          rejectionReason: action === "reject" ? rejectionReason : undefined,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.details || "Unable to update sample");
-
-      clearCachedApi(`/api/samples?status=${status}`);
-      clearCachedApi("/api/samples?status=all");
-      clearCachedApi("/api/reports");
-      clearCachedApi("/api/dashboard/stats");
-      setSamples((current) =>
-        current.map((sample) => (sample._id === sampleId ? data.sample : sample))
-      );
-      setRejectionReason("");
-      const actionLabel = {
-        collect: "collected",
-        processing: "moved to processing",
-        reject: "rejected",
-      }[action] || "updated";
-      setSuccess(`Sample ${data.sample?.sampleId || ""} ${actionLabel} successfully.`);
-    } catch (err) {
-      console.error("Update sample error:", err);
-      setError(err.message || "Unable to update sample");
-    } finally {
-      setUpdatingId("");
-    }
-  }
-
-  async function deleteSample(sampleId) {
-    if (!confirm("Delete this sample? This action cannot be undone.")) return;
-    setUpdatingId(sampleId);
-    setError("");
-    setSuccess("");
-    try {
-      const res = await fetch(`/api/samples/${sampleId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Unable to delete sample");
-      clearCachedApi(`/api/samples?status=${status}`);
-      clearCachedApi("/api/samples?status=all");
-      clearCachedApi("/api/dashboard/stats");
-      setSamples((current) => current.filter((s) => s._id !== sampleId));
-      setSuccess("Sample deleted successfully.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUpdatingId("");
-    }
-  }
+    loadSamples();
+  }, [loadSamples]);
 
   return (
     <div className="module-page">
@@ -142,52 +76,43 @@ export default function SamplesPage() {
         <div>
           <p className="module-kicker">Sample Workflow</p>
           <h1>Samples</h1>
-          <span>Collect, process, reject, and track samples before result entry.</span>
+          <span>Register, track, and process samples.</span>
         </div>
-        <button className="dash-btn-secondary" type="button" onClick={() => loadSamples()}>
-          {Icons.refresh} Refresh
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {canCreateSamples && (
+            <button className="dash-btn-primary" type="button" onClick={() => router.push("/samples/register")}>
+              + Register Sample
+            </button>
+          )}
+          <button className="dash-btn-secondary" type="button" onClick={() => loadSamples()}>
+            {Icons.refresh} Refresh
+          </button>
+        </div>
       </div>
 
       {error && <div className="module-alert">{error}</div>}
-      <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
       <section className="module-panel">
         <div className="sample-toolbar">
           <label>
             Status
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="all">All</option>
-              <option value="pending">Pending</option>
-              <option value="collected">Collected</option>
-              <option value="processing">Processing</option>
-              <option value="rejected">Rejected</option>
-              <option value="reported">Reported</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
             </select>
           </label>
-          {canCollectSamples && (
-            <label>
-              Collector
-              <input value={collectorName} onChange={(e) => setCollectorName(e.target.value)} placeholder="Enter collector name" />
-            </label>
-          )}
-          {canRejectSamples && (
-            <label>
-              Rejection Reason
-              <input value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Enter rejection reason" />
-            </label>
-          )}
         </div>
 
         {loading ? (
           <p className="developer-empty">Loading samples...</p>
         ) : samples.length === 0 ? (
           <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-muted)" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🧪</div>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>{Icons.vial}</div>
             <p style={{ fontWeight: 600, marginBottom: 4 }}>
               {status === "all" ? "No samples found" : `No ${status} samples`}
             </p>
-            <p style={{ fontSize: 12 }}>Samples appear here once bills are created.</p>
+            <p style={{ fontSize: 12 }}>Register a sample or create a bill to generate one.</p>
           </div>
         ) : (
           <div className="sample-table">
@@ -195,48 +120,66 @@ export default function SamplesPage() {
               <span>Sample</span>
               <span>Patient</span>
               <span>Test</span>
-              <span>Bill</span>
               <span>Status</span>
-              {canActOnSamples && <span>Actions</span>}
+              <span>Actions</span>
             </div>
-            {samples.map((sample) => (
-              <div key={sample._id} className={`sample-table-row ${sample.status}`}>
-                <span>
-                  <strong>{sample.sampleId}</strong>
-                  <small>{sample.barcode}</small>
-                </span>
-                <span>{sample.patient?.name}<small>{sample.patient?.patientId}</small></span>
-                <span>{sample.testSnapshot?.name}<small>{sample.testSnapshot?.sampleType || "-"}</small></span>
-                <span>{sample.billingRecord?.billId}<small>{sample.billingRecord?.priority}</small></span>
-                <span>
-                  <em>{sample.status}</em>
-                  {sample.status === "rejected" && sample.rejectionReason && (
-                    <small style={{ display: "block", color: "var(--error)", fontSize: "11px", marginTop: "2px" }}>
-                      Reason: {sample.rejectionReason}
-                    </small>
-                  )}
-                </span>
-                {canActOnSamples && (
-                  <span className="sample-actions">
-                    {canViewSamples && (
-                      <button disabled={updatingId === sample._id} onClick={() => printLabel(sample._id)}>Label</button>
-                    )}
-                    {canCollectSamples && (
-                      <button disabled={updatingId === sample._id || sample.status !== "pending"} onClick={() => updateSample(sample._id, "collect")}>Collect</button>
-                    )}
-                    {canUpdateSamples && (
-                      <button disabled={updatingId === sample._id || !["collected"].includes(sample.status)} onClick={() => updateSample(sample._id, "processing")}>Process</button>
-                    )}
-                    {canRejectSamples && (
-                      <button disabled={updatingId === sample._id || sample.status === "reported"} onClick={() => updateSample(sample._id, "reject")}>Reject</button>
-                    )}
-                    {canDeleteSamples && sample.status !== "reported" && (
-                      <button disabled={updatingId === sample._id} onClick={() => deleteSample(sample._id)} style={{ color: "var(--error)" }}>Delete</button>
+            {samples.map((sample) => {
+              const [bg, color] = statusColors[sample.status] || ["var(--surface)", "var(--text-secondary)"];
+              const canProcess = ["registered", "collected", "processing"].includes(sample.status);
+              const canReject = !["rejected", "released", "archived"].includes(sample.status);
+              const isRejecting = rejecting.id === sample._id;
+              return (
+                <div key={sample._id} className={`sample-table-row ${sample.status}`}>
+                  <span>
+                    <strong>{sample.sampleId}</strong>
+                    <small>{sample.barcode}</small>
+                  </span>
+                  <span>{sample.patient?.name}<small>{sample.patient?.patientId}</small></span>
+                  <span>{sample.testSnapshot?.name}<small>{sample.testSnapshot?.sampleType || "-"}</small></span>
+                  <span>
+                    <span style={{ background: bg, color, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>
+                      {sample.status}
+                    </span>
+                    {sample.status === "rejected" && sample.rejectionReason && (
+                      <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4, maxWidth: 180, lineHeight: 1.3 }}>
+                        {sample.rejectionReason}
+                      </div>
                     )}
                   </span>
-                )}
-              </div>
-            ))}
+                  <span className="sample-actions">
+                    {canProcess && canViewSamples && (
+                      <button onClick={() => router.push(`/samples/wizard?sampleId=${sample._id}`)}>
+                        Process
+                      </button>
+                    )}
+                    {canReject && canViewSamples && !isRejecting && (
+                      <button style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }} onClick={() => setRejecting({ id: sample._id, reason: "", saving: false })}>
+                        Reject
+                      </button>
+                    )}
+                    {isRejecting && (
+                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                        <input
+                          className="lims-input"
+                          placeholder="Reason for rejection"
+                          value={rejecting.reason}
+                          onChange={(e) => setRejecting((prev) => ({ ...prev, reason: e.target.value }))}
+                          style={{ height: 30, width: 160, fontSize: 12, padding: "0 8px" }}
+                          maxLength={150}
+                          autoFocus
+                        />
+                        <button className="btn-lims-primary" style={{ height: 30, fontSize: 11, padding: "0 8px" }} disabled={rejecting.saving || !rejecting.reason.trim()} onClick={() => handleReject(sample._id)}>
+                          {rejecting.saving ? "..." : "Confirm"}
+                        </button>
+                        <button className="btn-lims-secondary" style={{ height: 30, fontSize: 11, padding: "0 8px" }} disabled={rejecting.saving} onClick={() => setRejecting({ id: null, reason: "", saving: false })}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

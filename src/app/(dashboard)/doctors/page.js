@@ -287,6 +287,18 @@ export default function DoctorList() {
             </button>
           </div>
 
+          <button
+            className="dash-btn-secondary"
+            onClick={() => fetchAllDoctors(currentPage)}
+            disabled={listLoading}
+            style={{ height: 34, padding: "0 14px", fontSize: 12 }}
+          >
+            <span className={listLoading ? "icon-spin" : ""}>
+              {Icons.refresh}
+            </span>
+            Refresh
+          </button>
+
           <div className="search-container" style={{ position: "relative", flex: 1, maxWidth: "320px" }}>
             <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", fontSize: '14px' }}>
               {Icons.search}

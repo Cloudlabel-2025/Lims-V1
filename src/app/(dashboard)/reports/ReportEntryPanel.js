@@ -77,7 +77,7 @@ export default function ReportEntryPanel({
           <label>
             Collected Sample
             <select value={selectedSample} onChange={(e) => updateSample(e.target.value)}>
-              <option value="">Manual entry without sample</option>
+              <option value="">Select a collected sample</option>
               {samples.map((sample) => (
                 <option key={sample._id} value={sample._id}>
                   {sample.sampleId} · {sample.patient?.name} · {sample.testSnapshot?.name}
@@ -166,8 +166,8 @@ export default function ReportEntryPanel({
           </>
         )}
 
-        {!selectedPatient && <small style={{ color: "var(--error)", display: "block", marginTop: 8 }}>Please select a patient before saving.</small>}
-        {!selectedTest && <small style={{ color: "var(--error)", display: "block", marginTop: 8 }}>Please select a test before saving.</small>}
+        {!selectedPatient && <div style={{ background: "#fef2f2", color: "#dc2626", padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, marginTop: 12 }}>Please select a patient before saving.</div>}
+        {!selectedTest && <div style={{ background: "#fef2f2", color: "#dc2626", padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, marginTop: 8 }}>Please select a test before saving.</div>}
         <button className="dash-btn-primary module-save" type="submit" disabled={!selectedPatient || !selectedTest || saving}>
           {saving ? "Saving..." : editing ? "Update Report" : "Save Report"}
         </button>

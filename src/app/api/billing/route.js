@@ -90,9 +90,6 @@ export async function POST(req) {
     const doctor = patient.refDoctorName
       ? await Doctor.findOne({ name: patient.refDoctorName }).select("_id commission status").lean()
       : null;
-    if (patient.refDoctorName && !doctor) {
-      return Response.json({ error: "Referring doctor must be verified before billing" }, { status: 400 });
-    }
     if (doctor && doctor.status !== "Active") {
       return Response.json({ error: "Referring doctor must be active before billing" }, { status: 400 });
     }
@@ -184,8 +181,14 @@ export async function POST(req) {
     }
 
     const subtotalAmount = money(totalAmount);
-    const discountAmount = Math.min(money(body.discountAmount), subtotalAmount);
-    const taxAmount = money(body.taxAmount);
+
+    const rawDiscount = money(body.discountAmount);
+    if (rawDiscount > 0 && !hasPermission(auth.session, "billing.discount")) {
+      return Response.json({ error: "No permission to apply discounts" }, { status: 403 });
+    }
+    const discountAmount = Math.min(rawDiscount, subtotalAmount);
+
+    const taxAmount = Math.min(money(body.taxAmount), subtotalAmount);
     const invoiceAmount = money(subtotalAmount - discountAmount + taxAmount);
     const commissionRate = doctor?.commission || 0;
     const commissionAmount = (invoiceAmount * commissionRate) / 100;
@@ -222,7 +225,7 @@ export async function POST(req) {
           testDefinition: item.testDefinition,
           testSnapshot: item.testSnapshot,
         })),
-        { session }
+        { session, ordered: true }
       );
 
       const receivableAccount = await getAccountByCode(connection, auth.tenantId, "1100", { session });

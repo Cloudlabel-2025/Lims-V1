@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { Icons } from "@/app/components/Icons";
 
 const PAGE_SIZE = 20;
 
@@ -44,24 +45,52 @@ export default function ListsTab({
 }) {
   const [activeListTab, setActiveListTab] = useState("categories");
   const [page, setPage] = useState({ categories: 1, tests: 1, packages: 1 });
+  const [search, setSearch] = useState({ categories: "", tests: "", packages: "" });
+
+  const filteredCategories = useMemo(
+    () => {
+      const q = search.categories.toLowerCase();
+      return q ? categories.filter((c) => c.name.toLowerCase().includes(q)) : categories;
+    },
+    [categories, search.categories]
+  );
+  const filteredTests = useMemo(
+    () => {
+      const q = search.tests.toLowerCase();
+      return q ? tests.filter((t) => t.name.toLowerCase().includes(q)) : tests;
+    },
+    [tests, search.tests]
+  );
+  const filteredPackages = useMemo(
+    () => {
+      const q = search.packages.toLowerCase();
+      return q ? packages.filter((p) => p.name.toLowerCase().includes(q)) : packages;
+    },
+    [packages, search.packages]
+  );
 
   const paginatedCategories = useMemo(
-    () => categories.slice((page.categories - 1) * PAGE_SIZE, page.categories * PAGE_SIZE),
-    [categories, page.categories]
+    () => filteredCategories.slice((page.categories - 1) * PAGE_SIZE, page.categories * PAGE_SIZE),
+    [filteredCategories, page.categories]
   );
   const paginatedTests = useMemo(
-    () => tests.slice((page.tests - 1) * PAGE_SIZE, page.tests * PAGE_SIZE),
-    [tests, page.tests]
+    () => filteredTests.slice((page.tests - 1) * PAGE_SIZE, page.tests * PAGE_SIZE),
+    [filteredTests, page.tests]
   );
   const paginatedPackages = useMemo(
-    () => packages.slice((page.packages - 1) * PAGE_SIZE, page.packages * PAGE_SIZE),
-    [packages, page.packages]
+    () => filteredPackages.slice((page.packages - 1) * PAGE_SIZE, page.packages * PAGE_SIZE),
+    [filteredPackages, page.packages]
   );
 
   const totalPages = {
-    categories: Math.max(1, Math.ceil(categories.length / PAGE_SIZE)),
-    tests: Math.max(1, Math.ceil(tests.length / PAGE_SIZE)),
-    packages: Math.max(1, Math.ceil(packages.length / PAGE_SIZE)),
+    categories: Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE)),
+    tests: Math.max(1, Math.ceil(filteredTests.length / PAGE_SIZE)),
+    packages: Math.max(1, Math.ceil(filteredPackages.length / PAGE_SIZE)),
+  };
+
+  const handleSearch = (tab, value) => {
+    setSearch((prev) => ({ ...prev, [tab]: value }));
+    setPage((prev) => ({ ...prev, [tab]: 1 }));
   };
 
   const tabStyle = (isActive) => ({
@@ -104,6 +133,16 @@ export default function ListsTab({
             <h2>Department Categories</h2>
             <p>{categories.length} categories available</p>
           </div>
+          <div style={{ marginBottom: 12 }}>
+            <input
+              className="lims-input"
+              placeholder="Search categories..."
+              maxLength={35}
+              value={search.categories}
+              onChange={(e) => handleSearch("categories", e.target.value)}
+              style={{ height: 34, fontSize: 13, paddingLeft: 10 }}
+            />
+          </div>
           <div className="test-card-list">
             {paginatedCategories.map((cat) => (
               <article key={cat._id} className="test-card">
@@ -112,7 +151,7 @@ export default function ListsTab({
                   <span>Used in {categoryUsageCounts.get(cat._id) || 0} tests</span>
                 </div>
                 {onDeleteCategory && (
-                  <button type="button" className="test-card-delete" onClick={() => onDeleteCategory(cat._id)} title="Delete category">🗑</button>
+                  <button type="button" className="test-card-delete" onClick={() => onDeleteCategory(cat._id)} title="Delete category">{Icons.trash}</button>
                 )}
               </article>
             ))}
@@ -126,6 +165,16 @@ export default function ListsTab({
           <div className="module-panel-header">
             <h2>Defined Tests</h2>
             <p>{tests.length} tests configured</p>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <input
+              className="lims-input"
+              placeholder="Search tests..."
+              maxLength={35}
+              value={search.tests}
+              onChange={(e) => handleSearch("tests", e.target.value)}
+              style={{ height: 34, fontSize: 13, paddingLeft: 10 }}
+            />
           </div>
           <div className="test-card-list">
             {paginatedTests.map((test) => (
@@ -141,7 +190,7 @@ export default function ListsTab({
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <strong>{test.status}</strong>
                   {onDeleteTest && (
-                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeleteTest(test._id); }} title="Delete test">🗑</button>
+                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeleteTest(test._id); }} title="Delete test">{Icons.trash}</button>
                   )}
                 </div>
               </article>
@@ -157,6 +206,16 @@ export default function ListsTab({
             <h2>Defined Packages</h2>
             <p>{packages.length} packages configured</p>
           </div>
+          <div style={{ marginBottom: 12 }}>
+            <input
+              className="lims-input"
+              placeholder="Search packages..."
+              maxLength={35}
+              value={search.packages}
+              onChange={(e) => handleSearch("packages", e.target.value)}
+              style={{ height: 34, fontSize: 13, paddingLeft: 10 }}
+            />
+          </div>
           <div className="test-card-list">
             {paginatedPackages.map((pkg) => (
               <article
@@ -171,7 +230,7 @@ export default function ListsTab({
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <strong>{pkg.status}</strong>
                   {onDeletePackage && (
-                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeletePackage(pkg._id); }} title="Delete package">🗑</button>
+                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeletePackage(pkg._id); }} title="Delete package">{Icons.trash}</button>
                   )}
                 </div>
               </article>

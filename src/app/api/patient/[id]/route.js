@@ -14,10 +14,8 @@ export async function GET(req, { params }) {
     const { tenantId } = auth;
     const { Patient } = await getTenantModels(tenantId);
     const { id } = await params;
-    console.log("Backend API: GET single patient with ID:", id);
     const patient = await Patient.findById(id);
     if (!patient) {
-      console.log("Backend API: Patient not found for ID:", id);
       return Response.json({ error: "Patient not found" }, { status: 404 });
     }
     return Response.json(patient);
@@ -35,7 +33,6 @@ export async function PUT(req, { params }) {
     const { Patient } = await getTenantModels(tenantId);
     const body = await req.json();
     const { id } = await params;
-    console.log("Backend API: PUT single patient update for ID:", id);
 
     // Remove immutable fields if present in body
     delete body.patientId;

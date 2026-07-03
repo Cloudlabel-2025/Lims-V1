@@ -85,6 +85,7 @@ export async function GET(req) {
         primaryColor: lab.branding?.primaryColor || defaultTheme.primaryColor,
         secondaryColor: lab.branding?.secondaryColor || defaultTheme.secondaryColor,
         accentColor: lab.branding?.accentColor || defaultTheme.accentColor,
+        reportHeader: lab.branding?.reportHeader?.url || null,
         enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultTheme.enabledModules,
         loginHighlights: lab.branding?.loginHighlights || [],
       },
@@ -153,6 +154,24 @@ export async function PATCH(req) {
           : {}),
     };
 
+    if (body.reportHeader !== undefined) {
+      const rh = body.reportHeader;
+      if (rh === null) {
+        delete lab.branding.reportHeader;
+      } else if (rh && rh.url && rh.publicId) {
+        lab.branding.reportHeader = {
+          url: String(rh.url).trim(),
+          storageKey: String(rh.publicId).trim(),
+          publicId: String(rh.publicId).trim(),
+          originalName: String(rh.originalName || "").trim().slice(0, 180),
+          size: Number(rh.size) || undefined,
+          mimeType: String(rh.mimeType || "").trim().slice(0, 80),
+          altText: String(rh.altText || "").trim().slice(0, 120) || "Report header",
+          uploadedAt: rh.uploadedAt ? new Date(rh.uploadedAt) : new Date(),
+        };
+      }
+    }
+
     await lab.save();
     clearTenantConfigCache(auth.tenantId);
 
@@ -166,6 +185,7 @@ export async function PATCH(req) {
         primaryColor: lab.branding?.primaryColor || defaultTheme.primaryColor,
         secondaryColor: lab.branding?.secondaryColor || defaultTheme.secondaryColor,
         accentColor: lab.branding?.accentColor || defaultTheme.accentColor,
+        reportHeader: lab.branding?.reportHeader?.url || null,
         enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultTheme.enabledModules,
         loginHighlights: lab.branding?.loginHighlights || [],
       },

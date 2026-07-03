@@ -69,8 +69,9 @@ export async function GET(req) {
       status: tenant.status,
     });
     return NextResponse.json({ tenant: publicTenantPayload(tenant) });
-  } catch {
+  } catch (error) {
     debugRequestLog("invalid");
+    console.error("Internal tenant lookup error:", error);
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
 }

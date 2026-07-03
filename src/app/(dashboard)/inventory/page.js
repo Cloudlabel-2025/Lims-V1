@@ -338,7 +338,7 @@ export default function InventoryPage() {
 
         <div style={{ position: "relative", minWidth: 280, flex: "0 1 360px" }}>
           <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>{Icons.search}</span>
-          <input className="lims-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
+          <input className="lims-input" maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
         </div>
       </div>
 
@@ -387,7 +387,7 @@ export default function InventoryPage() {
                 <h5 style={{ margin: 0, fontSize: 16 }}>{editingItemId ? "Edit Item Master" : "Add Item Master"}</h5>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   <Field label="Item Code">
-                  <input className="lims-input" required value={itemForm.itemCode} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, itemCode: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, itemCode: "Code contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, itemCode: "" })); setItemForm({ ...itemForm, itemCode: v }); }} style={inputStyle()} />
+                   <input className="lims-input" required maxLength={35} value={itemForm.itemCode} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, itemCode: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, itemCode: "Code contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, itemCode: "" })); setItemForm({ ...itemForm, itemCode: v }); }} style={inputStyle()} />
                   <ErrorMsg message={itemFormErrors.itemCode} />
                 </Field>
                   <Field label="Type">
@@ -397,11 +397,11 @@ export default function InventoryPage() {
                   </Field>
                 </div>
                 <Field label="Item Name">
-                  <input className="lims-input" required value={itemForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, name: "" })); setItemForm({ ...itemForm, name: v }); }} style={inputStyle()} />
+                   <input className="lims-input" required minLength={2} maxLength={35} value={itemForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, name: "" })); setItemForm({ ...itemForm, name: v }); }} style={inputStyle()} />
                   <ErrorMsg message={itemFormErrors.name} />
                 </Field>
                 <Field label="Generic / Alternate Name">
-                  <input className="lims-input" value={itemForm.genericName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, genericName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, genericName: "Name contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, genericName: "" })); setItemForm({ ...itemForm, genericName: v }); }} style={inputStyle()} />
+                   <input className="lims-input" maxLength={35} value={itemForm.genericName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, genericName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, genericName: "Name contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, genericName: "" })); setItemForm({ ...itemForm, genericName: v }); }} style={inputStyle()} />
                   <ErrorMsg message={itemFormErrors.genericName} />
                 </Field>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -438,15 +438,15 @@ export default function InventoryPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                   <Field label="Conv. Factor">
-                    <input className="lims-input" type="number" min="0" step="0.001" value={itemForm.purchaseToBaseFactor} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, purchaseToBaseFactor: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, purchaseToBaseFactor: "" })); setItemForm({ ...itemForm, purchaseToBaseFactor: v }); }} style={inputStyle()} />
+                     <input className="lims-input" type="number" min="0" max="9999999999" step="0.001" value={itemForm.purchaseToBaseFactor} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, purchaseToBaseFactor: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, purchaseToBaseFactor: "" })); setItemForm({ ...itemForm, purchaseToBaseFactor: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.purchaseToBaseFactor} />
                   </Field>
                   <Field label="Min Stock">
-                    <input className="lims-input" type="number" min="0" step="0.001" value={itemForm.minimumStockBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, minimumStockBase: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, minimumStockBase: "" })); setItemForm({ ...itemForm, minimumStockBase: v }); }} style={inputStyle()} />
+                     <input className="lims-input" type="number" min="0" max="9999999999" step="0.001" value={itemForm.minimumStockBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, minimumStockBase: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, minimumStockBase: "" })); setItemForm({ ...itemForm, minimumStockBase: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.minimumStockBase} />
                   </Field>
                   <Field label="Reorder">
-                    <input className="lims-input" type="number" min="0" step="0.001" value={itemForm.reorderLevelBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, reorderLevelBase: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, reorderLevelBase: "" })); setItemForm({ ...itemForm, reorderLevelBase: v }); }} style={inputStyle()} />
+                     <input className="lims-input" type="number" min="0" max="9999999999" step="0.001" value={itemForm.reorderLevelBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, reorderLevelBase: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, reorderLevelBase: "" })); setItemForm({ ...itemForm, reorderLevelBase: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.reorderLevelBase} />
                   </Field>
                 </div>
@@ -467,31 +467,31 @@ export default function InventoryPage() {
                 {!editingItemId && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <Field label="Opening Qty">
-                      <input className="lims-input" type="number" min="0" step="0.001" value={itemForm.openingQuantityBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, openingQuantityBase: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, openingQuantityBase: "" })); setItemForm({ ...itemForm, openingQuantityBase: v }); }} style={inputStyle()} />
+                       <input className="lims-input" type="number" min="0" max="9999999999" step="0.001" value={itemForm.openingQuantityBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setItemFormErrors((p) => ({ ...p, openingQuantityBase: "Exponential notation is not allowed" })); return; } setItemFormErrors((p) => ({ ...p, openingQuantityBase: "" })); setItemForm({ ...itemForm, openingQuantityBase: v }); }} style={inputStyle()} />
                       <ErrorMsg message={itemFormErrors.openingQuantityBase} />
                     </Field>
                     <Field label="Batch No">
-                      <input className="lims-input" value={itemForm.batchNo} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, batchNo: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, batchNo: "Batch No contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, batchNo: "" })); setItemForm({ ...itemForm, batchNo: v }); }} style={inputStyle()} />
+                       <input className="lims-input" maxLength={35} value={itemForm.batchNo} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, batchNo: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, batchNo: "Batch No contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, batchNo: "" })); setItemForm({ ...itemForm, batchNo: v }); }} style={inputStyle()} />
                       <ErrorMsg message={itemFormErrors.batchNo} />
                     </Field>
                   </div>
                 )}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   <Field label="Manufacturer">
-                    <input className="lims-input" value={itemForm.manufacturer} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, manufacturer: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, manufacturer: "Manufacturer contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, manufacturer: "" })); setItemForm({ ...itemForm, manufacturer: v }); }} style={inputStyle()} />
+                     <input className="lims-input" maxLength={35} value={itemForm.manufacturer} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, manufacturer: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, manufacturer: "Manufacturer contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, manufacturer: "" })); setItemForm({ ...itemForm, manufacturer: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.manufacturer} />
                   </Field>
                   <Field label="Supplier">
-                    <input className="lims-input" value={itemForm.preferredSupplier} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, preferredSupplier: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, preferredSupplier: "Supplier contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, preferredSupplier: "" })); setItemForm({ ...itemForm, preferredSupplier: v }); }} style={inputStyle()} />
+                     <input className="lims-input" maxLength={35} value={itemForm.preferredSupplier} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, preferredSupplier: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, preferredSupplier: "Supplier contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, preferredSupplier: "" })); setItemForm({ ...itemForm, preferredSupplier: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.preferredSupplier} />
                   </Field>
                 </div>
                 <Field label="Location">
-                  <input className="lims-input" value={itemForm.defaultLocation} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, defaultLocation: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, defaultLocation: "Location contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, defaultLocation: "" })); setItemForm({ ...itemForm, defaultLocation: v }); }} style={inputStyle()} />
+                   <input className="lims-input" maxLength={35} value={itemForm.defaultLocation} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, defaultLocation: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, defaultLocation: "Location contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, defaultLocation: "" })); setItemForm({ ...itemForm, defaultLocation: v }); }} style={inputStyle()} />
                   <ErrorMsg message={itemFormErrors.defaultLocation} />
                 </Field>
                 <Field label="Storage Condition">
-                  <input className="lims-input" value={itemForm.storageCondition} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, storageCondition: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, storageCondition: "Storage condition contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, storageCondition: "" })); setItemForm({ ...itemForm, storageCondition: v }); }} style={inputStyle()} />
+                   <input className="lims-input" maxLength={35} value={itemForm.storageCondition} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setItemFormErrors((p) => ({ ...p, storageCondition: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setItemFormErrors((p) => ({ ...p, storageCondition: "Storage condition contains invalid characters" })); return; } setItemFormErrors((p) => ({ ...p, storageCondition: "" })); setItemForm({ ...itemForm, storageCondition: v }); }} style={inputStyle()} />
                   <ErrorMsg message={itemFormErrors.storageCondition} />
                 </Field>
                 <div style={{ display: "flex", gap: 10 }}>
@@ -528,11 +528,11 @@ export default function InventoryPage() {
               saving={saving}
               fields={<>
                 <Field label="Name">
-                  <input required className="lims-input" value={categoryForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCategoryFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCategoryFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCategoryFormErrors((p) => ({ ...p, name: "" })); setCategoryForm({ ...categoryForm, name: v }); }} style={inputStyle()} />
+                  <input required className="lims-input" maxLength={35} value={categoryForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCategoryFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCategoryFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } setCategoryFormErrors((p) => ({ ...p, name: "" })); setCategoryForm({ ...categoryForm, name: v }); }} style={inputStyle()} />
                   <ErrorMsg message={categoryFormErrors.name} />
                 </Field>
                 <Field label="Code">
-                  <input required className="lims-input" value={categoryForm.code} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCategoryFormErrors((p) => ({ ...p, code: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCategoryFormErrors((p) => ({ ...p, code: "Code contains invalid characters" })); return; } setCategoryFormErrors((p) => ({ ...p, code: "" })); setCategoryForm({ ...categoryForm, code: v }); }} style={inputStyle()} />
+                  <input required className="lims-input" maxLength={35} value={categoryForm.code} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setCategoryFormErrors((p) => ({ ...p, code: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setCategoryFormErrors((p) => ({ ...p, code: "Code contains invalid characters" })); return; } setCategoryFormErrors((p) => ({ ...p, code: "" })); setCategoryForm({ ...categoryForm, code: v }); }} style={inputStyle()} />
                   <ErrorMsg message={categoryFormErrors.code} />
                 </Field>
                 <Field label="Parent Category">
@@ -541,11 +541,11 @@ export default function InventoryPage() {
                     {parentCategories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
                   </select>
                 </Field>
-                <Field label="Description"><input className="lims-input" value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} style={inputStyle()} /></Field>
+                <Field label="Description"><input className="lims-input" maxLength={150} value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} style={inputStyle()} /></Field>
               </>}
             >
               <div style={{ display: "grid", gap: 10 }}>
-                <input className="lims-input" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} placeholder="Search categories..." style={{ ...inputStyle(), maxWidth: 300 }} />
+                <input className="lims-input" maxLength={35} value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} placeholder="Search categories..." style={{ ...inputStyle(), maxWidth: 300 }} />
                 <MasterTable headings={["Name", "Code", "Parent", "Status"]} rows={inventory.categories.filter((c) => { const q = categorySearch.toLowerCase(); return !q || c.name.toLowerCase().includes(q) || (c.code || "").toLowerCase().includes(q) || (c.parentCategory?.name || "").toLowerCase().includes(q); }).map((category) => [category.name, category.code || "-", category.parentCategory?.name || "Main", category.status])} />
               </div>
             </MastersPanel>
@@ -582,11 +582,11 @@ export default function InventoryPage() {
               saving={saving}
               fields={<>
                 <Field label="Name">
-                  <input required className="lims-input" value={uomForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setUomFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isLettersOnly(v)) { setUomFormErrors((p) => ({ ...p, name: "Name must contain only letters" })); return; } setUomFormErrors((p) => ({ ...p, name: "" })); setUomForm({ ...uomForm, name: v }); }} style={inputStyle()} />
+                  <input required className="lims-input" maxLength={35} value={uomForm.name} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setUomFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } if (v && !isLettersOnly(v)) { setUomFormErrors((p) => ({ ...p, name: "Name must contain only letters" })); return; } setUomFormErrors((p) => ({ ...p, name: "" })); setUomForm({ ...uomForm, name: v }); }} style={inputStyle()} />
                   <ErrorMsg message={uomFormErrors.name} />
                 </Field>
                 <Field label="Symbol">
-                  <input required className="lims-input" value={uomForm.symbol} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setUomFormErrors((p) => ({ ...p, symbol: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setUomFormErrors((p) => ({ ...p, symbol: "Symbol contains invalid characters" })); return; } setUomFormErrors((p) => ({ ...p, symbol: "" })); setUomForm({ ...uomForm, symbol: v }); }} style={inputStyle()} />
+                  <input required className="lims-input" maxLength={35} value={uomForm.symbol} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setUomFormErrors((p) => ({ ...p, symbol: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setUomFormErrors((p) => ({ ...p, symbol: "Symbol contains invalid characters" })); return; } setUomFormErrors((p) => ({ ...p, symbol: "" })); setUomForm({ ...uomForm, symbol: v }); }} style={inputStyle()} />
                   <ErrorMsg message={uomFormErrors.symbol} />
                 </Field>
                 <Field label="Type">
@@ -595,11 +595,11 @@ export default function InventoryPage() {
                   </select>
                 </Field>
                 <Field label="Conversion to Base">
-                  <input required className="lims-input" type="number" min="0" step="0.001" value={uomForm.conversionToBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setUomFormErrors((p) => ({ ...p, conversionToBase: "Exponential notation is not allowed" })); return; } setUomFormErrors((p) => ({ ...p, conversionToBase: "" })); setUomForm({ ...uomForm, conversionToBase: v }); }} style={inputStyle()} />
+                  <input required className="lims-input" type="number" min="0" max="9999999999" step="0.001" value={uomForm.conversionToBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setUomFormErrors((p) => ({ ...p, conversionToBase: "Exponential notation is not allowed" })); return; } setUomFormErrors((p) => ({ ...p, conversionToBase: "" })); setUomForm({ ...uomForm, conversionToBase: v }); }} style={inputStyle()} />
                   <ErrorMsg message={uomFormErrors.conversionToBase} />
                 </Field>
                 <Field label="Base Symbol">
-                  <input required className="lims-input" value={uomForm.baseSymbol} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setUomFormErrors((p) => ({ ...p, baseSymbol: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setUomFormErrors((p) => ({ ...p, baseSymbol: "Base symbol contains invalid characters" })); return; } setUomFormErrors((p) => ({ ...p, baseSymbol: "" })); setUomForm({ ...uomForm, baseSymbol: v }); }} style={inputStyle()} />
+                  <input required className="lims-input" maxLength={35} value={uomForm.baseSymbol} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setUomFormErrors((p) => ({ ...p, baseSymbol: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setUomFormErrors((p) => ({ ...p, baseSymbol: "Base symbol contains invalid characters" })); return; } setUomFormErrors((p) => ({ ...p, baseSymbol: "" })); setUomForm({ ...uomForm, baseSymbol: v }); }} style={inputStyle()} />
                   <ErrorMsg message={uomFormErrors.baseSymbol} />
                 </Field>
               </>}
@@ -774,27 +774,27 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
         )}
         {isReceipt && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Batch No"><input className="lims-input" value={form.batchNo} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, batchNo: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, batchNo: "Batch No contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, batchNo: "" })); setForm({ ...form, batchNo: v }); }} style={inputStyle()} /></Field>
+            <Field label="Batch No"><input className="lims-input" maxLength={35} value={form.batchNo} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, batchNo: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, batchNo: "Batch No contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, batchNo: "" })); setForm({ ...form, batchNo: v }); }} style={inputStyle()} /></Field>
             <Field label="Expiry"><input className="lims-input" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} style={inputStyle()} /></Field>
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Field label={isAdjustment ? "Current Batch Balance" : "Quantity"}>
-            <input required className="lims-input" type="number" min="0" step="0.001" value={isAdjustment ? form.newBalanceBase : form.quantityBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, [isAdjustment ? "newBalanceBase" : "quantityBase"]: "Exponential notation is not allowed" })); return; } setErrors?.((p) => ({ ...p, [isAdjustment ? "newBalanceBase" : "quantityBase"]: "" })); setForm({ ...form, [isAdjustment ? "newBalanceBase" : "quantityBase"]: v }); }} style={inputStyle()} />
+            <input required className="lims-input" type="number" min="0" max="9999999999" step="0.001" value={isAdjustment ? form.newBalanceBase : form.quantityBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, [isAdjustment ? "newBalanceBase" : "quantityBase"]: "Exponential notation is not allowed" })); return; } setErrors?.((p) => ({ ...p, [isAdjustment ? "newBalanceBase" : "quantityBase"]: "" })); setForm({ ...form, [isAdjustment ? "newBalanceBase" : "quantityBase"]: v }); }} style={inputStyle()} />
             <ErrorMsg message={isAdjustment ? errors.newBalanceBase : errors.quantityBase} />
           </Field>
-          <Field label="Cost / Base Unit"><input className="lims-input" type="number" min="0" step="0.01" value={form.costPerBaseUnit} onChange={(e) => setForm({ ...form, costPerBaseUnit: e.target.value })} style={inputStyle()} /></Field>
+          <Field label="Cost / Base Unit"><input className="lims-input" type="number" min="0" max="9999999999" step="0.01" value={form.costPerBaseUnit} onChange={(e) => setForm({ ...form, costPerBaseUnit: e.target.value })} style={inputStyle()} /></Field>
         </div>
         <Field label="Supplier / To Location">
-          <input className="lims-input" value={isReceipt ? form.supplier : form.toLocation} onChange={(e) => { const v = e.target.value; const key = isReceipt ? "supplier" : "toLocation"; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, [key]: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, [key]: "Field contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, [key]: "" })); setForm({ ...form, [key]: v }); }} style={inputStyle()} />
+          <input className="lims-input" maxLength={35} value={isReceipt ? form.supplier : form.toLocation} onChange={(e) => { const v = e.target.value; const key = isReceipt ? "supplier" : "toLocation"; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, [key]: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, [key]: "Field contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, [key]: "" })); setForm({ ...form, [key]: v }); }} style={inputStyle()} />
           <ErrorMsg message={isReceipt ? errors.supplier : errors.toLocation} />
         </Field>
         <Field label="Reference No">
-          <input className="lims-input" value={form.referenceNo} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, referenceNo: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, referenceNo: "Reference No contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, referenceNo: "" })); setForm({ ...form, referenceNo: v }); }} style={inputStyle()} />
+          <input className="lims-input" maxLength={35} value={form.referenceNo} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, referenceNo: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, referenceNo: "Reference No contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, referenceNo: "" })); setForm({ ...form, referenceNo: v }); }} style={inputStyle()} />
           <ErrorMsg message={errors.referenceNo} />
         </Field>
         <Field label="Reason">
-          <input className="lims-input" value={form.reason} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, reason: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, reason: "Reason contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, reason: "" })); setForm({ ...form, reason: v }); }} style={inputStyle()} />
+          <input className="lims-input" maxLength={150} value={form.reason} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, reason: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setErrors?.((p) => ({ ...p, reason: "Reason contains invalid characters" })); return; } setErrors?.((p) => ({ ...p, reason: "" })); setForm({ ...form, reason: v }); }} style={inputStyle()} />
           <ErrorMsg message={errors.reason} />
         </Field>
         <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Posting..." : "Post Transaction"}</button>

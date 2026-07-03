@@ -1,17 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const statusColors = {
   draft: ["#f1f5f9", "#475569"],
-  verified: ["#f0fdf4", "#15803d"],
+  reviewed: ["#eff6ff", "#1d4ed8"],
+  approved: ["#f0fdf4", "#15803d"],
   released: ["#ecfdf5", "#047857"],
-  delivered: ["#eff6ff", "#1d4ed8"],
 };
 
-const STATUS_OPTIONS = ["all", "draft", "verified", "released", "delivered"];
+const STATUS_OPTIONS = ["all", "draft", "reviewed", "approved", "released"];
 
-export default function ReportList({ reports, setSelectedReport, selectedReport, dateFrom, dateTo, onDateFromChange, onDateToChange }) {
+export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange, onDateToChange }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -25,7 +27,8 @@ export default function ReportList({ reports, setSelectedReport, selectedReport,
       const matchSearch = !q ||
         r.patient?.name?.toLowerCase().includes(q) ||
         r.testSnapshot?.name?.toLowerCase().includes(q) ||
-        r.reportId?.toLowerCase().includes(q);
+        r.reportId?.toLowerCase().includes(q) ||
+        r.sampleId?.toLowerCase().includes(q);
       let matchDate = true;
       if (from || to) {
         const rDate = new Date(r.createdAt);
@@ -41,6 +44,47 @@ export default function ReportList({ reports, setSelectedReport, selectedReport,
       <div className="module-panel-header">
         <h2>Generated Reports</h2>
         <p>{filtered.length} of {reports.length} reports</p>
+      </div>
+
+      <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+        {[
+          { label: "7 days", days: 7 },
+          { label: "30 days", days: 30 },
+          { label: "90 days", days: 90 },
+          { label: "All", days: 0 },
+        ].map((opt) => {
+          const isActive = opt.days === 0
+            ? !dateFrom && !dateTo
+            : dateFrom && !dateTo && dateFrom === new Date(Date.now() - opt.days * 86400000).toISOString().split("T")[0];
+          return (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => {
+                if (opt.days === 0) {
+                  onDateFromChange?.("");
+                  onDateToChange?.("");
+                } else {
+                  const d = new Date(Date.now() - opt.days * 86400000);
+                  onDateFromChange?.(d.toISOString().split("T")[0]);
+                  onDateToChange?.("");
+                }
+              }}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: isActive ? "1.5px solid var(--brand-action, var(--primary))" : "1px solid var(--border)",
+                background: isActive ? "var(--primary-50)" : "#fff",
+                color: isActive ? "var(--brand-action, var(--primary))" : "var(--text-secondary)",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
@@ -86,12 +130,11 @@ export default function ReportList({ reports, setSelectedReport, selectedReport,
             <article
               key={report._id}
               className="test-card"
-              onClick={() => setSelectedReport(report)}
-              style={selectedReport?._id === report._id ? { borderColor: "var(--primary)", background: "var(--primary-50)" } : {}}
+              onClick={() => router.push(`/reports/${report._id}`)}
             >
               <div>
                 <h3>{report.testSnapshot?.name}</h3>
-                <span>{report.patient?.name} &middot; {report.reportId}</span>
+                <span>{report.patient?.name} &middot; {report.reportId} {report.version > 1 ? `v${report.version}` : ""}</span>
               </div>
               <span style={{ background: bg, color, borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 800 }}>
                 {report.status}

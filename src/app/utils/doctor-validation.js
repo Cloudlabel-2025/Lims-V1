@@ -14,7 +14,8 @@ export function isValidDoctorName(value) {
 export function isValidMciNumber(value) {
   const cleaned = cleanDoctorValue(value);
   if (/https?:\/\//i.test(cleaned) || /www\./i.test(cleaned)) return false;
-  return /^[A-Z]{2,}[A-Z\s/-]*\d[\d\s/-]*$/.test(cleaned.toUpperCase());
+  if (cleaned.length < 5 || cleaned.length > 20) return false;
+  return /^[A-Za-z0-9\s/-]+$/.test(cleaned);
 }
 
 export function isValidDoctorDegree(value) {

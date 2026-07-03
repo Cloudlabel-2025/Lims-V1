@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { tenantModuleGroups } from "@/app/lib/modules";
 import { getAllowedNavItems, hasAnyPermission, hasPermission } from "@/app/lib/client-rbac";
 
 export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout, theme, user }) {
@@ -20,12 +21,25 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
     analytics: Icons.barChart,
     accounts: Icons.wallet,
     inventory: Icons.flask,
-    quality: Icons.shield,
   };
   const navItems = getAllowedNavItems(user, theme)
     .map((module) => ({ ...module, icon: iconByModule[module.id] || Icons.settings }));
+  const allowedIds = new Set(navItems.map((item) => item.id));
+
+  const groupsWithItems = tenantModuleGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((id) => allowedIds.has(id)),
+    }))
+    .filter((group) => group.items.length > 0);
+
   const canOpenSettings = hasAnyPermission(user, ["settings.manage", "users.manage"]);
   const canViewAudit = hasAnyPermission(user, ["settings.manage"]);
+  const adminItems = [
+    ...(canOpenSettings ? [{ id: "settings", label: "Settings", href: "/settings", icon: Icons.settings }] : []),
+    ...(hasAnyPermission(user, ["users.manage"]) ? [{ id: "users", label: "User Assignment", href: "/users", icon: Icons.person }] : []),
+    ...(canViewAudit ? [{ id: "audit", label: "Audit Log", href: "/audit", icon: Icons.list }] : []),
+  ];
 
   const isActive = (href) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -35,8 +49,8 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
   return (
     <>
       {mobileOpen && (
-        <div 
-          className="sidebar-overlay open" 
+        <div
+          className="sidebar-overlay open"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -54,57 +68,44 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
 
       {/* Navigation */}
       <nav className="dash-nav">
-        <div className="dash-nav-section-label">{!collapsed && "Main Menu"}</div>
-        {navItems.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            className={`dash-nav-item ${isActive(item.href) ? "active" : ""}`}
-            onClick={() => setMobileOpen && setMobileOpen(false)}
-          >
-            <span className="dash-nav-icon">{item.icon}</span>
-            {!collapsed && <span className="dash-nav-label">{item.label}</span>}
-            {isActive(item.href) && <div className="dash-nav-indicator" />}
-          </Link>
+        {groupsWithItems.map((group) => (
+          <div key={group.id} className="dash-nav-section">
+            <div className="dash-nav-section-label">{!collapsed && group.label}</div>
+            {group.items.map((itemId) => {
+              const item = navItems.find((i) => i.id === itemId);
+              if (!item) return null;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`dash-nav-item ${isActive(item.href) ? "active" : ""}`}
+                  onClick={() => setMobileOpen && setMobileOpen(false)}
+                >
+                  <span className="dash-nav-icon">{item.icon}</span>
+                  {!collapsed && <span className="dash-nav-label">{item.label}</span>}
+                  {isActive(item.href) && <div className="dash-nav-indicator" />}
+                </Link>
+              );
+            })}
+          </div>
         ))}
 
-        {canOpenSettings && (
-          <>
-            <div className="dash-nav-section-label" style={{ marginTop: 20 }}>
-              {!collapsed && "Settings"}
-            </div>
-            <Link
-              href="/settings"
-              className={`dash-nav-item ${pathname === "/settings" ? "active" : ""}`}
-              onClick={() => setMobileOpen && setMobileOpen(false)}
-            >
-              <span className="dash-nav-icon">{Icons.settings}</span>
-              {!collapsed && <span className="dash-nav-label">Settings</span>}
-              {pathname === "/settings" && <div className="dash-nav-indicator" />}
-            </Link>
-            {hasAnyPermission(user, ["users.manage"]) && (
+        {adminItems.length > 0 && (
+          <div className="dash-nav-section">
+            <div className="dash-nav-section-label">{!collapsed && "Administration"}</div>
+            {adminItems.map((item) => (
               <Link
-                href="/users"
-                className={`dash-nav-item ${pathname === "/users" ? "active" : ""}`}
+                key={item.id}
+                href={item.href}
+                className={`dash-nav-item ${pathname === item.href ? "active" : ""}`}
                 onClick={() => setMobileOpen && setMobileOpen(false)}
               >
-                <span className="dash-nav-icon">{Icons.person}</span>
-                {!collapsed && <span className="dash-nav-label">User Assignment</span>}
-                {pathname === "/users" && <div className="dash-nav-indicator" />}
+                <span className="dash-nav-icon">{item.icon}</span>
+                {!collapsed && <span className="dash-nav-label">{item.label}</span>}
+                {pathname === item.href && <div className="dash-nav-indicator" />}
               </Link>
-            )}
-            {canViewAudit && (
-              <Link
-                href="/audit"
-                className={`dash-nav-item ${pathname === "/audit" ? "active" : ""}`}
-                onClick={() => setMobileOpen && setMobileOpen(false)}
-              >
-                <span className="dash-nav-icon">{Icons.list}</span>
-                {!collapsed && <span className="dash-nav-label">Audit Log</span>}
-                {pathname === "/audit" && <div className="dash-nav-indicator" />}
-              </Link>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </nav>
 

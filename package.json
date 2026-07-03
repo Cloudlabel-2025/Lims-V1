@@ -13,10 +13,12 @@
   "dependencies": {
     "bootstrap": "^5.3.8",
     "cloudinary": "^2.10.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "mongoose": "^9.4.1",
     "next": "^16.2.6",
-    "react": "19.2.3",
     "nodemailer": "^9.0.1",
+    "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {

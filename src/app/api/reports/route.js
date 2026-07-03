@@ -60,7 +60,7 @@ export async function GET(req) {
     const { TestReport } = await getTenantModels(auth.tenantId);
     const reports = await TestReport.find(query)
       .populate("patient", "name patientId age gender phone")
-      .select("reportId patient testDefinition testSnapshot results remarks status enteredBy createdAt updatedAt")
+      .select("reportId sampleId patient testDefinition testSnapshot results remarks status enteredBy version template createdAt updatedAt")
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();
@@ -83,8 +83,9 @@ export async function POST(req) {
     const sampleId = clean(body.sample);
     let patientId = clean(body.patient);
     let testDefinitionId = clean(body.testDefinition);
+    const template = clean(body.template) || "test-report";
 
-    const { Patient, TestDefinition, TestReport, Sample, BillingRecord, QcLog } = await getTenantModels(auth.tenantId);
+    const { Patient, TestDefinition, TestReport, Sample, BillingRecord } = await getTenantModels(auth.tenantId);
 
     if (!sampleId) {
       return Response.json({ error: "Sample is required for result entry" }, { status: 400 });
@@ -92,21 +93,11 @@ export async function POST(req) {
 
     const sample = await Sample.findById(sampleId);
     if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
-    if (!["collected", "processing"].includes(sample.status)) {
-      return Response.json({ error: "Sample must be collected before result entry" }, { status: 400 });
+    if (!["in-testing", "testing-complete", "processing", "completed"].includes(sample.status)) {
+      return Response.json({ error: "Sample must be in testing before result entry" }, { status: 400 });
     }
     patientId = String(sample.patient);
     testDefinitionId = String(sample.testDefinition);
-
-    const qcPass = await QcLog.findOne({
-      sample: sample._id,
-      tenantId: auth.tenantId,
-      result: "pass",
-    }).sort({ createdAt: -1 });
-
-    if (!qcPass) {
-      return Response.json({ error: "QC approval is required before result entry" }, { status: 400 });
-    }
 
     if (!patientId) return Response.json({ error: "Patient is required" }, { status: 400 });
     if (!testDefinitionId) return Response.json({ error: "Test is required" }, { status: 400 });
@@ -182,6 +173,8 @@ export async function POST(req) {
       remarks: clean(body.remarks),
       status: "draft",
       enteredBy: auth.session.email,
+      template,
+      version: 1,
     });
 
     sample.status = "reported";

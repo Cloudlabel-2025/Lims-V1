@@ -59,12 +59,6 @@ export const availableLabModules = [
     permission: "inventory.view",
     href: "/inventory",
   },
-  {
-    id: "quality",
-    label: "Quality Control",
-    permission: "quality.view",
-    href: "/quality",
-  },
 ];
 
 export const defaultLabModules = [
@@ -83,7 +77,7 @@ export const tenantModuleGroups = [
   {
     id: "operations",
     label: "Lab Operations",
-    items: ["dashboard", "patients", "doctors", "tests", "samples", "reports", "quality"],
+    items: ["dashboard", "patients", "doctors", "tests", "samples", "reports"],
   },
   {
     id: "finance",

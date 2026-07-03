@@ -1,5 +1,6 @@
 "use client";
 
+import { Icons } from "@/app/components/Icons";
 import dynamic from "next/dynamic";
 
 const MultiSelect = dynamic(() => import("@/app/components/MultiSelect"), {
@@ -41,6 +42,8 @@ export default function PackagesTab({
                     onChange={(e) => setPackageForm((p) => ({ ...p, name: e.target.value }))}
                     placeholder="Enter package name"
                     required
+                    minLength={2}
+                    maxLength={35}
                     pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*"
                     title="Only letters, numbers, spaces, and . &amp; ' / , - allowed"
                   />
@@ -52,6 +55,7 @@ export default function PackagesTab({
                     onChange={(e) => setPackageForm((p) => ({ ...p, code: e.target.value }))}
                     placeholder="Enter package code"
                     required
+                    maxLength={35}
                     pattern="[A-Za-z0-9_-]+"
                     title="Only letters, numbers, underscore, and hyphen"
                   />
@@ -62,6 +66,7 @@ export default function PackagesTab({
                   value={packageForm.description}
                   onChange={(e) => setPackageForm((p) => ({ ...p, description: e.target.value }))}
                   placeholder="Enter description"
+                  maxLength={150}
                   style={{ width: "100%", height: "80px", padding: "10px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border)", fontSize: "13.5px" }}
                 />
               </label>
@@ -71,7 +76,7 @@ export default function PackagesTab({
                   <input
                     type="number"
                     min="0"
-                    max="999999999"
+                    max="9999999999"
                     value={packageForm.price}
                     onChange={(e) => setPackageForm((p) => ({ ...p, price: e.target.value }))}
                     placeholder="Enter price"
@@ -149,7 +154,7 @@ export default function PackagesTab({
                       onClick={(e) => { e.stopPropagation(); onDeletePackage(pkg._id); }}
                       title="Delete package"
                     >
-                      🗑
+                      {Icons.trash}
                     </button>
                   )}
                 </div>

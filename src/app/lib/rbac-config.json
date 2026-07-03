@@ -410,8 +410,8 @@
                             "action":  "delete",
                             "category":  "samples",
                             "dependencies":  [
-                                                 "samples.view"
-                                             ],
+                                                  "samples.view"
+                                              ],
                             "description":  "Delete sample records.",
                             "isDangerous":  true,
                             "availableForPlans":  [
@@ -419,6 +419,18 @@
                                                        "enterprise"
                                                    ],
                             "sortOrder":  124
+                        },
+                        {
+                            "name":  "Register Samples",
+                            "key":  "samples.create",
+                            "module":  "samples",
+                            "action":  "create",
+                            "category":  "samples",
+                            "dependencies":  [
+                                                  "samples.view"
+                                              ],
+                            "description":  "Register new sample records outside of billing.",
+                            "sortOrder":  125
                         },
                         {
                             "name":  "View Reports",
@@ -701,36 +713,6 @@
                                                       "enterprise"
                                                   ],
                             "sortOrder":  181
-                        },
-                        {
-                            "name":  "View Quality Control",
-                            "key":  "quality.view",
-                            "module":  "quality",
-                            "action":  "view",
-                            "category":  "quality",
-                            "description":  "View QC logs, calibration records, and quality events.",
-                            "availableForPlans":  [
-                                                      "professional",
-                                                      "enterprise"
-                                                  ],
-                            "sortOrder":  190
-                        },
-                        {
-                            "name":  "Manage Quality Control",
-                            "key":  "quality.manage",
-                            "module":  "quality",
-                            "action":  "manage",
-                            "category":  "quality",
-                            "dependencies":  [
-                                                 "quality.view"
-                                             ],
-                            "description":  "Manage QC logs, calibration records, and corrective actions.",
-                            "isDangerous":  true,
-                            "availableForPlans":  [
-                                                      "professional",
-                                                      "enterprise"
-                                                  ],
-                            "sortOrder":  191
                         }
                     ],
     "roleTemplates":  [
@@ -772,11 +754,10 @@
                                                   "billing.collect",
                                                   "accounts.view",
                                                   "accounts.reports",
-                                                  "analytics.view",
-                                                  "inventory.view",
-                                                  "quality.view"
-                                              ],
-                              "category":  "management",
+                                                   "analytics.view",
+                                                   "inventory.view"
+                                               ],
+                               "category":  "management",
                               "availableForPlans":  [
                                                         "professional",
                                                         "enterprise"
@@ -842,10 +823,9 @@
                                                   "reports.edit",
                                                   "reports.verify",
                                                   "reports.release",
-                                                  "reports.print",
-                                                  "quality.view"
-                                              ],
-                              "category":  "reporting",
+                                                   "reports.print"
+                                               ],
+                               "category":  "reporting",
                               "availableForPlans":  [
                                                         "professional",
                                                         "enterprise"
@@ -964,25 +944,7 @@
                                                         "enterprise"
                                                     ],
                               "sortOrder":  60
-                          },
-                          {
-                              "name":  "Quality Control",
-                              "description":  "Manages QC logs, calibration records, and quality checks.",
-                              "permissions":  [
-                                                  "dashboard.view",
-                                                  "samples.view",
-                                                  "reports.view",
-                                                  "inventory.view",
-                                                  "quality.view",
-                                                  "quality.manage"
-                                              ],
-                              "category":  "quality",
-                              "availableForPlans":  [
-                                                        "professional",
-                                                        "enterprise"
-                                                    ],
-                              "sortOrder":  70
-                          }
+                            }
                       ]
 }
 

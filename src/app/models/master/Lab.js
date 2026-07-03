@@ -166,6 +166,16 @@ export const LabSchema = new mongoose.Schema(
         match: /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/,
         default: "#f59e0b",
       },
+      reportHeader: {
+        url: { type: String, trim: true },
+        storageKey: { type: String, trim: true, select: false },
+        publicId: { type: String, trim: true, select: false },
+        originalName: { type: String, trim: true },
+        size: { type: Number, min: 0 },
+        mimeType: { type: String, trim: true },
+        altText: { type: String, trim: true, maxlength: 120 },
+        uploadedAt: { type: Date },
+      },
       loginHighlights: {
         type: [
           {

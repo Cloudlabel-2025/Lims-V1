@@ -34,7 +34,7 @@ const getTimeAgo = (date) => {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} hr${hours > 1 ? "s" : ""} ago`;
 
-  return new Date(date).toLocaleDateString();
+  return new Date(date).toLocaleDateString("en-IN");
 };
 
 async function loadDashboardStats() {
@@ -71,7 +71,7 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const today = new Date().toLocaleDateString("en-US", {
+  const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
     year: "numeric",
     month: "long",

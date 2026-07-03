@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { hasPermission } from "@/app/lib/client-rbac";
+import { useCurrentUser } from "@/app/lib/use-current-user";
 
 function rangeText(result) {
   const hasMin = Number.isFinite(result.normalMin);
@@ -31,25 +34,58 @@ const templateLabels = {
   "summary": "Summary Report",
 };
 
-export default function ReportPreview({ selectedReport, labConfig, canEditReports, canPrintReports, canVerifyReports, canReleaseReports, canDeleteReports, onReportUpdated, onSuccess, onDelete }) {
+export default function ReportViewPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const user = useCurrentUser();
+  const [report, setReport] = useState(null);
+  const [labConfig, setLabConfig] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState("");
   const printRef = useRef(null);
 
-  if (!selectedReport) return null;
+  const canEditReports = hasPermission(user, "reports.edit");
+  const canPrintReports = hasPermission(user, "reports.print");
+  const canVerifyReports = hasPermission(user, "reports.verify");
+  const canReleaseReports = hasPermission(user, "reports.release");
+  const canDeleteReports = hasPermission(user, "reports.delete");
 
-  const flow = statusFlow[selectedReport.status];
-  const canAct =
-    (flow?.next === "review" && canVerifyReports) ||
-    (flow?.next === "approve" && canVerifyReports) ||
-    (flow?.next === "release" && canReleaseReports);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError("");
+      try {
+        const [reportRes, themeRes] = await Promise.all([
+          fetch(`/api/reports/${id}`, { credentials: "include" }),
+          fetch("/api/theme", { credentials: "include" }),
+        ]);
+        const reportData = await reportRes.json();
+        if (!reportRes.ok) throw new Error(reportData.error || "Report not found");
+        if (!cancelled) {
+          setReport(reportData.report);
+          if (themeRes.ok) {
+            const themeData = await themeRes.json();
+            setLabConfig(themeData.theme || null);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [id]);
 
-  async function performAction(action) {
+  const performAction = useCallback(async (action) => {
     setUpdating(true);
     setError("");
     try {
-      const res = await fetch(`/api/reports/${selectedReport._id}`, {
+      const res = await fetch(`/api/reports/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -57,14 +93,13 @@ export default function ReportPreview({ selectedReport, labConfig, canEditReport
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to update report");
-      onReportUpdated?.(data.report);
-      onSuccess?.(`Report ${data.report?.reportId || ""} ${action === "review" ? "reviewed" : action === "approve" ? "approved" : "released"} successfully.`);
+      setReport(data.report);
     } catch (err) {
       setError(err.message);
     } finally {
       setUpdating(false);
     }
-  }
+  }, [id]);
 
   async function downloadPdf() {
     setDownloading(true);
@@ -90,7 +125,7 @@ export default function ReportPreview({ selectedReport, labConfig, canEditReport
         pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
         heightLeft -= pageHeight;
       }
-      pdf.save(`${selectedReport.reportId || "report"}.pdf`);
+      pdf.save(`${report.reportId || "report"}.pdf`);
     } catch (err) {
       setError("Failed to generate PDF: " + err.message);
     } finally {
@@ -98,27 +133,71 @@ export default function ReportPreview({ selectedReport, labConfig, canEditReport
     }
   }
 
-  const [badgeBg, badgeColor] = statusBadge[selectedReport.status] || ["var(--surface)", "var(--text-secondary)"];
-  const templateLabel = templateLabels[selectedReport.template] || selectedReport.template || "Test Report";
+  async function handleDelete() {
+    if (!confirm("Delete this report? This action cannot be undone.")) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/reports/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to delete report");
+      router.push("/reports");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
+  if (loading) {
+    return (
+      <div className="module-page">
+        <div className="module-header"><h1>Loading report...</h1></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="module-page">
+        <div className="module-header">
+          <button className="dash-btn-secondary" onClick={() => router.push("/reports")}>{Icons.back} Back to Reports</button>
+        </div>
+        <div className="module-alert">{error}</div>
+      </div>
+    );
+  }
+
+  if (!report) return null;
+
+  const flow = statusFlow[report.status];
+  const canAct =
+    (flow?.next === "review" && canVerifyReports) ||
+    (flow?.next === "approve" && canVerifyReports) ||
+    (flow?.next === "release" && canReleaseReports);
+  const [badgeBg, badgeColor] = statusBadge[report.status] || ["var(--surface)", "var(--text-secondary)"];
+  const templateLabel = templateLabels[report.template] || report.template || "Test Report";
   const labName = labConfig?.labName || "Laboratory";
   const labLogo = labConfig?.logo;
   const now = new Date();
 
   return (
-    <section className="module-panel report-preview">
-      <div className="report-title-row">
+    <div className="module-page">
+      <div className="module-header">
         <div>
+          <button className="dash-btn-secondary" onClick={() => router.push("/reports")} style={{ marginBottom: 8 }}>
+            {Icons.back} Back to Reports
+          </button>
           <p className="module-kicker">Structured Report</p>
-          <h2>{selectedReport.testSnapshot?.name}</h2>
-          <span>{selectedReport.reportId}</span>
-          {selectedReport.sampleId && <span className="report-sample-id-badge">Sample: {selectedReport.sampleId}</span>}
-          {selectedReport.version > 1 && <span className="report-version-badge">v{selectedReport.version}</span>}
+          <h1>{report.testSnapshot?.name}</h1>
+          <span>{report.reportId}</span>
+          {report.sampleId && <span className="report-sample-id-badge">Sample: {report.sampleId}</span>}
+          {report.version > 1 && <span className="report-version-badge">v{report.version}</span>}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <span className="report-template-badge">{templateLabel}</span>
           <span style={{ background: badgeBg, color: badgeColor, borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 800 }}>
-            {selectedReport.status}
+            {report.status}
           </span>
           {canAct && flow && (
             <button
@@ -145,10 +224,10 @@ export default function ReportPreview({ selectedReport, labConfig, canEditReport
               </button>
             </>
           )}
-          {canDeleteReports && selectedReport.status === "draft" && (
+          {canDeleteReports && report.status === "draft" && (
             <button
               type="button"
-              onClick={() => onDelete?.(selectedReport._id)}
+              onClick={handleDelete}
               style={{ height: 36, padding: "0 14px", border: "1px solid var(--error)", borderRadius: 8, background: "#fff", color: "var(--error)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
             >
               Delete
@@ -157,7 +236,7 @@ export default function ReportPreview({ selectedReport, labConfig, canEditReport
         </div>
       </div>
 
-      {error && <div className="module-alert" style={{ marginTop: 12 }}>{error}</div>}
+      {error && <div className="module-alert">{error}</div>}
 
       <div id="report-print-area" ref={printRef} className="report-print-area">
         <div className="report-print-header">
@@ -169,41 +248,19 @@ export default function ReportPreview({ selectedReport, labConfig, canEditReport
         </div>
 
         <div className="report-patient-grid">
-          <div>
-            <span>Patient</span>
-            <strong>{selectedReport.patient?.name}</strong>
-          </div>
-          <div>
-            <span>Patient ID</span>
-            <strong>{selectedReport.patient?.patientId}</strong>
-          </div>
-          <div>
-            <span>Age / Gender</span>
-            <strong>{selectedReport.patient?.age || "-"} / {selectedReport.patient?.gender || "-"}</strong>
-          </div>
-          <div>
-            <span>Sample</span>
-            <strong>{selectedReport.testSnapshot?.sampleType || "-"}</strong>
-          </div>
-          <div>
-            <span>Sample ID</span>
-            <strong>{selectedReport.sampleId || "-"}</strong>
-          </div>
-          <div>
-            <span>Report Date</span>
-            <strong>{new Date(selectedReport.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>
-          </div>
+          <div><span>Patient</span><strong>{report.patient?.name}</strong></div>
+          <div><span>Patient ID</span><strong>{report.patient?.patientId}</strong></div>
+          <div><span>Age / Gender</span><strong>{report.patient?.age || "-"} / {report.patient?.gender || "-"}</strong></div>
+          <div><span>Sample</span><strong>{report.testSnapshot?.sampleType || "-"}</strong></div>
+          <div><span>Sample ID</span><strong>{report.sampleId || "-"}</strong></div>
+          <div><span>Report Date</span><strong>{new Date(report.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong></div>
         </div>
 
         <div className="report-result-table">
           <div className="report-result-head">
-            <span>Parameter</span>
-            <span>Result</span>
-            <span>Unit</span>
-            <span>Normal Range</span>
-            <span>Flag</span>
+            <span>Parameter</span><span>Result</span><span>Unit</span><span>Normal Range</span><span>Flag</span>
           </div>
-          {selectedReport.results?.map((result) => (
+          {report.results?.map((result) => (
             <div key={result.key} className={`report-result-row ${result.flag}`}>
               <span>{result.name}</span>
               <strong>{result.textValue || result.value || "-"}</strong>
@@ -214,30 +271,20 @@ export default function ReportPreview({ selectedReport, labConfig, canEditReport
           ))}
         </div>
 
-        {selectedReport.remarks && <p className="report-remarks">{selectedReport.remarks}</p>}
+        {report.remarks && <p className="report-remarks">{report.remarks}</p>}
 
         <div className="report-print-footer">
           <p>{labName} Laboratory Report | Generated on {now.toLocaleDateString("en-IN")} {now.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true })}</p>
         </div>
       </div>
 
-      <div className="report-status-history">
-        {selectedReport.reviewedAt && (
-          <div><strong>Reviewed:</strong> {new Date(selectedReport.reviewedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })} {selectedReport.reviewedBy ? `by ${selectedReport.reviewedBy}` : ""}</div>
-        )}
-        {selectedReport.approvedAt && (
-          <div><strong>Approved:</strong> {new Date(selectedReport.approvedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })} {selectedReport.approvedBy ? `by ${selectedReport.approvedBy}` : ""}</div>
-        )}
-        {selectedReport.releasedAt && (
-          <div><strong>Released:</strong> {new Date(selectedReport.releasedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })} {selectedReport.releasedBy ? `by ${selectedReport.releasedBy}` : ""}</div>
-        )}
-        {selectedReport.enteredBy && (
-          <div><strong>Entered by:</strong> {selectedReport.enteredBy}</div>
-        )}
-        {selectedReport.version > 1 && (
-          <div><strong>Version:</strong> {selectedReport.version} ({selectedReport.previousVersions?.length || 0} previous revision{(selectedReport.previousVersions?.length || 0) !== 1 ? "s" : ""})</div>
-        )}
+      <div className="report-status-history" style={{ marginTop: 16 }}>
+        {report.reviewedAt && <div><strong>Reviewed:</strong> {new Date(report.reviewedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })} {report.reviewedBy ? `by ${report.reviewedBy}` : ""}</div>}
+        {report.approvedAt && <div><strong>Approved:</strong> {new Date(report.approvedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })} {report.approvedBy ? `by ${report.approvedBy}` : ""}</div>}
+        {report.releasedAt && <div><strong>Released:</strong> {new Date(report.releasedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })} {report.releasedBy ? `by ${report.releasedBy}` : ""}</div>}
+        {report.enteredBy && <div><strong>Entered by:</strong> {report.enteredBy}</div>}
+        {report.version > 1 && <div><strong>Version:</strong> {report.version} ({report.previousVersions?.length || 0} previous revision{(report.previousVersions?.length || 0) !== 1 ? "s" : ""})</div>}
       </div>
-    </section>
+    </div>
   );
 }

@@ -13,16 +13,43 @@ function getCounterModel(connection) {
   );
 }
 
-async function getNextSequence(connection, name) {
+async function getNextSequence(connection, name, session) {
   const Counter = getCounterModel(connection);
-  const counter = await Counter.findOneAndUpdate(
-    { name },
-    { $inc: { seq: 1 } },
-    { returnDocument: "after", upsert: true }
-  );
+  const options = { returnDocument: "after", upsert: true };
+  if (session) options.session = session;
+  const counter = await Counter.findOneAndUpdate({ name }, { $inc: { seq: 1 } }, options);
 
   return counter.seq;
 }
+
+const CustodyEntrySchema = new mongoose.Schema(
+  {
+    action: { type: String, required: true, trim: true },
+    handledBy: { type: String, required: true, trim: true },
+    notes: { type: String, trim: true, maxlength: 300 },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const ResultParameterSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    unit: { type: String, trim: true },
+    normalMin: { type: Number },
+    normalMax: { type: Number },
+    required: { type: Boolean, default: true },
+    value: { type: Number },
+    textValue: { type: String, trim: true },
+    flag: {
+      type: String,
+      enum: ["normal", "low", "high", "not-entered"],
+      default: "not-entered",
+    },
+  },
+  { _id: false }
+);
 
 export const SampleSchema = new mongoose.Schema(
   {
@@ -41,12 +68,10 @@ export const SampleSchema = new mongoose.Schema(
     billingRecord: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "BillingRecord",
-      required: true,
       index: true,
     },
     billingItemId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
       index: true,
     },
     patient: {
@@ -67,17 +92,22 @@ export const SampleSchema = new mongoose.Schema(
       categoryName: String,
       sampleType: String,
     },
-    collectedAt: {
-      type: Date,
-    },
-    collectorName: {
+    sampleType: {
       type: String,
       trim: true,
+      maxlength: 80,
+    },
+    receivedAt: { type: Date },
+    receivedBy: { type: String, trim: true },
+    batchId: { type: String, trim: true, index: true },
+    results: {
+      type: [ResultParameterSchema],
+      default: [],
     },
     status: {
       type: String,
-      enum: ["pending", "collected", "processing", "rejected", "reported"],
-      default: "pending",
+      enum: ["registered", "collected", "processing", "completed", "released", "rejected", "archived"],
+      default: "registered",
       index: true,
     },
     rejectionReason: {
@@ -85,13 +115,18 @@ export const SampleSchema = new mongoose.Schema(
       trim: true,
       maxlength: 300,
     },
+    custodyLog: {
+      type: [CustodyEntrySchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );
 
 SampleSchema.pre("save", async function generateSampleId() {
   if (!this.sampleId) {
-    const seq = await getNextSequence(this.constructor.db, "sampleId");
+    const session = this.$session();
+    const seq = await getNextSequence(this.constructor.db, "sampleId", session);
     this.sampleId = `SMP-${String(seq).padStart(6, "0")}`;
   }
 
@@ -100,6 +135,45 @@ SampleSchema.pre("save", async function generateSampleId() {
   }
 });
 
+SampleSchema.methods.addCustodyEntry = function (action, handledBy, notes) {
+  this.custodyLog.push({
+    action,
+    handledBy,
+    notes: notes || "",
+    timestamp: new Date(),
+  });
+};
+
+SampleSchema.methods.transitionStatus = function (newStatus, handledBy, notes) {
+  const oldStatus = this.status;
+
+  const validTransitions = {
+    registered: ["collected", "rejected"],
+    collected: ["processing", "rejected"],
+    processing: ["completed", "rejected"],
+    completed: ["released", "rejected"],
+    rejected: [],
+    released: [],
+    archived: [],
+  };
+
+  if (newStatus === "rejected" && !["rejected", "released", "archived"].includes(oldStatus)) {
+    this.status = newStatus;
+    this.addCustodyEntry(`status:${oldStatus} -> ${newStatus}`, handledBy, notes);
+    return;
+  }
+
+  const allowed = validTransitions[oldStatus] || [];
+  if (!allowed.includes(newStatus)) {
+    throw new Error(`Cannot transition from ${oldStatus} to ${newStatus}`);
+  }
+
+  this.status = newStatus;
+  this.addCustodyEntry(`status:${oldStatus} -> ${newStatus}`, handledBy, notes);
+};
+
+SampleSchema.index({ createdAt: -1 });
+SampleSchema.index({ status: 1, createdAt: -1 });
 export function getSampleModel(connection = mongoose) {
   return connection.models.Sample || connection.model("Sample", SampleSchema);
 }

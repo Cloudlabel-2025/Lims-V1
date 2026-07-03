@@ -930,6 +930,29 @@ body {
   cursor: not-allowed;
 }
 
+.btn-icon-delete {
+  height: 30px;
+  width: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.btn-icon-delete:hover {
+  background: #fef2f2;
+  color: #e11d48;
+}
+
+.icon-spin {
+  animation: spin 0.8s linear infinite;
+}
+
 .spin-anim {
   animation: spin 0.8s linear infinite;
 }
@@ -2221,6 +2244,7 @@ body {
   top: 0;
   height: 100vh;
   overflow: hidden;
+  box-shadow: 1px 0 12px rgba(0,0,0,0.04);
 }
 
 .dash-sidebar.collapsed {
@@ -2234,6 +2258,18 @@ body {
   padding: 20px;
   border-bottom: 1px solid var(--border-light);
   min-height: 68px;
+  position: relative;
+}
+
+.dash-sidebar-logo::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brand-action, var(--primary)) 20%, var(--brand-action, var(--primary)) 80%, transparent);
+  opacity: 0.3;
 }
 
 .dash-logo-icon {
@@ -2247,6 +2283,16 @@ body {
   color: var(--on-primary, #fff);
   flex-shrink: 0;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
+  position: relative;
+}
+
+.dash-logo-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+  pointer-events: none;
 }
 
 .dash-logo-text {
@@ -2278,6 +2324,14 @@ body {
   overflow-y: auto;
 }
 
+.dash-nav-section {
+  margin-bottom: 4px;
+}
+
+.dash-nav-section:last-child {
+  margin-bottom: 0;
+}
+
 .dash-nav-section-label {
   font-size: 10px;
   font-weight: 700;
@@ -2287,6 +2341,17 @@ body {
   padding: 8px 12px 8px;
   white-space: nowrap;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-nav-section-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+  pointer-events: none;
 }
 
 .dash-nav-item {
@@ -2313,12 +2378,14 @@ body {
 .dash-nav-item:hover {
   background: var(--primary-50);
   color: var(--brand-action, var(--primary));
+  transform: translateX(3px);
 }
 
 .dash-nav-item.active {
-  background: var(--primary-50);
+  background: linear-gradient(90deg, var(--primary-50), transparent);
   color: var(--brand-action, var(--primary));
   font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .dash-nav-indicator {
@@ -2327,9 +2394,10 @@ body {
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 20px;
-  background: var(--primary);
-  border-radius: 0 3px 3px 0;
+  height: 24px;
+  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .dash-nav-icon {
@@ -2337,11 +2405,24 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.dash-nav-item:hover .dash-nav-icon {
+  transform: scale(1.1);
+}
+
+.dash-nav-item.active .dash-nav-icon {
+  transform: scale(1.1);
 }
 
 .dash-nav-label {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.dash-nav-item.active:hover {
+  transform: none;
 }
 
 .dash-nav-item.logout {
@@ -2355,8 +2436,37 @@ body {
 
 /* Sidebar Bottom */
 .dash-sidebar-bottom {
-  padding: 12px;
+  padding: 8px 12px;
   border-top: 1px solid var(--border-light);
+  background: var(--surface);
+}
+
+/* Collapsed mode polish */
+.dash-sidebar.collapsed .dash-nav-item {
+  justify-content: center;
+  padding: 12px 4px;
+}
+
+.dash-sidebar.collapsed .dash-nav-item:hover {
+  transform: none;
+}
+
+/* Nav scrollbar styling */
+.dash-nav::-webkit-scrollbar {
+  width: 3px;
+}
+
+.dash-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dash-nav::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.dash-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 /* Dashboard Main Area */
@@ -6215,6 +6325,105 @@ body {
   cursor: not-allowed;
 }
 
+/* ============================================
+   WIZARD PROGRESS & STEP CARD
+   ============================================ */
+.wizard-progress {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  position: relative;
+}
+.wizard-step::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  background: var(--border-light);
+  margin: 0 8px;
+}
+.wizard-step:last-child::after {
+  display: none;
+}
+.wizard-step.done::after,
+.wizard-step.active::after {
+  background: var(--primary);
+}
+.wizard-step-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  background: var(--border-light);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.wizard-step.done .wizard-step-number {
+  background: var(--primary);
+  color: #fff;
+}
+.wizard-step.active .wizard-step-number {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+.wizard-step-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.wizard-step.active .wizard-step-label {
+  color: var(--text-primary);
+}
+.wizard-step.done .wizard-step-label {
+  color: var(--text-secondary);
+}
+.wizard-step-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.wizard-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+.wizard-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.wizard-info-card small {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.wizard-info-card strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
 @media (max-width: 1100px) {
   .module-grid,
   .module-form-grid,
@@ -6241,6 +6450,153 @@ body {
 }
 
 
+
+/* ============================================
+   CUSTODY TIMELINE
+   ============================================ */
+.custody-timeline {
+  padding: 8px 0;
+}
+.custody-entry {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 4px 0;
+  position: relative;
+}
+.custody-entry + .custody-entry .custody-dot::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 1px;
+  height: 10px;
+  background: var(--border);
+}
+.custody-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  margin-top: 4px;
+  position: relative;
+}
+.custody-entry > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.custody-action {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.custody-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.custody-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ============================================
+   REPORT BADGES & STATUS HISTORY
+   ============================================ */
+.report-version-badge {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.report-template-badge {
+  display: inline-block;
+  background: #f0f9ff;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+.report-status-history {
+  gap: 16px;
+}
+.report-status-history div {
+  background: var(--surface);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+}
+.report-status-history strong {
+  color: var(--text);
+  margin-right: 4px;
+}
+
+/* ============================================
+   REPORT PRINT AREA
+   ============================================ */
+.report-print-area {
+  background: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+.report-print-header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #1a56db;
+}
+.report-print-header-img {
+  max-width: 100%;
+  max-height: 100px;
+  object-fit: contain;
+}
+.report-print-header-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.report-logo-img {
+  max-height: 48px;
+  width: auto;
+}
+.report-print-header-fallback h1 {
+  margin: 0;
+  font-size: 22px;
+  color: #1a56db;
+}
+.report-print-header-date {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #666;
+}
+.report-print-footer {
+  text-align: center;
+  margin-top: 32px;
+  padding-top: 12px;
+  border-top: 1px solid #ddd;
+  font-size: 11px;
+  color: #999;
+}
+.report-sample-id-badge {
+  display: inline-block;
+  font-size: 11px;
+  color: #555;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
 
 /* ============================================
    PRINT — Report Print Layout
@@ -6316,5 +6672,23 @@ body {
 
   .module-panel.report-preview {
     display: block !important;
+  }
+
+  .report-print-area {
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .report-print-header {
+    border-bottom-color: #000;
+  }
+  .report-print-header-fallback h1 {
+    color: #000;
+  }
+  .report-print-footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    border-top-color: #ccc;
   }
 }

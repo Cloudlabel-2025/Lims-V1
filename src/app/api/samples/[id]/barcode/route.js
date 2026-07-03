@@ -21,7 +21,6 @@ export async function GET(req, { params }) {
         : null,
       patientId: sample.patient?.patientId ?? null,
       type: sample.type,
-      collectedAt: sample.collectedAt,
     });
   } catch (error) {
     return jsonError("Unable to fetch barcode data", error, 500);

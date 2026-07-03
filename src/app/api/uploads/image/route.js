@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 
 const contextFolders = {
   "lab-logo": "branding/logo",
+  "report-header": "reports/header",
   "report-signature": "reports/signatures",
   "patient-photo": "patients/photos",
   "doctor-photo": "doctors/photos",

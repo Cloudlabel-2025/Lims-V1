@@ -23,7 +23,7 @@ function getActiveLabLoginUrl(lab) {
 
 function formatDate(value) {
   if (!value) return "Not available";
-  return new Date(value).toLocaleDateString("en-US", {
+  return new Date(value).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",

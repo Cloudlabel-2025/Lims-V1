@@ -28,7 +28,10 @@ function PatientSidebar({ patient, onClose }) {
         if (!cancelled && response.ok) {
           setVisitCount((data.billingRecords || []).length);
         }
-      } catch {}
+      } catch (e) {
+        console.error("Failed to load visit count:", e);
+        if (!cancelled) setVisitCount(0);
+      }
     }
     loadVisitCount();
     return () => { cancelled = true; };

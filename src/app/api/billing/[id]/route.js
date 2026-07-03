@@ -48,13 +48,16 @@ export async function PATCH(req, { params }) {
       }
 
       if (body.discountAmount !== undefined) {
-        if (hasPermission(auth.session, "billing.discount")) {
-          billingRecord.discountAmount = Number(body.discountAmount) || 0;
-        } else {
+        if (!hasPermission(auth.session, "billing.discount")) {
           return Response.json({ error: "No permission to apply discounts" }, { status: 403 });
         }
+        const itemsSubtotal = billingRecord.itemsSubtotal || billingRecord.subtotalAmount || 0;
+        billingRecord.discountAmount = Math.min(Math.max(0, Number(body.discountAmount) || 0), itemsSubtotal);
       }
-      if (body.taxAmount !== undefined) billingRecord.taxAmount = Number(body.taxAmount) || 0;
+      if (body.taxAmount !== undefined) {
+        const itemsSubtotal = billingRecord.itemsSubtotal || billingRecord.subtotalAmount || 0;
+        billingRecord.taxAmount = Math.min(Math.max(0, Number(body.taxAmount) || 0), itemsSubtotal);
+      }
       if (body.notes !== undefined) billingRecord.notes = body.notes;
 
       billingRecord.totalAmount = Math.max(0, (billingRecord.itemsSubtotal || 0) - (billingRecord.discountAmount || 0) + (billingRecord.taxAmount || 0));
