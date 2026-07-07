@@ -38,7 +38,37 @@ export default function EditDoctor({ params }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === "mciNumber") {
+      const sanitized = value.replace(/[^A-Za-z0-9/]/g, "").slice(0, 20);
+      setForm((prev) => ({ ...prev, mciNumber: sanitized }));
+    } else if (name === "experience") {
+      const cleaned = value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1").slice(0, 4);
+      if (!/^\d{0,2}\.?\d?$/.test(cleaned)) return;
+      if (cleaned.length === 1 && cleaned[0] === ".") return;
+      if (cleaned.length >= 3 && cleaned[2] !== ".") return;
+      setForm((prev) => ({ ...prev, experience: cleaned }));
+    } else if (name === "phone") {
+      const sanitized = value.replace(/\D/g, "").slice(0, 10);
+      setForm((prev) => ({ ...prev, phone: sanitized }));
+    } else if (name === "clinicName") {
+      const sanitized = value.replace(/[^A-Za-z ]/g, "").slice(0, 25);
+      setForm((prev) => ({ ...prev, clinicName: sanitized }));
+    } else if (name === "location") {
+      const sanitized = value.replace(/[^A-Za-z ]/g, "").slice(0, 20);
+      const capitalized = sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
+      setForm((prev) => ({ ...prev, location: capitalized }));
+    } else if (name === "clinicAddress") {
+      const sanitized = value.replace(/[^A-Za-z0-9 .,/-]/g, "").slice(0, 100);
+      setForm((prev) => ({ ...prev, clinicAddress: sanitized }));
+    } else if (name === "commission") {
+      const cleaned = value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1").slice(0, 5);
+      if (!/^\d*\.?\d{0,2}$/.test(cleaned)) return;
+      const num = Number(cleaned);
+      if (cleaned && !isNaN(num) && num > 40) return;
+      setForm((prev) => ({ ...prev, commission: cleaned }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
     if (showErrors && errors[name]) {
       setErrors((prev) => {
         const newErrs = { ...prev };
@@ -153,7 +183,7 @@ export default function EditDoctor({ params }) {
                   value={form.mciNumber} 
                   minLength={5}
                   maxLength={20}
-                  pattern="[A-Za-z0-9\s/-]+"
+                  pattern="[A-Za-z0-9/]+"
                   onChange={handleChange} 
                 />
                 {errors.mciNumber && <div className="lims-error-text">{errors.mciNumber}</div>}
@@ -228,12 +258,11 @@ export default function EditDoctor({ params }) {
                 <label className="lims-label">Experience (Years) <span className="required">*</span></label>
                 <input 
                   name="experience" 
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   className={`lims-input ${errors.experience ? 'invalid' : ''}`} 
                   placeholder="Enter experience"
                   value={form.experience} 
-                  min={0}
-                  max={80}
                   onChange={handleChange} 
                 />
                 {errors.experience && <div className="lims-error-text">{errors.experience}</div>}
@@ -255,6 +284,7 @@ export default function EditDoctor({ params }) {
                   name="phone" 
                   className={`lims-input ${errors.phone ? 'invalid' : ''}`} 
                   placeholder="Enter mobile number"
+                  inputMode="numeric"
                   minLength={10}
                   maxLength={10} 
                   value={form.phone} 
@@ -282,7 +312,7 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.clinicName ? 'invalid' : ''}`} 
                   placeholder="Enter clinic or hospital name"
                   value={form.clinicName} 
-                  maxLength={35}
+                  maxLength={25}
                   onChange={handleChange} 
                 />
                 {errors.clinicName && <div className="lims-error-text">{errors.clinicName}</div>}
@@ -294,7 +324,7 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.location ? 'invalid' : ''}`} 
                   placeholder="Enter location"
                   value={form.location} 
-                  maxLength={35}
+                  maxLength={20}
                   onChange={handleChange} 
                 />
                 {errors.location && <div className="lims-error-text">{errors.location}</div>}
@@ -306,7 +336,7 @@ export default function EditDoctor({ params }) {
                   className={`lims-input ${errors.clinicAddress ? 'invalid' : ''}`} 
                   placeholder="Enter practice address"
                   value={form.clinicAddress} 
-                  maxLength={150}
+                  maxLength={100}
                   onChange={handleChange} 
                 />
                 {errors.clinicAddress && <div className="lims-error-text">{errors.clinicAddress}</div>}
@@ -327,26 +357,12 @@ export default function EditDoctor({ params }) {
                 <div style={{ position: 'relative' }}>
                   <input 
                     name="commission" 
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     className={`lims-input ${errors.commission ? 'invalid' : ''}`} 
                     placeholder="Enter commission"
                     value={form.commission} 
-                    min={0}
-                    max="40"
-                    step="0.1"
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === "") {
-                        setForm(prev => ({ ...prev, commission: "" }));
-                        return;
-                      }
-                      const val = parseFloat(raw);
-                      if (!isNaN(val) && val > 40) {
-                        setForm(prev => ({ ...prev, commission: "40" }));
-                      } else {
-                        handleChange(e);
-                      }
-                    }} 
+                    onChange={handleChange}
                   />
                   <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: '600' }}>%</span>
                 </div>

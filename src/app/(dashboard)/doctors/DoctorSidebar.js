@@ -52,6 +52,7 @@ function DoctorSidebar({
           <div className="brand-patient-info">
             <div className="brand-patient-name">{doctor.name}</div>
             <div className="brand-patient-id-mini">{doctor.doctorId}</div>
+            <div style={{ fontSize: "11px", opacity: 0.85, marginTop: "2px" }}>MCI: {doctor.mciNumber}</div>
           </div>
 
           <div

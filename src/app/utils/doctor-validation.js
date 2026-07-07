@@ -1,6 +1,6 @@
 export const DOCTOR_LIMITS = {
-  maxNameLength: 50,
-  maxExperienceYears: 80,
+  maxNameLength: 30,
+  maxExperienceYears: 60,
 };
 
 export function cleanDoctorValue(value) {
@@ -8,14 +8,14 @@ export function cleanDoctorValue(value) {
 }
 
 export function isValidDoctorName(value) {
-  return /^[A-Za-z .]+$/.test(cleanDoctorValue(value));
+  return /^[A-Za-z ]+$/.test(cleanDoctorValue(value));
 }
 
 export function isValidMciNumber(value) {
   const cleaned = cleanDoctorValue(value);
   if (/https?:\/\//i.test(cleaned) || /www\./i.test(cleaned)) return false;
   if (cleaned.length < 5 || cleaned.length > 20) return false;
-  return /^[A-Za-z0-9\s/-]+$/.test(cleaned);
+  return /^[A-Za-z0-9/]+$/.test(cleaned);
 }
 
 export function isValidDoctorDegree(value) {
@@ -26,9 +26,9 @@ export function isValidDoctorDegree(value) {
 
 export function isValidExperienceYears(value) {
   const cleaned = cleanDoctorValue(value);
-  if (!/^\d{1,2}$/.test(cleaned)) return false;
+  if (!/^\d{2}\.\d$/.test(cleaned)) return false;
   const years = Number(cleaned);
-  return Number.isInteger(years) && years >= 0 && years <= DOCTOR_LIMITS.maxExperienceYears;
+  return Number.isFinite(years) && years >= 0 && years <= DOCTOR_LIMITS.maxExperienceYears;
 }
 
 export function isValidDoctorEmail(value) {
@@ -53,21 +53,22 @@ function containsUrl(value) {
 export function isValidClinicName(value) {
   const cleaned = cleanDoctorValue(value);
   if (containsUrl(cleaned)) return false;
-  return /^[A-Za-z][A-Za-z0-9 .&'-]*[A-Za-z0-9]$|^[A-Za-z]$/.test(cleaned);
+  if (cleaned.length > 25) return false;
+  return /^[A-Za-z ]+$/.test(cleaned);
 }
 
 export function isValidLocation(value) {
   const cleaned = cleanDoctorValue(value);
   if (containsUrl(cleaned)) return false;
-  return /^[A-Za-z][A-Za-z0-9 .,'-]*[A-Za-z0-9.]$|^[A-Za-z]$/.test(cleaned);
+  if (cleaned.length > 20) return false;
+  return /^[A-Za-z ]+$/.test(cleaned);
 }
 
 export function isValidAddress(value) {
   const cleaned = cleanDoctorValue(value);
   if (containsUrl(cleaned)) return false;
-  const specialChars = (cleaned.match(/[^A-Za-z0-9 .,/#-]/g) || []).length;
-  if (specialChars / cleaned.length > 0.5) return false;
-  return cleaned.length >= 5;
+  if (cleaned.length > 100) return false;
+  return /^[A-Za-z0-9 .,/-]+$/.test(cleaned);
 }
 
 export function validateDoctorPayload(payload, { partial = false } = {}) {
@@ -84,7 +85,7 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
   if (cleanDoctorValue(form.name)) {
     const name = cleanDoctorValue(form.name);
     if (name.length < 2) errors.name = "Name must be at least 2 characters";
-    else if (name.length > DOCTOR_LIMITS.maxNameLength) errors.name = "Name must not exceed 50 characters";
+    else if (name.length > DOCTOR_LIMITS.maxNameLength) errors.name = "Name must not exceed 30 characters";
     else if (!isValidDoctorName(name)) errors.name = "Only letters, spaces, and periods allowed";
   }
 
@@ -102,7 +103,7 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
 
   requireField("experience", "Experience is required");
   if (cleanDoctorValue(form.experience) && !isValidExperienceYears(form.experience)) {
-    errors.experience = "Experience must be a whole number between 0 and 80";
+    errors.experience = "Experience must be in format YY.M (e.g. 12.1 for 12 years 1 month)";
   }
 
   requireField("phone", "Mobile number is required");
@@ -116,18 +117,24 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
   }
 
   requireField("clinicName", "Clinic/Hospital name is required");
-  if (cleanDoctorValue(form.clinicName) && !isValidClinicName(form.clinicName)) {
-    errors.clinicName = "Enter a valid clinic name";
+  if (cleanDoctorValue(form.clinicName)) {
+    const name = cleanDoctorValue(form.clinicName);
+    if (name.length > 25) errors.clinicName = "Clinic name must not exceed 25 characters";
+    else if (!isValidClinicName(name)) errors.clinicName = "Only letters and spaces allowed";
   }
 
   requireField("location", "Location is required");
-  if (cleanDoctorValue(form.location) && !isValidLocation(form.location)) {
-    errors.location = "Enter a valid location";
+  if (cleanDoctorValue(form.location)) {
+    const loc = cleanDoctorValue(form.location);
+    if (loc.length > 20) errors.location = "Location must not exceed 20 characters";
+    else if (!isValidLocation(loc)) errors.location = "Only letters and spaces allowed";
   }
 
   requireField("clinicAddress", "Practice address is required");
-  if (cleanDoctorValue(form.clinicAddress) && !isValidAddress(form.clinicAddress)) {
-    errors.clinicAddress = "Enter a valid practice address";
+  if (cleanDoctorValue(form.clinicAddress)) {
+    const addr = cleanDoctorValue(form.clinicAddress);
+    if (addr.length > 100) errors.clinicAddress = "Address must not exceed 100 characters";
+    else if (!isValidAddress(addr)) errors.clinicAddress = "Only letters, numbers, spaces, and . , / - allowed";
   }
 
   if ((!partial || Object.prototype.hasOwnProperty.call(form, "commission")) && !isValidCommission(form.commission)) {

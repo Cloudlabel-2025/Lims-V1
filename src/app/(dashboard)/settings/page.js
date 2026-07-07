@@ -79,6 +79,8 @@ export default function LabAdminSettingsPage() {
   const [roleSaving, setRoleSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [roleMessage, setRoleMessage] = useState("");
+  const [expandedModules, setExpandedModules] = useState(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -293,6 +295,68 @@ export default function LabAdminSettingsPage() {
     }
   }
 
+  function toggleModuleExpand(moduleId) {
+    setExpandedModules((current) => {
+      const next = new Set(current);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+      } else {
+        next.add(moduleId);
+      }
+      return next;
+    });
+  }
+
+  function handleSelectAll(_moduleId, permissions) {
+    setRoles((current) =>
+      current.map((role, index) =>
+        index === activeRoleIndex
+          ? {
+              ...role,
+              permissions: (() => {
+                const selected = new Set(
+                  role.permissions.includes("*")
+                    ? labPermissions.map((p) => p.key)
+                    : role.permissions
+                );
+                permissions.forEach((permission) => {
+                  addPermissionWithDependencies(selected, permission.key, permissionByKey);
+                });
+                return labPermissions
+                  .map((p) => p.key)
+                  .filter((key) => selected.has(key));
+              })(),
+            }
+          : role
+      )
+    );
+  }
+
+  function handleClear(_moduleId, permissions) {
+    setRoles((current) =>
+      current.map((role, index) =>
+        index === activeRoleIndex
+          ? {
+              ...role,
+              permissions: (() => {
+                const selected = new Set(
+                  role.permissions.includes("*")
+                    ? labPermissions.map((p) => p.key)
+                    : role.permissions
+                );
+                permissions.forEach((permission) => {
+                  removePermissionWithDependents(selected, permission.key, dependentKeysByPermission);
+                });
+                return labPermissions
+                  .map((p) => p.key)
+                  .filter((key) => selected.has(key));
+              })(),
+            }
+          : role
+      )
+    );
+  }
+
   return (
     <section className="settings-page">
       <div className="settings-header">
@@ -349,6 +413,13 @@ export default function LabAdminSettingsPage() {
             roleSaving={roleSaving}
             cancelRoleChanges={cancelRoleChanges}
             saveRoleConfiguration={saveRoleConfiguration}
+            expandedModules={expandedModules}
+            onToggleModuleExpand={toggleModuleExpand}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            handleSelectAll={handleSelectAll}
+            handleClear={handleClear}
+            permissionByKey={permissionByKey}
           />
 
         </>

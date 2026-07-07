@@ -16,12 +16,9 @@ function clean(value) {
 }
 
 function getAllowedPermissionKeys(session, enabledModules) {
-  const sessionPermissionSet = new Set(session.permissions || []);
-  const hasAllPermissions = sessionPermissionSet.has("*");
-
   return new Set(
     getPermissionCatalogForEnabledModules(enabledModules)
-      .filter((permission) => permission.key !== "settings.branding" && (hasAllPermissions || sessionPermissionSet.has(permission.key)))
+      .filter((permission) => permission.key !== "settings.branding")
       .map((permission) => permission.key)
   );
 }

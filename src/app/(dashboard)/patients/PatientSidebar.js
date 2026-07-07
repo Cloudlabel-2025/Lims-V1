@@ -168,21 +168,11 @@ function PatientSidebar({ patient, onClose }) {
                 {patient.phone || "N/A"}
               </div>
             </div>
-            <div className="vital-mini-box">
-              <div className="vital-icon-circle temp">{Icons.mail}</div>
-              <div className="vital-mini-label" style={{ fontSize: "10px", opacity: 1, fontWeight: "600" }}>
-                EMAIL
-              </div>
-              <div className="vital-mini-value" style={{ fontSize: "13px", fontWeight: "700" }}>
-                {patient.email || "N/A"}
-              </div>
-            </div>
           </div>
         </div>
 
         <div className="patient-contact-grid">
           <DetailRow icon={Icons.phone} value={patient.phone ? `+91 ${patient.phone}` : ""} />
-          <DetailRow icon={Icons.mail} value={patient.email || "Not provided"} truncate />
           <DetailRow icon={Icons.mapPin} value={patient.address} truncate />
         </div>
       </div>

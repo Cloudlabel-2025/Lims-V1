@@ -287,18 +287,6 @@ export default function DoctorList() {
             </button>
           </div>
 
-          <button
-            className="dash-btn-secondary"
-            onClick={() => fetchAllDoctors(currentPage)}
-            disabled={listLoading}
-            style={{ height: 34, padding: "0 14px", fontSize: 12 }}
-          >
-            <span className={listLoading ? "icon-spin" : ""}>
-              {Icons.refresh}
-            </span>
-            Refresh
-          </button>
-
           <div className="search-container" style={{ position: "relative", flex: 1, maxWidth: "320px" }}>
             <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", fontSize: '14px' }}>
               {Icons.search}
@@ -316,6 +304,18 @@ export default function DoctorList() {
             />
           </div>
           
+          <button
+            className="dash-btn-secondary"
+            onClick={() => fetchAllDoctors(currentPage)}
+            disabled={listLoading}
+            style={{ height: 34, padding: "0 14px", fontSize: 12 }}
+          >
+            <span className={listLoading ? "icon-spin" : ""}>
+              {Icons.refresh}
+            </span>
+            Refresh
+          </button>
+
           {canRegisterDoctors && (
             <button 
               className="btn-lims-primary" 
@@ -331,9 +331,6 @@ export default function DoctorList() {
       <div className="doctor-list-container" style={{ marginTop: "24px" }}>
         <div className="patient-list-header" style={{ marginBottom: "16px" }}>
           <span className="patient-list-count">{listLoading ? "Loading..." : `${pagination.total || allDoctors.length} doctors`}</span>
-          <button className="btn-refresh" onClick={() => fetchAllDoctors(currentPage)} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--brand-action, var(--primary))', fontWeight: '600', fontSize: '13px' }}>
-            <div style={{ transform: listLoading ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s' }}>{Icons.logo}</div> Refresh
-          </button>
         </div>
 
         {allDoctors.length > 0 ? (

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
+import DatePicker from "@/app/components/DatePicker";
 import { getISTNow, getEmptyForm, calculateAge } from "@/app/utils/patient-helpers";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
@@ -78,6 +79,24 @@ export default function PatientRegistration() {
     if (name === "dob") {
       const calculatedAge = calculateAge(value);
       setForm((prev) => ({ ...prev, dob: value, age: calculatedAge }));
+    } else if (name === "name") {
+      const sanitized = value.replace(/[^A-Za-z ]/g, "").slice(0, 30);
+      const capitalized = sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
+      setForm((prev) => ({ ...prev, name: capitalized }));
+    } else if (name === "barcode") {
+      const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+      let formatted = "";
+      for (let i = 0; i < cleaned.length; i++) {
+        if (i === 4 || i === 12) formatted += "-";
+        formatted += cleaned[i];
+      }
+      setForm((prev) => ({ ...prev, barcode: formatted }));
+    } else if (name === "uhId") {
+      const sanitized = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 14);
+      setForm((prev) => ({ ...prev, uhId: sanitized }));
+    } else if (name === "address") {
+      const sanitized = value.replace(/[^A-Za-z0-9 .,/-]/g, "").slice(0, 100);
+      setForm((prev) => ({ ...prev, address: sanitized }));
     } else {
       setForm((prev) => ({
         ...prev,
@@ -99,8 +118,8 @@ export default function PatientRegistration() {
     const newErrors = {};
     if (!form.name?.trim()) newErrors.name = "Patient name is required";
     else if (form.name.trim().length < 2) newErrors.name = "Name must be at least 2 characters";
-    else if (form.name.trim().length > 20) newErrors.name = "Name must be at most 20 characters";
-    else if (!/^[A-Za-z .]+$/.test(form.name.trim())) newErrors.name = "Only letters, spaces, and periods allowed";
+    else if (form.name.trim().length > 30) newErrors.name = "Name must be at most 30 characters";
+    else if (!/^[A-Za-z ]+$/.test(form.name.trim())) newErrors.name = "Only letters and spaces allowed";
     if (!form.gender) newErrors.gender = "Gender is required";
     if (form.gender === "Other" && !form.genderIdentity) newErrors.genderIdentity = "Gender identity is required";
     if (!form.dob) newErrors.dob = "Date of Birth is required";
@@ -114,7 +133,7 @@ export default function PatientRegistration() {
     if (!form.phone?.trim()) newErrors.phone = "Mobile number is required";
     else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
     if (!form.address?.trim()) newErrors.address = "Address is required";
-    else if (!/^[A-Za-z0-9 .,/#-]+$/.test(form.address)) newErrors.address = "Only letters, numbers, spaces, and . , / # - allowed";
+    else if (!/^[A-Za-z0-9 .,/-]+$/.test(form.address)) newErrors.address = "Only letters, numbers, spaces, and . , / - allowed";
     else if (/https?:\/\/|www\./i.test(form.address)) newErrors.address = "URLs not allowed in address";
     if (!form.receivedTime) newErrors.receivedTime = "Received time is required";
     else if (isNaN(new Date(form.receivedTime).getTime())) newErrors.receivedTime = "Invalid received time";
@@ -134,8 +153,7 @@ export default function PatientRegistration() {
       newErrors.receivedTime = "Received time cannot be before date of birth";
     }
     if (!form.barcode?.trim()) newErrors.barcode = "Barcode is required";
-    else if (!/^[A-Za-z0-9-_]+$/.test(form.barcode)) newErrors.barcode = "Only letters, numbers, hyphens, and underscores allowed";
-    else if (/https?:\/\/|www\./i.test(form.barcode)) newErrors.barcode = "URLs not allowed in barcode";
+    else if (!/^[A-Z]{4}-\d{8}-\d{4}$/.test(form.barcode)) newErrors.barcode = "Format: XXXX-NNNNNNNN-NNNN (e.g., ABCD-12345678-1234)";
     if (hasRefDoctor && !form.refDoctorName?.trim()) newErrors.refDoctorName = "Referring doctor name is required";
     if (!form.uhId?.trim()) newErrors.uhId = "UH ID is required";
     else if (!/^[A-Za-z0-9]{14}$/.test(String(form.uhId))) newErrors.uhId = "UH ID must be exactly 14 alphanumeric characters";
@@ -296,12 +314,12 @@ export default function PatientRegistration() {
               <div className="col-md-4"><label className="lims-label">Patient ID</label><input className="lims-input" value="Auto-generated" disabled /></div>
               <div className="col-md-4">
                 <label className="lims-label">Full Name <span className="required">*</span></label>
-                <input name="name" className={`lims-input ${errors.name ? 'invalid' : ''}`} placeholder="Enter full name" value={form.name} minLength={2} maxLength={35} onChange={handleChange} />
+                <input name="name" className={`lims-input ${errors.name ? 'invalid' : ''}`} placeholder="Enter full name" value={form.name} minLength={2} maxLength={30} onChange={handleChange} />
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
               </div>
               <div className="col-md-3">
                 <label className="lims-label">Date of Birth <span className="required">*</span></label>
-                <input type="date" name="dob" className={`lims-input ${errors.dob ? 'invalid' : ''}`} value={form.dob} max={new Date().toISOString().split("T")[0]} onChange={handleChange} />
+                <DatePicker value={form.dob} onChange={handleChange} max={new Date().toISOString().split("T")[0]} error={errors.dob} />
                 {errors.dob && <div className="lims-error-text">{errors.dob}</div>}
               </div>
               <div className="col-md-1">
@@ -317,7 +335,7 @@ export default function PatientRegistration() {
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Barcode <span className="required">*</span></label>
-                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="Enter barcode" maxLength={35} value={form.barcode} onChange={handleChange} />
+                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="XXXX-NNNNNNNN-NNNN" maxLength={18} value={form.barcode} onChange={handleChange} />
                 {errors.barcode && <div className="lims-error-text">{errors.barcode}</div>}
               </div>
               <div className="col-md-4">
@@ -356,7 +374,7 @@ export default function PatientRegistration() {
               </div>
               <div className="col-md-8">
                 <label className="lims-label">Address <span className="required">*</span></label>
-                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" maxLength={150} value={form.address} onChange={handleChange} />
+                <input name="address" className={`lims-input ${errors.address ? 'invalid' : ''}`} placeholder="Enter address" maxLength={100} value={form.address} onChange={handleChange} />
                 {errors.address && <div className="lims-error-text">{errors.address}</div>}
               </div>
             </div>

@@ -1243,6 +1243,152 @@ body {
   padding-right: 36px;
 }
 
+/* Date picker */
+.date-picker-container {
+  position: relative;
+  width: 100%;
+}
+
+.date-picker-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.date-picker-trigger {
+  cursor: pointer;
+  caret-color: var(--text-primary);
+  padding-right: 38px;
+}
+
+.date-picker-cal-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.date-picker-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+  min-width: 320px;
+}
+
+.date-picker-popover .rdp-root {
+  --rdp-accent-color: var(--brand-action, var(--primary));
+  --rdp-accent-background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  --rdp-day-height: 38px;
+  --rdp-day-width: 38px;
+  --rdp-day_button-height: 36px;
+  --rdp-day_button-width: 36px;
+  --rdp-day_button-border-radius: 8px;
+  --rdp-nav-height: 2.25rem;
+  --rdp-dropdown-gap: 6px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.date-picker-popover .rdp-caption_label {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 0;
+  color: var(--text-primary);
+}
+
+.date-picker-popover .rdp-dropdowns {
+  gap: 10px;
+}
+
+.date-picker-popover .rdp-dropdown_root {
+  width: 85px;
+}
+
+.date-picker-popover .rdp-dropdown_root:last-child {
+  width: 78px;
+}
+
+.date-picker-popover .rdp-dropdown {
+  font-size: 13px;
+  padding: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.date-picker-popover .rdp-day_today:not(.rdp-day_selected) {
+  font-weight: 800;
+  color: var(--brand-action, var(--primary));
+}
+
+.date-picker-popover .rdp-day_button:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+}
+
+.date-picker-popover .rdp-nav {
+  padding: 0 4px;
+}
+
+.date-picker-popover .rdp-nav button {
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.date-picker-popover .rdp-nav button:hover {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.date-picker-year-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  width: 100%;
+  max-height: 161px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.date-picker-year-option {
+  display: block;
+  width: 100%;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.1s;
+}
+
+.date-picker-year-option:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.date-picker-year-option.selected {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  font-weight: 600;
+  color: var(--brand-action, var(--primary));
+}
+
+.date-picker-year-option:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* Alert override */
 .lims-alert {
   border-radius: var(--radius-md);
@@ -4818,6 +4964,59 @@ body {
   grid-template-columns: 1fr;
   gap: 0;
   margin-top: 0;
+}
+
+.permission-search {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.permission-search-input {
+  width: 100%;
+  height: 42px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 0 36px 0 12px;
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.permission-search-input:focus {
+  border-color: var(--brand-action, var(--primary));
+}
+
+.permission-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.permission-checkbox-danger {
+  border-left: 3px solid #dc2626 !important;
+}
+
+.permission-checkbox-danger input {
+  accent-color: #dc2626;
+}
+
+.dependency-hint {
+  display: block;
+  margin-top: 4px;
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .settings-page {

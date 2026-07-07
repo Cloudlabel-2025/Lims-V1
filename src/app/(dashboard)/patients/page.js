@@ -250,23 +250,45 @@ export default function PatientList() {
           </select>
 
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             className="lims-input"
             placeholder="Min Age"
             value={ageMinFilter}
-            onChange={(e) => { setAgeMinFilter(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || /^[0-9]+$/.test(val)) {
+                const num = Number(val);
+                if (val === "" || (num >= 0 && num <= 120)) {
+                  setAgeMinFilter(val);
+                  setCurrentPage(1);
+                }
+              }
+            }}
             style={{ height: "40px", fontSize: "12px", width: "80px" }}
-            min="0"
+            maxLength={3}
           />
 
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             className="lims-input"
             placeholder="Max Age"
             value={ageMaxFilter}
-            onChange={(e) => { setAgeMaxFilter(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || /^[0-9]+$/.test(val)) {
+                const num = Number(val);
+                if (val === "" || (num >= 0 && num <= 120)) {
+                  setAgeMaxFilter(val);
+                  setCurrentPage(1);
+                }
+              }
+            }}
             style={{ height: "40px", fontSize: "12px", width: "80px" }}
-            min="0"
+            maxLength={3}
           />
 
           {canCreatePatient && (
@@ -302,11 +324,17 @@ export default function PatientList() {
         {!listLoading && allPatients.length === 0 ? (
           <div className="patient-list-empty">
             {Icons.noResults}
-            <div className="patient-list-empty-title">No patients yet</div>
-            {canCreatePatient && (
-            <button className="btn-lims-primary" onClick={() => router.push("/patients/register")}>
-              Register First Patient
-            </button>
+            {searchQuery.trim() || genderFilter || ageMinFilter || ageMaxFilter ? (
+              <div className="patient-list-empty-title">No patient found</div>
+            ) : (
+              <>
+                <div className="patient-list-empty-title">No patients yet</div>
+                {canCreatePatient && (
+                <button className="btn-lims-primary" onClick={() => router.push("/patients/register")}>
+                  Register First Patient
+                </button>
+                )}
+              </>
             )}
           </div>
         ) : viewState === "grid" ? (
