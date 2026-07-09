@@ -46,45 +46,28 @@ export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange
         <p>{filtered.length} of {reports.length} reports</p>
       </div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
-        {[
-          { label: "7 days", days: 7 },
-          { label: "30 days", days: 30 },
-          { label: "90 days", days: 90 },
-          { label: "All", days: 0 },
-        ].map((opt) => {
-          const isActive = opt.days === 0
-            ? !dateFrom && !dateTo
-            : dateFrom && !dateTo && dateFrom === new Date(Date.now() - opt.days * 86400000).toISOString().split("T")[0];
-          return (
-            <button
-              key={opt.label}
-              type="button"
-              onClick={() => {
-                if (opt.days === 0) {
-                  onDateFromChange?.("");
-                  onDateToChange?.("");
-                } else {
-                  const d = new Date(Date.now() - opt.days * 86400000);
-                  onDateFromChange?.(d.toISOString().split("T")[0]);
-                  onDateToChange?.("");
-                }
-              }}
-              style={{
-                padding: "4px 10px",
-                borderRadius: 6,
-                border: isActive ? "1.5px solid var(--brand-action, var(--primary))" : "1px solid var(--border)",
-                background: isActive ? "var(--primary-50)" : "#fff",
-                color: isActive ? "var(--brand-action, var(--primary))" : "var(--text-secondary)",
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
+      <div style={{ marginBottom: 8 }}>
+        <select
+          className="lims-input"
+          value={dateFrom && !dateTo ? ["7", "30", "90"].find((d) => dateFrom === new Date(Date.now() - Number(d) * 86400000).toISOString().split("T")[0]) || "all" : "all"}
+          onChange={(e) => {
+            const days = Number(e.target.value);
+            if (!days) {
+              onDateFromChange?.("");
+              onDateToChange?.("");
+            } else {
+              const d = new Date(Date.now() - days * 86400000);
+              onDateFromChange?.(d.toISOString().split("T")[0]);
+              onDateToChange?.("");
+            }
+          }}
+          style={{ height: 34, fontSize: 12 }}
+        >
+          <option value="all">All time</option>
+          <option value="7">7 days</option>
+          <option value="30">30 days</option>
+          <option value="90">90 days</option>
+        </select>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>

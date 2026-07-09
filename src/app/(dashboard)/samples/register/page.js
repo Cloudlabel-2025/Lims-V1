@@ -32,7 +32,12 @@ export default function SampleRegistration() {
 
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      let cleaned = value;
+      if (name === "sampleType") cleaned = value.replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 25);
+      if (name === "batchId") cleaned = value.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase().slice(0, 15);
+      return { ...prev, [name]: cleaned };
+    });
   }
 
   async function handleSubmit(e) {
@@ -113,11 +118,11 @@ export default function SampleRegistration() {
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Sample Type</label>
-                <input name="sampleType" className="lims-input" value={form.sampleType} onChange={handleChange} placeholder="e.g. Blood, Urine" minLength={2} maxLength={35} />
+                <input name="sampleType" className="lims-input" value={form.sampleType} onChange={handleChange} placeholder="e.g. Blood, Urine" minLength={2} maxLength={25} />
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Batch / Order ID</label>
-                <input name="batchId" className="lims-input" value={form.batchId} onChange={handleChange} placeholder="Optional batch identifier" maxLength={35} />
+                <input name="batchId" className="lims-input" value={form.batchId} onChange={handleChange} placeholder="e.g. BATCH-001" maxLength={15} />
               </div>
             </div>
           </div>

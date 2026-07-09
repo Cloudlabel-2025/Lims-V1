@@ -3175,7 +3175,7 @@ body {
 /* Dashboard Content */
 .dash-content {
   padding: 28px;
-  max-width: 1200px;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -6286,6 +6286,10 @@ body {
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.75fr);
   gap: 18px;
   align-items: start;
+}
+
+.reports-page .module-grid {
+  grid-template-columns: 1fr;
 }
 
 .module-panel {

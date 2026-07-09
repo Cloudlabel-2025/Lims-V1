@@ -9,12 +9,21 @@ import Table from "../_components/Table";
 import Field from "../_components/Field";
 import PaginationControls from "../_components/PaginationControls";
 
-function downloadExcel(url) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  a.click();
+async function downloadExcel(url) {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) throw new Error("Download failed");
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "report.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function DailyCollectionReport({ from, to, loadTrigger }) {
@@ -53,7 +62,7 @@ function DailyCollectionReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
-        <button type="button" className="btn-lims-secondary" onClick={() => downloadExcel(`/api/accounting/reports/daily-collection?from=${from}&to=${to}&export=xlsx`)} style={{ height: 34, padding: "0 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/daily-collection?from=${from}&to=${to}&export=xlsx`)}>
           {Icons.download} Excel
         </button>
       </div>
@@ -117,7 +126,7 @@ function MonthlyRevenueReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
-        <button type="button" className="btn-lims-secondary" onClick={() => downloadExcel(`/api/accounting/reports/monthly-revenue?from=${from}&to=${to}&export=xlsx`)} style={{ height: 34, padding: "0 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/monthly-revenue?from=${from}&to=${to}&export=xlsx`)}>
           {Icons.download} Excel
         </button>
       </div>
@@ -178,7 +187,7 @@ function WeeklyCollectionReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
-        <button type="button" className="btn-lims-secondary" onClick={() => downloadExcel(`/api/accounting/reports/weekly?from=${from}&to=${to}&export=xlsx`)} style={{ height: 34, padding: "0 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/weekly?from=${from}&to=${to}&export=xlsx`)}>
           {Icons.download} Excel
         </button>
       </div>
@@ -242,6 +251,9 @@ function IncomeExpenseReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
+        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/income-expense?from=${from}&to=${to}&export=xlsx`)}>
+          {Icons.download} Excel
+        </button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         <StatCard label="Revenue" value={`Rs ${money(totals?.netRevenue || 0)}`} icon={Icons.barChart} />
@@ -304,7 +316,7 @@ function OutstandingReport() {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); }} />
           Full View
         </label>
-        <button type="button" className="btn-lims-secondary" onClick={() => downloadExcel("/api/accounting/reports/outstanding?export=xlsx")} style={{ height: 34, padding: "0 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel("/api/accounting/reports/outstanding?export=xlsx")}>
           {Icons.download} Excel
         </button>
       </div>
@@ -391,9 +403,7 @@ export default function ReportsPage() {
           <button type="button" className="btn-lims-primary" onClick={() => setLoadTrigger((p) => p + 1)} style={{ height: 38 }}>
             Load
           </button>
-          <button type="button" className="btn-lims-secondary" onClick={() => downloadExcel(`/api/accounting/reports/consolidated?from=${from}&to=${to}`)} style={{ height: 38, display: "inline-flex", alignItems: "center", gap: 6 }}>
-            {Icons.download} Download All
-          </button>
+
         </div>
       )}
 

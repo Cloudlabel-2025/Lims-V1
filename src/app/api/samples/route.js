@@ -62,7 +62,7 @@ export async function POST(req) {
 
     const [patient, test] = await Promise.all([
       Patient.findById(patientId),
-      TestDefinition.findById(testDefinitionId),
+      TestDefinition.findById(testDefinitionId).populate("category", "name"),
     ]);
 
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });

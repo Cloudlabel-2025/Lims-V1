@@ -44,6 +44,8 @@ export default function ReportViewPage() {
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
   const printRef = useRef(null);
 
   const canEditReports = hasPermission(user, "reports.edit");
@@ -134,7 +136,7 @@ export default function ReportViewPage() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this report? This action cannot be undone.")) return;
+    setConfirmDelete(false);
     setError("");
     try {
       const res = await fetch(`/api/reports/${id}`, {
@@ -203,7 +205,7 @@ export default function ReportViewPage() {
             <button
               type="button"
               disabled={updating}
-              onClick={() => performAction(flow.next)}
+              onClick={() => { setError(""); setConfirmAction(flow.next); }}
               style={{ height: 36, padding: "0 14px", border: "none", borderRadius: 8, background: flow.bg, color: flow.color, fontWeight: 800, fontSize: 13, cursor: "pointer" }}
             >
               {updating ? "..." : flow.label}
@@ -227,8 +229,8 @@ export default function ReportViewPage() {
           {canDeleteReports && report.status === "draft" && (
             <button
               type="button"
-              onClick={handleDelete}
-              style={{ height: 36, padding: "0 14px", border: "1px solid var(--error)", borderRadius: 8, background: "#fff", color: "var(--error)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+              onClick={() => { setError(""); setConfirmDelete(true); }}
+              style={{ height: 36, padding: "0 14px", border: "1.5px solid #dc2626", borderRadius: 8, background: "#fef2f2", color: "#dc2626", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
             >
               Delete
             </button>
@@ -236,7 +238,41 @@ export default function ReportViewPage() {
         </div>
       </div>
 
-      {error && <div className="module-alert">{error}</div>}
+      {error && !confirmDelete && !confirmAction && <div className="module-alert">{error}</div>}
+
+      {confirmAction && (
+        <div className="cms-success-dialog-backdrop" role="presentation">
+          <section className="cms-success-dialog" role="dialog" aria-live="polite">
+            <div className="cms-success-dialog-icon" style={{ fontSize: 28 }}>!</div>
+            <h2>Confirm {confirmAction.charAt(0).toUpperCase() + confirmAction.slice(1)}</h2>
+            <p>Are you sure you want to {confirmAction} this report?</p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 20 }}>
+              <button className="dash-btn-secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
+              <button className="dash-btn-primary" onClick={() => { const action = confirmAction; setConfirmAction(null); performAction(action); }} disabled={updating}>
+                {updating ? "..." : "Confirm"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="cms-success-dialog-backdrop" role="presentation">
+          <section className="cms-success-dialog" role="dialog" aria-live="polite">
+            <div className="cms-success-dialog-icon" style={{ border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626" }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" />
+              </svg>
+            </div>
+            <h2>Delete Report</h2>
+            <p>Are you sure you want to delete this report? This action cannot be undone.</p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 20 }}>
+              <button className="dash-btn-secondary" onClick={() => setConfirmDelete(false)}>Cancel</button>
+              <button className="dash-btn-primary" onClick={handleDelete} style={{ background: "#fef2f2", border: "1.5px solid #dc2626", color: "#dc2626", fontWeight: 700 }}>Delete</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       <div id="report-print-area" ref={printRef} className="report-print-area">
         <div className="report-print-header">

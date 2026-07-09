@@ -23,60 +23,50 @@ export async function GET(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "dashboard.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Patient, Doctor, TestReport } = await getTenantModels(tenantId);
+    const { Patient, Sample, TestReport } = await getTenantModels(tenantId);
     const canViewPatients = hasPermission(auth.session, "patients.view");
-    const canViewDoctors = hasPermission(auth.session, "doctors.view");
+    const canViewSamples = hasPermission(auth.session, "samples.view");
     const canViewReports = hasPermission(auth.session, "reports.view");
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const canViewDoctorsFinance = hasPermission(auth.session, "accounts.view");
     const [
-      totalPatients,
+      samplesToday,
+      pendingSamples,
       todayPatients,
-      recentPatients,
-      totalDoctors,
-      reportsReady,
       pendingReports,
-      pendingPayouts,
+      recentPatients,
     ] = await Promise.all([
-      canViewPatients ? Patient.countDocuments({}) : Promise.resolve(null),
+      canViewSamples
+        ? Sample.countDocuments({ createdAt: { $gte: startOfToday } })
+        : Promise.resolve(null),
+      canViewSamples
+        ? Sample.countDocuments({ status: { $in: ["registered", "collected"] } })
+        : Promise.resolve(null),
       canViewPatients
         ? Patient.countDocuments({ createdAt: { $gte: startOfToday } })
         : Promise.resolve(null),
+      canViewReports ? TestReport.countDocuments({ status: "draft" }) : Promise.resolve(null),
       canViewPatients
         ? Patient.find({}).sort({ createdAt: -1 }).limit(5).select("name patientId age gender createdAt")
             .lean()
-        : Promise.resolve([]),
-      canViewDoctors ? Doctor.countDocuments({}) : Promise.resolve(null),
-      canViewReports
-        ? TestReport.countDocuments({ status: { $in: ["completed", "verified", "released"] } })
-        : Promise.resolve(null),
-      canViewReports ? TestReport.countDocuments({ status: "draft" }) : Promise.resolve(null),
-      canViewDoctorsFinance
-        ? Doctor.aggregate([
-            { $match: { status: "Active" } },
-            { $group: { _id: null, total: { $sum: { $ifNull: ["$pendingPayout", 0] } } } },
-          ])
         : Promise.resolve([]),
     ]);
 
     debugRequestLog("ok", {
       tenantId,
       canViewPatients,
-      canViewDoctors,
+      canViewSamples,
       canViewReports,
     });
     return Response.json({
-      totalPatients,
-      totalDoctors,
+      samplesToday,
+      pendingSamples,
       todayPatients,
-      reportsReady,
       pendingReports,
-      pendingPayouts: pendingPayouts[0]?.total || 0,
       recentPatients,
       permissions: {
         patients: canViewPatients,
-        doctors: canViewDoctors,
+        samples: canViewSamples,
         reports: canViewReports,
       },
     });

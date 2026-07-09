@@ -80,52 +80,42 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      label: "Total Patients",
-      value: stats?.totalPatients || 0,
-      permission: "patients.view",
+      label: "Samples Today",
+      value: stats?.samplesToday || 0,
+      permission: "samples.view",
       trend: "up",
-      change: "Live",
-      icon: Icons.patients,
+      change: "Today",
+      icon: Icons.flask,
       color: "#0d9488",
       bg: "linear-gradient(135deg, #f0fdfa, #ccfbf1)",
     },
     {
-      label: "Registrations Today",
-      value: stats?.todayPatients || 0,
-      permission: "patients.view",
-      trend: "up",
-      change: "Today",
-      icon: Icons.flask,
+      label: "Pending Samples",
+      value: stats?.pendingSamples || 0,
+      permission: "samples.view",
+      trend: "down",
+      change: "Needs attention",
+      icon: Icons.clock,
       color: "#7c3aed",
       bg: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
     },
     {
-      label: "Consulting Doctors",
-      value: stats?.totalDoctors || 0,
-      permission: "doctors.view",
-      trend: "up",
-      change: "Active",
-      icon: Icons.stethoscope,
-      color: "#2563eb",
-      bg: "linear-gradient(135deg, #eff6ff, #dbeafe)",
-    },
-    {
-      label: "Reports Ready",
-      value: stats?.reportsReady || 0,
+      label: "Reports Pending",
+      value: stats?.pendingReports || 0,
       permission: "reports.view",
-      trend: "up",
-      change: "Ready",
+      trend: "down",
+      change: "Review",
       icon: Icons.report,
       color: "#ea580c",
       bg: "linear-gradient(135deg, #fff7ed, #ffedd5)",
     },
     {
-      label: "Pending Reports",
-      value: stats?.pendingReports || 0,
-      permission: "reports.view",
-      trend: "down",
-      change: "Action",
-      icon: Icons.clock,
+      label: "Patients Today",
+      value: stats?.todayPatients || 0,
+      permission: "patients.view",
+      trend: "up",
+      change: "New",
+      icon: Icons.users,
       color: "#f43f5e",
       bg: "linear-gradient(135deg, #fff1f2, #ffe4e6)",
     },
@@ -297,9 +287,9 @@ export default function DashboardPage() {
           <div className="dash-quick-stats">
             <div className="dash-quick-title">Quick Summary</div>
             <div className="dash-quick-row">
-              <span className="dash-quick-label">Total Doctors</span>
+              <span className="dash-quick-label">Samples Today</span>
               <span className="dash-quick-value">
-                {hasPermission(user, "doctors.view") ? stats?.totalDoctors || 0 : "Hidden"}
+                {hasPermission(user, "samples.view") ? stats?.samplesToday || 0 : "Hidden"}
               </span>
             </div>
             <div className="dash-quick-row">

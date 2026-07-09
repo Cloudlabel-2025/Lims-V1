@@ -16,12 +16,6 @@ export default function StepDetails({ sample, onNext }) {
         </div>
         <div className="col-md-4">
           <div className="wizard-info-card">
-            <small className="text-muted">Barcode</small>
-            <strong>{sample.barcode || "-"}</strong>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="wizard-info-card">
             <small className="text-muted">Status</small>
             <strong>{sample.status}</strong>
           </div>

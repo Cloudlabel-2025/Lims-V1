@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 
 function rangeText(parameter) {
@@ -22,6 +22,7 @@ function getFlag(parameter, rawValue) {
 }
 
 export default function StepReview({ testDef, sample, results, onBack, onSubmit, submitting }) {
+  const [confirming, setConfirming] = useState(false);
   const parameters = useMemo(
     () => (testDef?.parameters || []).slice().sort((a, b) => a.sortOrder - b.sortOrder),
     [testDef]
@@ -85,10 +86,28 @@ export default function StepReview({ testDef, sample, results, onBack, onSubmit,
         <button className="dash-btn-secondary" onClick={onBack} disabled={submitting}>
           {Icons.arrowLeft} Back
         </button>
-        <button className="dash-btn-primary" onClick={onSubmit} disabled={submitting}>
+        <button className="dash-btn-primary" onClick={() => setConfirming(true)} disabled={submitting}>
           {submitting ? "Submitting..." : String.fromCharCode(10003) + " Submit Results"}
         </button>
       </div>
+
+      {confirming && (
+        <div className="cms-success-dialog-backdrop" role="presentation">
+          <section className="cms-success-dialog" role="dialog" aria-live="polite">
+            <div className="cms-success-dialog-icon" style={{ fontSize: 28 }}>!</div>
+            <h2>Confirm Submission</h2>
+            <p>Are you sure you want to submit these results? This action cannot be undone.</p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 20 }}>
+              <button className="dash-btn-secondary" onClick={() => setConfirming(false)} disabled={submitting}>
+                Cancel
+              </button>
+              <button className="dash-btn-primary" onClick={() => { setConfirming(false); onSubmit(); }} disabled={submitting}>
+                {submitting ? "Submitting..." : "Confirm"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

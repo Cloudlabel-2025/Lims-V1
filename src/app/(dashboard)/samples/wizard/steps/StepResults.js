@@ -31,16 +31,9 @@ export default function StepResults({ testDef, results, setResults, onNext, onBa
   );
 
   function handleResultChange(key, value) {
-    if (/[eE]/.test(value)) {
-      setResultsErrors((prev) => ({ ...prev, [key]: "Exponential notation is not allowed" }));
-      return;
-    }
-    if (value !== "" && value !== "-" && value !== "." && !Number.isFinite(Number(value))) {
-      setResultsErrors((prev) => ({ ...prev, [key]: "Invalid numeric value" }));
-      return;
-    }
+    const cleaned = value.replace(/\D/g, "").slice(0, 12);
     setResultsErrors((prev) => ({ ...prev, [key]: "" }));
-    setResults((current) => ({ ...current, [key]: value }));
+    setResults((current) => ({ ...current, [key]: cleaned }));
   }
 
   function handleNext() {
@@ -86,6 +79,7 @@ export default function StepResults({ testDef, results, setResults, onNext, onBa
                   onChange={(e) => handleResultChange(parameter.key, e.target.value)}
                   required={parameter.required}
                   placeholder="Enter value"
+                  maxLength={12}
                   style={resultsErrors[parameter.key] ? { borderColor: "var(--error)" } : {}}
                 />
                 {resultsErrors[parameter.key] && (

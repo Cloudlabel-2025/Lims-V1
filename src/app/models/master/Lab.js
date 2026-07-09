@@ -95,11 +95,10 @@ export const LabSchema = new mongoose.Schema(
       default: ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports"],
     },
     numbering: {
-      patientPrefix: {
-        type: String,
-        default: "UDHIRAM-",
-        trim: true,
-      },
+        patientPrefix: {
+          type: String,
+          trim: true,
+        },
     },
     adminAccess: {
       email: {

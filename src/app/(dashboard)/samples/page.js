@@ -93,8 +93,8 @@ export default function SamplesPage() {
               + Register Sample
             </button>
           )}
-          <button className="dash-btn-secondary" type="button" onClick={() => loadSamples()}>
-            {Icons.refresh} Refresh
+          <button className="dash-btn-secondary" type="button" onClick={() => loadSamples()} disabled={loading}>
+            <span className={loading ? "icon-spin" : ""}>{Icons.refresh}</span> Refresh
           </button>
         </div>
       </div>
@@ -156,16 +156,18 @@ export default function SamplesPage() {
                     )}
                   </span>
                   <span className="sample-actions">
-                    {canProcess && canViewSamples && (
-                      <button onClick={() => router.push(`/samples/wizard?sampleId=${sample._id}`)}>
-                        Process
-                      </button>
-                    )}
-                    {canReject && canViewSamples && !isRejecting && (
-                      <button style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }} onClick={() => setRejecting({ id: sample._id, reason: "", saving: false })}>
-                        Reject
-                      </button>
-                    )}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap" }}>
+                      {canProcess && canViewSamples && (
+                        <button onClick={() => router.push(`/samples/wizard?sampleId=${sample._id}`)}>
+                          Process
+                        </button>
+                      )}
+                      {canReject && canViewSamples && !isRejecting && (
+                        <button style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }} onClick={() => setRejecting({ id: sample._id, reason: "", saving: false })}>
+                          Reject
+                        </button>
+                      )}
+                    </div>
                     {isRejecting && (
                       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                         <input

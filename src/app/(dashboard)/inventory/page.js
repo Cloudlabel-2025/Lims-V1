@@ -518,7 +518,7 @@ export default function InventoryPage() {
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>{Icons.search}</span>
             <input className="lims-input" maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setItemPage(1); loadInventory(1); } }} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
           </div>}
-          <button type="button" onClick={() => { loadInventory(itemPage); if (activeTab === "movements") loadMovements(movementPage); }} title="Refresh" style={{ height: 38, width: 38, display: "grid", placeItems: "center", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", cursor: "pointer", color: "var(--text-secondary)" }}>{Icons.refresh}</button>
+          <button className="dash-btn-secondary" onClick={() => { loadInventory(itemPage); if (activeTab === "movements") loadMovements(movementPage); }} disabled={loading} style={{ height: 34, padding: "0 14px", fontSize: 12 }}><span className={loading ? "icon-spin" : ""}>{Icons.refresh}</span> Refresh</button>
         </div>
       </div>
 
