@@ -22,3 +22,27 @@ export function isValidName(value) {
 export function inputStyle() {
   return { height: 38, fontSize: 13 };
 }
+
+export function sanitizeVendorName(value) {
+  const cleaned = (value || "").replace(/[^A-Za-z0-9-]/g, "");
+  const parts = cleaned.split("-");
+  if (parts.length > 2) return parts[0] + "-" + parts.slice(1).join("");
+  return cleaned;
+}
+
+export function sanitizeCorporateName(value) {
+  const cleaned = (value || "").replace(/[^A-Za-z0-9- ]/g, "");
+  const parts = cleaned.split("-");
+  if (parts.length > 2) return parts[0] + "-" + parts.slice(1).join("");
+  return cleaned.slice(0, 30);
+}
+
+export function sanitizeAmountInput(value) {
+  const cleaned = (value || "").replace(/[^0-9]/g, "");
+  return cleaned.slice(0, 7);
+}
+
+export function isValidUrl(value) {
+  if (!value) return true;
+  return /^https?:\/\/[^\s$.?#].[^\s]*$/i.test(value);
+}

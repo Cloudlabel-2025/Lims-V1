@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { Icons } from "@/app/components/Icons";
 
 function getModuleLabel(moduleId) {
   return moduleId
@@ -8,6 +9,22 @@ function getModuleLabel(moduleId) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
+
+const moduleIcons = {
+  dashboard: Icons.home,
+  patients: Icons.person,
+  doctors: Icons.stethoscope,
+  tests: Icons.flask,
+  billing: Icons.wallet,
+  samples: Icons.vial,
+  reports: Icons.report,
+  accounts: Icons.barChart,
+  analytics: Icons.activity,
+  inventory: Icons.grid,
+  users: Icons.users,
+  settings: Icons.settings,
+  general: Icons.settings,
+};
 
 export default function PermissionMatrix({
   activeRole,
@@ -107,7 +124,7 @@ export default function PermissionMatrix({
                       aria-expanded={expanded}
                     >
                       <span className="cms-permission-toggle">
-                        {expanded ? "\u2212" : "+"}
+                        {moduleIcons[moduleId] || Icons.settings}
                       </span>
                       <span className="cms-permission-title">
                         <strong>{getModuleLabel(moduleId)}</strong>

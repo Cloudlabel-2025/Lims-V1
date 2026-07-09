@@ -25,7 +25,7 @@ function ScrollableDropdown({ name, options, value, onChange, ...props }) {
       <select
         className="rdp-dropdown"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         aria-label={props["aria-label"]}
       >
         {options?.map((opt) => (
@@ -57,7 +57,7 @@ function ScrollableDropdown({ name, options, value, onChange, ...props }) {
               key={opt.value}
               type="button"
               disabled={opt.disabled}
-              onClick={() => { onChange(opt.value); setYearOpen(false); }}
+              onClick={() => { onChange({ target: { value: opt.value } }); setYearOpen(false); }}
               className={`date-picker-year-option${String(opt.value) === String(value) ? " selected" : ""}`}
             >
               {opt.label}
@@ -145,7 +145,7 @@ export default function DatePicker({ value, onChange, max, className, error }) {
     if (year.length === 4) {
       const y = parseInt(year, 10);
       const cur = new Date().getFullYear();
-      if (y < 1945 || y > cur) return;
+      if (y < 1941 || y > cur) return;
       const full = day + "-" + month + "-" + year;
       if (!parse(full, "dd-MM-yyyy", new Date())) return;
     }
@@ -234,8 +234,8 @@ export default function DatePicker({ value, onChange, max, className, error }) {
           <DayPicker
             mode="single"
             captionLayout="dropdown"
-            fromYear={1945}
-            toYear={new Date().getFullYear()}
+            startMonth={new Date(1940, 0, 1)}
+            endMonth={new Date(new Date().getFullYear(), 11, 31)}
             selected={selectedDate && isValid(selectedDate) ? selectedDate : undefined}
             onSelect={(date) => {
               if (date && isValid(date)) {
@@ -243,7 +243,7 @@ export default function DatePicker({ value, onChange, max, className, error }) {
               }
             }}
             disabled={[
-              { before: new Date(1945, 0, 1) },
+              { before: new Date(1941, 0, 1) },
               ...(maxDate ? [{ after: maxDate }] : []),
             ]}
             defaultMonth={selectedDate && isValid(selectedDate) ? selectedDate : undefined}

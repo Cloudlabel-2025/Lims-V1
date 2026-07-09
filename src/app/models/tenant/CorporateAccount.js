@@ -34,7 +34,7 @@ export const CorporateAccountSchema = new mongoose.Schema(
     creditLimit: { type: Number, default: 0, min: 0 },
     outstandingBalance: { type: Number, default: 0 },
     tenantId: { type: String, required: true, trim: true, lowercase: true, index: true },
-    statementCycle: { type: String, enum: ["monthly", "weekly"], default: "monthly" },
+    statementCycle: { type: String, enum: ["monthly", "weekly", "quarterly", "half-yearly", "yearly"], default: "monthly" },
   },
   { timestamps: true }
 );
@@ -42,7 +42,8 @@ export const CorporateAccountSchema = new mongoose.Schema(
 CorporateAccountSchema.index({ tenantId: 1, name: 1 }, { unique: true });
 
 export function getCorporateAccountModel(connection = mongoose) {
-  return connection.models.CorporateAccount || connection.model("CorporateAccount", CorporateAccountSchema);
+  delete connection.models.CorporateAccount;
+  return connection.model("CorporateAccount", CorporateAccountSchema);
 }
 
 const CorporateAccount = getCorporateAccountModel();

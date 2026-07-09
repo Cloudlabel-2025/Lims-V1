@@ -99,7 +99,7 @@ export async function POST(req) {
       creditLimit: money(rawCreditLimit),
       outstandingBalance: money(body.outstandingBalance),
       tenantId: auth.tenantId,
-      statementCycle: body.statementCycle === "weekly" ? "weekly" : "monthly",
+      statementCycle: ["monthly", "weekly", "quarterly", "half-yearly", "yearly"].includes(body.statementCycle) ? body.statementCycle : "monthly",
     });
 
     return Response.json({ corporateAccount }, { status: 201 });

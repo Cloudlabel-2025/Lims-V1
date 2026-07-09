@@ -20,6 +20,12 @@ export function isValidName(value) {
   return NAME_REGEX.test(clean(value));
 }
 
+const ITEM_CODE_REGEX = /^[A-Za-z0-9-]+$/;
+
+export function isValidItemCode(value) {
+  return ITEM_CODE_REGEX.test(clean(value));
+}
+
 export function isValidPersonName(value) {
   const cleaned = clean(value);
   if (containsUrl(cleaned)) return false;

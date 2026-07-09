@@ -47,10 +47,7 @@ export default function DoctorRegistration() {
       const sanitized = value.replace(/[^A-Za-z0-9/]/g, "").slice(0, 20);
       setForm((prev) => ({ ...prev, mciNumber: sanitized }));
     } else if (name === "experience") {
-      const cleaned = value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1").slice(0, 4);
-      if (!/^\d{0,2}\.?\d?$/.test(cleaned)) return;
-      if (cleaned.length === 1 && cleaned[0] === ".") return;
-      if (cleaned.length >= 3 && cleaned[2] !== ".") return;
+      const cleaned = value.replace(/\D/g, "").slice(0, 2);
       setForm((prev) => ({ ...prev, experience: cleaned }));
     } else if (name === "phone") {
       const sanitized = value.replace(/\D/g, "").slice(0, 10);

@@ -29,7 +29,7 @@ export async function GET(req) {
     since.setDate(since.getDate() - days);
     since.setHours(0, 0, 0, 0);
 
-    const { BillingRecord, TestReport, Sample, Patient, ExpenseEntry, InventoryItem, InventoryCategory } = await getTenantModels(auth.tenantId);
+    const { BillingRecord, TestReport, Sample, Patient, Doctor, ExpenseEntry, InventoryItem, InventoryCategory } = await getTenantModels(auth.tenantId);
 
     const [
       revenueSeries,
@@ -41,7 +41,6 @@ export async function GET(req) {
       totalBills,
       totalPatients,
       newPatients,
-      qcSeries,
       expenseBreakdown,
       inventoryValuation,
     ] = await Promise.all([
@@ -73,38 +72,65 @@ export async function GET(req) {
         { $limit: 10 },
       ]), []),
 
-      // Doctor referral stats — commission amounts only for users with accounts.view
-      safeMetric("doctor-referrals", BillingRecord.aggregate([
-        { $match: { createdAt: { $gte: since }, referralDoctor: { $exists: true, $ne: null } } },
-        {
-          $group: {
-            _id: "$referralDoctor",
-            bills: { $sum: 1 },
-            revenue: { $sum: { $ifNull: ["$totalAmount", 0] } },
-            commission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
-          },
-        },
-        { $sort: { bills: -1 } },
-        { $limit: 10 },
-        {
-          $lookup: {
-            from: "doctors",
-            localField: "_id",
-            foreignField: "_id",
-            as: "doctor",
-          },
-        },
-        { $unwind: { path: "$doctor", preserveNullAndEmpty: true } },
-        {
-          $project: {
-            name: "$doctor.name",
-            doctorId: "$doctor.doctorId",
-            bills: 1,
-            revenue: 1,
-            ...(hasPermission(auth.session, "accounts.view") ? { commission: 1 } : {}),
-          },
-        },
-      ]), []),
+      // Doctor referral stats — uses Mongoose queries instead of aggregation for reliability
+      safeMetric("doctor-referrals", (async () => {
+        const canViewCommission = hasPermission(auth.session, "accounts.view");
+
+        const [recordsWithRef, allDoctors, recordsWithoutRef] = await Promise.all([
+          BillingRecord.find({ createdAt: { $gte: since }, referralDoctor: { $ne: null, $exists: true } })
+            .select("referralDoctor totalAmount commissionAmount")
+            .lean(),
+          Doctor.find({}).select("name doctorId").lean(),
+          BillingRecord.find({ createdAt: { $gte: since }, $or: [{ referralDoctor: { $exists: false } }, { referralDoctor: null }] })
+            .populate("patient", "refDoctorName")
+            .select("referralDoctor totalAmount commissionAmount patient")
+            .lean(),
+        ]);
+
+        const doctorById = new Map(allDoctors.map(d => [String(d._id), d]));
+
+        // Group by doctor from records with referralDoctor set
+        const stats = new Map();
+        for (const r of recordsWithRef) {
+          if (!r.referralDoctor) continue;
+          const key = String(r.referralDoctor);
+          const entry = stats.get(key) || { _id: r.referralDoctor, bills: 0, revenue: 0, commission: 0 };
+          entry.bills += 1;
+          entry.revenue += r.totalAmount || 0;
+          entry.commission += r.commissionAmount || 0;
+          stats.set(key, entry);
+        }
+
+        // Fallback: match records without referralDoctor via patient's refDoctorName
+        for (const r of recordsWithoutRef) {
+          const refName = r.patient?.refDoctorName?.trim();
+          if (!refName) continue;
+
+          let matched = allDoctors.find(d => d.name.toLowerCase() === refName.toLowerCase());
+          if (!matched && refName.includes(" ")) {
+            const lastName = refName.split(" ").pop().toLowerCase();
+            matched = allDoctors.find(d => d.name.toLowerCase().includes(lastName));
+          }
+          if (!matched) continue;
+
+          const key = String(matched._id);
+          const entry = stats.get(key) || { _id: matched._id, bills: 0, revenue: 0, commission: 0 };
+          entry.bills += 1;
+          entry.revenue += r.totalAmount || 0;
+          entry.commission += r.commissionAmount || 0;
+          stats.set(key, entry);
+        }
+
+        const sorted = [...stats.values()].sort((a, b) => b.bills - a.bills).slice(0, 10);
+
+        return sorted.map(d => ({
+          name: doctorById.get(String(d._id))?.name || null,
+          doctorId: doctorById.get(String(d._id))?.doctorId || null,
+          bills: d.bills,
+          revenue: d.revenue,
+          ...(canViewCommission ? { commission: d.commission } : {}),
+        }));
+      })(), []),
 
       // Report status breakdown
       safeMetric("report-status-counts", TestReport.aggregate([
@@ -134,11 +160,11 @@ export async function GET(req) {
         {
           $group: {
             _id: "$category",
-            total: { $sum: { $add: ["$amount", { $ifNull: ["$taxAmount", 0] }] } },
+            amount: { $sum: { $add: ["$amount", { $ifNull: ["$taxAmount", 0] }] } },
             count: { $sum: 1 },
           },
         },
-        { $sort: { total: -1 } },
+        { $sort: { amount: -1 } },
       ]), []),
 
       // Inventory valuation — total stock value by category
@@ -152,18 +178,32 @@ export async function GET(req) {
             as: "cat",
           },
         },
-        { $unwind: { path: "$cat", preserveNullAndEmpty: true } },
+        { $unwind: { path: "$cat", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$batches", preserveNullAndEmptyArrays: true } },
         {
           $group: {
-            _id: {
-              categoryId: "$category",
-              categoryName: { $ifNull: ["$cat.name", "Uncategorized"] },
-            },
-            items: { $sum: 1 },
+            _id: { $ifNull: ["$cat.name", "Uncategorized"] },
+            items: { $addToSet: "$_id" },
             totalStock: { $sum: { $ifNull: ["$stockOnHandBase", 0] } },
+            totalValue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ["$batches.quantityBase", 0] },
+                  { $ifNull: ["$batches.costPerBaseUnit", 0] },
+                ],
+              },
+            },
           },
         },
-        { $sort: { items: -1 } },
+        {
+          $project: {
+            _id: 1,
+            items: { $size: "$items" },
+            totalStock: 1,
+            totalValue: 1,
+          },
+        },
+        { $sort: { totalValue: -1 } },
       ]), []),
     ]);
 

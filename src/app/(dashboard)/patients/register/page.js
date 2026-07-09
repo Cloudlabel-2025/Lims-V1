@@ -97,6 +97,9 @@ export default function PatientRegistration() {
     } else if (name === "address") {
       const sanitized = value.replace(/[^A-Za-z0-9 .,/-]/g, "").slice(0, 100);
       setForm((prev) => ({ ...prev, address: sanitized }));
+    } else if (name === "phone") {
+      const sanitized = value.replace(/\D/g, "").slice(0, 10);
+      setForm((prev) => ({ ...prev, phone: sanitized }));
     } else {
       setForm((prev) => ({
         ...prev,
@@ -125,7 +128,7 @@ export default function PatientRegistration() {
     if (!form.dob) newErrors.dob = "Date of Birth is required";
     else {
       const dobDate = new Date(form.dob);
-      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1900) newErrors.dob = "Invalid date of birth";
+      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1941) newErrors.dob = "Invalid date of birth";
       else if (dobDate > new Date()) newErrors.dob = "Date of Birth cannot be in the future";
     }
     if (!form.age && form.age !== 0) newErrors.age = "Age is required";
@@ -369,7 +372,7 @@ export default function PatientRegistration() {
             <div className="row g-3">
               <div className="col-md-4">
                 <label className="lims-label">Mobile Number <span className="required">*</span></label>
-                <input name="phone" className={`lims-input ${errors.phone ? 'invalid' : ''}`} placeholder="Enter mobile number" minLength={10} maxLength={10} value={form.phone} onChange={handleChange} />
+                <input name="phone" type="text" inputMode="numeric" className={`lims-input ${errors.phone ? 'invalid' : ''}`} placeholder="Enter mobile number" minLength={10} maxLength={10} value={form.phone} onChange={handleChange} />
                 {errors.phone && <div className="lims-error-text">{errors.phone}</div>}
               </div>
               <div className="col-md-8">

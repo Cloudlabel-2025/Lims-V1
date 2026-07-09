@@ -49,6 +49,10 @@ export default function NewVisit({ params }) {
     return total;
   }, [tests, packages, selectedTests]);
 
+  const discountRupees = Math.round(selectedTotal * (Number(discountAmount || 0) / 100));
+  const taxRupees = Math.round(selectedTotal * (Number(taxAmount || 0) / 100));
+  const netPayable = Math.max(0, selectedTotal - discountRupees + taxRupees);
+
   const investigationOptions = useMemo(
     () => [
       ...packages.map((pkg) => ({ value: `pkg_${pkg._id}`, label: pkg.name, sublabel: `Package · ₹${pkg.price}` })),
@@ -143,8 +147,8 @@ export default function NewVisit({ params }) {
           receivedTime,
           collectionTime: collectionTime || undefined,
           notes,
-          discountAmount: discountAmount || 0,
-          taxAmount: taxAmount || 0,
+          discountAmount: discountRupees,
+          taxAmount: taxRupees,
         }),
       });
       const data = await res.json();
@@ -179,8 +183,6 @@ export default function NewVisit({ params }) {
       </div>
     );
   }
-
-  const netPayable = Math.max(0, selectedTotal - Number(discountAmount || 0) + Number(taxAmount || 0));
 
   const s = {
     label: { display: "block", fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" },
@@ -248,7 +250,7 @@ export default function NewVisit({ params }) {
             <div style={s.row}>
               <div style={{ ...s.col6, ...s.field }}>
                 <label style={s.label}>Priority</label>
-                <select style={s.input} value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <select className="lims-select-field" style={s.input} value={priority} onChange={(e) => setPriority(e.target.value)}>
                   <option value="routine">Routine</option>
                   <option value="urgent">Urgent (STAT)</option>
                 </select>
@@ -278,12 +280,12 @@ export default function NewVisit({ params }) {
             </div>
             <div style={s.row}>
               <div style={{ ...s.col6, ...s.field }}>
-                <label style={s.label}>Discount (₹)</label>
-                <input type="number" style={s.input} min="0" max="9999999999" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} placeholder="0" />
+                <label style={s.label}>Discount (%)</label>
+                <input type="number" style={s.input} min="0" max="90" value={discountAmount} onChange={(e) => { const v = e.target.value; if (v === "" || (!isNaN(v) && Number(v) >= 0 && Number(v) <= 90)) setDiscountAmount(v); }} placeholder="0" className="no-spinner" onKeyDown={(e) => { if (e.key === "e" || e.key === "E" || e.key === "-" || e.key === "+") e.preventDefault(); }} />
               </div>
               <div style={{ ...s.col6, ...s.field }}>
-                <label style={s.label}>Tax (₹)</label>
-                <input type="number" style={s.input} min="0" max="9999999999" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} placeholder="0" />
+                <label style={s.label}>Tax (%)</label>
+                <input type="number" style={s.input} min="0" max="90" value={taxAmount} onChange={(e) => { const v = e.target.value; if (v === "" || (!isNaN(v) && Number(v) >= 0 && Number(v) <= 90)) setTaxAmount(v); }} placeholder="0" className="no-spinner" onKeyDown={(e) => { if (e.key === "e" || e.key === "E" || e.key === "-" || e.key === "+") e.preventDefault(); }} />
               </div>
             </div>
             <div style={{ ...s.col12, ...s.field, padding: 0 }}>
@@ -303,14 +305,28 @@ export default function NewVisit({ params }) {
         <div style={{
           background: "var(--surface)", padding: "20px 24px", borderRadius: "12px",
           border: "1px solid var(--border-light)", marginBottom: "24px",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <div>
-            <span style={{ fontSize: "13px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Net Payable</span>
-            <strong style={{ fontSize: "24px", color: "var(--brand-action, var(--primary))" }}>₹{netPayable}</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-muted)" }}>
+            <span>Subtotal</span><span>₹{selectedTotal}</span>
           </div>
-          <div style={{ color: "var(--text-secondary)", fontSize: "14px", fontWeight: "600" }}>
-            {selectedTests.length} Investigations Selected
+          {discountRupees > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--success)" }}>
+              <span>Discount ({Number(discountAmount || 0)}%)</span><span>− ₹{discountRupees}</span>
+            </div>
+          )}
+          {taxRupees > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-secondary)" }}>
+              <span>Tax ({Number(taxAmount || 0)}%)</span><span>+ ₹{taxRupees}</span>
+            </div>
+          )}
+          <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "10px", marginTop: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+            <div>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Net Payable</span>
+              <strong style={{ fontSize: "24px", color: "var(--brand-action, var(--primary))" }}>₹{netPayable}</strong>
+            </div>
+            <div style={{ color: "var(--text-secondary)", fontSize: "14px", fontWeight: "600" }}>
+              {selectedTests.length} Investigations Selected
+            </div>
           </div>
         </div>
 

@@ -87,9 +87,23 @@ export async function POST(req) {
     const patient = await Patient.findById(patientId).select("name patientId age gender phone refDoctorName").lean();
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
 
-    const doctor = patient.refDoctorName
-      ? await Doctor.findOne({ name: patient.refDoctorName }).select("_id commission status").lean()
-      : null;
+    let doctor = null;
+    if (patient.refDoctorName) {
+      const refName = patient.refDoctorName.trim();
+      doctor = await Doctor.findOne({
+        name: { $regex: new RegExp(`^${refName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+      })
+        .select("_id commission status")
+        .lean();
+      if (!doctor && refName.includes(" ")) {
+        const lastName = refName.split(" ").pop();
+        doctor = await Doctor.findOne({
+          name: { $regex: new RegExp(lastName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") },
+        })
+          .select("_id commission status")
+          .lean();
+      }
+    }
     if (doctor && doctor.status !== "Active") {
       return Response.json({ error: "Referring doctor must be active before billing" }, { status: 400 });
     }

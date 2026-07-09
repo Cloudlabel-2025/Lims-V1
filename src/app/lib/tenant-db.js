@@ -20,6 +20,8 @@ import { getInventoryCategoryModel } from "@/app/models/tenant/InventoryCategory
 import { getInventoryItemModel } from "@/app/models/tenant/InventoryItem";
 import { getInventoryMovementModel } from "@/app/models/tenant/InventoryMovement";
 import { getInventoryUomModel } from "@/app/models/tenant/InventoryUom";
+import { getInventoryItemTypeModel } from "@/app/models/tenant/InventoryItemType";
+import { getInventoryStorageConditionModel } from "@/app/models/tenant/InventoryStorageCondition";
 
 
 const tenantDbCache = globalThis.tenantDbCache || new Map();
@@ -96,6 +98,8 @@ export async function getTenantModels(tenantId) {
     InventoryItem: getInventoryItemModel(connection),
     InventoryMovement: getInventoryMovementModel(connection),
     InventoryUom: getInventoryUomModel(connection),
+    InventoryItemType: getInventoryItemTypeModel(connection),
+    InventoryStorageCondition: getInventoryStorageConditionModel(connection),
   };
 }
 

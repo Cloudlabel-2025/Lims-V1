@@ -61,7 +61,7 @@ export async function PUT(req, { params }) {
       if (isNaN(dobDate.getTime())) {
         return Response.json({ error: "Invalid date of birth" }, { status: 400 });
       }
-      if (dobDate.getFullYear() < 1900) {
+      if (dobDate.getFullYear() < 1941) {
         return Response.json({ error: "Invalid date of birth" }, { status: 400 });
       }
       if (dobDate > new Date()) {

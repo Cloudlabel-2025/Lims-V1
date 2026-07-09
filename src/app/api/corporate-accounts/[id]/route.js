@@ -92,7 +92,7 @@ export async function PUT(req, { params }) {
     }
     if (body.outstandingBalance !== undefined) corporateAccount.outstandingBalance = money(body.outstandingBalance);
     if (body.statementCycle !== undefined) {
-      corporateAccount.statementCycle = body.statementCycle === "weekly" ? "weekly" : "monthly";
+      corporateAccount.statementCycle = ["monthly", "weekly", "quarterly", "half-yearly", "yearly"].includes(body.statementCycle) ? body.statementCycle : "monthly";
     }
 
     await corporateAccount.save();

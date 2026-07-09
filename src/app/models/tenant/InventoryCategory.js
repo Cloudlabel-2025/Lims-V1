@@ -10,9 +10,8 @@ export const InventoryCategorySchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 80,
-      match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Category name contains invalid characters"],
-      validate: { validator: noUrl, message: "URLs are not allowed in category name" },
+      maxlength: 20,
+      match: [/^[A-Z][A-Za-z\s]*$/, "Category name must start with a capital letter and contain only letters and spaces"],
     },
     code: {
       type: String,
@@ -30,8 +29,7 @@ export const InventoryCategorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-InventoryCategorySchema.index({ name: 1, parentCategory: 1 }, { unique: true });
-InventoryCategorySchema.index({ code: 1 }, { unique: true, sparse: true });
+InventoryCategorySchema.index({ code: 1 }, { unique: true });
 
 export function getInventoryCategoryModel(connection = mongoose) {
   return connection.models.InventoryCategory || connection.model("InventoryCategory", InventoryCategorySchema);

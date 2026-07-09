@@ -156,13 +156,6 @@ export async function POST(req) {
         await corporateAccount.save({ session });
       }
 
-      lockedBillingRecord.paymentBreakdown = {
-        cash: money((lockedBillingRecord.paymentBreakdown?.cash || 0) + (paymentParts.find((part) => part.key === "cash")?.amount || 0)),
-        card: money((lockedBillingRecord.paymentBreakdown?.card || 0) + (paymentParts.find((part) => part.key === "card")?.amount || 0)),
-        online: money((lockedBillingRecord.paymentBreakdown?.online || 0) + (paymentParts.find((part) => part.key === "online")?.amount || 0)),
-        corporate: money((lockedBillingRecord.paymentBreakdown?.corporate || 0) + corporateAmount),
-      };
-
       const alreadyPaid = money(
         (lockedBillingRecord.paymentBreakdown?.cash || 0) +
           (lockedBillingRecord.paymentBreakdown?.card || 0) +
@@ -173,6 +166,14 @@ export async function POST(req) {
       if (receivedAmount > remainingDue) {
         throw new Error("Payment amount cannot exceed bill balance");
       }
+
+      lockedBillingRecord.paymentBreakdown = {
+        cash: money((lockedBillingRecord.paymentBreakdown?.cash || 0) + (paymentParts.find((part) => part.key === "cash")?.amount || 0)),
+        card: money((lockedBillingRecord.paymentBreakdown?.card || 0) + (paymentParts.find((part) => part.key === "card")?.amount || 0)),
+        online: money((lockedBillingRecord.paymentBreakdown?.online || 0) + (paymentParts.find((part) => part.key === "online")?.amount || 0)),
+        corporate: money((lockedBillingRecord.paymentBreakdown?.corporate || 0) + corporateAmount),
+      };
+
       const totalPaid = money(alreadyPaid + receivedAmount);
       const isFullyPaid = totalPaid >= money(lockedBillingRecord.totalAmount);
 

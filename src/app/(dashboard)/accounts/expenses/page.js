@@ -2,12 +2,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
-import { money, formatDate, isExponential, hasUrl, isValidName, inputStyle } from "../_components/helpers";
+import { money, formatDate, inputStyle, sanitizeVendorName, sanitizeAmountInput, isValidUrl } from "../_components/helpers";
 import Field from "../_components/Field";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 
-const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxAmount: "", paidFrom: "vendor-payable", attachmentUrl: "" };
+const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxPercentage: "", paidFrom: "vendor-payable", attachmentUrl: "" };
 
 function TwoColumn({ left, right }) {
   return (
@@ -82,10 +82,12 @@ export default function ExpensesPage() {
     setError("");
     setSuccess("");
     try {
+      if (form.attachmentUrl && !isValidUrl(form.attachmentUrl)) { setError("Receipt URL is not valid"); setSaving(false); return; }
+      const taxAmount = form.taxPercentage && form.amount ? Math.round(Number(form.amount) * Number(form.taxPercentage) / 100) : 0;
       await fetchJson("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, taxAmount: String(taxAmount) }),
       });
       setForm(emptyExpense);
       setFormErrors({});
@@ -145,16 +147,17 @@ export default function ExpensesPage() {
               </select>
             </Field>
             <Field label="Vendor">
-              <input required className="lims-input" minLength={3} maxLength={30} value={form.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setFormErrors((p) => ({ ...p, vendorName: "" })); setForm({ ...form, vendorName: v }); }} style={inputStyle()} />
+              <input required className="lims-input" minLength={3} maxLength={30} value={form.vendorName} onChange={(e) => { const v = sanitizeVendorName(e.target.value); setFormErrors((p) => ({ ...p, vendorName: "" })); setForm({ ...form, vendorName: v }); }} style={inputStyle()} />
               {formErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.vendorName}</small>}
             </Field>
             <Field label="Amount">
-              <input required className="lims-input" type="number" min="0.01" max="9999999999" step="0.01" value={form.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setFormErrors((p) => ({ ...p, amount: "" })); setForm({ ...form, amount: v }); }} style={inputStyle()} />
+              <input required className="lims-input no-spinner" inputMode="numeric" maxLength={7} value={form.amount} onChange={(e) => { const v = sanitizeAmountInput(e.target.value); setFormErrors((p) => ({ ...p, amount: "" })); setForm({ ...form, amount: v }); }} style={inputStyle()} />
               {formErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.amount}</small>}
             </Field>
-            <Field label="Tax">
-              <input required className="lims-input" type="number" min="0" max="9999999999" step="0.01" value={form.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setFormErrors((p) => ({ ...p, taxAmount: "" })); setForm({ ...form, taxAmount: v }); }} style={inputStyle()} />
-              {formErrors.taxAmount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.taxAmount}</small>}
+            <Field label="Tax (%)">
+              <input className="lims-input no-spinner" inputMode="numeric" maxLength={2} value={form.taxPercentage} onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (Number(v) > 90) return; setFormErrors((p) => ({ ...p, taxPercentage: "" })); setForm({ ...form, taxPercentage: v }); }} style={inputStyle()} placeholder="0-90" />
+              {form.taxPercentage && form.amount ? <small style={{ color: "var(--text-secondary)", fontSize: 10, display: "block", marginTop: 2 }}>Tax Amount: Rs {Math.round(Number(form.amount) * Number(form.taxPercentage) / 100)}</small> : null}
+              {formErrors.taxPercentage && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.taxPercentage}</small>}
             </Field>
             <Field label="Credit">
               <select className="lims-input" value={form.paidFrom} onChange={(e) => setForm({ ...form, paidFrom: e.target.value })} style={inputStyle()}>
@@ -163,7 +166,7 @@ export default function ExpensesPage() {
                 <option value="bank">Bank</option>
               </select>
             </Field>
-            <Field label="Receipt URL"><input className="lims-input" maxLength={500} value={form.attachmentUrl} onChange={(e) => setForm({ ...form, attachmentUrl: e.target.value })} style={inputStyle()} /></Field>
+            <Field label="Receipt URL"><input className="lims-input" type="url" maxLength={500} value={form.attachmentUrl} onChange={(e) => { const v = e.target.value; if (v && !isValidUrl(v)) { setFormErrors((p) => ({ ...p, attachmentUrl: "Enter a valid URL (http:// or https://)" })); } else { setFormErrors((p) => ({ ...p, attachmentUrl: "" })); } setForm({ ...form, attachmentUrl: v }); }} style={inputStyle()} placeholder="https://" />{formErrors.attachmentUrl && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.attachmentUrl}</small>}</Field>
             <button className="btn-lims-primary" disabled={saving} style={{ height: 38 }}>{saving ? "Posting..." : "Record Expense"}</button>
           </form>
         }
@@ -175,7 +178,7 @@ export default function ExpensesPage() {
               <>
                 <ExpensesTable
                   expenses={expenses}
-                  onEdit={(exp) => { setEditForm(exp); setEditingId(exp._id); }}
+                  onEdit={(exp) => { const taxPct = exp.amount && Number(exp.amount) > 0 ? Math.round((Number(exp.taxAmount || 0) / Number(exp.amount)) * 100) : 0; setEditForm({ ...exp, amount: String(exp.amount ?? ""), taxPercentage: taxPct > 0 ? String(taxPct) : "" }); setEditingId(exp._id); }}
                   onDelete={deleteExpense}
                 />
                 <PaginationControls pagination={pagination} loading={loading} onPageChange={setPage} />
@@ -194,9 +197,9 @@ export default function ExpensesPage() {
                 {["reagent", "staff", "equipment", "overhead"].map((cat) => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </Field>
-            <Field label="Vendor"><input required className="lims-input" minLength={3} maxLength={30} value={editForm.vendorName} onChange={(e) => { const v = e.target.value; if (hasUrl(v)) { setFormErrors((p) => ({ ...p, vendorName: "URLs are not allowed" })); return; } if (v && !isValidName(v)) { setFormErrors((p) => ({ ...p, vendorName: "Vendor name contains invalid characters" })); return; } setFormErrors((p) => ({ ...p, vendorName: "" })); setEditForm({ ...editForm, vendorName: v }); }} style={inputStyle()} />{formErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.vendorName}</small>}</Field>
-            <Field label="Amount"><input required className="lims-input" type="number" min="0.01" max="9999999999" step="0.01" value={editForm.amount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setFormErrors((p) => ({ ...p, amount: "Exponential notation is not allowed" })); return; } setFormErrors((p) => ({ ...p, amount: "" })); setEditForm({ ...editForm, amount: v }); }} style={inputStyle()} />{formErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.amount}</small>}</Field>
-            <Field label="Tax"><input required className="lims-input" type="number" min="0" max="9999999999" step="0.01" value={editForm.taxAmount} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setFormErrors((p) => ({ ...p, taxAmount: "Exponential notation is not allowed" })); return; } setFormErrors((p) => ({ ...p, taxAmount: "" })); setEditForm({ ...editForm, taxAmount: v }); }} style={inputStyle()} />{formErrors.taxAmount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.taxAmount}</small>}</Field>
+            <Field label="Vendor"><input required className="lims-input" minLength={3} maxLength={30} value={editForm.vendorName} onChange={(e) => { const v = sanitizeVendorName(e.target.value); setFormErrors((p) => ({ ...p, vendorName: "" })); setEditForm({ ...editForm, vendorName: v }); }} style={inputStyle()} />{formErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.vendorName}</small>}</Field>
+            <Field label="Amount"><input required className="lims-input no-spinner" inputMode="numeric" maxLength={7} value={editForm.amount} onChange={(e) => { const v = sanitizeAmountInput(e.target.value); setFormErrors((p) => ({ ...p, amount: "" })); setEditForm({ ...editForm, amount: v }); }} style={inputStyle()} />{formErrors.amount && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.amount}</small>}</Field>
+            <Field label="Tax (%)"><input className="lims-input no-spinner" inputMode="numeric" maxLength={2} value={editForm.taxPercentage} onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (Number(v) > 90) return; setFormErrors((p) => ({ ...p, taxPercentage: "" })); setEditForm({ ...editForm, taxPercentage: v }); }} style={inputStyle()} placeholder="0-90" />{editForm.taxPercentage && editForm.amount ? <small style={{ color: "var(--text-secondary)", fontSize: 10, display: "block", marginTop: 2 }}>Tax Amount: Rs {Math.round(Number(editForm.amount) * Number(editForm.taxPercentage) / 100)}</small> : null}{formErrors.taxPercentage && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.taxPercentage}</small>}</Field>
             <Field label="Credit">
               <select className="lims-input" value={editForm.paidFrom} onChange={(e) => setEditForm({ ...editForm, paidFrom: e.target.value })} style={inputStyle()}>
                 <option value="vendor-payable">Vendor Payable</option>
@@ -204,20 +207,19 @@ export default function ExpensesPage() {
                 <option value="bank">Bank</option>
               </select>
             </Field>
+            <Field label="Receipt URL"><input className="lims-input" type="url" maxLength={500} value={editForm.attachmentUrl} onChange={(e) => { const v = e.target.value; if (v && !isValidUrl(v)) { setFormErrors((p) => ({ ...p, attachmentUrl: "Enter a valid URL (http:// or https://)" })); } else { setFormErrors((p) => ({ ...p, attachmentUrl: "" })); } setEditForm({ ...editForm, attachmentUrl: v }); }} style={inputStyle()} placeholder="https://" />{formErrors.attachmentUrl && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.attachmentUrl}</small>}</Field>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <button type="button" className="btn-lims-secondary" onClick={() => setEditingId(null)} style={{ flex: 1, height: 38 }}>Cancel</button>
               <button type="button" className="btn-lims-primary" disabled={saving} onClick={() => {
                 const errs = {};
                 if (!editForm.vendorName) errs.vendorName = "Vendor is required";
-                else if (hasUrl(editForm.vendorName)) errs.vendorName = "URLs are not allowed";
-                else if (!isValidName(editForm.vendorName)) errs.vendorName = "Vendor name contains invalid characters";
+                else if (editForm.vendorName.length < 3) errs.vendorName = "Vendor name must be at least 3 characters";
                 if (editForm.amount === "" || editForm.amount === undefined || editForm.amount === null) errs.amount = "Amount is required";
-                else if (isExponential(editForm.amount)) errs.amount = "Exponential notation is not allowed";
-                if (editForm.taxAmount === "" || editForm.taxAmount === undefined || editForm.taxAmount === null) errs.taxAmount = "Tax is required";
-                else if (isExponential(editForm.taxAmount)) errs.taxAmount = "Exponential notation is not allowed";
+                if (editForm.attachmentUrl && !isValidUrl(editForm.attachmentUrl)) errs.attachmentUrl = "Enter a valid URL (http:// or https://)";
                 setFormErrors((p) => ({ ...p, ...errs }));
                 if (Object.keys(errs).length) return;
-                updateExpense(editingId, { category: editForm.category, vendorName: editForm.vendorName, amount: editForm.amount, taxAmount: editForm.taxAmount, paidFrom: editForm.paidFrom });
+                const taxAmount = editForm.taxPercentage && editForm.amount ? Math.round(Number(editForm.amount) * Number(editForm.taxPercentage) / 100) : 0;
+                updateExpense(editingId, { category: editForm.category, vendorName: editForm.vendorName, amount: editForm.amount, taxAmount: String(taxAmount), paidFrom: editForm.paidFrom });
               }} style={{ flex: 1, height: 38 }}>{saving ? "Saving..." : "Save"}</button>
             </div>
           </div>

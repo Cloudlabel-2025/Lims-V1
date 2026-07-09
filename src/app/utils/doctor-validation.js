@@ -1,6 +1,6 @@
 export const DOCTOR_LIMITS = {
   maxNameLength: 30,
-  maxExperienceYears: 60,
+  maxExperienceYears: 99,
 };
 
 export function cleanDoctorValue(value) {
@@ -26,7 +26,7 @@ export function isValidDoctorDegree(value) {
 
 export function isValidExperienceYears(value) {
   const cleaned = cleanDoctorValue(value);
-  if (!/^\d{2}\.\d$/.test(cleaned)) return false;
+  if (!/^\d{1,2}$/.test(cleaned)) return false;
   const years = Number(cleaned);
   return Number.isFinite(years) && years >= 0 && years <= DOCTOR_LIMITS.maxExperienceYears;
 }
@@ -103,7 +103,7 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
 
   requireField("experience", "Experience is required");
   if (cleanDoctorValue(form.experience) && !isValidExperienceYears(form.experience)) {
-    errors.experience = "Experience must be in format YY.M (e.g. 12.1 for 12 years 1 month)";
+    errors.experience = "Experience must be a whole number between 0 and 99";
   }
 
   requireField("phone", "Mobile number is required");

@@ -1235,12 +1235,39 @@ body {
   cursor: not-allowed;
 }
 
+.lims-input[type="number"]::-webkit-inner-spin-button,
+.lims-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.lims-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .lims-select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8.5L1.5 4h9L6 8.5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 36px;
+}
+
+.lims-select-field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8.5L1.5 4h9L6 8.5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 19px center;
+  padding-right: 41px !important;
+}
+
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner {
+  -moz-appearance: textfield;
 }
 
 /* Date picker */
@@ -1301,28 +1328,45 @@ body {
 .date-picker-popover .rdp-caption_label {
   font-size: 13px;
   font-weight: 700;
-  padding: 4px 0;
+  padding: 0;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+  border: 0;
 }
 
 .date-picker-popover .rdp-dropdowns {
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
 }
 
 .date-picker-popover .rdp-dropdown_root {
-  width: 85px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100px;
 }
 
 .date-picker-popover .rdp-dropdown_root:last-child {
-  width: 78px;
+  width: 90px;
 }
 
 .date-picker-popover .rdp-dropdown {
   font-size: 13px;
-  padding: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 4px 6px;
   width: 100%;
+  color: var(--text-primary);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  opacity: 1;
+  position: relative;
+  appearance: auto;
+  cursor: pointer;
 }
 
 .date-picker-popover .rdp-day_today:not(.rdp-day_selected) {
@@ -1352,7 +1396,7 @@ body {
   top: calc(100% + 2px);
   left: 0;
   width: 100%;
-  max-height: 161px;
+  max-height: 120px;
   overflow-y: auto;
   background: #fff;
   border: 1px solid #ddd;
@@ -1614,6 +1658,138 @@ body {
   border-top-color: var(--on-primary, #fff);
   border-radius: var(--radius-full);
   animation: spin 0.6s linear infinite;
+}
+
+/* Chart Cards */
+.chart-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.chart-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-toggle-group {
+  display: inline-flex;
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.chart-toggle-btn {
+  all: unset;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.chart-toggle-btn.active {
+  background: #fff;
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.chart-toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+.stat-card-upgraded {
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-card-upgraded .accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 12px 12px 0 0;
+}
+
+.stat-card-upgraded .label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.stat-card-upgraded .value {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--text-primary);
+  animation: countUp 0.6s ease-out both;
+}
+
+.stat-card-upgraded:nth-child(1) .value { animation-delay: 0s; }
+.stat-card-upgraded:nth-child(2) .value { animation-delay: 0.1s; }
+.stat-card-upgraded:nth-child(3) .value { animation-delay: 0.2s; }
+.stat-card-upgraded:nth-child(4) .value { animation-delay: 0.3s; }
+
+.stat-card-upgraded .sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.stat-card-upgraded .trend-up {
+  color: #059669;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stat-card-upgraded .trend-down {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.chart-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s;
+}
+
+/* Skeleton Loader */
+.lims-skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, #e8ecf0 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 /* ============================================

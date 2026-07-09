@@ -16,6 +16,10 @@ function isValidName(value) {
   return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
 }
 
+function isValidItemCode(value) {
+  return /^[A-Z0-9-]*$/.test(value);
+}
+
 function isLettersOnly(value) {
   return /^[A-Za-z\s]*$/.test(value);
 }
@@ -29,10 +33,30 @@ function isExponential(value) {
   return /[eE]/.test(String(value));
 }
 
+function isValidDecimal(value, intMax = 4, fracMax = 3) {
+  if (value === "" || value === undefined || value === null) return true;
+  return new RegExp(`^\\d{0,${intMax}}(\\.\\d{0,${fracMax}})?$`).test(String(value));
+}
+
 function dateValue(value) {
   if (!value) return undefined;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function validateExpiryDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "Invalid expiry date";
+  const year = date.getFullYear();
+  if (year < 2000) return "Expiry year looks incorrect";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(year, date.getMonth(), date.getDate());
+  if (expiry <= today) return "Expiry date must be in the future";
+  const maxFuture = new Date(today.getFullYear() + 15, today.getMonth(), today.getDate());
+  if (expiry > maxFuture) return "Expiry date is too far in the future";
+  return "";
 }
 
 function escapeRegex(value) {
@@ -80,7 +104,7 @@ async function loadInventory(auth, req) {
   const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
 
-  const { InventoryCategory, InventoryItem, InventoryMovement, InventoryUom } = await getTenantModels(auth.tenantId);
+    const { InventoryCategory, InventoryItem, InventoryMovement, InventoryUom, InventoryItemType, InventoryStorageCondition } = await getTenantModels(auth.tenantId);
   const itemQuery = {};
 
   if (status && status !== "all") itemQuery.status = status;
@@ -90,9 +114,10 @@ async function loadInventory(auth, req) {
     itemQuery.$or = [{ name: regex }, { itemCode: regex }, { genericName: regex }, { manufacturer: regex }];
   }
 
-  const [categories, uoms, items, total, movements] = await Promise.all([
+  const [categories, itemTypes, storageConditions, items, total, movements] = await Promise.all([
     InventoryCategory.find({}).populate("parentCategory", "name code").sort({ parentCategory: 1, name: 1 }).lean(),
-    InventoryUom.find({}).sort({ type: 1, name: 1 }).lean(),
+    InventoryItemType.find({}).sort({ name: 1 }).lean(),
+    InventoryStorageCondition.find({}).sort({ name: 1 }).lean(),
     InventoryItem.find(itemQuery)
       .populate("category", "name code")
       .populate("subCategory", "name code")
@@ -110,6 +135,28 @@ async function loadInventory(auth, req) {
       .lean(),
   ]);
 
+  let uoms = await InventoryUom.find({}).sort({ type: 1, name: 1 }).lean();
+  const defaultUoms = [
+    { name: "Microgram", symbol: "mcg", type: "weight", conversionToBase: 0.000001, baseSymbol: "g" },
+    { name: "Milligram", symbol: "mg", type: "weight", conversionToBase: 0.001, baseSymbol: "g" },
+    { name: "Gram", symbol: "g", type: "weight", conversionToBase: 1, baseSymbol: "g" },
+    { name: "Kilogram", symbol: "kg", type: "weight", conversionToBase: 1000, baseSymbol: "g" },
+    { name: "Milliliter", symbol: "mL", type: "volume", conversionToBase: 0.001, baseSymbol: "L" },
+    { name: "Liter", symbol: "L", type: "volume", conversionToBase: 1, baseSymbol: "L" },
+    { name: "Units", symbol: "units", type: "count", conversionToBase: 1, baseSymbol: "units" },
+    { name: "Each", symbol: "each", type: "count", conversionToBase: 1, baseSymbol: "each" },
+    { name: "Dozen", symbol: "dozen", type: "count", conversionToBase: 12, baseSymbol: "each" },
+    { name: "Box of 10", symbol: "box10", type: "pack", conversionToBase: 10, baseSymbol: "each" },
+    { name: "Box of 50", symbol: "box50", type: "pack", conversionToBase: 50, baseSymbol: "each" },
+    { name: "Strip of 10", symbol: "strip10", type: "pack", conversionToBase: 10, baseSymbol: "each" },
+    { name: "Vial", symbol: "vial", type: "pack", conversionToBase: 1, baseSymbol: "each" },
+    { name: "Pair", symbol: "pair", type: "count", conversionToBase: 2, baseSymbol: "each" },
+  ];
+  if (uoms.length === 0) {
+    await InventoryUom.insertMany(defaultUoms);
+    uoms = await InventoryUom.find({}).sort({ type: 1, name: 1 }).lean();
+  }
+
   const decoratedItems = items.map((item) => ({ ...item, ...expiryState(item) }));
   const stats = {
     totalItems: total,
@@ -124,9 +171,28 @@ async function loadInventory(auth, req) {
     ),
   };
 
+  const defaultTypes = ["reagent", "consumable", "chemical", "control", "calibrator", "equipment", "stationery", "other"];
+  if (itemTypes.length === 0) {
+    await InventoryItemType.insertMany(defaultTypes.map((name) => ({ name })));
+    itemTypes.push(...defaultTypes.map((name) => ({ name })));
+  }
+
+  const defaultConditions = [
+    "Room Temperature (15\u201325\u00b0C)", "Refrigerated (2\u20138\u00b0C)", "Frozen (\u201320\u00b0C)",
+    "Deep Freeze (\u201380\u00b0C)", "Cold Room", "Controlled Room Temperature (20\u201325\u00b0C)",
+    "Inert Atmosphere", "Desiccated", "Light-Sensitive", "Ventilated Area",
+    "Flammable Cabinet", "Corrosive Cabinet", "Toxic Storage", "Cryogenic", "Ambient",
+  ];
+  if (storageConditions.length === 0) {
+    await InventoryStorageCondition.insertMany(defaultConditions.map((name) => ({ name })));
+    storageConditions.push(...defaultConditions.map((name) => ({ name })));
+  }
+
   return {
     categories,
     uoms,
+    itemTypes,
+    storageConditions,
     items: decoratedItems,
     movements,
     stats,
@@ -153,28 +219,33 @@ export async function POST(req) {
 
     const body = await req.json();
     const action = clean(body.action);
-    const { InventoryCategory, InventoryItem, InventoryMovement, InventoryUom } = await getTenantModels(auth.tenantId);
+  const { InventoryCategory, InventoryItem, InventoryMovement, InventoryUom, InventoryItemType, InventoryStorageCondition } = await getTenantModels(auth.tenantId);
 
     if (action === "category") {
-      const name = clean(body.name);
+      let name = clean(body.name);
       if (!name) return Response.json({ error: "Category name is required" }, { status: 400 });
-      if (!isValidName(name)) return Response.json({ error: "Category name contains invalid characters" }, { status: 400 });
-      if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in category name" }, { status: 400 });
+      name = name.charAt(0).toUpperCase() + name.slice(1);
+      if (name.length > 20) return Response.json({ error: "Category name must not exceed 20 characters" }, { status: 400 });
+      if (!/^[A-Z][A-Za-z\s]*$/.test(name)) return Response.json({ error: "Category name must start with a capital letter and contain only letters and spaces" }, { status: 400 });
 
       const code = clean(body.code);
       if (!code) return Response.json({ error: "Category code is required" }, { status: 400 });
-      if (!isValidName(code)) return Response.json({ error: "Category code contains invalid characters" }, { status: 400 });
+      if (!isValidName(code)) return Response.json({ error: "Code contains invalid characters" }, { status: 400 });
       if (hasUrl(code)) return Response.json({ error: "URLs are not allowed in category code" }, { status: 400 });
 
-      const category = await InventoryCategory.create({
-        name,
-        code,
-        parentCategory: mongoose.Types.ObjectId.isValid(body.parentCategory) ? body.parentCategory : null,
-        description: clean(body.description),
-        status: body.status === "inactive" ? "inactive" : "active",
-      });
-
-      return Response.json({ category }, { status: 201 });
+      try {
+        const category = await InventoryCategory.create({
+          name,
+          code,
+          parentCategory: mongoose.Types.ObjectId.isValid(body.parentCategory) ? body.parentCategory : null,
+          description: clean(body.description),
+          status: body.status === "inactive" ? "inactive" : "active",
+        });
+        return Response.json({ category }, { status: 201 });
+      } catch (err) {
+        if (err.code === 11000) return Response.json({ error: "Category code already exists" }, { status: 409 });
+        throw err;
+      }
     }
 
     if (action === "uom") {
@@ -215,103 +286,166 @@ export async function POST(req) {
     }
 
     if (action === "item") {
+      const errors = [];
+
       const itemCode = clean(body.itemCode).toUpperCase();
       const name = clean(body.name);
-      if (!itemCode || !name || !mongoose.Types.ObjectId.isValid(body.category) || !mongoose.Types.ObjectId.isValid(body.baseUom)) {
-        return Response.json({ error: "Item code, name, category and base UOM are required" }, { status: 400 });
+      if (!itemCode) errors.push("Item code is required");
+      else {
+        if (!isValidItemCode(itemCode)) errors.push("Item code must contain only capital letters, numbers, and hyphens");
+        if (itemCode.length > 15) errors.push("Item code must not exceed 15 characters");
       }
-      if (!isValidName(itemCode)) return Response.json({ error: "Item code contains invalid characters" }, { status: 400 });
-      if (hasUrl(itemCode)) return Response.json({ error: "URLs are not allowed in item code" }, { status: 400 });
-      if (!isValidName(name)) return Response.json({ error: "Item name contains invalid characters" }, { status: 400 });
-      if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in item name" }, { status: 400 });
+
+      if (!name) errors.push("Item name is required");
+      else {
+        if (hasUrl(name)) errors.push("URLs are not allowed in item name");
+        if (!isValidName(name)) errors.push("Item name contains invalid characters");
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(body.category)) errors.push("Category is required");
+      if (!mongoose.Types.ObjectId.isValid(body.baseUom)) errors.push("Base UOM is required");
 
       const genericName = clean(body.genericName);
-      if (!genericName) return Response.json({ error: "Generic name is required" }, { status: 400 });
-      if (!isValidName(genericName)) return Response.json({ error: "Generic name contains invalid characters" }, { status: 400 });
-      if (hasUrl(genericName)) return Response.json({ error: "URLs are not allowed in generic name" }, { status: 400 });
+      if (!genericName) errors.push("Generic name is required");
+      else {
+        if (!/^[A-Za-z0-9]+$/.test(genericName)) errors.push("Generic name must contain only letters and numbers");
+        if (genericName.length > 20) errors.push("Generic name must not exceed 20 characters");
+      }
 
-      if (!body.subCategory || !mongoose.Types.ObjectId.isValid(body.subCategory)) {
-        return Response.json({ error: "Sub category is required" }, { status: 400 });
+      if (!mongoose.Types.ObjectId.isValid(body.subCategory)) {
+        errors.push("Sub category is required");
       }
-      if (!body.purchaseUom || !mongoose.Types.ObjectId.isValid(body.purchaseUom)) {
-        return Response.json({ error: "Purchase UOM is required" }, { status: 400 });
-      }
+
+      if (!mongoose.Types.ObjectId.isValid(body.purchaseUom)) errors.push("Purchase UOM is required");
 
       if (body.purchaseToBaseFactor === undefined || body.purchaseToBaseFactor === null || body.purchaseToBaseFactor === "") {
-        return Response.json({ error: "Conversion factor is required" }, { status: 400 });
+        errors.push("Conversion factor is required");
+      } else {
+        if (isExponential(body.purchaseToBaseFactor)) errors.push("Exponential notation is not allowed in conversion factor");
+        else if (Number(body.purchaseToBaseFactor) <= 0) errors.push("Conversion factor must be greater than 0");
+        else if (!isValidDecimal(body.purchaseToBaseFactor)) errors.push("Conversion factor must have max 4 digits before decimal, 3 after");
       }
-      if (isExponential(body.purchaseToBaseFactor)) {
-        return Response.json({ error: "Exponential notation is not allowed in conversion factor" }, { status: 400 });
+
+      const minStockVal = body.minimumStockBase === undefined || body.minimumStockBase === null || body.minimumStockBase === "" ? null : Number(body.minimumStockBase);
+      if (minStockVal === null) errors.push("Min stock is required");
+      else {
+        if (isExponential(body.minimumStockBase)) errors.push("Exponential notation is not allowed in min stock");
+        else if (minStockVal < 0) errors.push("Min stock cannot be negative");
+        else if (!isValidDecimal(body.minimumStockBase)) errors.push("Min stock must have max 4 digits before decimal, 3 after");
       }
-      if (Number(body.purchaseToBaseFactor) <= 0) {
-        return Response.json({ error: "Conversion factor must be greater than 0" }, { status: 400 });
+
+      const reorderVal = body.reorderLevelBase === undefined || body.reorderLevelBase === null || body.reorderLevelBase === "" ? null : Number(body.reorderLevelBase);
+      if (reorderVal === null) errors.push("Reorder level is required");
+      else {
+        if (isExponential(body.reorderLevelBase)) errors.push("Exponential notation is not allowed in reorder level");
+        else if (reorderVal < 0) errors.push("Reorder level cannot be negative");
+        else if (!isValidDecimal(body.reorderLevelBase)) errors.push("Reorder level must have max 4 digits before decimal, 3 after");
       }
-      if (body.minimumStockBase === undefined || body.minimumStockBase === null || body.minimumStockBase === "") {
-        return Response.json({ error: "Min stock is required" }, { status: 400 });
+
+      const maxStockVal = body.maximumStockBase === undefined || body.maximumStockBase === null || body.maximumStockBase === "" ? null : Number(body.maximumStockBase);
+      if (maxStockVal === null) errors.push("Max stock is required");
+      else {
+        if (isExponential(body.maximumStockBase)) errors.push("Exponential notation is not allowed in max stock");
+        else if (maxStockVal < 0) errors.push("Max stock cannot be negative");
+        else if (!isValidDecimal(body.maximumStockBase)) errors.push("Max stock must have max 4 digits before decimal, 3 after");
       }
-      if (isExponential(body.minimumStockBase)) {
-        return Response.json({ error: "Exponential notation is not allowed in min stock" }, { status: 400 });
-      }
-      if (Number(body.minimumStockBase) < 0) {
-        return Response.json({ error: "Min stock cannot be negative" }, { status: 400 });
-      }
-      if (body.reorderLevelBase === undefined || body.reorderLevelBase === null || body.reorderLevelBase === "") {
-        return Response.json({ error: "Reorder level is required" }, { status: 400 });
-      }
-      if (isExponential(body.reorderLevelBase)) {
-        return Response.json({ error: "Exponential notation is not allowed in reorder level" }, { status: 400 });
-      }
-      if (Number(body.reorderLevelBase) < 0) {
-        return Response.json({ error: "Reorder level cannot be negative" }, { status: 400 });
-      }
-      if (Number(body.minimumStockBase) > Number(body.reorderLevelBase)) {
-        return Response.json({ error: "Min stock cannot exceed reorder level" }, { status: 400 });
-      }
+
       if (body.openingQuantityBase === undefined || body.openingQuantityBase === null || body.openingQuantityBase === "") {
-        return Response.json({ error: "Opening quantity is required" }, { status: 400 });
-      }
-      if (isExponential(body.openingQuantityBase)) {
-        return Response.json({ error: "Exponential notation is not allowed in opening quantity" }, { status: 400 });
-      }
-      if (Number(body.openingQuantityBase) < 0) {
-        return Response.json({ error: "Opening quantity cannot be negative" }, { status: 400 });
+        errors.push("Opening quantity is required");
+      } else {
+        if (isExponential(body.openingQuantityBase)) errors.push("Exponential notation is not allowed in opening quantity");
+        else if (Number(body.openingQuantityBase) < 0) errors.push("Opening quantity cannot be negative");
+        else if (!isValidDecimal(body.openingQuantityBase)) errors.push("Opening quantity must have max 4 digits before decimal, 3 after");
       }
 
       const manufacturer = clean(body.manufacturer);
-      if (!manufacturer) return Response.json({ error: "Manufacturer is required" }, { status: 400 });
-      if (!isValidName(manufacturer)) return Response.json({ error: "Manufacturer contains invalid characters" }, { status: 400 });
-      if (hasUrl(manufacturer)) return Response.json({ error: "URLs are not allowed in manufacturer" }, { status: 400 });
+      if (!manufacturer) errors.push("Manufacturer is required");
+      else if (manufacturer.length > 20) errors.push("Manufacturer must not exceed 20 characters");
+      else if (!/^[A-Z][A-Za-z\s]*$/.test(manufacturer)) errors.push("Manufacturer must contain only letters and spaces, starting with a capital letter");
 
       const preferredSupplier = clean(body.preferredSupplier);
-      if (!preferredSupplier) return Response.json({ error: "Supplier is required" }, { status: 400 });
-      if (!isValidName(preferredSupplier)) return Response.json({ error: "Supplier contains invalid characters" }, { status: 400 });
-      if (hasUrl(preferredSupplier)) return Response.json({ error: "URLs are not allowed in supplier" }, { status: 400 });
+      if (!preferredSupplier) errors.push("Supplier is required");
+      else if (preferredSupplier.length > 20) errors.push("Supplier must not exceed 20 characters");
+      else if (!/^[A-Z][A-Za-z\s]*$/.test(preferredSupplier)) errors.push("Supplier must contain only letters and spaces, starting with a capital letter");
 
-      const batchNo = clean(body.batchNo);
-      if (!batchNo) return Response.json({ error: "Batch No is required" }, { status: 400 });
-      if (!isValidName(batchNo)) return Response.json({ error: "Batch No contains invalid characters" }, { status: 400 });
-      if (hasUrl(batchNo)) return Response.json({ error: "URLs are not allowed in batch number" }, { status: 400 });
+      const batchNo = clean(body.batchNo).toUpperCase();
+      if (!batchNo) errors.push("Batch No is required");
+      else {
+        if (!/^[A-Za-z0-9]+$/.test(batchNo)) errors.push("Batch No must contain only letters and numbers");
+        if (batchNo.length > 15) errors.push("Batch No must not exceed 15 characters");
+      }
 
       const defaultLocation = clean(body.defaultLocation);
-      if (!defaultLocation) return Response.json({ error: "Location is required" }, { status: 400 });
-      if (!isValidName(defaultLocation)) return Response.json({ error: "Location contains invalid characters" }, { status: 400 });
-      if (hasUrl(defaultLocation)) return Response.json({ error: "URLs are not allowed in location" }, { status: 400 });
+      if (!defaultLocation) errors.push("Location is required");
+      else if (defaultLocation.length > 75) errors.push("Location must not exceed 75 characters");
+      else if (!/^[A-Za-z0-9 .,\/-]*$/.test(defaultLocation)) errors.push("Location must contain only letters, numbers, spaces, and symbols . , / -");
 
       const storageCondition = clean(body.storageCondition);
-      if (!storageCondition) return Response.json({ error: "Storage condition is required" }, { status: 400 });
-      if (!isValidName(storageCondition)) return Response.json({ error: "Storage condition contains invalid characters" }, { status: 400 });
-      if (hasUrl(storageCondition)) return Response.json({ error: "URLs are not allowed in storage condition" }, { status: 400 });
+      if (!storageCondition) errors.push("Storage condition is required");
+      else {
+        const validConditions = await InventoryStorageCondition.find({}).lean();
+        if (validConditions.length > 0 && !validConditions.some((c) => c.name === storageCondition)) {
+          errors.push("Invalid storage condition");
+        }
+      }
+
+      const notes = clean(body.notes);
+      if (notes && notes.length > 500) errors.push("Notes must not exceed 500 characters");
+
+      const validConvUnits = ["mg", "g", "kg", "ml", "l", "IU", "µg", "unit", "pack", "oz", "lb"];
+      const conversionFactorUnit = clean(body.conversionFactorUnit);
+      if (!conversionFactorUnit) errors.push("Conversion factor unit is required");
+      else if (!validConvUnits.includes(conversionFactorUnit)) errors.push("Invalid conversion factor unit");
+
+      const itemType = clean(body.itemType);
+      if (!itemType) errors.push("Item type is required");
+      else {
+        const validTypes = await InventoryItemType.find({}).lean();
+        if (validTypes.length > 0 && !validTypes.some((t) => t.name === itemType)) {
+          errors.push("Invalid item type");
+        }
+      }
+
+      if (body.status && !["active", "inactive"].includes(body.status)) {
+        errors.push("Status must be 'active' or 'inactive'");
+      }
+
+      if (minStockVal !== null && reorderVal !== null && minStockVal > reorderVal) {
+        errors.push("Min stock cannot exceed reorder level");
+      }
+      if (maxStockVal !== null && reorderVal !== null && reorderVal > maxStockVal) {
+        errors.push("Reorder level cannot exceed max stock");
+      }
+      if (maxStockVal !== null && minStockVal !== null && minStockVal > maxStockVal) {
+        errors.push("Min stock cannot exceed max stock");
+      }
+
+      if (body.expiryDate) {
+        const expErr = validateExpiryDate(body.expiryDate);
+        if (expErr) errors.push(expErr);
+        else if (body.receivedDate) {
+          const expiry = new Date(body.expiryDate);
+          expiry.setHours(0, 0, 0, 0);
+          const received = new Date(body.receivedDate);
+          received.setHours(0, 0, 0, 0);
+          if (expiry <= received) errors.push("Expiry date must be after received date");
+        }
+      }
+
+      if (errors.length > 0) {
+        return Response.json({ error: errors.join("; ") }, { status: 400 });
+      }
 
       const openingQty = numberValue(body.openingQuantityBase, 0);
       const openingBatch = openingQty > 0
         ? [{
             batchNo: batchNo || "OPENING",
-            supplier: preferredSupplier,
+            supplier: preferredSupplier || "N/A",
             receivedDate: dateValue(body.receivedDate) || new Date(),
             expiryDate: dateValue(body.expiryDate),
             quantityBase: openingQty,
             costPerBaseUnit: numberValue(body.costPerBaseUnit, 0),
-            location: defaultLocation,
+            location: defaultLocation || "Default",
           }]
         : [];
 
@@ -321,10 +455,11 @@ export async function POST(req) {
         genericName,
         category: body.category,
         subCategory: body.subCategory,
-        itemType: clean(body.itemType) || "reagent",
+        itemType,
         baseUom: body.baseUom,
         purchaseUom: body.purchaseUom,
         purchaseToBaseFactor: numberValue(body.purchaseToBaseFactor, 1),
+        conversionFactorUnit,
         stockOnHandBase: openingQty,
         minimumStockBase: numberValue(body.minimumStockBase, 0),
         reorderLevelBase: numberValue(body.reorderLevelBase, 0),
@@ -334,7 +469,8 @@ export async function POST(req) {
         storageCondition,
         defaultLocation,
         trackExpiry: body.trackExpiry !== false,
-        notes: clean(body.notes),
+        status: body.status === "inactive" ? "inactive" : "active",
+        notes: notes || undefined,
         batches: openingBatch,
       });
 
@@ -352,6 +488,15 @@ export async function POST(req) {
       }
 
       return Response.json({ item }, { status: 201 });
+    }
+
+    if (action === "itemtype") {
+      const name = clean(body.name);
+      if (!name) return Response.json({ error: "Item type name is required" }, { status: 400 });
+      const exists = await InventoryItemType.findOne({ name: new RegExp(`^${escapeRegex(name)}$`, "i") });
+      if (exists) return Response.json({ error: "Item type already exists" }, { status: 409 });
+      const itemType = await InventoryItemType.create({ name });
+      return Response.json({ itemType }, { status: 201 });
     }
 
     if (action === "movement") {
@@ -393,6 +538,18 @@ export async function POST(req) {
       let quantityBase = numberValue(body.quantityBase, 0);
       if (quantityBase <= 0) return Response.json({ error: "Quantity must be greater than zero" }, { status: 400 });
 
+      if (body.expiryDate) {
+        const expErr = validateExpiryDate(body.expiryDate);
+        if (expErr) return Response.json({ error: expErr }, { status: 400 });
+        if (body.receivedDate) {
+          const expiry = new Date(body.expiryDate);
+          expiry.setHours(0, 0, 0, 0);
+          const received = new Date(body.receivedDate);
+          received.setHours(0, 0, 0, 0);
+          if (expiry <= received) return Response.json({ error: "Expiry date must be after received date" }, { status: 400 });
+        }
+      }
+
       if (movementType === "receipt") {
         const batch = item.batches.create({
           batchNo: clean(body.batchNo) || `BATCH-${Date.now()}`,
@@ -423,8 +580,50 @@ export async function POST(req) {
         return Response.json({ item, movement }, { status: 201 });
       }
 
-      const selectedBatch = item.batches.id(body.batchId) || item.batches.find((batch) => batch.quantityBase > 0);
-      if (!selectedBatch) return Response.json({ error: "A stock batch is required" }, { status: 400 });
+      const availableBatches = (item.batches || []).filter((b) => b.quantityBase > 0);
+      let selectedBatch = body.batchId
+        ? item.batches.id(body.batchId)
+        : availableBatches.sort((a, b) => {
+            if (!a.expiryDate) return 1;
+            if (!b.expiryDate) return -1;
+            return new Date(a.expiryDate) - new Date(b.expiryDate);
+          })[0];
+
+      if (!selectedBatch) {
+        if (movementType === "adjustment") {
+          const newBalance = numberValue(body.newBalanceBase, quantityBase);
+          selectedBatch = item.batches.create({
+            batchNo: `ADJ-${Date.now()}`,
+            quantityBase: Math.max(0, newBalance),
+            receivedDate: dateValue(body.movementDate) || new Date(),
+            location: clean(body.toLocation) || item.defaultLocation,
+          });
+          item.batches.push(selectedBatch);
+          item.stockOnHandBase = Math.max(0, newBalance);
+          await item.save();
+          quantityBase = newBalance;
+          const movement = await InventoryMovement.create({
+            item: item._id,
+            batchId: selectedBatch._id,
+            movementType,
+            quantityBase,
+            balanceAfterBase: item.stockOnHandBase,
+            reason: clean(body.reason) || "Initial stock adjustment",
+            referenceNo: clean(body.referenceNo),
+            toLocation: selectedBatch.location,
+            performedBy: auth.user?.name || auth.user?.email,
+            movementDate: dateValue(body.movementDate) || new Date(),
+          });
+          return Response.json({ item, movement }, { status: 201 });
+        }
+        return Response.json({ error: "A stock batch is required" }, { status: 400 });
+      }
+
+      if (movementType === "expiry") {
+        if (!selectedBatch.expiryDate || new Date(selectedBatch.expiryDate) >= new Date()) {
+          return Response.json({ error: "Selected batch has not expired yet" }, { status: 400 });
+        }
+      }
 
       if (movementType === "adjustment") {
         const newBalance = numberValue(body.newBalanceBase, selectedBatch.quantityBase);
@@ -435,7 +634,7 @@ export async function POST(req) {
           return Response.json({ error: "Quantity exceeds selected batch balance" }, { status: 400 });
         }
         selectedBatch.quantityBase -= quantityBase;
-        if (selectedBatch.quantityBase === 0) selectedBatch.status = movementType === "wastage" ? "wasted" : "consumed";
+        if (selectedBatch.quantityBase === 0) selectedBatch.status = movementType === "wastage" || movementType === "expiry" ? "wasted" : "consumed";
         quantityBase = -quantityBase;
       }
 

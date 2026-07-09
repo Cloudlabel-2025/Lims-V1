@@ -35,7 +35,10 @@ export default function EditPatient({ params }) {
           };
           setForm(formattedData);
           if (data.refDoctorName) setHasRefDoctor(true);
-        } else {
+    } else if (name === "phone") {
+      const sanitized = value.replace(/\D/g, "").slice(0, 10);
+      setForm((prev) => ({ ...prev, phone: sanitized }));
+    } else {
           setStatus({ type: "danger", message: data.error || "Failed to load patient data." });
         }
       } catch (err) {
@@ -96,7 +99,7 @@ export default function EditPatient({ params }) {
     if (!form.dob) newErrors.dob = "Date of Birth is required";
     else {
       const dobDate = new Date(form.dob);
-      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1900) newErrors.dob = "Invalid date of birth";
+      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1941) newErrors.dob = "Invalid date of birth";
       else if (dobDate > new Date()) newErrors.dob = "Date of birth cannot be in the future";
     }
     if (!form.age && form.age !== 0) newErrors.age = "Age is required";

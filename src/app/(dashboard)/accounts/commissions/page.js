@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import SuccessDialog from "@/app/components/SuccessDialog";
 import { money, formatDate, inputStyle } from "../_components/helpers";
 import StatCard from "../_components/StatCard";
 import Badge from "../_components/Badge";
@@ -15,6 +16,7 @@ export default function CommissionsPage() {
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [releasing, setReleasing] = useState(null);
+  const [confirming, setConfirming] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [payoutPage, setPayoutPage] = useState(1);
@@ -85,7 +87,7 @@ export default function CommissionsPage() {
       </div>
 
       {error && <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 800 }}>{error}</div>}
-      {success && <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#ecfdf5", color: "#047857", fontSize: 13, fontWeight: 800 }}>{success}</div>}
+      <SuccessDialog message={success} onClose={() => setSuccess("")} title="Payout Released" />
 
       {loading ? (
         <div className="form-card" style={{ padding: 28, borderRadius: 8 }}>Loading...</div>
@@ -139,23 +141,46 @@ export default function CommissionsPage() {
         </>
       )}
 
-      {releasing && (
+      {releasing && !confirming && (
         <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "grid", placeItems: "center", zIndex: 1000 }} onClick={() => setReleasing(null)}>
-          <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 400, width: "90%", display: "grid", gap: 14 }} onClick={(e) => e.stopPropagation()}>
-            <h5 style={{ margin: 0, fontSize: 16 }}>Release Payout</h5>
-            <div style={{ fontSize: 14 }}>
-              Doctor: <strong>{releasing.name}</strong><br />
-              Amount: <strong>Rs {money(releasing.pendingPayout)}</strong>
+          <div className="form-card" style={{ padding: 32, borderRadius: 14, maxWidth: 540, width: "95%", display: "grid", gap: 20 }} onClick={(e) => e.stopPropagation()}>
+            <h5 style={{ margin: 0, fontSize: 17 }}>Release Payout</h5>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, background: "var(--surface, #f8fafc)", padding: 16, borderRadius: 8 }}>
+              <div style={{ fontSize: 14, color: "var(--text-muted)" }}>
+                Doctor<br />
+                <strong style={{ color: "var(--text-primary)", fontSize: 15 }}>{releasing.name}</strong>
+              </div>
+              <div style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "right" }}>
+                Amount<br />
+                <strong style={{ color: "var(--text-primary)", fontSize: 15 }}>Rs {money(releasing.pendingPayout)}</strong>
+              </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <button type="button" className="btn-lims-primary" onClick={() => handleRelease(releasing._id, "cash")} style={{ height: 42 }}>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 2 }}>Select payment method</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <button type="button" className="btn-lims-primary" onClick={() => setConfirming({ doctorId: releasing._id, method: "cash", name: releasing.name, amount: releasing.pendingPayout })} style={{ height: 46, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0 20" }}>
                 {Icons.wallet} Cash
               </button>
-              <button type="button" className="btn-lims-primary" onClick={() => handleRelease(releasing._id, "bank")} style={{ height: 42 }}>
-                {Icons.list} Bank
+              <button type="button" className="btn-lims-primary" onClick={() => setConfirming({ doctorId: releasing._id, method: "bank", name: releasing.name, amount: releasing.pendingPayout })} style={{ height: 46, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0 20" }}>
+                {Icons.list} Bank Transfer
               </button>
             </div>
-            <button type="button" className="btn-lims-secondary" onClick={() => setReleasing(null)} style={{ height: 38 }}>Cancel</button>
+            <button type="button" className="btn-lims-secondary" onClick={() => setReleasing(null)} style={{ height: 42, fontSize: 13 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {confirming && (
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", zIndex: 1100 }} onClick={() => setConfirming(null)}>
+          <div className="form-card" style={{ padding: 28, borderRadius: 14, maxWidth: 420, width: "90%", display: "grid", gap: 16, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+              Confirm releasing <strong>Rs {money(confirming.amount)}</strong> payout to <strong>{confirming.name}</strong> via <strong>{confirming.method === "cash" ? "Cash" : "Bank Transfer"}</strong>?
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" className="btn-lims-secondary" onClick={() => setConfirming(null)} style={{ flex: 1, height: 40, fontSize: 13 }}>Cancel</button>
+              <button type="button" className="btn-lims-primary" onClick={() => { const c = confirming; setConfirming(null); handleRelease(c.doctorId, c.method); }} style={{ flex: 1, height: 40, fontSize: 13 }}>
+                Yes, Release
+              </button>
+            </div>
           </div>
         </div>
       )}
