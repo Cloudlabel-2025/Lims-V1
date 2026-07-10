@@ -38,18 +38,24 @@ async function resolveUserByEmailAndTenant(email, tenantIdValue) {
     }).select("+passwordResetTokenHash +passwordResetExpiresAt");
 
     return user ? { tenantId: lab.tenantId, user } : { tenantId: null, user: null };
-  } catch {
+  } catch (error) {
+    console.error("[forgot-password] resolveUserByEmailAndTenant error:", error?.message || error);
     return { tenantId: null, user: null };
   }
 }
 
 async function resolveDeveloperUser(email) {
-  const masterConnection = await connectMasterDB();
-  const DeveloperUser = getDeveloperUserModel(masterConnection);
-  const user = await DeveloperUser.findOne({ email, status: "active" }).select(
-    "+passwordResetTokenHash +passwordResetExpiresAt"
-  );
-  return user || null;
+  try {
+    const masterConnection = await connectMasterDB();
+    const DeveloperUser = getDeveloperUserModel(masterConnection);
+    const user = await DeveloperUser.findOne({ email, status: "active" }).select(
+      "+passwordResetTokenHash +passwordResetExpiresAt"
+    );
+    return user || null;
+  } catch (error) {
+    console.error("[forgot-password] resolveDeveloperUser error:", error?.message || error);
+    return null;
+  }
 }
 
 export async function POST(req) {
@@ -79,6 +85,10 @@ export async function POST(req) {
       return Response.json({ error: "Email is required" }, { status: 400 });
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Response.json({ error: "Invalid email format" }, { status: 400 });
+    }
+
     if (userType === "tenant" && !bodyTenantId) {
       return Response.json({ error: "Tenant ID is required" }, { status: 400 });
     }
@@ -103,21 +113,29 @@ export async function POST(req) {
 
     user.passwordResetTokenHash = otpHash;
     user.passwordResetExpiresAt = expiresAt;
-    await user.save();
+
+    try {
+      await user.save();
+    } catch (saveError) {
+      console.error("[forgot-password] Failed to save reset token:", saveError?.message || saveError);
+      return jsonError("Unable to process password reset", saveError, 500);
+    }
 
     let emailResult = null;
     try {
       emailResult = await sendPasswordResetEmail({ to: email, otp, expiresAt });
     } catch (emailError) {
-      console.error("Password reset OTP email failed:", emailError.message);
+      console.error("[forgot-password] Password reset OTP email failed:", emailError.message);
       emailResult = { sent: false, reason: emailError.message };
     }
 
     if (!emailResult?.sent) {
+      const reason = emailResult?.reason || "Please try again.";
+      console.error(`[forgot-password] Email not sent to ${email}: ${reason}`);
       if (process.env.NODE_ENV !== "production") {
         console.info(`[forgot-password] DEV OTP for ${email}: ${otp}`);
         return Response.json(
-          { error: `Failed to send OTP email. ${emailResult?.reason || "Please try again."}` },
+          { error: `Failed to send OTP email. ${reason}` },
           { status: 500 }
         );
       }
@@ -131,6 +149,7 @@ export async function POST(req) {
       message: "OTP sent to your email. Check your inbox.",
     });
   } catch (error) {
+    console.error("[forgot-password] Unhandled error:", error?.stack || error?.message || error);
     return jsonError("Unable to start password reset", error, 500);
   }
 }
