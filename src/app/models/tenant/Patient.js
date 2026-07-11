@@ -128,13 +128,15 @@ patientSchema.pre("save", async function () {
         );
 
         const prefix = this.constructor.patientPrefix || "PT";
-        this.patientId = `${prefix}${String(counter.seq).padStart(8, "0")}`;
+        this.patientId = `${prefix}PS-${String(counter.seq).padStart(7, "0")}`;
     }
 });
 
 export function getPatientModel(connection = mongoose, options = {}) {
     if (connection.models.Patient) {
-        connection.models.Patient.patientPrefix = options.patientPrefix || "PT";
+        if (options.patientPrefix) {
+            connection.models.Patient.patientPrefix = options.patientPrefix;
+        }
         return connection.models.Patient;
     }
 

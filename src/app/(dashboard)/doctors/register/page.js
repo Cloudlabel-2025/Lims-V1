@@ -19,6 +19,7 @@ const EMPTY_FORM = {
   clinicAddress: "",
   commission: "0",
   gender: "Male",
+  genderIdentity: "",
   doctorType: "Non-Investor",
   status: "Active",
 };
@@ -69,7 +70,11 @@ export default function DoctorRegistration() {
       if (cleaned && !isNaN(num) && num > 40) return;
       setForm((prev) => ({ ...prev, commission: cleaned }));
     } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
+      setForm((prev) => ({
+        ...prev,
+        [name]: value,
+        ...(name === "gender" && value !== "Other" ? { genderIdentity: "" } : {}),
+      }));
     }
     if (showErrors && errors[name]) {
       setErrors((prev) => {
@@ -259,15 +264,33 @@ export default function DoctorRegistration() {
                 <label className="lims-label">Gender</label>
                 <select
                   name="gender"
-                  className="lims-select"
+                  className={`lims-select ${errors.gender ? 'invalid' : ''}`}
                   value={form.gender}
                   onChange={handleChange}
                 >
+                  <option value="">Select gender</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
                 </select>
+                {errors.gender && <div className="lims-error-text">{errors.gender}</div>}
               </div>
+              {form.gender === "Other" && (
+                <div className="col-md-4">
+                  <label className="lims-label">Gender Identity <span className="required">*</span></label>
+                  <select
+                    name="genderIdentity"
+                    className={`lims-select ${errors.genderIdentity ? 'invalid' : ''}`}
+                    value={form.genderIdentity}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select identity</option>
+                    <option value="Transwomen">Transwomen</option>
+                    <option value="Transman">Transman</option>
+                  </select>
+                  {errors.genderIdentity && <div className="lims-error-text">{errors.genderIdentity}</div>}
+                </div>
+              )}
               <div className="col-md-4">
                 <label className="lims-label">Experience (Years) <span className="required">*</span></label>
                 <input 

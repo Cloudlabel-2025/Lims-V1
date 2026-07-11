@@ -137,6 +137,10 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
     else if (!isValidAddress(addr)) errors.clinicAddress = "Only letters, numbers, spaces, and . , / - allowed";
   }
 
+  if (form.gender === "Other" && !cleanDoctorValue(form.genderIdentity)) {
+    errors.genderIdentity = "Gender identity is required";
+  }
+
   if ((!partial || Object.prototype.hasOwnProperty.call(form, "commission")) && !isValidCommission(form.commission)) {
     errors.commission = "Commission must be between 0 and 40%";
   }

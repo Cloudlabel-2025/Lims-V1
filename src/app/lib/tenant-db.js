@@ -82,7 +82,7 @@ export async function getTenantModels(tenantId) {
     AuditLog: getAuditLogModel(connection),
     BillingRecord: getBillingRecordModel(connection),
     CorporateAccount: getCorporateAccountModel(connection),
-    Doctor: getDoctorModel(connection),
+    Doctor: getDoctorModel(connection, { doctorPrefix: lab?.name ? `${lab.name.toUpperCase().replace(/\s+/g, "")}` : lab?.numbering?.doctorPrefix }),
     ExpenseEntry: getExpenseEntryModel(connection),
     JournalEntry: getJournalEntryModel(connection),
     Patient: getPatientModel(connection, { patientPrefix: lab?.name ? `${lab.name.toUpperCase().replace(/\s+/g, "")}` : lab?.numbering?.patientPrefix }),

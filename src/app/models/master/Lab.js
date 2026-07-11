@@ -99,6 +99,10 @@ export const LabSchema = new mongoose.Schema(
           type: String,
           trim: true,
         },
+        doctorPrefix: {
+          type: String,
+          trim: true,
+        },
     },
     adminAccess: {
       email: {

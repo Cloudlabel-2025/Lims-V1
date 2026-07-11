@@ -129,6 +129,10 @@ const doctorSchema = new mongoose.Schema({
         enum: ["Male", "Female", "Other"],
         default: "Male"
     },
+    genderIdentity: {
+        type: String,
+        enum: ["Transwomen", "Transman"],
+    },
     commission: {
         type: Number,
         default: 0,
@@ -165,12 +169,22 @@ doctorSchema.pre("save", async function () {
             { $inc: { seq: 1 } },
             { returnDocument: "after", upsert: true }
         );
-        this.doctorId = `UTHDR-${String(counter.seq).padStart(6, "0")}`;
+        const prefix = this.constructor.doctorPrefix || "DR";
+        this.doctorId = `${prefix}DR-${String(counter.seq).padStart(8, "0")}`;
     }
 });
 
-export function getDoctorModel(connection = mongoose) {
-    return connection.models.Doctor || connection.model("Doctor", doctorSchema);
+export function getDoctorModel(connection = mongoose, options = {}) {
+    if (connection.models.Doctor) {
+        if (options.doctorPrefix) {
+            connection.models.Doctor.doctorPrefix = options.doctorPrefix;
+        }
+        return connection.models.Doctor;
+    }
+
+    const Doctor = connection.model("Doctor", doctorSchema);
+    Doctor.doctorPrefix = options.doctorPrefix || "DR";
+    return Doctor;
 }
 
 const Doctor = getDoctorModel();
