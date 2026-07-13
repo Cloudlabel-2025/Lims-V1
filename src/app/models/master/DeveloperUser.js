@@ -104,7 +104,6 @@ export const DeveloperUserSchema = new mongoose.Schema(
 );
 
 DeveloperUserSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
-DeveloperUserSchema.index({ passwordResetExpiresAt: 1 }, { expireAfterSeconds: 0 });
 
 DeveloperUserSchema.pre("save", async function generateDeveloperUserId() {
   if (this.developerUserId) return;

@@ -124,7 +124,6 @@ export const UserSchema = new mongoose.Schema(
 
 UserSchema.index({ status: 1, role: 1 });
 UserSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
-UserSchema.index({ passwordResetExpiresAt: 1 }, { expireAfterSeconds: 0 });
 
 UserSchema.pre("save", async function generateUserId() {
   if (this.userId) return;
