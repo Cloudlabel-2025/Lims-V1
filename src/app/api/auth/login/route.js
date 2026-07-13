@@ -97,19 +97,7 @@ async function loginDeveloper({ req, email, password, rememberMe }) {
     .select("_id developerUserId firstName lastName email isSystemOwner +passwordHash failedLoginAttempts lockedUntil")
     .lean();
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    if (user) {
-      await DeveloperUser.updateOne(
-        { _id: user._id },
-        {
-          $inc: { failedLoginAttempts: 1 },
-          $set: user.failedLoginAttempts + 1 >= 5
-            ? { lockedUntil: new Date(Date.now() + 15 * 60 * 1000), status: "locked" }
-            : {},
-        }
-      );
-    }
-
+  if (!user) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
@@ -117,9 +105,26 @@ async function loginDeveloper({ req, email, password, rememberMe }) {
     return NextResponse.json({ error: "Account is temporarily locked. Try again later." }, { status: 423 });
   }
 
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    const nextAttempts = (user.failedLoginAttempts || 0) + 1;
+    const shouldLock = nextAttempts >= 5;
+
+    await DeveloperUser.updateOne(
+      { _id: user._id },
+      {
+        $inc: { failedLoginAttempts: 1 },
+        $set: shouldLock
+          ? { lockedUntil: new Date(Date.now() + 15 * 60 * 1000), status: "locked" }
+          : {},
+      }
+    );
+
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  }
+
   await DeveloperUser.updateOne(
     { _id: user._id },
-    { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null } }
+    { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null, status: "active" } }
   );
 
   await resetRateLimit("login:developer", `${email}:${ip}`);
@@ -176,23 +181,11 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     .select("_id userId firstName lastName email role +passwordHash failedLoginAttempts lockedUntil")
     .lean();
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    if (user) {
-      await User.updateOne(
-        { _id: user._id },
-        {
-          $inc: { failedLoginAttempts: 1 },
-          $set: user.failedLoginAttempts + 1 >= 5
-            ? { lockedUntil: new Date(Date.now() + 15 * 60 * 1000), status: "locked" }
-            : {},
-        }
-      );
-    }
-
-    writeAuditLog(req, { tenantId, session: { userId: user?._id || "unknown" } }, {
+  if (!user) {
+    writeAuditLog(req, { tenantId, session: { userId: "unknown" } }, {
       action: "login.failed",
       resourceType: "user",
-      resourceId: user?._id?.toString() || loginId,
+      resourceId: loginId,
       metadata: { loginId, reason: "invalid_credentials" },
     });
 
@@ -200,7 +193,38 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
   }
 
   if (user.lockedUntil && user.lockedUntil > new Date()) {
+    writeAuditLog(req, { tenantId, session: { userId: String(user._id) } }, {
+      action: "login.failed",
+      resourceType: "user",
+      resourceId: String(user._id),
+      metadata: { loginId, reason: "account_locked" },
+    });
+
     return NextResponse.json({ error: "Account is temporarily locked. Try again later." }, { status: 423 });
+  }
+
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    const nextAttempts = (user.failedLoginAttempts || 0) + 1;
+    const shouldLock = nextAttempts >= 5;
+
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $inc: { failedLoginAttempts: 1 },
+        $set: shouldLock
+          ? { lockedUntil: new Date(Date.now() + 15 * 60 * 1000), status: "locked" }
+          : {},
+      }
+    );
+
+    writeAuditLog(req, { tenantId, session: { userId: String(user._id) } }, {
+      action: "login.failed",
+      resourceType: "user",
+      resourceId: String(user._id),
+      metadata: { loginId, reason: "invalid_credentials" },
+    });
+
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
   const role = user.role
@@ -218,7 +242,7 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
 
   await User.updateOne(
     { _id: user._id },
-    { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null } }
+    { $set: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null, status: "active" } }
   );
 
   await resetRateLimit(`login:tenant:${tenantId}`, `${loginId}:${ip}`);

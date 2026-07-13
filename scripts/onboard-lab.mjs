@@ -181,6 +181,8 @@ async function main() {
       status: "active",
       passwordResetTokenHash: undefined,
       passwordResetExpiresAt: undefined,
+      failedLoginAttempts: 0,
+      lockedUntil: undefined,
     });
     await existingAdmin.save();
   } else {

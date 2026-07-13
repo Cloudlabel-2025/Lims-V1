@@ -15,7 +15,7 @@ function hashOtp(otp) {
 async function resolveUserByOtpAndTenant(otpHash, tenantId) {
   const { User } = await getTenantModels(tenantId);
   const user = await User.findOne({
-    status: { $in: ["active", "invited"] },
+    status: { $in: ["active", "invited", "locked"] },
     passwordResetTokenHash: otpHash,
     passwordResetExpiresAt: { $gt: new Date() },
   }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
@@ -77,7 +77,7 @@ export async function POST(req) {
       const DeveloperUser = getDeveloperUserModel(masterConnection);
       user = await DeveloperUser.findOne({
         email,
-        status: "active",
+        status: { $in: ["active", "locked"] },
         passwordResetTokenHash: otpHash,
         passwordResetExpiresAt: { $gt: new Date() },
       }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
@@ -118,7 +118,9 @@ export async function POST(req) {
     user.passwordResetTokenHash = undefined;
     user.passwordResetExpiresAt = undefined;
     user.passwordChangedAt = now;
-    user.status = user.status === "invited" ? "active" : user.status;
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
+    user.status = ["invited", "locked"].includes(user.status) ? "active" : user.status;
     await user.save();
 
     await resetRateLimit("forgot-password", ip);

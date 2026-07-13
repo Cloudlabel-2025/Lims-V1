@@ -210,10 +210,21 @@ export async function PATCH(req) {
       status,
     });
 
+    if (status === "locked") {
+      user.lockedUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    } else if (status === "active") {
+      user.lockedUntil = undefined;
+      user.failedLoginAttempts = 0;
+    }
+
     if (password) {
       user.passwordHash = await hashPassword(password);
       user.passwordResetTokenHash = undefined;
       user.passwordResetExpiresAt = undefined;
+      user.passwordChangedAt = new Date();
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = undefined;
+      if (user.status === "locked") user.status = "active";
     }
 
     await user.save();

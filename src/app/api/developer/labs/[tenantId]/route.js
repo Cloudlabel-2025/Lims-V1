@@ -240,10 +240,15 @@ export async function PATCH(req, context) {
         }
 
         if (adminEmailChanged) adminUser.email = adminEmail;
-        if (adminPasswordChanged) adminUser.passwordHash = await hashPassword(adminPassword);
+        if (adminPasswordChanged) {
+          adminUser.passwordHash = await hashPassword(adminPassword);
+          adminUser.passwordChangedAt = new Date();
+        }
         adminUser.status = "active";
         adminUser.passwordResetTokenHash = undefined;
         adminUser.passwordResetExpiresAt = undefined;
+        adminUser.failedLoginAttempts = 0;
+        adminUser.lockedUntil = undefined;
         await adminUser.save();
 
         lab.adminAccess = {

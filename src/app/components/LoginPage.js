@@ -25,11 +25,8 @@ function loadRememberedLogin(scope) {
     if (!rawCredentials) return null;
 
     const credentials = JSON.parse(rawCredentials);
-    if (
-      typeof credentials?.email === "string" &&
-      typeof credentials?.password === "string"
-    ) {
-      return credentials;
+    if (typeof credentials?.email === "string") {
+      return { email: credentials.email };
     }
   } catch {
     window.localStorage.removeItem(getRememberedLoginKey(scope));
@@ -43,7 +40,7 @@ function saveRememberedLogin(scope, credentials) {
 
   window.localStorage.setItem(
     getRememberedLoginKey(scope),
-    JSON.stringify(credentials)
+    JSON.stringify({ email: credentials.email })
   );
 }
 
@@ -118,7 +115,7 @@ export default function LoginPage({
 
     if (credentials) {
       setEmail(credentials.email);
-      setPassword(credentials.password);
+      setPassword("");
       setRememberMe(true);
       return;
     }

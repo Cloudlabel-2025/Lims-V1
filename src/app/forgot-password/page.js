@@ -60,6 +60,9 @@ export default function ForgotPasswordPage() {
         return;
       }
 
+      if (data.devOtp) {
+        setOtp(data.devOtp);
+      }
       setSuccess("OTP sent to your email. Check your inbox.");
       setStep("verify");
     } catch {
@@ -111,10 +114,11 @@ export default function ForgotPasswordPage() {
         return;
       }
 
-      setSuccess("Password reset successfully. You can now log in.");
+      setSuccess("Password reset successfully. Redirecting to login...");
       setOtp("");
       setPassword("");
       setConfirmPassword("");
+      setTimeout(() => { window.location.href = "/"; }, 2500);
     } catch {
       setError("Unable to reset password");
     } finally {

@@ -34,7 +34,7 @@ async function resolveUserByEmailAndTenant(email, tenantIdValue) {
     const { User } = await getTenantModels(lab.tenantId);
     const user = await User.findOne({
       email,
-      status: { $in: ["active", "invited"] },
+      status: { $in: ["active", "invited", "locked"] },
     }).select("+passwordResetTokenHash +passwordResetExpiresAt");
 
     return user ? { tenantId: lab.tenantId, user } : { tenantId: null, user: null };
@@ -48,7 +48,7 @@ async function resolveDeveloperUser(email) {
   try {
     const masterConnection = await connectMasterDB();
     const DeveloperUser = getDeveloperUserModel(masterConnection);
-    const user = await DeveloperUser.findOne({ email, status: "active" }).select(
+    const user = await DeveloperUser.findOne({ email, status: { $in: ["active", "locked"] } }).select(
       "+passwordResetTokenHash +passwordResetExpiresAt"
     );
     return user || null;
@@ -135,8 +135,7 @@ export async function POST(req) {
       if (process.env.NODE_ENV !== "production") {
         console.info(`[forgot-password] DEV OTP for ${email}: ${otp}`);
         return Response.json(
-          { error: `Failed to send OTP email. ${reason}` },
-          { status: 500 }
+          { message: "OTP generated (email not configured). Use the OTP from server logs.", devOtp: otp },
         );
       }
       return Response.json(

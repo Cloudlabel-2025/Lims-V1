@@ -75,6 +75,9 @@ export async function POST(req) {
 
     user.passwordHash = await hashPassword(newPassword);
     user.passwordChangedAt = new Date();
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
+    if (user.status === "locked") user.status = "active";
     await user.save();
 
     return Response.json({

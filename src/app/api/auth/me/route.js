@@ -52,8 +52,18 @@ export async function GET(req) {
 
       const User = getUserModel(tenantConnection);
       const currentUser = await User.findById(session.userId)
-        .select("passwordChangedAt")
+        .select("passwordChangedAt status")
         .lean();
+
+      if (!currentUser || currentUser.status !== "active") {
+        debugRequestLog("user-inactive", { userId: session.userId, status: currentUser?.status });
+        const response = NextResponse.json(
+          { error: "Your account is no longer active. Contact your lab admin." },
+          { status: 403 }
+        );
+        clearSessionCookie(response, req);
+        return response;
+      }
 
       if (currentUser?.passwordChangedAt) {
         const sessionIat = session.iat ? new Date(session.iat * 1000) : null;
@@ -71,8 +81,18 @@ export async function GET(req) {
       const masterConnection = await connectMasterDB();
       const DeveloperUser = getDeveloperUserModel(masterConnection);
       const devUser = await DeveloperUser.findById(session.userId)
-        .select("passwordChangedAt")
+        .select("passwordChangedAt status")
         .lean();
+
+      if (!devUser || devUser.status !== "active") {
+        debugRequestLog("user-inactive", { userId: session.userId, status: devUser?.status });
+        const response = NextResponse.json(
+          { error: "Your account is no longer active." },
+          { status: 403 }
+        );
+        clearSessionCookie(response, req);
+        return response;
+      }
 
       if (devUser?.passwordChangedAt) {
         const sessionIat = session.iat ? new Date(session.iat * 1000) : null;
