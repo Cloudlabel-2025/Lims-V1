@@ -8,13 +8,11 @@ import { getLabModel } from "@/app/models/master/Lab";
 import { checkRateLimit, getClientIp } from "@/app/lib/rate-limit";
 import crypto from "node:crypto";
 
-const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_LENGTH = 6;
 
 function generateOtp() {
-  const otp = String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
-  const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
-  return { otp, otpHash };
+  return String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
 }
 
 async function resolveUserByEmailAndTenant(email, tenantIdValue) {
@@ -38,8 +36,7 @@ async function resolveUserByEmailAndTenant(email, tenantIdValue) {
     }).select("+passwordResetTokenHash +passwordResetExpiresAt");
 
     return user ? { tenantId: lab.tenantId, user } : { tenantId: null, user: null };
-  } catch (error) {
-    console.error("[forgot-password] resolveUserByEmailAndTenant error:", error?.message || error);
+  } catch {
     return { tenantId: null, user: null };
   }
 }
@@ -52,30 +49,13 @@ async function resolveDeveloperUser(email) {
       "+passwordResetTokenHash +passwordResetExpiresAt"
     );
     return user || null;
-  } catch (error) {
-    console.error("[forgot-password] resolveDeveloperUser error:", error?.message || error);
+  } catch {
     return null;
   }
 }
 
 export async function POST(req) {
   try {
-    const ip = getClientIp(req);
-
-    const rateCheck = await checkRateLimit({
-      namespace: "forgot-password",
-      identifier: ip,
-      maxAttempts: 3,
-      windowMs: 15 * 60 * 1000,
-    });
-
-    if (!rateCheck.allowed) {
-      return Response.json(
-        { error: `Too many requests. Try again in ${rateCheck.retryAfter} seconds.` },
-        { status: 429 }
-      );
-    }
-
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
     const userType = body.userType === "developer" ? "developer" : "tenant";
@@ -93,6 +73,20 @@ export async function POST(req) {
       return Response.json({ error: "Tenant ID is required" }, { status: 400 });
     }
 
+    const rateCheck = await checkRateLimit({
+      namespace: "forgot-password",
+      identifier: email,
+      maxAttempts: 3,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    if (!rateCheck.allowed) {
+      return Response.json(
+        { error: `Too many requests. Try again in ${rateCheck.retryAfter} seconds.` },
+        { status: 429 }
+      );
+    }
+
     let user = null;
     let resetTenantId = null;
 
@@ -108,37 +102,26 @@ export async function POST(req) {
       return Response.json({ error: "No account found with this email address." }, { status: 404 });
     }
 
-    const { otp, otpHash } = generateOtp();
+    const otp = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-    user.passwordResetTokenHash = otpHash;
+    user.passwordResetTokenHash = otp;
     user.passwordResetExpiresAt = expiresAt;
 
     try {
       await user.save();
-    } catch (saveError) {
-      console.error("[forgot-password] Failed to save reset token:", saveError?.message || saveError);
-      return jsonError("Unable to process password reset", saveError, 500);
+    } catch {
+      return jsonError("Unable to process password reset", null, 500);
     }
 
     let emailResult = null;
     try {
       emailResult = await sendPasswordResetEmail({ to: email, otp, expiresAt });
     } catch (emailError) {
-      console.error("[forgot-password] Password reset OTP email failed:", emailError.message);
       emailResult = { sent: false, reason: emailError.message };
     }
 
     if (!emailResult?.sent) {
-      const reason = emailResult?.reason || "Please try again.";
-      console.error(`[forgot-password] Email not sent to ${email}: ${reason}`);
-      if (process.env.NODE_ENV !== "production") {
-        console.info(`[forgot-password] DEV OTP for ${email}: ${otp}`);
-        return Response.json(
-          { error: `Failed to send OTP email. ${reason}` },
-          { status: 500 }
-        );
-      }
       return Response.json(
         { error: "Unable to send OTP email. Please try again later." },
         { status: 500 }
@@ -149,7 +132,6 @@ export async function POST(req) {
       message: "OTP sent to your email. Check your inbox.",
     });
   } catch (error) {
-    console.error("[forgot-password] Unhandled error:", error?.stack || error?.message || error);
     return jsonError("Unable to start password reset", error, 500);
   }
 }

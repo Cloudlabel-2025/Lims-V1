@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import SuccessDialog from "@/app/components/SuccessDialog";
 import { applyCmsTheme } from "@/app/components/ThemeProvider";
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 export default function ForgotPasswordPage() {
-  const [step, setStep] = useState("request"); // "request" | "verify"
+  const router = useRouter();
+  const [step, setStep] = useState("request"); // "request" | "verify" | "done"
   const [email, setEmail] = useState("");
   const [userType, setUserType] = useState("tenant");
   const [tenantId, setTenantId] = useState("");
@@ -18,13 +21,46 @@ export default function ForgotPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownRef = useRef(null);
 
   useEffect(() => {
     applyCmsTheme();
     const params = new URLSearchParams(window.location.search);
     setUserType(params.get("userType") === "developer" ? "developer" : "tenant");
     setTenantId(params.get("tenantId") || "");
+  }, []);
+
+  const cooldownActive = cooldown > 0;
+
+  useEffect(() => {
+    if (!cooldownActive) {
+      if (cooldownRef.current) {
+        clearInterval(cooldownRef.current);
+        cooldownRef.current = null;
+      }
+      return;
+    }
+    cooldownRef.current = window.setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (cooldownRef.current) {
+        clearInterval(cooldownRef.current);
+        cooldownRef.current = null;
+      }
+    };
+  }, [cooldownActive]);
+
+  const startCooldown = useCallback(() => {
+    setCooldown(RESEND_COOLDOWN_SECONDS);
   }, []);
 
   async function handleRequestOtp(event) {
@@ -60,8 +96,8 @@ export default function ForgotPasswordPage() {
         return;
       }
 
-      setSuccess("OTP sent to your email. Check your inbox.");
       setStep("verify");
+      startCooldown();
     } catch {
       setError("Unable to send OTP");
     } finally {
@@ -72,7 +108,6 @@ export default function ForgotPasswordPage() {
   async function handleResetPassword(event) {
     event.preventDefault();
     setError("");
-    setSuccess("");
 
     if (!otp.trim()) {
       setError("Enter the OTP sent to your email");
@@ -111,15 +146,18 @@ export default function ForgotPasswordPage() {
         return;
       }
 
-      setSuccess("Password reset successfully. You can now log in.");
-      setOtp("");
-      setPassword("");
-      setConfirmPassword("");
+      setStep("done");
     } catch {
       setError("Unable to reset password");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleResendOtp() {
+    setError("");
+    setOtp("");
+    setStep("request");
   }
 
   return (
@@ -145,7 +183,11 @@ export default function ForgotPasswordPage() {
             </div>
             <h1 className="login-brand-title">Reset Access</h1>
             <p className="login-brand-subtitle">
-              {step === "request" ? "We'll send an OTP to your email" : "Enter the OTP from your email"}
+              {step === "done"
+                ? "Your password has been reset"
+                : step === "request"
+                  ? "We'll send an OTP to your email"
+                  : "Enter the OTP from your email"}
             </p>
             <div className="login-brand-divider" />
             <div className="login-brand-features">
@@ -168,11 +210,19 @@ export default function ForgotPasswordPage() {
         <div className="login-form-panel">
           <div className="login-form-wrapper">
             <div className="login-form-header">
-              <h2>{step === "request" ? "Forgot password" : "Enter OTP"}</h2>
+              <h2>
+                {step === "done"
+                  ? "Password Reset"
+                  : step === "request"
+                    ? "Forgot password"
+                    : "Enter OTP"}
+              </h2>
               <p>
-                {step === "request"
-                  ? "Enter your email to receive a 6-digit OTP"
-                  : `OTP sent to ${email}. Check your inbox.`}
+                {step === "done"
+                  ? "Your password has been reset successfully. You can now log in with your new password."
+                  : step === "request"
+                    ? "Enter your email to receive a 6-digit OTP"
+                    : `OTP sent to ${email}. Check your inbox.`}
               </p>
             </div>
 
@@ -182,8 +232,6 @@ export default function ForgotPasswordPage() {
                 {error}
               </div>
             )}
-
-            <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
             {step === "request" && (
               <form className="login-form" onSubmit={handleRequestOtp}>
@@ -214,7 +262,7 @@ export default function ForgotPasswordPage() {
               </form>
             )}
 
-            {step === "verify" && !success && (
+            {step === "verify" && (
               <form className="login-form" onSubmit={handleResetPassword}>
                 <div className="login-field">
                   <label className="login-label" htmlFor="reset-otp">6-digit OTP</label>
@@ -295,12 +343,34 @@ export default function ForgotPasswordPage() {
 
                 <button
                   type="button"
-                  onClick={() => { setStep("request"); setError(""); setOtp(""); }}
-                  style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", fontSize: "13px", marginTop: "8px", width: "100%", textAlign: "center" }}
+                  onClick={handleResendOtp}
+                  disabled={cooldown > 0}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: cooldown > 0 ? "var(--text-muted, #94a3b8)" : "var(--primary)",
+                    cursor: cooldown > 0 ? "not-allowed" : "pointer",
+                    fontSize: "13px",
+                    marginTop: "8px",
+                    width: "100%",
+                    textAlign: "center",
+                  }}
                 >
-                  Resend OTP
+                  {cooldown > 0 ? `Resend OTP in ${cooldown}s` : "Resend OTP"}
                 </button>
               </form>
+            )}
+
+            {step === "done" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  className="login-submit"
+                  onClick={() => router.push("/")}
+                >
+                  {Icons.arrowRight} Back to Login
+                </button>
+              </div>
             )}
 
             <div className="login-form-footer">

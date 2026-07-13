@@ -6,17 +6,12 @@ import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
 import { getLabModel } from "@/app/models/master/Lab";
 import { checkRateLimit, resetRateLimit, getClientIp } from "@/app/lib/rate-limit";
-import crypto from "node:crypto";
 
-function hashOtp(otp) {
-  return crypto.createHash("sha256").update(String(otp)).digest("hex");
-}
-
-async function resolveUserByOtpAndTenant(otpHash, tenantId) {
+async function resolveUserByOtpAndTenant(otp, tenantId) {
   const { User } = await getTenantModels(tenantId);
   const user = await User.findOne({
     status: { $in: ["active", "invited"] },
-    passwordResetTokenHash: otpHash,
+    passwordResetTokenHash: otp,
     passwordResetExpiresAt: { $gt: new Date() },
   }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
 
@@ -44,11 +39,9 @@ export async function POST(req) {
       return Response.json({ error: "OTP must be a 6-digit number" }, { status: 400 });
     }
 
-    const rateKey = `${userType}:${email}`;
-
     const rateCheck = await checkRateLimit({
       namespace: "reset-password",
-      identifier: `${rateKey}:${ip}`,
+      identifier: `${userType}:${email}:${ip}`,
       maxAttempts: 5,
       windowMs: 15 * 60 * 1000,
     });
@@ -69,7 +62,6 @@ export async function POST(req) {
       return Response.json({ error: passwordPolicy.errors.join("; ") }, { status: 400 });
     }
 
-    const otpHash = hashOtp(otp);
     let user = null;
 
     if (userType === "developer") {
@@ -78,7 +70,7 @@ export async function POST(req) {
       user = await DeveloperUser.findOne({
         email,
         status: "active",
-        passwordResetTokenHash: otpHash,
+        passwordResetTokenHash: otp,
         passwordResetExpiresAt: { $gt: new Date() },
       }).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
     } else {
@@ -101,9 +93,8 @@ export async function POST(req) {
         return Response.json({ error: "Invalid or expired OTP" }, { status: 400 });
       }
 
-      user = await resolveUserByOtpAndTenant(otpHash, lab.tenantId);
+      user = await resolveUserByOtpAndTenant(otp, lab.tenantId);
 
-      // Ensure OTP belongs to the correct email
       if (user && user.email !== email) {
         user = null;
       }
@@ -113,15 +104,17 @@ export async function POST(req) {
       return Response.json({ error: "Invalid or expired OTP" }, { status: 400 });
     }
 
-    const now = new Date();
     user.passwordHash = await hashPassword(password);
     user.passwordResetTokenHash = undefined;
     user.passwordResetExpiresAt = undefined;
-    user.passwordChangedAt = now;
+    user.passwordChangedAt = new Date();
     user.status = user.status === "invited" ? "active" : user.status;
     await user.save();
 
-    await resetRateLimit("forgot-password", ip);
+    await Promise.all([
+      resetRateLimit("forgot-password", email),
+      resetRateLimit("reset-password", `${userType}:${email}:${ip}`),
+    ]);
 
     return Response.json({ message: "Password has been reset successfully" });
   } catch (error) {
