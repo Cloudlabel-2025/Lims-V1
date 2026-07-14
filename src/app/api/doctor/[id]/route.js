@@ -53,6 +53,8 @@ export async function PUT(req, { params }) {
       return Response.json({ error: formatDoctorValidationErrors(validationErrors) }, { status: 400 });
     }
 
+    if (!payload.genderIdentity) delete payload.genderIdentity;
+
     payload.email = String(payload.email).toLowerCase();
     payload.phone = String(payload.phone);
     payload.mciNumber = String(payload.mciNumber).toUpperCase();

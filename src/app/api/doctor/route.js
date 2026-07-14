@@ -36,6 +36,8 @@ export async function POST(req) {
       );
     }
 
+    if (!payload.genderIdentity) delete payload.genderIdentity;
+
     const { mciNumber, phone } = payload;
 
     // --- Duplicate Checks ---
