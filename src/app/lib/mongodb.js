@@ -21,7 +21,8 @@ async function dbConnect() {
     const opts = {
       bufferCommands: false,
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000
+      serverSelectionTimeoutMS: 5000,
+      dbName: "CMS",
     };
 
     cached.promise = mongoose
