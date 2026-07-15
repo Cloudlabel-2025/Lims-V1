@@ -46,7 +46,6 @@ async function sendMailWithRetry(transporterFn, mailOptions) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const transporter = transporterFn();
-      await transporter.verify();
       await transporter.sendMail(mailOptions);
       return { sent: true };
     } catch (error) {
