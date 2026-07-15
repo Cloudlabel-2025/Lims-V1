@@ -125,7 +125,12 @@ export async function POST(req) {
     try {
       emailResult = await sendPasswordResetEmail({ to: email, otp, expiresAt });
     } catch (emailError) {
-      console.error("[forgot-password] Password reset OTP email failed:", emailError.message);
+      console.error("[forgot-password] Password reset OTP email failed:", {
+        code: emailError.code,
+        message: emailError.message,
+        response: emailError.response,
+        stack: emailError.stack,
+      });
       emailResult = { sent: false, reason: emailError.message };
     }
 

@@ -1,5 +1,8 @@
 import nodemailer from "nodemailer";
 
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
+
 function cleanEnv(name) {
   return String(process.env[name] || "").trim();
 }
@@ -14,17 +17,59 @@ function getSmtpConfig() {
   };
 }
 
-let transporter = null;
-
-function getTransporter(config) {
-  if (transporter) return transporter;
-  transporter = nodemailer.createTransport({
+function createTransporter(config) {
+  return nodemailer.createTransport({
     host: config.host,
     port: config.port,
     secure: config.port === 465,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
     auth: { user: config.user, pass: config.pass },
   });
-  return transporter;
+}
+
+function isTransientError(error) {
+  const code = (error.code || "").toUpperCase();
+  const message = (error.message || "").toLowerCase();
+  const transientCodes = ["ETIMEOUT", "ECONNRESET", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND", "EPIPE"];
+  const transientPhrases = ["timeout", "connection reset", "connection refused", "temporary", "try again", "throttl"];
+  return transientCodes.includes(code) || transientPhrases.some((p) => message.includes(p));
+}
+
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function sendMailWithRetry(transporterFn, mailOptions) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const transporter = transporterFn();
+      await transporter.verify();
+      await transporter.sendMail(mailOptions);
+      return { sent: true };
+    } catch (error) {
+      lastError = error;
+
+      console.error(`[reset-email] Attempt ${attempt}/${MAX_RETRIES} failed:`, {
+        code: error.code,
+        message: error.message,
+        response: error.response,
+      });
+
+      if (attempt < MAX_RETRIES && isTransientError(error)) {
+        const backoffMs = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        console.log(`[reset-email] Retrying in ${backoffMs}ms...`);
+        await delay(backoffMs);
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  throw new Error(lastError?.message || "Unable to send reset email");
 }
 
 export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
@@ -63,16 +108,14 @@ export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
       <p>If you did not request this, you can ignore this email.</p>
     </div>`;
 
-  try {
-    await getTransporter(config).sendMail({
+  return sendMailWithRetry(
+    () => createTransporter(config),
+    {
       from: config.from,
       to,
       subject: "Your LIMS password reset OTP",
       text: textBody,
       html: htmlBody,
-    });
-    return { sent: true };
-  } catch (error) {
-    throw new Error(error.message || "Unable to send reset email");
-  }
+    }
+  );
 }
