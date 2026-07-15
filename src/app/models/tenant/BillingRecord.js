@@ -140,12 +140,37 @@ export const BillingRecordSchema = new mongoose.Schema(
       cash: { type: Number, default: 0 },
       card: { type: Number, default: 0 },
       online: { type: Number, default: 0 },
+      corporate: { type: Number, default: 0 },
     },
     billingStatus: {
       type: String,
       enum: ["unpaid", "partial", "paid", "cancelled"],
       default: "unpaid",
       index: true,
+    },
+    firstPaymentDate: {
+      type: Date,
+    },
+    lastPaymentDate: {
+      type: Date,
+    },
+    lastPaymentAmount: {
+      type: Number,
+      default: 0,
+    },
+    lastPaymentMethod: {
+      type: String,
+      enum: ["cash", "card", "upi", "cheque", "corporate-credit", ""],
+      default: "",
+    },
+    lastPaymentModes: {
+      type: [
+        {
+          type: String,
+          enum: ["cash", "card", "upi", "cheque", "corporate-credit"],
+        },
+      ],
+      default: [],
     },
     createdBy: {
       type: String,
@@ -169,6 +194,7 @@ export const BillingRecordSchema = new mongoose.Schema(
 
 BillingRecordSchema.index({ createdAt: -1 });
 BillingRecordSchema.index({ tenantId: 1, createdAt: -1 });
+BillingRecordSchema.index({ tenantId: 1, updatedAt: -1 });
 BillingRecordSchema.index({ billingStatus: 1, createdAt: -1 });
 BillingRecordSchema.index({ status: 1, createdAt: -1 });
 

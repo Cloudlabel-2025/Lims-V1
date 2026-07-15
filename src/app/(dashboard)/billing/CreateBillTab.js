@@ -81,7 +81,11 @@ export default function CreateBillTab({
   createBill,
   canDiscountBilling = true,
 }) {
-  const netPayable = Math.max(0, selectedTotal - Number(discountAmount || 0) + Number(taxAmount || 0));
+  const discountPct = Math.min(95, Math.max(0, Number(discountAmount) || 0));
+  const taxPct = Math.min(95, Math.max(0, Number(taxAmount) || 0));
+  const discountValue = Math.min(selectedTotal, Math.round((selectedTotal * discountPct) / 100 * 100) / 100);
+  const taxValue = Math.round((selectedTotal * taxPct) / 100 * 100) / 100;
+  const netPayable = Math.max(0, selectedTotal - discountValue + taxValue);
   return (
     <div className="module-grid" style={{ gridTemplateColumns: "1fr" }}>
       <section className="module-panel" style={{ padding: "24px" }}>
@@ -127,24 +131,34 @@ export default function CreateBillTab({
           {canDiscountBilling && (
             <div style={s.row}>
               <div style={{ ...s.col6, ...s.field }}>
-                <label style={s.label}>Discount (₹)</label>
+                <label style={s.label}>Discount (%)</label>
                 <input
                   type="number"
                   style={s.input}
                   min="0"
+                  max="95"
+                  step="0.01"
                   value={discountAmount}
-                  onChange={(e) => setDiscountAmount(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setDiscountAmount(v);
+                  }}
                   placeholder="0"
                 />
               </div>
               <div style={{ ...s.col6, ...s.field }}>
-                <label style={s.label}>Tax (₹)</label>
+                <label style={s.label}>Tax (%)</label>
                 <input
                   type="number"
                   style={s.input}
                   min="0"
+                  max="95"
+                  step="0.01"
                   value={taxAmount}
-                  onChange={(e) => setTaxAmount(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setTaxAmount(v);
+                  }}
                   placeholder="0"
                 />
               </div>
@@ -153,13 +167,18 @@ export default function CreateBillTab({
 
           {!canDiscountBilling && (
             <div style={{ ...s.col12, ...s.field, padding: 0 }}>
-              <label style={s.label}>Tax (₹)</label>
+              <label style={s.label}>Tax (%)</label>
               <input
                 type="number"
                 style={s.input}
                 min="0"
+                max="95"
+                step="0.01"
                 value={taxAmount}
-                onChange={(e) => setTaxAmount(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setTaxAmount(v);
+                }}
                 placeholder="0"
               />
             </div>
@@ -184,14 +203,14 @@ export default function CreateBillTab({
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-muted)" }}>
               <span>Subtotal</span><span>₹{selectedTotal}</span>
             </div>
-            {Number(discountAmount) > 0 && (
+            {discountPct > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--success)" }}>
-                <span>Discount</span><span>− ₹{discountAmount}</span>
+                <span>Discount ({discountPct}%)</span><span>− ₹{discountValue}</span>
               </div>
             )}
-            {Number(taxAmount) > 0 && (
+            {taxPct > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-secondary)" }}>
-                <span>Tax</span><span>+ ₹{taxAmount}</span>
+                <span>Tax ({taxPct}%)</span><span>+ ₹{taxValue}</span>
               </div>
             )}
             <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "10px", marginTop: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>

@@ -69,6 +69,7 @@ export const defaultLabModules = [
   "billing",
   "samples",
   "reports",
+  "analytics",
   "accounts",
   "inventory",
 ];

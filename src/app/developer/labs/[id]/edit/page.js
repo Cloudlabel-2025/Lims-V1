@@ -19,6 +19,14 @@ const loginHighlightOptions = [
     "Inventory Management",
 ];
 
+const logoAllowedTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/avif"]);
+
+function validateLogoFile(file) {
+  if (!file) return "";
+  if (!logoAllowedTypes.has(file.type)) return "Logo must be a PNG, JPG, WebP, or AVIF image.";
+  return "";
+}
+
 const emptyForm = {
   name: "",
   tenantId: "",
@@ -105,6 +113,14 @@ export default function DeveloperEditLabPage({ params }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [existingLogo, setExistingLogo] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
+  const [logoInputTouched, setLogoInputTouched] = useState(false);
+  const [logoFileError, setLogoFileError] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const [logoAltText, setLogoAltText] = useState("");
 
   const formErrors = useMemo(() => validateForm(form), [form]);
   const canSubmit = Object.keys(formErrors).length === 0;
@@ -147,6 +163,8 @@ export default function DeveloperEditLabPage({ params }) {
               : emptyForm.enabledModules,
             loginHighlights: data.lab.loginHighlights || [],
           });
+          setExistingLogo(data.lab.logo || null);
+          setLogoAltText(data.lab.logoAltText || `${data.lab.name || "Lab"} logo`);
         }
       } catch (err) {
         if (!cancelled) setError(err.message);
@@ -243,6 +261,65 @@ export default function DeveloperEditLabPage({ params }) {
     setSuccess("");
   }
 
+  useEffect(() => {
+    if (!logoFile || logoFileError) {
+      setLogoPreviewUrl("");
+      return undefined;
+    }
+
+    const url = URL.createObjectURL(logoFile);
+    setLogoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile, logoFileError]);
+
+  function handleLogoFileChange(file) {
+    setLogoInputTouched(true);
+    setLogoRemoved(false);
+    const validationError = validateLogoFile(file);
+    setLogoFileError(validationError);
+    setLogoFile(validationError ? null : file);
+  }
+
+  function handleRemoveLogo() {
+    setLogoFile(null);
+    setLogoPreviewUrl("");
+    setLogoInputTouched(false);
+    setLogoFileError("");
+    setExistingLogo(null);
+    setLogoRemoved(true);
+  }
+
+  async function uploadLogoIfSelected() {
+    if (!logoFile) return null;
+
+    const tenantId = form.tenantId.trim();
+    const uploadForm = new FormData();
+    uploadForm.append("file", logoFile);
+    uploadForm.append("context", "lab-logo");
+    uploadForm.append("tenantId", tenantId);
+
+    setUploadingLogo(true);
+    try {
+      const response = await fetch("/api/uploads/image", {
+        method: "POST",
+        credentials: "include",
+        body: uploadForm,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.details || data.error || "Unable to upload logo");
+      }
+
+      return {
+        ...data.image,
+        altText: logoAltText || `${form.name} logo`,
+      };
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
@@ -256,6 +333,14 @@ export default function DeveloperEditLabPage({ params }) {
     setSaving(true);
 
     try {
+      let logo = undefined;
+
+      if (logoRemoved) {
+        logo = null;
+      } else if (logoFile) {
+        logo = await uploadLogoIfSelected();
+      }
+
       const payload = {
         name: form.name.trim(),
         status: form.status,
@@ -269,7 +354,14 @@ export default function DeveloperEditLabPage({ params }) {
         accentColor: form.accentColor,
         enabledModules: form.enabledModules,
         loginHighlights: form.loginHighlights,
+        logoAltText: logoAltText,
       };
+
+      if (logoRemoved) {
+        payload.removeLogo = true;
+      } else if (logo) {
+        payload.logo = logo;
+      }
 
       if (form.adminPassword.trim()) {
         payload.adminPassword = form.adminPassword.trim();
@@ -295,6 +387,16 @@ export default function DeveloperEditLabPage({ params }) {
         adminPassword: "",
         adminConfirmPassword: "",
       }));
+      if (data.lab.logo) {
+        setExistingLogo(data.lab.logo);
+      } else if (logoRemoved) {
+        setExistingLogo(null);
+      }
+      setLogoFile(null);
+      setLogoPreviewUrl("");
+      setLogoInputTouched(false);
+      setLogoFileError("");
+      setLogoRemoved(false);
       clearCachedApi("/api/developer/labs");
       clearCachedApi(`/api/developer/labs/${encodeURIComponent(id)}`);
       clearCachedApi(`/api/developer/labs/${data.lab.tenantId}/access`);
@@ -495,6 +597,52 @@ export default function DeveloperEditLabPage({ params }) {
 
           <div className="developer-module-picker">
             <div className="developer-panel-header">
+              <h2>Login Branding</h2>
+              <p>Upload a lab logo. Files over 2 MB will be compressed automatically.</p>
+            </div>
+            <div className="developer-form-grid">
+              <label>
+                Logo Image
+                <input
+                  className={logoFileError && logoInputTouched ? "invalid" : ""}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  onChange={(e) => handleLogoFileChange(e.target.files?.[0] || null)}
+                />
+                <small>PNG, JPG, WebP, or AVIF. Files over 2 MB will be compressed automatically.</small>
+                {logoFileError && logoInputTouched && <em>{logoFileError}</em>}
+              </label>
+              <label>
+                Logo Alt Text
+                <input
+                  value={logoAltText}
+                  onChange={(e) => setLogoAltText(e.target.value)}
+                  placeholder="Enter logo alt text"
+                  maxLength={120}
+                />
+              </label>
+            </div>
+            {(logoPreviewUrl || (existingLogo?.url && !logoRemoved)) && (
+              <div style={{ marginTop: 12, display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <div
+                  className="developer-logo-preview"
+                  role="img"
+                  aria-label={logoAltText || `${form.name || "Lab"} logo`}
+                  style={{ backgroundImage: `url("${logoPreviewUrl || existingLogo?.url}")` }}
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  style={{ marginTop: 8, fontSize: 12, color: "var(--error)", background: "none", border: "1px solid var(--error)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}
+                >
+                  Remove Logo
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="developer-module-picker">
+            <div className="developer-panel-header">
               <h2>Lab Modules</h2>
               <p>Only selected modules appear in this lab after login.</p>
             </div>
@@ -559,8 +707,8 @@ export default function DeveloperEditLabPage({ params }) {
             )}
           </div>
 
-          <button type="submit" className="developer-submit" disabled={!canSubmit || saving}>
-            {saving ? "Saving Lab..." : "Save Lab"}
+          <button type="submit" className="developer-submit" disabled={!canSubmit || saving || uploadingLogo}>
+            {uploadingLogo ? "Uploading Logo..." : saving ? "Saving Lab..." : "Save Lab"}
           </button>
         </form>
       )}

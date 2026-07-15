@@ -42,6 +42,25 @@ function normalizeColor(value, fallback) {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : fallback;
 }
 
+function normalizeLogo(value, fallbackAltText) {
+  if (!value || typeof value !== "object") return undefined;
+
+  const url = cleanString(value.url);
+  const publicId = cleanString(value.publicId);
+  if (!url || !publicId) return undefined;
+
+  return {
+    url,
+    publicId,
+    storageKey: publicId,
+    originalName: cleanString(value.originalName).slice(0, 180),
+    size: Number(value.size) || undefined,
+    mimeType: cleanString(value.mimeType).slice(0, 80),
+    altText: cleanString(value.altText).slice(0, 120) || fallbackAltText,
+    uploadedAt: value.uploadedAt ? new Date(value.uploadedAt) : new Date(),
+  };
+}
+
 function normalizeEnum(value, fallback, allowedValues) {
   const normalizedValue = cleanString(value).toLowerCase();
   const normalizedFallback = cleanString(fallback).toLowerCase();
@@ -86,6 +105,17 @@ function serializeLab(lab, req) {
     secondaryColor: lab.branding?.secondaryColor || "#0f766e",
     accentColor: lab.branding?.accentColor || "#f59e0b",
     logoUrl: lab.branding?.logo?.url || null,
+    logo: lab.branding?.logo
+      ? {
+          url: lab.branding.logo.url,
+          publicId: lab.branding.logo.publicId,
+          originalName: lab.branding.logo.originalName || "",
+          size: lab.branding.logo.size,
+          mimeType: lab.branding.logo.mimeType || "",
+          altText: lab.branding.logo.altText || `${lab.name} logo`,
+          uploadedAt: lab.branding.logo.uploadedAt,
+        }
+      : null,
     logoAltText: lab.branding?.logo?.altText || `${lab.name} logo`,
     reportHeaderUrl: lab.branding?.reportHeader?.url || null,
     loginHighlights: lab.branding?.loginHighlights || [],
@@ -276,6 +306,21 @@ export async function PATCH(req, context) {
     lab.set("branding.secondaryColor", normalizeColor(body.secondaryColor, lab.branding?.secondaryColor || "#0f766e"));
     lab.set("branding.accentColor", normalizeColor(body.accentColor, lab.branding?.accentColor || "#f59e0b"));
     lab.set("branding.loginHighlights", loginHighlights);
+
+    const logoAltText = cleanString(body.logoAltText).slice(0, 120) || `${lab.name} logo`;
+
+    if (body.removeLogo) {
+      lab.set("branding.logo", undefined);
+    } else if (body.logo) {
+      const logo = normalizeLogo(body.logo, logoAltText);
+      if (logo) lab.set("branding.logo", logo);
+    } else if (body.logoAltText !== undefined) {
+      const existingLogo = lab.branding?.logo;
+      if (existingLogo) {
+        const logoObj = existingLogo.toObject?.() || existingLogo;
+        lab.set("branding.logo", { ...logoObj, altText: logoAltText });
+      }
+    }
 
     await lab.save();
     clearTenantConfigCache(lab.tenantId);

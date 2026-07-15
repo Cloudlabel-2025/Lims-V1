@@ -60,7 +60,7 @@ const loginHighlightOptions = [
 
 const logoUploadRules = {
   maxSizeBytes: 2 * 1024 * 1024,
-  allowedTypes: new Set(["image/png", "image/jpeg", "image/webp"]),
+  allowedTypes: new Set(["image/png", "image/jpeg", "image/webp", "image/avif"]),
 };
 
 function slugifyTenantId(value) {
@@ -148,11 +148,7 @@ function validateLogoFile(file) {
   if (!file) return "";
 
   if (!logoUploadRules.allowedTypes.has(file.type)) {
-    return "Logo must be a PNG, JPG, or WebP image.";
-  }
-
-  if (file.size > logoUploadRules.maxSizeBytes) {
-    return "Logo image must be 2 MB or smaller.";
+    return "Logo must be a PNG, JPG, WebP, or AVIF image.";
   }
 
   return "";
@@ -756,13 +752,13 @@ export default function DeveloperCreateLabPage() {
                   <input
                     className={logoFileError && logoInputTouched ? "invalid" : ""}
                     type="file"
-                    accept="image/png,image/jpeg,image/webp"
+                    accept="image/png,image/jpeg,image/webp,image/avif"
                     onChange={(e) => {
                       setLogoInputTouched(true);
                       setLogoFile(e.target.files?.[0] || null);
                     }}
                   />
-                  <small>PNG, JPG, or WebP. Maximum 2 MB.</small>
+                  <small>PNG, JPG, WebP, or AVIF. Files over 2 MB will be compressed automatically.</small>
                   {logoFileError && logoInputTouched && <em>{logoFileError}</em>}
                 </label>
                 <label>

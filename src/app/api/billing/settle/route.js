@@ -12,8 +12,8 @@ function getPaymentParts(payment) {
   return [
     { key: "cash", method: "cash", accountCode: "1001", amount: money(payment?.cash) },
     { key: "card", method: "card", accountCode: "1002", amount: money(payment?.card) },
-    { key: "online", method: "online", accountCode: "1002", amount: money(payment?.online) },
-    { key: "corporate", method: "corporate", accountCode: "1200", amount: money(payment?.corporate) },
+    { key: "online", method: "upi", accountCode: "1002", amount: money(payment?.online) },
+    { key: "corporate", method: "corporate-credit", accountCode: "1200", amount: money(payment?.corporate) },
   ].filter((part) => part.amount > 0);
 }
 
@@ -181,6 +181,16 @@ export async function POST(req) {
       lockedBillingRecord.invoiceStatus = isFullyPaid ? "paid" : "partial";
       lockedBillingRecord.status = isFullyPaid ? "completed" : "in-progress";
 
+      if (!lockedBillingRecord.firstPaymentDate) {
+        lockedBillingRecord.firstPaymentDate = new Date();
+      }
+
+      lockedBillingRecord.lastPaymentDate = new Date();
+      lockedBillingRecord.lastPaymentAmount = receivedAmount;
+      const primaryPart = paymentParts.reduce((max, part) => (part.amount > (max?.amount || 0) ? part : max), null);
+      lockedBillingRecord.lastPaymentMethod = primaryPart?.method || "";
+      lockedBillingRecord.lastPaymentModes = paymentParts.map((part) => part.method);
+
       if (
         isFullyPaid &&
         lockedBillingRecord.referralDoctor &&
@@ -219,6 +229,17 @@ export async function POST(req) {
         billId: lockedBillingRecord.billId,
         billingStatus: lockedBillingRecord.billingStatus,
         invoiceStatus: lockedBillingRecord.invoiceStatus,
+        paymentBreakdown: {
+          cash: lockedBillingRecord.paymentBreakdown?.cash || 0,
+          card: lockedBillingRecord.paymentBreakdown?.card || 0,
+          online: lockedBillingRecord.paymentBreakdown?.online || 0,
+          corporate: lockedBillingRecord.paymentBreakdown?.corporate || 0,
+        },
+        firstPaymentDate: lockedBillingRecord.firstPaymentDate,
+        lastPaymentDate: lockedBillingRecord.lastPaymentDate,
+        lastPaymentAmount: lockedBillingRecord.lastPaymentAmount,
+        lastPaymentMethod: lockedBillingRecord.lastPaymentMethod,
+        lastPaymentModes: lockedBillingRecord.lastPaymentModes,
         paidAmount: totalPaid,
         receivedAmount,
         receiptIds: receipts.map((receipt) => receipt._id),

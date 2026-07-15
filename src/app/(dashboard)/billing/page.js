@@ -47,15 +47,17 @@ export default function BillingPage() {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [selectedBillingRecord, setSelectedBillingRecord] = useState(null);
   const [payment, setPayment] = useState({ cash: 0, card: 0, online: 0 });
-  const [results, setResults] = useState({}); // { [billingItemId]: { [paramKey]: value } }
-  const [testDetails, setTestDetails] = useState({}); // { [testDefId]: parameters }
   const [editingBill, setEditingBill] = useState(null);
   const [editDiscount, setEditDiscount] = useState("");
   const [editTax, setEditTax] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [showPartialConfirm, setShowPartialConfirm] = useState(false);
+  const [partialConfirmData, setPartialConfirmData] = useState(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelConfirmId, setCancelConfirmId] = useState(null);
 
   const pendingBills = useMemo(
-    () => billingRecords.filter((billingRecord) => billingRecord.billingStatus !== "paid"),
+    () => billingRecords.filter((billingRecord) => billingRecord.billingStatus !== "paid" && billingRecord.billingStatus !== "cancelled"),
     [billingRecords]
   );
   const pendingTotalPages = Math.max(1, Math.ceil(pendingBills.length / pendingLimit));
@@ -91,15 +93,16 @@ export default function BillingPage() {
   const canCancelBilling = hasPermission(user, "billing.cancel");
   const canUpdateBilling = hasPermission(user, "billing.update");
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async ({ force = false } = {}) => {
     setLoading(true);
     setError("");
     try {
+      const opts = force ? { force: true } : {};
       const [patientRes, testRes, pkgRes, billingRes] = await Promise.all([
-        cachedJsonFetch("/api/patient", { ttl: 15_000 }),
-        cachedJsonFetch("/api/tests/definitions?status=active", { ttl: 30_000 }),
-        cachedJsonFetch("/api/tests/packages", { ttl: 30_000 }),
-        cachedJsonFetch(`/api/billing?page=${billingPage}&limit=20`, { ttl: 10_000 }),
+        cachedJsonFetch("/api/patient", { ttl: 15_000, ...opts }),
+        cachedJsonFetch("/api/tests/definitions?status=active", { ttl: 30_000, ...opts }),
+        cachedJsonFetch("/api/tests/packages", { ttl: 30_000, ...opts }),
+        cachedJsonFetch(`/api/billing?page=${billingPage}&limit=20`, { ttl: 10_000, ...opts }),
       ]);
 
       const patientData = patientRes.data;
@@ -169,23 +172,33 @@ export default function BillingPage() {
 
     if (canDiscountBilling) {
       if (discountAmount === "" || discountAmount === null || discountAmount === undefined) {
-        setError("Discount amount is required");
+        setError("Discount percentage is required");
         setSaving(false);
         return;
       }
       if (/[eE]/.test(String(discountAmount))) {
-        setError("Invalid discount amount format");
+        setError("Invalid discount percentage format");
+        setSaving(false);
+        return;
+      }
+      if (Number(discountAmount) > 95) {
+        setError("Discount cannot exceed 95%");
         setSaving(false);
         return;
       }
     }
     if (taxAmount === "" || taxAmount === null || taxAmount === undefined) {
-      setError("Tax amount is required");
+      setError("Tax percentage is required");
       setSaving(false);
       return;
     }
     if (/[eE]/.test(String(taxAmount))) {
-      setError("Invalid tax amount format");
+      setError("Invalid tax percentage format");
+      setSaving(false);
+      return;
+    }
+    if (Number(taxAmount) > 95) {
+      setError("Tax percentage cannot exceed 95%");
       setSaving(false);
       return;
     }
@@ -194,7 +207,14 @@ export default function BillingPage() {
       const response = await fetch("/api/billing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient, tests: selectedTests, priority, notes, discountAmount: Number(discountAmount) || 0, taxAmount: Number(taxAmount) || 0 }),
+        body: JSON.stringify({
+          patient,
+          tests: selectedTests,
+          priority,
+          notes,
+          discountAmount: Math.round((selectedTotal * (Number(discountAmount) || 0)) / 100 * 100) / 100,
+          taxAmount: Math.round((selectedTotal * (Number(taxAmount) || 0)) / 100 * 100) / 100,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.details || data.error || "Unable to create bill");
@@ -220,56 +240,19 @@ export default function BillingPage() {
     }
   }
 
-  const openCloseModal = async (billingRecord) => {
+  const openCloseModal = (billingRecord) => {
     setSelectedBillingRecord(billingRecord);
     const paidAmount =
       Number(billingRecord.paymentBreakdown?.cash || 0) +
       Number(billingRecord.paymentBreakdown?.card || 0) +
-      Number(billingRecord.paymentBreakdown?.online || 0);
+      Number(billingRecord.paymentBreakdown?.online || 0) +
+      Number(billingRecord.paymentBreakdown?.corporate || 0);
     const remainingAmount = Math.max(0, Number(billingRecord.totalAmount || 0) - paidAmount);
     setPayment({ cash: remainingAmount, card: 0, online: 0 });
-    
-    // Initialize results structure
-    const initialResults = {};
-    const details = { ...testDetails };
-
-    for (const item of billingRecord.items || []) {
-      const defId = item.testDefinition;
-      if (!details[defId]) {
-        try {
-          const res = await fetch(`/api/tests/definitions/${defId}`, { credentials: "include" });
-          if (!res.ok) continue;
-          const data = await res.json();
-          if (data.test) details[defId] = data.test.parameters || [];
-        } catch (err) { console.error(err); }
-      }
-      
-      initialResults[item._id] = {};
-      (details[defId] || []).forEach(p => {
-        initialResults[item._id][p.key] = "";
-      });
-    }
-    
-    setTestDetails(details);
-    setResults(initialResults);
     setShowCloseModal(true);
   };
 
-  const handleCloseBill = async () => {
-    const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
-    const alreadyPaid =
-      Number(selectedBillingRecord.paymentBreakdown?.cash || 0) +
-      Number(selectedBillingRecord.paymentBreakdown?.card || 0) +
-      Number(selectedBillingRecord.paymentBreakdown?.online || 0);
-    const remainingAmount = Math.max(0, Number(selectedBillingRecord.totalAmount || 0) - alreadyPaid);
-    if (totalPaid > remainingAmount) {
-      setError(`Payment cannot exceed remaining balance (Rs ${remainingAmount}).`);
-      return;
-    }
-    if (totalPaid < remainingAmount) {
-      if (!confirm(`Total paid (Rs ${totalPaid}) is less than remaining balance (Rs ${remainingAmount}). Proceed?`)) return;
-    }
-
+  const processSettlement = async () => {
     setClosing(true);
     setError("");
     setSuccess("");
@@ -281,7 +264,6 @@ export default function BillingPage() {
         body: JSON.stringify({ 
           billingRecordId: selectedBillingRecord._id,
           payment,
-          results
         })
       });
       const data = await res.json();
@@ -295,11 +277,23 @@ export default function BillingPage() {
       setBillingRecords((current) =>
         current.map((billingRecord) =>
           billingRecord._id === selectedBillingRecord._id
-            ? { ...billingRecord, billingStatus: "paid" }
+            ? {
+              ...billingRecord,
+              billingStatus: data.billingStatus || billingRecord.billingStatus,
+              paymentBreakdown: data.paymentBreakdown || billingRecord.paymentBreakdown,
+              firstPaymentDate: data.firstPaymentDate || billingRecord.firstPaymentDate,
+              lastPaymentDate: data.lastPaymentDate || billingRecord.lastPaymentDate,
+              lastPaymentAmount: data.lastPaymentAmount ?? billingRecord.lastPaymentAmount,
+              lastPaymentMethod: data.lastPaymentMethod ?? billingRecord.lastPaymentMethod,
+              lastPaymentModes: data.lastPaymentModes ?? billingRecord.lastPaymentModes,
+            }
             : billingRecord
         )
       );
       setShowCloseModal(false);
+      setShowPartialConfirm(false);
+      setPartialConfirmData(null);
+      setPayment({ cash: 0, card: 0, online: 0 });
       setSuccess(data.message || "Bill settlement completed successfully.");
     } catch (err) {
       setError(err.message);
@@ -307,6 +301,27 @@ export default function BillingPage() {
     } finally {
       setClosing(false);
     }
+  };
+
+  const handleCloseBill = async () => {
+    const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
+    const alreadyPaid =
+      Number(selectedBillingRecord.paymentBreakdown?.cash || 0) +
+      Number(selectedBillingRecord.paymentBreakdown?.card || 0) +
+      Number(selectedBillingRecord.paymentBreakdown?.online || 0) +
+      Number(selectedBillingRecord.paymentBreakdown?.corporate || 0);
+    const remainingAmount = Math.max(0, Number(selectedBillingRecord.totalAmount || 0) - alreadyPaid);
+    if (totalPaid > remainingAmount) {
+      setError(`Payment cannot exceed remaining balance (Rs ${remainingAmount}).`);
+      return;
+    }
+    if (totalPaid < remainingAmount) {
+      setPartialConfirmData({ totalPaid, remainingAmount });
+      setShowPartialConfirm(true);
+      return;
+    }
+
+    await processSettlement();
   };
 
   const closeSettlementModal = useCallback(() => {
@@ -318,17 +333,11 @@ export default function BillingPage() {
     setPayment((current) => ({ ...current, [key]: value }));
   }, []);
 
-  const updateSettlementResult = useCallback((billingItemId, parameterKey, value) => {
-    setResults((current) => ({
-      ...current,
-      [billingItemId]: { ...current[billingItemId], [parameterKey]: value },
-    }));
-  }, []);
-
   function openEditBill(billingRecord) {
     setEditingBill(billingRecord);
-    setEditDiscount(billingRecord.discountAmount || "");
-    setEditTax(billingRecord.taxAmount || "");
+    const subtotal = billingRecord.subtotalAmount || billingRecord.totalAmount || 0;
+    setEditDiscount(subtotal > 0 && billingRecord.discountAmount > 0 ? String(Math.round(billingRecord.discountAmount / subtotal * 10000) / 100) : "");
+    setEditTax(subtotal > 0 && billingRecord.taxAmount > 0 ? String(Math.round(billingRecord.taxAmount / subtotal * 10000) / 100) : "");
     setEditNotes(billingRecord.notes || "");
   }
 
@@ -345,8 +354,9 @@ export default function BillingPage() {
     setSuccess("");
     try {
       const payload = {};
-      if (canDiscountBilling) payload.discountAmount = Number(editDiscount) || 0;
-      payload.taxAmount = Number(editTax) || 0;
+      const subtotal = editingBill.subtotalAmount || editingBill.totalAmount || 0;
+      if (canDiscountBilling) payload.discountAmount = Math.round((subtotal * (Number(editDiscount) || 0)) / 100 * 100) / 100;
+      payload.taxAmount = Math.round((subtotal * (Number(editTax) || 0)) / 100 * 100) / 100;
       payload.notes = editNotes;
       const res = await fetch(`/api/billing/${billingRecordId}`, {
         method: "PATCH",
@@ -374,12 +384,18 @@ export default function BillingPage() {
   }
 
   async function cancelBill(billingRecordId) {
-    if (!confirm("Cancel this bill? This action cannot be undone.")) return;
+    setCancelConfirmId(billingRecordId);
+    setShowCancelConfirm(true);
+  }
+
+  async function confirmCancelBill() {
+    if (!cancelConfirmId) return;
+    setShowCancelConfirm(false);
     setClosing(true);
     setError("");
     setSuccess("");
     try {
-      const res = await fetch(`/api/billing/${billingRecordId}`, {
+      const res = await fetch(`/api/billing/${cancelConfirmId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -392,7 +408,7 @@ export default function BillingPage() {
       clearCachedApi("/api/dashboard/stats");
       setBillingRecords((current) =>
         current.map((br) =>
-          br._id === billingRecordId ? { ...br, billingStatus: "cancelled" } : br
+          br._id === cancelConfirmId ? { ...br, billingStatus: "cancelled" } : br
         )
       );
       setSuccess(data.message || "Bill cancelled successfully.");
@@ -400,6 +416,7 @@ export default function BillingPage() {
       setError(err.message);
     } finally {
       setClosing(false);
+      setCancelConfirmId(null);
     }
   }
 
@@ -414,8 +431,11 @@ export default function BillingPage() {
           <span>Manage patient payments, commissions, and billing workflow.</span>
         </div>
         <div className="module-actions">
-          <button className="dash-btn-secondary" onClick={loadData}>
-            {Icons.refresh || "↻"} Refresh
+          <button className="dash-btn-secondary" onClick={() => loadData({ force: true })} disabled={loading} style={{ height: 34, padding: "0 14px", fontSize: 12 }}>
+            <span className={loading ? "icon-spin" : ""}>
+              {Icons.refresh}
+            </span>
+            Refresh
           </button>
         </div>
       </div>
@@ -663,13 +683,76 @@ export default function BillingPage() {
           billingRecord={selectedBillingRecord}
           closing={closing}
           payment={payment}
-          results={results}
-          testDetails={testDetails}
           onClose={closeSettlementModal}
           onPaymentChange={updateSettlementPayment}
-          onResultChange={updateSettlementResult}
           onSubmit={handleCloseBill}
         />
+      )}
+
+      {showPartialConfirm && partialConfirmData && (
+        <div className="modal-overlay" onClick={() => { setShowPartialConfirm(false); setPartialConfirmData(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "420px", width: "95%", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
+            <div style={{ padding: "20px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h4 style={{ margin: 0, fontSize: "18px" }}>Confirm Partial Payment</h4>
+              <button onClick={() => { setShowPartialConfirm(false); setPartialConfirmData(null); }} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{Icons.close}</button>
+            </div>
+            <div style={{ padding: "20px" }}>
+              <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "var(--radius-md)", padding: "14px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "600", color: "#92400e", marginBottom: "8px" }}>
+                  {Icons.alertTriangle}
+                  <span>Partial Payment Detected</span>
+                </div>
+                <div style={{ fontSize: "13px", color: "#78350f", lineHeight: "1.5" }}>
+                  You are paying <strong>Rs {partialConfirmData.totalPaid}</strong> which is less than the remaining balance of <strong>Rs {partialConfirmData.remainingAmount}</strong>. The bill will remain in pending payments with a balance of <strong>Rs {partialConfirmData.remainingAmount - partialConfirmData.totalPaid}</strong>.
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button className="btn-modal-cancel" onClick={() => { setShowPartialConfirm(false); setPartialConfirmData(null); }}>Go Back</button>
+              <button
+                className="btn-modal-confirm"
+                onClick={async () => { setShowPartialConfirm(false); setPartialConfirmData(null); await processSettlement(); }}
+                disabled={closing}
+                style={closing ? { opacity: 0.6, cursor: "not-allowed" } : {}}
+              >
+                {closing ? "Processing..." : "Confirm Partial Payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelConfirm && (
+        <div className="modal-overlay" onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "420px", width: "95%", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
+            <div style={{ padding: "20px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h4 style={{ margin: 0, fontSize: "18px" }}>Cancel Bill</h4>
+              <button onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); }} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{Icons.close}</button>
+            </div>
+            <div style={{ padding: "20px" }}>
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-md)", padding: "14px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "600", color: "#991b1b", marginBottom: "8px" }}>
+                  {Icons.alertTriangle}
+                  <span>Cancel Bill?</span>
+                </div>
+                <div style={{ fontSize: "13px", color: "#7f1d1d", lineHeight: "1.5" }}>
+                  This action cannot be undone. The bill will be permanently cancelled and all associated records will be voided.
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button className="btn-modal-cancel" onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); }}>Go Back</button>
+              <button
+                className="btn-modal-confirm"
+                onClick={confirmCancelBill}
+                disabled={closing}
+                style={closing ? { opacity: 0.6, cursor: "not-allowed", background: "var(--danger, #dc2626)" } : { background: "var(--danger, #dc2626)" }}
+              >
+                {closing ? "Processing..." : "Yes, Cancel Bill"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {editingBill && (
@@ -682,27 +765,35 @@ export default function BillingPage() {
             <div className="modal-body" style={{ display: "grid", gap: 16, padding: 20 }}>
               {canDiscountBilling && (
                 <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>Discount (₹)</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Discount (%)</span>
                   <input
                     className="lims-input"
                     type="number"
                     min="0"
-                    max="9999999999"
+                    max="95"
+                    step="0.01"
                     value={editDiscount}
-                    onChange={(e) => setEditDiscount(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setEditDiscount(v);
+                    }}
                     placeholder="0"
                   />
                 </label>
               )}
               <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Tax (₹)</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Tax (%)</span>
                 <input
                   className="lims-input"
                   type="number"
                   min="0"
-                  max="9999999999"
+                  max="95"
+                  step="0.01"
                   value={editTax}
-                  onChange={(e) => setEditTax(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setEditTax(v);
+                  }}
                   placeholder="0"
                 />
               </label>

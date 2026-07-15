@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
+import sharp from "sharp";
 import { v2 as cloudinary } from "cloudinary";
 
-const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 const maxImageSizeBytes = Number(process.env.CLOUDINARY_MAX_IMAGE_SIZE_BYTES || 5 * 1024 * 1024);
+const compressionThresholdBytes = 2 * 1024 * 1024;
 const defaultUploadTimeoutMs = 30_000;
 
 export class ImageUploadError extends Error {
@@ -48,7 +50,7 @@ export function validateImageFile(file) {
   }
 
   if (!allowedImageTypes.has(file.type)) {
-    throw new ImageUploadError("Only JPG, PNG, and WEBP images are allowed", 400);
+    throw new ImageUploadError("Only JPG, PNG, WEBP, and AVIF images are allowed", 400);
   }
 
   if (file.size > maxImageSizeBytes) {
@@ -59,14 +61,38 @@ export function validateImageFile(file) {
   }
 }
 
+async function compressImageIfNeeded(file) {
+  if (file.size <= compressionThresholdBytes) {
+    return { buffer: Buffer.from(await file.arrayBuffer()), mimeType: file.type, wasCompressed: false };
+  }
+
+  const inputBuffer = Buffer.from(await file.arrayBuffer());
+  let quality = 80;
+
+  const tryCompress = async (q) =>
+    sharp(inputBuffer)
+      .resize({ width: 1920, height: 1920, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: q })
+      .toBuffer({ resolveWithObject: true });
+
+  let { data: outputBuffer, info } = await tryCompress(quality);
+
+  while (outputBuffer.length > compressionThresholdBytes && quality > 20) {
+    quality -= 10;
+    ({ data: outputBuffer, info } = await tryCompress(quality));
+  }
+
+  return { buffer: outputBuffer, mimeType: info.format === "webp" ? "image/webp" : file.type, wasCompressed: true };
+}
+
 export async function uploadImageToCloudinary(file, { folder, publicIdPrefix }) {
   validateImageFile(file);
   const cloudinaryConfig = assertCloudinaryConfig();
   const { cloudName, apiKey, apiSecret } = cloudinaryConfig;
 
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const { buffer, mimeType, wasCompressed } = await compressImageIfNeeded(file);
   const timeoutMs = getUploadTimeoutMs();
-  const dataUri = `data:${file.type};base64,${bytes.toString("base64")}`;
+  const dataUri = `data:${mimeType};base64,${buffer.toString("base64")}`;
   const timestamp = Math.floor(Date.now() / 1000);
   const uploadParams = {
     folder,
@@ -107,7 +133,7 @@ export async function uploadImageToCloudinary(file, { folder, publicIdPrefix }) 
       );
     }
 
-    return buildUploadResult(result, file);
+    return buildUploadResult(result, file, { wasCompressed, compressedSize: buffer.length });
   } catch (error) {
     if (error instanceof ImageUploadError) throw error;
 
@@ -126,7 +152,7 @@ export async function uploadImageToCloudinary(file, { folder, publicIdPrefix }) 
       .join(" - ");
 
     if (!isTimeout) {
-      return uploadImageWithSdk(dataUri, file, { folder, publicIdPrefix, timeoutMs, cloudinaryConfig });
+      return uploadImageWithSdk(dataUri, file, { folder, publicIdPrefix, timeoutMs, cloudinaryConfig, wasCompressed, compressedSize: buffer.length });
     }
 
     throw new ImageUploadError(
@@ -138,12 +164,14 @@ export async function uploadImageToCloudinary(file, { folder, publicIdPrefix }) 
   }
 }
 
-function buildUploadResult(result, file) {
+function buildUploadResult(result, file, { wasCompressed, compressedSize } = {}) {
   return {
     url: result.secure_url,
     publicId: result.public_id,
     originalName: file.name,
-    size: file.size,
+    size: wasCompressed ? compressedSize : file.size,
+    originalSize: file.size,
+    wasCompressed: !!wasCompressed,
     mimeType: file.type,
     width: result.width,
     height: result.height,
@@ -154,7 +182,7 @@ function buildUploadResult(result, file) {
 async function uploadImageWithSdk(
   dataUri,
   file,
-  { folder, publicIdPrefix, timeoutMs, cloudinaryConfig }
+  { folder, publicIdPrefix, timeoutMs, cloudinaryConfig, wasCompressed, compressedSize }
 ) {
   configureCloudinarySdk(cloudinaryConfig);
 
@@ -167,7 +195,7 @@ async function uploadImageWithSdk(
       timeout: timeoutMs,
     });
 
-    return buildUploadResult(result, file);
+    return buildUploadResult(result, file, { wasCompressed, compressedSize });
   } catch (error) {
     const isTimeout =
       error?.code === "ETIMEDOUT" ||

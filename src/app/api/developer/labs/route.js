@@ -29,6 +29,7 @@ import { getUserModel } from "@/app/models/tenant/User";
 import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { buildTenantUrl } from "@/app/lib/subdomain";
+import rbacConfig from "@/app/lib/rbac-config.json";
 
 export const maxDuration = 60;
 
@@ -186,14 +187,20 @@ async function createTenantRoles(masterConnection, tenantConnection) {
     throw new Error("No active role templates found. Run seed-rbac first.");
   }
 
+  const allTenantPermissions = rbacConfig.permissions
+    .filter((permission) => permission.scope !== "developer")
+    .map((permission) => permission.key);
+
   let adminRole = null;
 
   for (const template of templates) {
     let role = await Role.findOne({ name: template.name });
+    const isAdminTemplate = template.isDefaultAdmin || template.name === "Admin";
+    const permissions = isAdminTemplate ? allTenantPermissions : template.permissions;
     const roleData = {
       name: template.name,
       description: template.description,
-      permissions: template.permissions,
+      permissions,
       isDefaultAdmin: template.isDefaultAdmin,
       isSystemRole: template.isSystemTemplate,
       status: "active",

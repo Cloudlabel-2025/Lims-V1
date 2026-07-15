@@ -92,7 +92,7 @@ export const LabSchema = new mongoose.Schema(
     },
     enabledModules: {
       type: [String],
-      default: ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports"],
+      default: ["dashboard", "patients", "doctors", "tests", "billing", "samples", "reports", "analytics", "accounts", "inventory"],
     },
     numbering: {
         patientPrefix: {

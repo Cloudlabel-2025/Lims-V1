@@ -23,7 +23,8 @@
     "react": "19.2.3",
     "react-day-picker": "^10.0.1",
     "react-dom": "19.2.3",
-    "recharts": "^3.9.2"
+    "recharts": "^3.9.2",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "babel-plugin-react-compiler": "1.0.0",

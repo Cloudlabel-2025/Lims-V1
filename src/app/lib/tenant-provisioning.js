@@ -3,6 +3,7 @@ import connectMasterDB from "@/app/lib/master-db";
 import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { defaultLabModules } from "@/app/lib/modules";
+import rbacConfig from "@/app/lib/rbac-config.json";
 import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { getPatientModel } from "@/app/models/tenant/Patient";
 import { getLabModel } from "@/app/models/master/Lab";
@@ -112,13 +113,20 @@ async function createTenantRoles(masterConnection, tenantConnection) {
     throw new Error("No active role templates found. Run seed-rbac first.");
   }
 
+  const allTenantPermissions = rbacConfig.permissions
+    .filter((permission) => permission.scope !== "developer")
+    .map((permission) => permission.key);
+
   for (const template of templates) {
+    const isAdminTemplate = template.isDefaultAdmin || template.name === "Admin";
+    const permissions = isAdminTemplate ? allTenantPermissions : template.permissions;
+
     await Role.findOneAndUpdate(
       { name: template.name },
       {
         name: template.name,
         description: template.description,
-        permissions: template.permissions,
+        permissions,
         isDefaultAdmin: template.isDefaultAdmin,
         isSystemRole: template.isSystemTemplate,
         status: "active",

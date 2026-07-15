@@ -34,8 +34,8 @@ export async function GET(req) {
 
     const canViewFinancials = hasPermission(auth.session, "accounts.view");
     const financialSelect = canViewFinancials
-      ? "billId patient items priority status notes referralDoctor subtotalAmount discountAmount taxAmount totalAmount commissionAmount paymentBreakdown billingStatus invoiceStatus invoiceJournalEntryId paymentReceiptIds commissionJournalEntryId createdBy createdAt updatedAt"
-      : "billId patient items priority status notes referralDoctor billingStatus createdAt updatedAt";
+      ? "billId patient items priority status notes referralDoctor subtotalAmount discountAmount taxAmount totalAmount commissionAmount paymentBreakdown billingStatus firstPaymentDate lastPaymentDate lastPaymentAmount lastPaymentMethod lastPaymentModes invoiceStatus invoiceJournalEntryId paymentReceiptIds commissionJournalEntryId createdBy createdAt updatedAt"
+      : "billId patient items priority status notes referralDoctor totalAmount paymentBreakdown billingStatus firstPaymentDate lastPaymentDate lastPaymentAmount lastPaymentMethod lastPaymentModes invoiceStatus createdBy createdAt updatedAt";
     const doctorPopulateSelect = canViewFinancials ? "name doctorId commission pendingPayout" : "name doctorId";
 
     const { BillingRecord } = await getTenantModels(auth.tenantId);
@@ -44,7 +44,7 @@ export async function GET(req) {
         .populate("patient", "name patientId age gender phone")
         .populate("referralDoctor", doctorPopulateSelect)
         .select(financialSelect)
-        .sort({ createdAt: -1 })
+        .sort({ updatedAt: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
