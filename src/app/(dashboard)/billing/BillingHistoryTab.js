@@ -3,14 +3,14 @@
 import { useState, useMemo } from "react";
 
 const SORT_OPTIONS = [
-  { value: "recent", label: "Recent Transaction" },
+  { value: "recent", label: "Recent Payment" },
   { value: "oldest", label: "Oldest First" },
   { value: "billId-asc", label: "Bill ID (Ascending)" },
   { value: "billId-desc", label: "Bill ID (Descending)" },
   { value: "patient-asc", label: "Patient Name (A–Z)" },
   { value: "patient-desc", label: "Patient Name (Z–A)" },
-  { value: "amount-desc", label: "Amount (High to Low)" },
-  { value: "amount-asc", label: "Amount (Low to High)" },
+  { value: "amount-desc", label: "Amount Paid (High to Low)" },
+  { value: "amount-asc", label: "Amount Paid (Low to High)" },
 ];
 
 const METHOD_LABEL = { cash: "Cash", card: "Card", upi: "UPI", "corporate-credit": "Corporate", cheque: "Cheque" };
@@ -19,68 +19,68 @@ function formatMethod(method) {
   return METHOD_LABEL[method] || method;
 }
 
-function formatMethods(methods, fallbackMethod) {
-  const uniqueMethods = Array.isArray(methods)
-    ? methods.filter(Boolean).filter((method, index, list) => list.indexOf(method) === index)
-    : [];
-  if (uniqueMethods.length === 0) return formatMethod(fallbackMethod);
-  return uniqueMethods.map((method) => METHOD_LABEL[method] || method).join(" + ");
-}
-
-function sortRecords(records, sortBy) {
-  const sorted = [...records];
+function sortTransactions(transactions, sortBy) {
+  const sorted = [...transactions];
   switch (sortBy) {
     case "recent":
-      return sorted.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      return sorted.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
     case "oldest":
-      return sorted.sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+      return sorted.sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
     case "billId-asc":
       return sorted.sort((a, b) => (a.billId || "").localeCompare(b.billId || "", undefined, { numeric: true }));
     case "billId-desc":
       return sorted.sort((a, b) => (b.billId || "").localeCompare(a.billId || "", undefined, { numeric: true }));
     case "patient-asc":
-      return sorted.sort((a, b) => (a.patient?.name || "").localeCompare(b.patient?.name || ""));
+      return sorted.sort((a, b) => (a.patientName || "").localeCompare(b.patientName || ""));
     case "patient-desc":
-      return sorted.sort((a, b) => (b.patient?.name || "").localeCompare(a.patient?.name || ""));
+      return sorted.sort((a, b) => (b.patientName || "").localeCompare(a.patientName || ""));
     case "amount-desc":
-      return sorted.sort((a, b) => (Number(b.totalAmount) || 0) - (Number(a.totalAmount) || 0));
+      return sorted.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
     case "amount-asc":
-      return sorted.sort((a, b) => (Number(a.totalAmount) || 0) - (Number(b.totalAmount) || 0));
+      return sorted.sort((a, b) => (Number(a.amount) || 0) - (Number(b.amount) || 0));
     default:
       return sorted;
   }
 }
 
-function filterRecords(records, search) {
-  if (!search.trim()) return records;
+function filterTransactions(transactions, search) {
+  if (!search.trim()) return transactions;
   const q = search.trim().toLowerCase();
-  return records.filter((r) => {
-    if (r.billId && r.billId.toLowerCase().includes(q)) return true;
-    if (r.patient?.name && r.patient.name.toLowerCase().includes(q)) return true;
-    if (r.patient?.patientId && r.patient.patientId.toLowerCase().includes(q)) return true;
+  return transactions.filter((t) => {
+    if (t.billId && t.billId.toLowerCase().includes(q)) return true;
+    if (t.patientName && t.patientName.toLowerCase().includes(q)) return true;
+    if (t.patientId && t.patientId.toLowerCase().includes(q)) return true;
     return false;
   });
 }
 
-export default function BillingHistoryTab({ billingRecords, pagination, loading, onPageChange }) {
+export default function BillingHistoryTab({
+  paymentTransactions,
+  pagination,
+  loading,
+  onPageChange,
+  onViewHistory,
+}) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("recent");
 
-  const displayedRecords = useMemo(() => {
+  const displayedTransactions = useMemo(() => {
     const seen = new Set();
-    const unique = billingRecords.filter((r) => {
-      if (seen.has(r._id)) return false;
-      seen.add(r._id);
+    const unique = paymentTransactions.filter((t) => {
+      if (seen.has(t._id)) return false;
+      seen.add(t._id);
       return true;
     });
-    return sortRecords(filterRecords(unique, search), sortBy);
-  }, [billingRecords, search, sortBy]);
+    return sortTransactions(filterTransactions(unique, search), sortBy);
+  }, [paymentTransactions, search, sortBy]);
 
   return (
     <div className="form-card" style={{ padding: "0", overflowX: "auto" }}>
       <div className="form-card-header">
         <h6 style={{ margin: 0 }}>Billing History</h6>
-        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>All laboratory bills and payment statuses.</p>
+        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)", fontWeight: "400" }}>
+          Individual payment transactions. Click &ldquo;View History&rdquo; to see all payments for a bill.
+        </p>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--border-light)", flexWrap: "wrap" }}>
@@ -104,103 +104,127 @@ export default function BillingHistoryTab({ billingRecords, pagination, loading,
       </div>
 
       <div className="lims-table-container" style={{ overflowX: "auto" }}>
-        <table className="lims-table" style={{ width: "100%", minWidth: "900px", borderCollapse: "collapse" }}>
+        <table className="lims-table" style={{ width: "100%", minWidth: "1100px", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill ID</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Patient Details</th>
-              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Date</th>
+              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Payment Date</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Investigation(s)</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Bill Amount</th>
-              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Total Amount Paid</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Amount Paid Now</th>
+              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Total Paid</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Remaining</th>
-              <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Paid On</th>
               <th style={{ padding: "14px 20px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Payment Mode</th>
               <th style={{ padding: "14px 20px", textAlign: "center", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Status</th>
+              <th style={{ padding: "14px 20px", textAlign: "center", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)" }}>Action</th>
             </tr>
           </thead>
           <tbody>
-            {displayedRecords.length === 0 ? (
+            {displayedTransactions.length === 0 ? (
               <tr>
                 <td colSpan={11} style={{ padding: "32px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
-                  {search.trim() ? "No bills match your search." : "No billing records found."}
+                  {search.trim() ? "No transactions match your search." : "No payment transactions found."}
                 </td>
               </tr>
             ) : (
-              displayedRecords.map((billingRecord) => (
-                <tr key={billingRecord._id} style={{ borderBottom: "1px solid var(--border-light)", transition: "background 0.2s" }}>
+              displayedTransactions.map((txn) => (
+                <tr
+                  key={txn._id}
+                  className="payment-history-row"
+                  style={{
+                    borderBottom: "1px solid var(--border-light)",
+                    transition: "background 0.2s",
+                    cursor: "pointer",
+                  }}
+                >
                   <td style={{ padding: "14px 20px" }}>
-                    <span style={{ fontWeight: "700", color: "var(--brand-action, var(--primary))", fontSize: "13px" }}>{billingRecord.billId}</span>
+                    <span
+                      style={{
+                        fontWeight: "700",
+                        color: "var(--brand-action, var(--primary))",
+                        fontSize: "13px",
+                      }}
+                    >
+                      {txn.billId}
+                    </span>
                   </td>
                   <td style={{ padding: "14px 20px" }}>
                     <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "14px" }}>{billingRecord.patient?.name || "N/A"}</span>
-                      <small style={{ color: "var(--text-muted)", fontSize: "11px" }}>ID: {billingRecord.patient?.patientId || "—"}</small>
+                      <span style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "14px" }}>{txn.patientName}</span>
+                      <small style={{ color: "var(--text-muted)", fontSize: "11px" }}>ID: {txn.patientId}</small>
                     </div>
                   </td>
                   <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
-                    {new Date(billingRecord.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                    {new Date(txn.receivedAt).toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
                   </td>
                   <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
                     <span style={{ background: "var(--border-light)", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "600" }}>
-                      {billingRecord.items?.length || 0} Tests
+                      {txn.investigationCount || 0} Tests
                     </span>
                   </td>
                   <td style={{ padding: "14px 20px" }}>
-                    <strong style={{ color: "var(--text-primary)", fontSize: "14px" }}>₹{billingRecord.totalAmount || 0}</strong>
-                  </td>
-                  <td style={{ padding: "14px 20px" }}>
-                    <span style={{ color: "var(--success)", fontSize: "14px", fontWeight: "600" }}>
-                      ₹
-                      {(() => {
-                        const pb = billingRecord.paymentBreakdown || {};
-                        const paid = Number(pb.cash || 0) + Number(pb.card || 0) + Number(pb.online || 0) + Number(pb.corporate || 0);
-                        return paid || 0;
-                      })()}
-                    </span>
+                    <strong style={{ color: "var(--text-primary)", fontSize: "14px" }}>₹{Number(txn.invoiceTotalAmount || 0).toLocaleString("en-IN")}</strong>
                   </td>
                   <td style={{ padding: "14px 20px" }}>
                     <span style={{ color: "var(--brand-action, var(--primary))", fontSize: "14px", fontWeight: "600" }}>
-                      {billingRecord.lastPaymentAmount ? `₹${billingRecord.lastPaymentAmount}` : "—"}
+                      ₹{Number(txn.amount || 0).toLocaleString("en-IN")}
                     </span>
                   </td>
                   <td style={{ padding: "14px 20px" }}>
-                    <span style={{
-                      color: billingRecord.billingStatus === "paid" ? "var(--success)" : "var(--warning-700)",
-                      fontSize: "14px",
-                      fontWeight: "600"
-                    }}>
-                      ₹
-                      {(() => {
-                        const pb = billingRecord.paymentBreakdown || {};
-                        const paid = Number(pb.cash || 0) + Number(pb.card || 0) + Number(pb.online || 0) + Number(pb.corporate || 0);
-                        const remaining = Math.max(0, Number(billingRecord.totalAmount || 0) - paid);
-                        return remaining;
-                      })()}
+                    <span style={{ color: "var(--success)", fontSize: "14px", fontWeight: "600" }}>
+                      ₹{Number(txn.cumulativePaid || 0).toLocaleString("en-IN")}
+                    </span>
+                  </td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <span
+                      style={{
+                        color: Number(txn.remaining || 0) > 0 ? "var(--warning-700)" : "var(--success)",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      ₹{Number(txn.remaining || 0).toLocaleString("en-IN")}
                     </span>
                   </td>
                   <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
-                    {billingRecord.billingStatus === "paid" || billingRecord.billingStatus === "partial"
-                      ? new Date(billingRecord.lastPaymentDate || billingRecord.firstPaymentDate || billingRecord.updatedAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })
-                      : "—"}
-                  </td>
-                  <td style={{ padding: "14px 20px", color: "var(--text-secondary)", fontSize: "13px" }}>
-                    {formatMethods(billingRecord.lastPaymentModes, billingRecord.lastPaymentMethod)}
+                    {formatMethod(txn.method)}
                   </td>
                   <td style={{ padding: "14px 20px", textAlign: "center" }}>
-                    <span style={{
-                      display: "inline-block",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "11px",
-                      fontWeight: "700",
-                      background: billingRecord.billingStatus === "paid" ? "var(--success-50)" : "var(--warning-50)",
-                      color: billingRecord.billingStatus === "paid" ? "var(--success-700)" : "var(--warning-700)",
-                      textTransform: "uppercase"
-                    }}>
-                      {billingRecord.billingStatus}
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        background: txn.billingStatus === "paid" ? "var(--success-50)" : "var(--warning-50)",
+                        color: txn.billingStatus === "paid" ? "var(--success-700)" : "var(--warning-700)",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {txn.billingStatus}
                     </span>
+                  </td>
+                  <td style={{ padding: "14px 20px", textAlign: "center" }}>
+                    <button
+                      type="button"
+                      className="view-history-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewHistory?.(txn.invoiceId);
+                      }}
+                      title="View payment history for this bill"
+                    >
+                      View History
+                    </button>
                   </td>
                 </tr>
               ))
@@ -217,13 +241,39 @@ function PaginationControls({ pagination, loading, onPageChange }) {
   if (!pagination || pagination.totalPages <= 1) return null;
 
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", padding: "14px 20px", borderTop: "1px solid var(--border-light)", flexWrap: "wrap" }}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "12px",
+        padding: "14px 20px",
+        borderTop: "1px solid var(--border-light)",
+        flexWrap: "wrap",
+      }}
+    >
       <span style={{ color: "var(--text-muted)", fontSize: "13px", fontWeight: 600 }}>
         Page {pagination.page} of {pagination.totalPages}
       </span>
       <div style={{ display: "flex", gap: "8px" }}>
-        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page <= 1} onClick={() => onPageChange(Math.max(1, pagination.page - 1))} style={{ height: "36px", padding: "0 12px" }}>Previous</button>
-        <button type="button" className="btn-lims-secondary" disabled={loading || pagination.page >= pagination.totalPages} onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))} style={{ height: "36px", padding: "0 12px" }}>Next</button>
+        <button
+          type="button"
+          className="btn-lims-secondary"
+          disabled={loading || pagination.page <= 1}
+          onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
+          style={{ height: "36px", padding: "0 12px" }}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          className="btn-lims-secondary"
+          disabled={loading || pagination.page >= pagination.totalPages}
+          onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))}
+          style={{ height: "36px", padding: "0 12px" }}
+        >
+          Next
+        </button>
       </div>
     </div>
   );

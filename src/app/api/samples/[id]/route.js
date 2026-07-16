@@ -65,6 +65,20 @@ export async function PUT(req, { params }) {
       if (!reason) {
         return Response.json({ error: "Rejection reason is required" }, { status: 400 });
       }
+
+      if (sample.reservedInventory?.length) {
+        const { InventoryItem } = await getTenantModels(auth.tenantId);
+        for (const res of sample.reservedInventory) {
+          if (res.item && res.quantityBase > 0) {
+            await InventoryItem.findOneAndUpdate(
+              { _id: res.item, reservedBase: { $gte: res.quantityBase } },
+              { $inc: { reservedBase: -res.quantityBase } }
+            );
+          }
+        }
+        sample.reservedInventory = [];
+      }
+
       sample.transitionStatus("rejected", handledBy, reason);
       sample.rejectionReason = reason;
     } else if (action === "record-results") {
@@ -125,12 +139,120 @@ export async function PUT(req, { params }) {
     await sample.save();
 
     if (sample.status === "completed") {
+      const { InventoryItem, InventoryMovement, InventoryUom } = await getTenantModels(auth.tenantId);
+
+      const testWithInventory = await TestDefinition.findById(sample.testDefinition)
+        .populate("category", "name")
+        .populate("requiredInventoryItems.item")
+        .populate("requiredInventoryItems.uom");
+
+      if (sample.reservedInventory?.length) {
+        for (const res of sample.reservedInventory) {
+          const itemDoc = await InventoryItem.findById(res.item);
+          if (!itemDoc) continue;
+
+          const deductQty = res.quantityBase;
+          let remaining = deductQty;
+
+          const availableBatches = (itemDoc.batches || [])
+            .filter((b) => b.status === "available" && b.quantityBase > 0)
+            .sort((a, b) => {
+              if (!a.expiryDate) return 1;
+              if (!b.expiryDate) return -1;
+              return new Date(a.expiryDate) - new Date(b.expiryDate);
+            });
+
+          for (const batch of availableBatches) {
+            if (remaining <= 0) break;
+            const batchDeduct = Math.min(remaining, batch.quantityBase);
+            remaining -= batchDeduct;
+
+            const batchUpdate = { $inc: { "batches.$.quantityBase": -batchDeduct } };
+            if (batch.quantityBase - batchDeduct <= 0) {
+              batchUpdate.$set = { "batches.$.status": "consumed" };
+            }
+
+            await InventoryItem.findOneAndUpdate(
+              { _id: itemDoc._id, "batches._id": batch._id },
+              { $inc: { stockOnHandBase: -batchDeduct, reservedBase: -batchDeduct }, ...batchUpdate }
+            );
+
+            await InventoryMovement.create({
+              item: itemDoc._id,
+              batchId: batch._id,
+              movementType: "issue",
+              quantityBase: -batchDeduct,
+              balanceAfterBase: Math.max(0, (itemDoc.stockOnHandBase || 0) - batchDeduct),
+              reason: `Auto-consumed for sample ${sample.sampleId}`,
+              referenceNo: sample.sampleId,
+              performedBy: handledBy,
+              movementDate: new Date(),
+            });
+          }
+        }
+        sample.reservedInventory = [];
+      } else if (testWithInventory?.requiredInventoryItems?.length) {
+        for (const reqItem of testWithInventory.requiredInventoryItems) {
+          const item = reqItem.item;
+          const uom = reqItem.uom;
+          if (!item || !uom) continue;
+
+          const quantityInBase = reqItem.quantityPerTest * (uom.conversionToBase || 1);
+
+          if ((item.stockOnHandBase || 0) < quantityInBase) {
+            console.warn(`[INVENTORY] Low stock for ${item.name}: needed ${quantityInBase} ${item.baseUom}, have ${item.stockOnHandBase}`);
+            continue;
+          }
+
+          let remaining = quantityInBase;
+          const availableBatches = (item.batches || [])
+            .filter((b) => b.status === "available" && b.quantityBase > 0)
+            .sort((a, b) => {
+              if (!a.expiryDate) return 1;
+              if (!b.expiryDate) return -1;
+              return new Date(a.expiryDate) - new Date(b.expiryDate);
+            });
+
+          for (const batch of availableBatches) {
+            if (remaining <= 0) break;
+            const deductQty = Math.min(remaining, batch.quantityBase);
+            remaining -= deductQty;
+
+            const batchUpdate = { $inc: { "batches.$.quantityBase": -deductQty } };
+            if (batch.quantityBase - deductQty <= 0) {
+              batchUpdate.$set = { "batches.$.status": "consumed" };
+            }
+
+            await InventoryItem.findOneAndUpdate(
+              { _id: item._id, "batches._id": batch._id },
+              { $inc: { stockOnHandBase: -deductQty }, ...batchUpdate }
+            );
+
+            await InventoryMovement.create({
+              item: item._id,
+              batchId: batch._id,
+              movementType: "issue",
+              quantityBase: -deductQty,
+              balanceAfterBase: Math.max(0, (item.stockOnHandBase || 0) - deductQty),
+              reason: `Auto-consumed for sample ${sample.sampleId}`,
+              referenceNo: sample.sampleId,
+              performedBy: handledBy,
+              movementDate: new Date(),
+            });
+          }
+
+          if (remaining > 0) {
+            console.warn(`[INVENTORY] Partial consumption for ${item.name}: ${quantityInBase - remaining}/${quantityInBase} consumed, ${remaining} short`);
+          }
+        }
+      }
+
       const testSnapshot = {
-        testId: test.testId,
-        name: test.name,
-        code: test.code,
-        categoryName: test.category?.name,
-        sampleType: test.sampleType,
+        testId: testWithInventory.testId,
+        name: testWithInventory.name,
+        code: testWithInventory.code,
+        categoryName: testWithInventory.category?.name,
+        sampleType: testWithInventory.sampleType,
       };
       await TestReport.create({
         patient: sample.patient,

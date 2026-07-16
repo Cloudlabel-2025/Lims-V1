@@ -20,6 +20,10 @@ const SettlementModal = dynamic(() => import("./SettlementModal"), {
   ssr: false,
   loading: () => null,
 });
+const PaymentHistoryModal = dynamic(() => import("./PaymentHistoryModal"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function BillingPage() {
   const user = useCurrentUser();
@@ -33,6 +37,14 @@ export default function BillingPage() {
   const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [pendingPage, setPendingPage] = useState(1);
   const pendingLimit = 20;
+
+  // Payment history state
+  const [paymentPage, setPaymentPage] = useState(1);
+  const [paymentPagination, setPaymentPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  const [paymentTransactions, setPaymentTransactions] = useState([]);
+  const [historyBillId, setHistoryBillId] = useState(null);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+
   const [patient, setPatient] = useState("");
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState("routine");
@@ -46,7 +58,7 @@ export default function BillingPage() {
   const [success, setSuccess] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [selectedBillingRecord, setSelectedBillingRecord] = useState(null);
-  const [payment, setPayment] = useState({ cash: 0, card: 0, online: 0 });
+  const [payment, setPayment] = useState({ amount: 0, method: "cash" });
   const [editingBill, setEditingBill] = useState(null);
   const [editDiscount, setEditDiscount] = useState("");
   const [editTax, setEditTax] = useState("");
@@ -127,9 +139,32 @@ export default function BillingPage() {
     }
   }, [billingPage]);
 
+  const loadPaymentHistory = useCallback(async ({ force = false } = {}) => {
+    setLoading(true);
+    setError("");
+    try {
+      const opts = force ? { force: true } : {};
+      const res = await cachedJsonFetch(`/api/billing/payments-history?page=${paymentPage}&limit=20`, { ttl: 10_000, ...opts });
+      if (!res.response.ok) throw new Error(res.data.error || "Unable to load payment history");
+      const data = res.data;
+      setPaymentTransactions(data.paymentTransactions || []);
+      setPaymentPagination(data.pagination || { page: paymentPage, limit: 20, total: 0, totalPages: 1 });
+    } catch (err) {
+      setError("Failed to load payment history. Please refresh.");
+    } finally {
+      setLoading(false);
+    }
+  }, [paymentPage]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (activeTab === "history") {
+      loadPaymentHistory();
+    }
+  }, [activeTab, loadPaymentHistory]);
 
   useEffect(() => {
     const patientId = searchParams.get("patientId");
@@ -248,7 +283,7 @@ export default function BillingPage() {
       Number(billingRecord.paymentBreakdown?.online || 0) +
       Number(billingRecord.paymentBreakdown?.corporate || 0);
     const remainingAmount = Math.max(0, Number(billingRecord.totalAmount || 0) - paidAmount);
-    setPayment({ cash: remainingAmount, card: 0, online: 0 });
+    setPayment({ amount: remainingAmount, method: "cash" });
     setShowCloseModal(true);
   };
 
@@ -257,13 +292,20 @@ export default function BillingPage() {
     setError("");
     setSuccess("");
     try {
+      // Convert new format { amount, method } to old format { cash, card, online, corporate }
+      const paymentPayload = {
+        cash: payment.method === "cash" ? payment.amount : 0,
+        card: payment.method === "card" ? payment.amount : 0,
+        online: payment.method === "upi" ? payment.amount : 0,
+        corporate: payment.method === "corporate-credit" ? payment.amount : 0,
+      };
       const res = await fetch("/api/billing/settle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ 
           billingRecordId: selectedBillingRecord._id,
-          payment,
+          payment: paymentPayload,
         })
       });
       const data = await res.json();
@@ -271,6 +313,8 @@ export default function BillingPage() {
 
       clearCachedApi("/api/billing");
       clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
+      clearCachedApi("/api/billing/payments-history");
+      clearCachedApi(`/api/billing/payments-history?page=${paymentPage}&limit=20`);
       clearCachedApi("/api/dashboard/stats");
       clearCachedApi("/api/samples?status=all");
       clearCachedApi("/api/reports");
@@ -293,18 +337,18 @@ export default function BillingPage() {
       setShowCloseModal(false);
       setShowPartialConfirm(false);
       setPartialConfirmData(null);
-      setPayment({ cash: 0, card: 0, online: 0 });
+      setPayment({ amount: 0, method: "cash" });
       setSuccess(data.message || "Bill settlement completed successfully.");
     } catch (err) {
       setError(err.message);
-      setPayment({ cash: 0, card: 0, online: 0 });
+      setPayment({ amount: 0, method: "cash" });
     } finally {
       setClosing(false);
     }
   };
 
   const handleCloseBill = async () => {
-    const totalPaid = Number(payment.cash) + Number(payment.card) + Number(payment.online);
+    const totalPaid = Number(payment.amount);
     const alreadyPaid =
       Number(selectedBillingRecord.paymentBreakdown?.cash || 0) +
       Number(selectedBillingRecord.paymentBreakdown?.card || 0) +
@@ -326,7 +370,12 @@ export default function BillingPage() {
 
   const closeSettlementModal = useCallback(() => {
     setShowCloseModal(false);
-    setPayment({ cash: 0, card: 0, online: 0 });
+    setPayment({ amount: 0, method: "cash" });
+  }, []);
+
+  const handleViewHistory = useCallback((billId) => {
+    setHistoryBillId(billId);
+    setShowPaymentHistory(true);
   }, []);
 
   const updateSettlementPayment = useCallback((key, value) => {
@@ -672,10 +721,11 @@ export default function BillingPage() {
 
       {activeTab === "history" && (
         <BillingHistoryTab
-          billingRecords={billingRecords}
-          pagination={billingPagination}
+          paymentTransactions={paymentTransactions}
+          pagination={paymentPagination}
           loading={loading}
-          onPageChange={setBillingPage}
+          onPageChange={setPaymentPage}
+          onViewHistory={handleViewHistory}
         />
       )}
       {showCloseModal && selectedBillingRecord && (
@@ -817,6 +867,14 @@ export default function BillingPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showPaymentHistory && historyBillId && (
+        <PaymentHistoryModal
+          billId={historyBillId}
+          isOpen={showPaymentHistory}
+          onClose={() => setShowPaymentHistory(false)}
+        />
       )}
     </div>
   );

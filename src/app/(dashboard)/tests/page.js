@@ -20,7 +20,7 @@ const ListsTab = dynamic(() => import("./ListsTab"), {
   loading: () => <div className="module-panel">Loading lists...</div>,
 });
 
-const NAME_PATTERN = /^[A-Za-z][A-Za-z0-9 .&'\/,-]*$/;
+const NAME_PATTERN = /^[A-Za-z0-9-]+$/;
 const CODE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const UNIT_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
 const URL_RE = /https?:\/\/|www\./i;
@@ -49,6 +49,12 @@ const blankParameter = {
   required: true,
 };
 
+const blankRequiredItem = {
+  item: "",
+  quantityPerTest: "",
+  uom: "",
+};
+
 const blankForm = {
   name: "",
   code: "",
@@ -57,6 +63,7 @@ const blankForm = {
   price: "",
   status: "active",
   parameters: [{ ...blankParameter }],
+  requiredInventoryItems: [],
 };
 
 const blankPackageForm = {
@@ -74,6 +81,8 @@ export default function TestsPage() {
   const [categories, setCategories] = useState([]);
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [inventoryUoms, setInventoryUoms] = useState([]);
   const [form, setForm] = useState(blankForm);
   const [packageForm, setPackageForm] = useState(blankPackageForm);
   const [categoryName, setCategoryName] = useState("");
@@ -136,14 +145,16 @@ export default function TestsPage() {
     setError("");
     setSuccess("");
     try {
-      const [categoryResponse, testResponse, packageResponse] = await Promise.all([
+      const [categoryResponse, testResponse, packageResponse, inventoryResponse] = await Promise.all([
         cachedJsonFetch("/api/tests/categories", { ttl: 30_000 }),
         cachedJsonFetch("/api/tests/definitions", { ttl: 30_000 }),
         cachedJsonFetch("/api/tests/packages", { ttl: 30_000 }),
+        cachedJsonFetch("/api/inventory?limit=9999", { ttl: 30_000 }),
       ]);
       const categoryData = categoryResponse.data;
       const testData = testResponse.data;
       const packageData = packageResponse.data;
+      const inventoryData = inventoryResponse.data;
 
       if (!categoryResponse.response.ok) throw new Error(categoryData.error || "Unable to load categories");
       if (!testResponse.response.ok) throw new Error(testData.error || "Unable to load tests");
@@ -152,6 +163,8 @@ export default function TestsPage() {
       setCategories(categoryData.categories || []);
       setTests(testData.tests || []);
       setPackages(packageData.packages || []);
+      setInventoryItems(inventoryData.items || []);
+      setInventoryUoms(inventoryData.uoms || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -199,12 +212,36 @@ export default function TestsPage() {
     }));
   }
 
+  function addRequiredItem() {
+    setForm((current) => ({
+      ...current,
+      requiredInventoryItems: [...current.requiredInventoryItems, { ...blankRequiredItem }],
+    }));
+  }
+
+  function removeRequiredItem(index) {
+    setForm((current) => ({
+      ...current,
+      requiredInventoryItems: current.requiredInventoryItems.filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateRequiredItem(index, name, value) {
+    setForm((current) => ({
+      ...current,
+      requiredInventoryItems: current.requiredInventoryItems.map((entry, i) =>
+        i === index ? { ...entry, [name]: value } : entry
+      ),
+    }));
+  }
+
   async function saveCategory(event) {
     event.preventDefault();
     const name = categoryName.trim();
     if (!name) { setError("Category name is required"); return; }
+    if (name.length > 25) { setError("Category name must be 25 characters or less"); return; }
     if (!isValidField(name, NAME_PATTERN)) {
-      setError("Category name contains invalid characters");
+      setError("Category name can only contain letters, numbers, and hyphens");
       return;
     }
     if (rejectUrl(name)) {
@@ -247,28 +284,35 @@ export default function TestsPage() {
     if (!form.name || !form.name.trim()) { setError("Test name is required"); return; }
     if (!form.code || !form.code.trim()) { setError("Test code is required"); return; }
 
+    if (form.name.trim().length > 25) { setError("Test name must be 25 characters or less"); return; }
     if (!isValidField(form.name, NAME_PATTERN)) {
-      setError("Test name contains invalid characters");
+      setError("Test name can only contain letters, numbers, and hyphens");
+      return;
+    }
+    if ((form.name.match(/-/g) || []).length > 1) {
+      setError("Test name can contain only one hyphen");
       return;
     }
     if (rejectUrl(form.name)) {
       setError("Test name cannot contain a URL");
       return;
     }
-    if (!isValidField(form.code, CODE_PATTERN)) {
-      setError("Code contains invalid characters");
+    if (form.code.trim().length > 20) { setError("Test code must be 20 characters or less"); return; }
+    if (!/^[A-Z0-9]+$/.test(form.code.trim())) {
+      setError("Test code can only contain uppercase letters and numbers");
       return;
     }
     if (rejectUrl(form.code)) {
-      setError("Code cannot contain a URL");
+      setError("Test code cannot contain a URL");
       return;
     }
     if (!form.sampleType.trim()) {
       setError("Sample type is required");
       return;
     }
-    if (!isValidField(form.sampleType, NAME_PATTERN)) {
-      setError("Sample type contains invalid characters");
+    if (form.sampleType.trim().length > 20) { setError("Sample type must be 20 characters or less"); return; }
+    if (!/^[A-Za-z0-9]+$/.test(form.sampleType.trim())) {
+      setError("Sample type can only contain letters and numbers");
       return;
     }
     if (rejectUrl(form.sampleType)) {
@@ -320,6 +364,23 @@ export default function TestsPage() {
         setError(`Parameter ${i + 1} range contains an invalid value`);
         return;
       }
+
+      const toNum = (v) => (v === "" || v === null || v === undefined ? NaN : Number(v));
+      const cMin = toNum(p.normalMin), cMax = toNum(p.normalMax);
+      if (Number.isFinite(cMin) && Number.isFinite(cMax) && cMin >= cMax) {
+        setError(`Parameter ${i + 1} common range min must be less than max`);
+        return;
+      }
+      const mMn = toNum(p.maleMin), mMx = toNum(p.maleMax);
+      if (Number.isFinite(mMn) && Number.isFinite(mMx) && mMn >= mMx) {
+        setError(`Parameter ${i + 1} male range min must be less than max`);
+        return;
+      }
+      const fMn = toNum(p.femaleMin), fMx = toNum(p.femaleMax);
+      if (Number.isFinite(fMn) && Number.isFinite(fMx) && fMn >= fMx) {
+        setError(`Parameter ${i + 1} female range min must be less than max`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -364,20 +425,26 @@ export default function TestsPage() {
     if (!packageForm.code || !packageForm.code.trim()) { setError("Package code is required"); return; }
     if (!packageForm.tests || packageForm.tests.length === 0) { setError("At least one test must be selected"); return; }
 
-    if (!isValidField(packageForm.name, NAME_PATTERN)) {
-      setError("Package name contains invalid characters");
+    if (packageForm.name.trim().length > 25) { setError("Package name must be 25 characters or less"); return; }
+    if (!/^[A-Za-z0-9\-]+$/.test(packageForm.name.trim())) {
+      setError("Package name can only contain letters, numbers, and hyphens");
+      return;
+    }
+    if ((packageForm.name.match(/-/g) || []).length > 1) {
+      setError("Package name can contain only one hyphen");
       return;
     }
     if (rejectUrl(packageForm.name)) {
       setError("Package name cannot contain a URL");
       return;
     }
-    if (!isValidField(packageForm.code, CODE_PATTERN)) {
-      setError("Code contains invalid characters");
+    if (packageForm.code.trim().length > 20) { setError("Package code must be 20 characters or less"); return; }
+    if (!/^[A-Z0-9]+$/.test(packageForm.code.trim())) {
+      setError("Package code can only contain uppercase letters and numbers");
       return;
     }
     if (rejectUrl(packageForm.code)) {
-      setError("Code cannot contain a URL");
+      setError("Package code cannot contain a URL");
       return;
     }
     if (packageForm.price === "" || packageForm.price === null || packageForm.price === undefined) {
@@ -386,6 +453,10 @@ export default function TestsPage() {
     }
     if (isExponential(packageForm.price)) {
       setError("Package price contains an invalid value");
+      return;
+    }
+    if (!/^\d{1,8}$/.test(String(packageForm.price).trim())) {
+      setError("Package price must be a number with up to 8 digits");
       return;
     }
     if (Number(packageForm.price) < 0) {
@@ -463,6 +534,11 @@ export default function TestsPage() {
         femaleMax: p.femaleMax ?? "",
         required: p.required !== false,
       })) : [{ ...blankParameter }],
+      requiredInventoryItems: test.requiredInventoryItems?.map(ri => ({
+        item: ri.item?._id || ri.item || "",
+        quantityPerTest: ri.quantityPerTest ?? "",
+        uom: ri.uom?._id || ri.uom || "",
+      })) || [],
     });
   }
 
@@ -472,6 +548,7 @@ export default function TestsPage() {
       ...blankForm,
       category: categories[0]?._id || "",
       parameters: [{ ...blankParameter }],
+      requiredInventoryItems: [],
     });
   }
 
@@ -651,11 +728,11 @@ export default function TestsPage() {
               <div className="module-form-grid">
                 <label>
                   Test Name
-                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required maxLength={100} pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*" title="Only letters, numbers, spaces, and . &amp; ' / , - allowed" />
+                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required maxLength={25} pattern="[A-Za-z0-9\-]+" title="Only letters, numbers, and hyphens allowed (max 25 characters, only one hyphen)" />
                 </label>
                 <label>
                   Code
-                  <input value={form.code} onChange={(e) => updateField("code", e.target.value)} placeholder="Enter test code" required pattern="[A-Za-z0-9_-]+" title="Only letters, numbers, underscore, and hyphen" />
+                  <input value={form.code} onChange={(e) => updateField("code", e.target.value.toUpperCase())} placeholder="Enter test code" required maxLength={20} pattern="[A-Z0-9]+" title="Only uppercase letters and numbers allowed (max 20 characters)" />
                 </label>
                 <label>
                   Category
@@ -668,7 +745,7 @@ export default function TestsPage() {
                 </label>
                 <label>
                   Sample Type
-                  <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Enter sample type" required pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*" title="Only letters, numbers, spaces, and . &amp; ' / , - allowed" />
+                  <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Enter sample type" required maxLength={20} pattern="[A-Za-z0-9]+" title="Only letters and numbers allowed (max 20 characters)" />
                 </label>
                 <label>
                   Price
@@ -800,6 +877,89 @@ export default function TestsPage() {
                   </div>
                 ))}
               </div>
+
+              <div className="module-subhead">
+                <h3>Required Inventory Items</h3>
+                <button type="button" className="module-icon-btn" onClick={addRequiredItem} title="Add required inventory item">
+                  {Icons.plus}
+                </button>
+              </div>
+
+              {form.requiredInventoryItems.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {form.requiredInventoryItems.map((entry, index) => (
+                    <div key={index} style={{
+                      display: "flex",
+                      gap: "12px",
+                      alignItems: "center",
+                      padding: "14px",
+                      background: "var(--surface)",
+                      borderRadius: "var(--radius-lg)",
+                      border: "1px solid var(--border)",
+                      flexWrap: "wrap",
+                    }}>
+                      <div style={{ flex: "2 1 200px" }}>
+                        <select
+                          className="lims-input"
+                          value={entry.item}
+                          onChange={(e) => updateRequiredItem(index, "item", e.target.value)}
+                          required
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">Select inventory item</option>
+                          {inventoryItems.map((item) => (
+                            <option key={item._id} value={item._id}>{item.itemCode} - {item.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: "1 1 100px" }}>
+                        <input
+                          className="lims-input"
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={entry.quantityPerTest}
+                          onChange={(e) => updateRequiredItem(index, "quantityPerTest", e.target.value)}
+                          placeholder="Qty per test"
+                          required
+                          style={{ width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ flex: "1 1 120px" }}>
+                        <select
+                          className="lims-input"
+                          value={entry.uom}
+                          onChange={(e) => updateRequiredItem(index, "uom", e.target.value)}
+                          required
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">Select UOM</option>
+                          {inventoryUoms.filter(u => u.status === "active").map((uom) => (
+                            <option key={uom._id} value={uom._id}>{uom.name} ({uom.symbol})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        className="module-icon-btn danger"
+                        onClick={() => removeRequiredItem(index)}
+                        title="Remove"
+                        style={{
+                          width: "38px",
+                          height: "38px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "var(--radius-sm)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {Icons.trash}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <button type="submit" className="dash-btn-primary module-save" disabled={!canSave || saving}>
                 {saving ? "Saving..." : editingId ? "Update Test" : "Create Test"}

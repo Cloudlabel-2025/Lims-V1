@@ -26,9 +26,9 @@ export default function CategoriesTab({
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
                   placeholder="Enter category name"
-                  pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*"
-                  title="Only letters, numbers, spaces, and . & ' / , - allowed"
-                  maxLength={50}
+                  pattern="[A-Za-z0-9\-]+"
+                  title="Only letters, numbers, and hyphens allowed (max 25 characters)"
+                  maxLength={25}
                   required
                 />
               </label>

@@ -147,6 +147,14 @@ export const TestDefinitionSchema = new mongoose.Schema(
       type: [TestParameterSchema],
       default: [],
     },
+    requiredInventoryItems: [
+      {
+        _id: false,
+        item: { type: mongoose.Schema.Types.ObjectId, ref: "InventoryItem", required: true },
+        quantityPerTest: { type: Number, required: true, min: 0 },
+        uom: { type: mongoose.Schema.Types.ObjectId, ref: "InventoryUom", required: true },
+      },
+    ],
     status: {
       type: String,
       enum: ["active", "inactive"],

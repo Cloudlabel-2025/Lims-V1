@@ -27,6 +27,7 @@ const emptyItem = {
   expiryDate: "",
   costPerBaseUnit: 0,
   trackExpiry: true,
+  quarantineOnReceipt: false,
   status: "active",
   notes: "",
 };
@@ -227,6 +228,26 @@ export default function InventoryPage() {
   const [movementFilters, setMovementFilters] = useState({ type: "", search: "", dateFrom: "", dateTo: "" });
   const [movementData, setMovementData] = useState([]);
   const [movementPagination, setMovementPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierForm, setSupplierForm] = useState({ name: "", code: "", contactPerson: "", email: "", phone: "", address: "", leadTimeDays: 7, rating: 3, notes: "" });
+  const [supplierFormErrors, setSupplierFormErrors] = useState({});
+  const [editingSupplierId, setEditingSupplierId] = useState(null);
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [poForm, setPoForm] = useState({ poNumber: "", supplier: "", items: [{ item: "", quantityOrdered: 1, unitCost: 0, notes: "" }], orderDate: "", expectedDeliveryDate: "", notes: "" });
+  const [poFormErrors, setPoFormErrors] = useState({});
+  const [editingPoId, setEditingPoId] = useState(null);
+  const [poSearch, setPoSearch] = useState("");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importType, setImportType] = useState("items");
+  const [importFile, setImportFile] = useState(null);
+  const [importResults, setImportResults] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [locationForm, setLocationForm] = useState({ name: "", code: "", description: "", parentLocation: "" });
+  const [locationFormErrors, setLocationFormErrors] = useState({});
+  const [editingLocationId, setEditingLocationId] = useState(null);
+  const [locationSearch, setLocationSearch] = useState("");
   const [itemTypes, setItemTypes] = useState([]);
   const [typeInput, setTypeInput] = useState("");
   const [editingTypeId, setEditingTypeId] = useState(null);
@@ -288,6 +309,45 @@ export default function InventoryPage() {
     if (activeTab === "movements") loadMovements(1);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === "suppliers") {
+      (async () => {
+        try {
+          const r = await fetch("/api/inventory/suppliers");
+          const d = await r.json();
+          if (r.ok) setSuppliers(d.suppliers || []);
+        } catch {}
+      })();
+    }
+    if (activeTab === "purchaseOrders") {
+      (async () => {
+        try {
+          const r = await fetch("/api/inventory/purchase-orders");
+          const d = await r.json();
+          if (r.ok) setPurchaseOrders(d.purchaseOrders || []);
+        } catch {}
+      })();
+    }
+    if (activeTab === "locations") {
+      (async () => {
+        try {
+          const r = await fetch("/api/inventory/locations");
+          const d = await r.json();
+          if (r.ok) setLocations(d.locations || []);
+        } catch {}
+      })();
+    }
+    if (activeTab === "stock" || activeTab === "items") {
+      (async () => {
+        try {
+          const r = await fetch("/api/inventory/locations");
+          const d = await r.json();
+          if (r.ok && (!locations || locations.length === 0)) setLocations(d.locations || []);
+        } catch {}
+      })();
+    }
+  }, [activeTab]);
+
   async function postInventory(payload, success) {
     setSaving(true);
     setError("");
@@ -330,8 +390,8 @@ export default function InventoryPage() {
     event.preventDefault();
 
     const errors = {};
-    if (!itemForm.itemCode) errors.itemCode = "Item code is required";
-    else if (!isValidItemCode(itemForm.itemCode)) errors.itemCode = "Item code must contain only capital letters, numbers, and hyphens";
+    if (!itemForm.itemCode && editingItemId) errors.itemCode = "Item code is required";
+    else if (itemForm.itemCode && !isValidItemCode(itemForm.itemCode)) errors.itemCode = "Item code must contain only capital letters, numbers, and hyphens";
     if (itemForm.itemCode && itemForm.itemCode.length > 15) errors.itemCode = "Item code must not exceed 15 characters";
     if (!itemForm.name) errors.name = "Item name is required";
     else if (!isValidName(itemForm.name)) errors.name = "Name contains invalid characters";
@@ -429,7 +489,8 @@ export default function InventoryPage() {
       await postInventory({ action: "item", ...itemForm }, (data) => {
         setItemForm(emptyItem);
         setItemFormErrors({});
-        setSuccessMessage(`Inventory item "${data.item?.name || itemForm.name}" created successfully.`);
+        const code = data.item?.itemCode || data.generatedCode;
+        setSuccessMessage(code ? `Item "${data.item?.name || itemForm.name}" created — code: ${code}` : `Inventory item "${data.item?.name || itemForm.name}" created successfully.`);
       });
       return;
     }
@@ -495,6 +556,9 @@ export default function InventoryPage() {
     ["items", "Item Master", Icons.flask],
     ["categories", "Category", Icons.grid],
     ["uom", "UOM", Icons.settings],
+    ["suppliers", "Suppliers", Icons.user],
+    ["purchaseOrders", "Purchase Orders", Icons.clipboard],
+    ["locations", "Locations", Icons.mapPin],
     ["stock", "Stock", Icons.activity],
     ["expiry", "Expiry/Wastage", Icons.alertCircle],
     ["movements", "Ledger", Icons.list],
@@ -519,6 +583,12 @@ export default function InventoryPage() {
             <input className="lims-input" maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setItemPage(1); loadInventory(1); } }} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
           </div>}
           <button className="dash-btn-secondary" onClick={() => { loadInventory(itemPage); if (activeTab === "movements") loadMovements(movementPage); }} disabled={loading} style={{ height: 34, padding: "0 14px", fontSize: 12 }}><span className={loading ? "icon-spin" : ""}>{Icons.refresh}</span> Refresh</button>
+          {["items", "categories", "uom", "movements"].includes(activeTab) && (
+            <button className="dash-btn-secondary" onClick={() => { const typeMap = { items: "items", categories: "categories", uom: "uoms", movements: "movements" }; window.open(`/api/inventory/export?type=${typeMap[activeTab]}&search=${encodeURIComponent(searchQuery)}`, "_blank"); }} style={{ height: 34, padding: "0 14px", fontSize: 12 }}>{Icons.download} Export CSV</button>
+          )}
+          {["items", "categories", "uom"].includes(activeTab) && (
+            <button className="dash-btn-secondary" onClick={() => { const typeMap = { items: "items", categories: "categories", uom: "uoms" }; setImportType(typeMap[activeTab] || "items"); setImportFile(null); setImportResults(null); setShowImportModal(true); }} style={{ height: 34, padding: "0 14px", fontSize: 12 }}>{Icons.plus} Import CSV</button>
+          )}
         </div>
       </div>
 
@@ -571,6 +641,7 @@ export default function InventoryPage() {
                 <StatCard icon={Icons.flask} label="Items" value={inventory.stats.totalItems || 0} />
                 <StatCard icon={Icons.activity} label="Stock Units" value={formatNumber(inventory.stats.totalStock)} tone="#047857" />
                 <StatCard icon={Icons.alertCircle} label="Low Stock" value={inventory.stats.lowStock || 0} tone="#b45309" />
+                <StatCard icon={Icons.alertCircle} label="Quarantine" value={inventory.stats.quarantineBatches || 0} tone="#d97706" />
                 <StatCard icon={Icons.clock} label="Near Expiry" value={inventory.stats.nearExpiryBatches || 0} tone="#1d4ed8" />
                 <StatCard icon={Icons.trash} label="Expired Batches" value={inventory.stats.expiredBatches || 0} tone="#b91c1c" />
                 <StatCard icon={Icons.list} label="Stock Value" value={`Rs ${formatNumber(inventory.stats.inventoryValue)}`} />
@@ -591,7 +662,8 @@ export default function InventoryPage() {
               <div className="row g-3">
                 <div className="col-md-6">
                   <Field label="Item Code">
-                    <input className="lims-input" required maxLength={15} value={itemForm.itemCode} onChange={(e) => { let v = e.target.value.toUpperCase(); if (v && !isValidItemCode(v)) return; setItemFormErrors((p) => ({ ...p, itemCode: "" })); setItemForm({ ...itemForm, itemCode: v }); }} style={inputStyle()} />
+                    <input className="lims-input" required={!!editingItemId} maxLength={15} value={itemForm.itemCode} onChange={(e) => { let v = e.target.value.toUpperCase(); if (v && !isValidItemCode(v)) return; setItemFormErrors((p) => ({ ...p, itemCode: "" })); setItemForm({ ...itemForm, itemCode: v }); }} style={inputStyle()} />
+                    {!editingItemId && <small style={{ color: "var(--text-muted)", fontSize: 11 }}>Leave blank to auto-generate (e.g. REAG-0001)</small>}
                     <ErrorMsg message={itemFormErrors.itemCode} />
                   </Field>
                 </div>
@@ -715,6 +787,16 @@ export default function InventoryPage() {
                     </label>
                   </Field>
                 </div>
+                {!editingItemId && (
+                  <div className="col-md-6">
+                    <Field label="Quarantine on Receipt">
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", height: 38 }}>
+                        <input type="checkbox" checked={itemForm.quarantineOnReceipt === true} onChange={(e) => setItemForm({ ...itemForm, quarantineOnReceipt: e.target.checked })} style={{ width: 16, height: 16 }} />
+                        Hold opening stock in quarantine
+                      </label>
+                    </Field>
+                  </div>
+                )}
                 {itemForm.trackExpiry !== false && !editingItemId && (
                   <div className="col-md-6">
                     <Field label="Expiry Date">
@@ -753,7 +835,14 @@ export default function InventoryPage() {
                 </div>
                 <div className="col-md-6">
                   <Field label="Location">
-                    <input className="lims-input" required maxLength={75} value={itemForm.defaultLocation} onChange={(e) => { const v = e.target.value; if (v && !/^[A-Za-z0-9 .,\/-]*$/.test(v)) { setItemFormErrors((p) => ({ ...p, defaultLocation: "Only letters, numbers, spaces, and . , / - allowed" })); return; } setItemFormErrors((p) => ({ ...p, defaultLocation: "" })); setItemForm({ ...itemForm, defaultLocation: v }); }} style={inputStyle()} />
+                    {locations.length > 0 ? (
+                      <select required className="lims-input" value={itemForm.defaultLocation} onChange={(e) => { setItemFormErrors((p) => ({ ...p, defaultLocation: "" })); setItemForm({ ...itemForm, defaultLocation: e.target.value }); }} style={{ ...inputStyle(), width: "100%" }}>
+                        <option value="">-- Select --</option>
+                        {locations.filter((l) => l.status === "active").map((l) => <option key={l._id} value={l.name}>{l.code} — {l.name}</option>)}
+                      </select>
+                    ) : (
+                      <input className="lims-input" required maxLength={75} value={itemForm.defaultLocation} onChange={(e) => { const v = e.target.value; if (v && !/^[A-Za-z0-9 .,\/-]*$/.test(v)) { setItemFormErrors((p) => ({ ...p, defaultLocation: "Only letters, numbers, spaces, and . , / - allowed" })); return; } setItemFormErrors((p) => ({ ...p, defaultLocation: "" })); setItemForm({ ...itemForm, defaultLocation: v }); }} style={inputStyle()} />
+                    )}
                     <ErrorMsg message={itemFormErrors.defaultLocation} />
                   </Field>
                 </div>
@@ -1010,6 +1099,420 @@ export default function InventoryPage() {
             />
           )}
 
+          {activeTab === "suppliers" && (
+            <MastersPanel
+              title={editingSupplierId ? "Edit Supplier" : "Add Supplier"}
+              viewMode={viewMode}
+              onOpenForm={() => { setEditingSupplierId(null); setSupplierForm({ name: "", code: "", contactPerson: "", email: "", phone: "", address: "", leadTimeDays: 7, rating: 3, notes: "" }); setSupplierFormErrors({}); setViewMode("form"); }}
+              onBack={() => { setEditingSupplierId(null); setViewMode("list"); }}
+              formContent={<>
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <Field label="Supplier Name">
+                      <input required className="lims-input" maxLength={120} value={supplierForm.name} onChange={(e) => { const v = e.target.value; if (v && !isLettersAndBasic(v)) { setSupplierFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } if (/https?:\/\//.test(v)) { setSupplierFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } setSupplierFormErrors((p) => ({ ...p, name: "" })); setSupplierForm({ ...supplierForm, name: v }); }} style={inputStyle()} />
+                      <ErrorMsg message={supplierFormErrors.name} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Code">
+                      <input required className="lims-input" maxLength={20} value={supplierForm.code} onChange={(e) => { let v = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""); setSupplierFormErrors((p) => ({ ...p, code: "" })); setSupplierForm({ ...supplierForm, code: v }); }} style={inputStyle()} />
+                      <ErrorMsg message={supplierFormErrors.code} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Contact Person">
+                      <input className="lims-input" maxLength={100} value={supplierForm.contactPerson} onChange={(e) => { const v = e.target.value; if (v && !isLettersAndBasic(v)) { setSupplierFormErrors((p) => ({ ...p, contactPerson: "Invalid characters" })); return; } setSupplierFormErrors((p) => ({ ...p, contactPerson: "" })); setSupplierForm({ ...supplierForm, contactPerson: v }); }} style={inputStyle()} />
+                      <ErrorMsg message={supplierFormErrors.contactPerson} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Email">
+                      <input className="lims-input" type="email" maxLength={100} value={supplierForm.email} onChange={(e) => { setSupplierFormErrors((p) => ({ ...p, email: "" })); setSupplierForm({ ...supplierForm, email: e.target.value }); }} style={inputStyle()} />
+                      <ErrorMsg message={supplierFormErrors.email} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Phone">
+                      <input className="lims-input" maxLength={20} value={supplierForm.phone} onChange={(e) => { const v = e.target.value; if (v && !/^[0-9+\-() ]*$/.test(v)) { setSupplierFormErrors((p) => ({ ...p, phone: "Phone contains invalid characters" })); return; } setSupplierFormErrors((p) => ({ ...p, phone: "" })); setSupplierForm({ ...supplierForm, phone: v }); }} style={inputStyle()} />
+                      <ErrorMsg message={supplierFormErrors.phone} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Lead Time (Days)">
+                      <input className="lims-input" type="number" min="0" max="999" value={supplierForm.leadTimeDays} onChange={(e) => { const v = Number(e.target.value); setSupplierFormErrors((p) => ({ ...p, leadTimeDays: "" })); setSupplierForm({ ...supplierForm, leadTimeDays: Number.isFinite(v) ? v : 0 }); }} style={inputStyle()} />
+                      <ErrorMsg message={supplierFormErrors.leadTimeDays} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Rating">
+                      <select className="lims-input" value={supplierForm.rating} onChange={(e) => setSupplierForm({ ...supplierForm, rating: Number(e.target.value) })} style={{ ...inputStyle(), width: "100%" }}>
+                        {[1,2,3,4,5].map((r) => <option key={r} value={r}>{r} — {"★".repeat(r)}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <div className="col-12">
+                    <Field label="Address">
+                      <input className="lims-input" maxLength={300} value={supplierForm.address} onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })} style={inputStyle()} />
+                    </Field>
+                  </div>
+                  <div className="col-12">
+                    <Field label="Notes">
+                      <input className="lims-input" maxLength={500} value={supplierForm.notes} onChange={(e) => setSupplierForm({ ...supplierForm, notes: e.target.value })} style={inputStyle()} />
+                    </Field>
+                  </div>
+                </div>
+              </>}
+              listContent={
+                <>
+                  <input className="lims-input" maxLength={35} value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Search suppliers by name, code, contact…" style={{ ...inputStyle(), maxWidth: 300 }} />
+                  <MasterTable
+                    headings={["Code", "Name", "Contact", "Email", "Lead Time", "Rating", "Action"]}
+                    rows={
+                      suppliers
+                        .filter((s) => {
+                          const q = supplierSearch.toLowerCase();
+                          return !q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || (s.contactPerson || "").toLowerCase().includes(q);
+                        })
+                        .map((s) => [
+                          s.code,
+                          s.name,
+                          s.contactPerson || "—",
+                          s.email || "—",
+                          `${s.leadTimeDays || 0}d`,
+                          "★".repeat(s.rating || 3),
+                          <div key={s._id} style={{ display: "flex", gap: 6 }}>
+                            <button type="button" title="Edit" onClick={() => {
+                              setEditingSupplierId(s._id);
+                              setSupplierForm({ name: s.name, code: s.code, contactPerson: s.contactPerson || "", email: s.email || "", phone: s.phone || "", address: s.address || "", leadTimeDays: s.leadTimeDays || 7, rating: s.rating || 3, notes: s.notes || "" });
+                              setViewMode("form");
+                            }} style={{ ...actionBtnStyle, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1e40af" }}>✎</button>
+                            <button type="button" title="Deactivate" className="btn-icon-delete" onClick={async () => {
+                              if (!confirm(`Deactivate supplier "${s.name}"?`)) return;
+                              try {
+                                const r = await fetch(`/api/inventory/suppliers/${s._id}`, { method: "DELETE" });
+                                const d = await r.json();
+                                if (!r.ok) throw new Error(d.error);
+                                setSuppliers((prev) => prev.filter((x) => x._id !== s._id));
+                                setSuccessMessage(`Supplier "${s.name}" deactivated`);
+                              } catch (err) { setError(err.message); }
+                            }}>🗑</button>
+                          </div>
+                        ])
+                    }
+                  />
+                </>
+              }
+              formOnSubmit={async (e) => {
+                e.preventDefault();
+                const errors = {};
+                const name = (supplierForm.name || "").trim();
+                const code = (supplierForm.code || "").trim().toUpperCase();
+                if (!name) errors.name = "Supplier name is required";
+                else if (name.length > 120) errors.name = "Must not exceed 120 characters";
+                else if (!isLettersAndBasic(name)) errors.name = "Name contains invalid characters";
+                else if (/https?:\/\//.test(name)) errors.name = "URLs are not allowed";
+                if (!code) errors.code = "Code is required";
+                else if (code.length > 20) errors.code = "Must not exceed 20 characters";
+                else if (!/^[A-Z0-9-]+$/.test(code)) errors.code = "Only uppercase letters, numbers, and hyphens allowed";
+                const cp = (supplierForm.contactPerson || "").trim();
+                if (cp && !isLettersAndBasic(cp)) errors.contactPerson = "Invalid characters";
+                if (cp && /https?:\/\//.test(cp)) errors.contactPerson = "URLs are not allowed";
+                const email = (supplierForm.email || "").trim();
+                if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Invalid email format";
+                const phone = (supplierForm.phone || "").trim();
+                if (phone && !/^[0-9+\-() ]+$/.test(phone)) errors.phone = "Phone contains invalid characters";
+                const ltd = Number(supplierForm.leadTimeDays);
+                if (!Number.isFinite(ltd) || ltd < 0) errors.leadTimeDays = "Must be a non-negative number";
+                if (Object.keys(errors).length) { setSupplierFormErrors(errors); return; }
+                const payload = { name, code, contactPerson: cp || undefined, email: email || undefined, phone: phone || undefined, address: (supplierForm.address || "").trim() || undefined, leadTimeDays: ltd, rating: Number(supplierForm.rating) || 3, notes: (supplierForm.notes || "").trim() || undefined };
+                setSaving(true);
+                try {
+                  const url = editingSupplierId ? `/api/inventory/suppliers/${editingSupplierId}` : "/api/inventory/suppliers";
+                  const r = await fetch(url, { method: editingSupplierId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                  const d = await r.json();
+                  if (!r.ok) throw new Error(d.error);
+                  setSuppliers((prev) => editingSupplierId ? prev.map((s) => s._id === editingSupplierId ? d.supplier : s) : [...prev, d.supplier]);
+                  setSuccessMessage(editingSupplierId ? `Supplier "${d.supplier.name}" updated` : `Supplier "${d.supplier.name}" created`);
+                  setEditingSupplierId(null);
+                  setSupplierForm({ name: "", code: "", contactPerson: "", email: "", phone: "", address: "", leadTimeDays: 7, rating: 3, notes: "" });
+                  setSupplierFormErrors({});
+                  setViewMode("list");
+                } catch (err) { setError(err.message); } finally { setSaving(false); }
+              }}
+            />
+          )}
+
+          {activeTab === "purchaseOrders" && (
+            <MastersPanel
+              title={editingPoId ? "Edit Purchase Order" : "New Purchase Order"}
+              viewMode={viewMode}
+              onOpenForm={() => { setEditingPoId(null); setPoForm({ poNumber: "", supplier: "", items: [{ item: "", quantityOrdered: 1, unitCost: 0, notes: "" }], orderDate: "", expectedDeliveryDate: "", notes: "" }); setPoFormErrors({}); setViewMode("form"); }}
+              onBack={() => { setEditingPoId(null); setViewMode("list"); }}
+              formContent={<>
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <Field label="PO Number">
+                      <input required className="lims-input" maxLength={30} value={poForm.poNumber} onChange={(e) => { let v = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""); setPoFormErrors((p) => ({ ...p, poNumber: "" })); setPoForm({ ...poForm, poNumber: v }); }} style={inputStyle()} />
+                      <ErrorMsg message={poFormErrors.poNumber} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Supplier">
+                      <select required className="lims-input" value={poForm.supplier} onChange={(e) => setPoForm({ ...poForm, supplier: e.target.value })} style={{ ...inputStyle(), width: "100%" }}>
+                        <option value="">-- Select --</option>
+                        {suppliers.filter((s) => s.status === "active").map((s) => <option key={s._id} value={s._id}>{s.code} — {s.name}</option>)}
+                      </select>
+                      <ErrorMsg message={poFormErrors.supplier} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Order Date">
+                      <input className="lims-input" type="date" value={poForm.orderDate} onChange={(e) => setPoForm({ ...poForm, orderDate: e.target.value })} style={inputStyle()} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Expected Delivery">
+                      <input className="lims-input" type="date" value={poForm.expectedDeliveryDate} onChange={(e) => setPoForm({ ...poForm, expectedDeliveryDate: e.target.value })} style={inputStyle()} />
+                    </Field>
+                  </div>
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <strong style={{ fontSize: 13 }}>Line Items</strong>
+                    <button type="button" className="btn-lims-secondary" onClick={() => setPoForm({ ...poForm, items: [...poForm.items, { item: "", quantityOrdered: 1, unitCost: 0, notes: "" }] })} style={{ height: 30, padding: "0 10px", fontSize: 12 }}>+ Add Item</button>
+                  </div>
+                  {poForm.items.map((line, idx) => (
+                    <div key={idx} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 36px", gap: 8, marginBottom: 6, alignItems: "start" }}>
+                      <select required className="lims-input" value={line.item} onChange={(e) => { const items = [...poForm.items]; items[idx] = { ...items[idx], item: e.target.value }; setPoForm({ ...poForm, items }); }} style={{ ...inputStyle(), fontSize: 12 }}>
+                        <option value="">Select item</option>
+                        {inventory.items.filter((it) => it.status === "active").map((it) => <option key={it._id} value={it._id}>{it.itemCode} — {it.name}</option>)}
+                      </select>
+                      <input className="lims-input" type="number" min="1" value={line.quantityOrdered} onChange={(e) => { const items = [...poForm.items]; items[idx] = { ...items[idx], quantityOrdered: Number(e.target.value) }; setPoForm({ ...poForm, items }); }} style={{ ...inputStyle(), fontSize: 12 }} />
+                      <input className="lims-input" type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => { const items = [...poForm.items]; items[idx] = { ...items[idx], unitCost: Number(e.target.value) }; setPoForm({ ...poForm, items }); }} style={{ ...inputStyle(), fontSize: 12 }} />
+                      <div style={{ fontSize: 12, paddingTop: 8, color: "var(--text-secondary)" }}>Rs {(line.quantityOrdered * line.unitCost).toFixed(2)}</div>
+                      {poForm.items.length > 1 && <button type="button" title="Remove" className="btn-icon-delete" onClick={() => { const items = poForm.items.filter((_, i) => i !== idx); setPoForm({ ...poForm, items }); }} style={{ marginTop: 4 }}>🗑</button>}
+                    </div>
+                  ))}
+                  <div style={{ textAlign: "right", fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+                    Total: Rs {poForm.items.reduce((sum, l) => sum + (l.quantityOrdered * l.unitCost), 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="row g-3" style={{ marginTop: 12 }}>
+                  <div className="col-12">
+                    <Field label="Notes">
+                      <input className="lims-input" maxLength={500} value={poForm.notes} onChange={(e) => setPoForm({ ...poForm, notes: e.target.value })} style={inputStyle()} />
+                    </Field>
+                  </div>
+                </div>
+              </>}
+              listContent={
+                <>
+                  <input className="lims-input" maxLength={35} value={poSearch} onChange={(e) => setPoSearch(e.target.value)} placeholder="Search POs by number, notes…" style={{ ...inputStyle(), maxWidth: 300 }} />
+                  <MasterTable
+                    headings={["PO Number", "Supplier", "Items", "Total", "Status", "Action"]}
+                    rows={
+                      purchaseOrders
+                        .filter((po) => {
+                          const q = poSearch.toLowerCase();
+                          return !q || po.poNumber.toLowerCase().includes(q) || (po.notes || "").toLowerCase().includes(q);
+                        })
+                        .map((po) => [
+                          po.poNumber,
+                          po.supplier?.name || "—",
+                          `${po.items?.length || 0} line(s)`,
+                          `Rs ${(po.totalAmount || 0).toFixed(2)}`,
+                          <span key={`status-${po._id}`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: po.status === "received" ? "#dcfce7" : po.status === "cancelled" ? "#fee2e2" : po.status === "submitted" ? "#dbeafe" : "#f3f4f6", color: po.status === "received" ? "#166534" : po.status === "cancelled" ? "#991b1b" : po.status === "submitted" ? "#1e40af" : "#374151" }}>{po.status.replace(/_/g, " ")}</span>,
+                          <div key={po._id} style={{ display: "flex", gap: 6 }}>
+                            {po.status === "draft" && <button type="button" title="Submit" onClick={async () => {
+                              try {
+                                const r = await fetch(`/api/inventory/purchase-orders/${po._id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "submitted" }) });
+                                const d = await r.json();
+                                if (!r.ok) throw new Error(d.error);
+                                setPurchaseOrders((prev) => prev.map((p) => p._id === po._id ? { ...p, status: "submitted" } : p));
+                                setSuccessMessage(`PO "${po.poNumber}" submitted`);
+                              } catch (err) { setError(err.message); }
+                            }} style={{ ...actionBtnStyle, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1e40af", fontSize: 11 }}>Submit</button>}
+                            {["submitted", "partially_received"].includes(po.status) && <button type="button" title="Receive" onClick={async () => {
+                              try {
+                                const receivedItems = po.items.map((it) => ({ itemId: it._id, quantityReceived: it.quantityOrdered - (it.quantityReceived || 0) }));
+                                const r = await fetch(`/api/inventory/purchase-orders/${po._id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "received", receivedItems }) });
+                                const d = await r.json();
+                                if (!r.ok) throw new Error(d.error);
+                                setPurchaseOrders((prev) => prev.map((p) => p._id === po._id ? { ...p, status: "received" } : p));
+                                setSuccessMessage(`PO "${po.poNumber}" marked as received`);
+                              } catch (err) { setError(err.message); }
+                            }} style={{ ...actionBtnStyle, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", fontSize: 11 }}>Receive</button>}
+                            {po.status !== "cancelled" && po.status !== "received" && <button type="button" title="Cancel" onClick={async () => {
+                              if (!confirm(`Cancel PO "${po.poNumber}"?`)) return;
+                              try {
+                                const r = await fetch(`/api/inventory/purchase-orders/${po._id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "cancelled" }) });
+                                const d = await r.json();
+                                if (!r.ok) throw new Error(d.error);
+                                setPurchaseOrders((prev) => prev.map((p) => p._id === po._id ? { ...p, status: "cancelled" } : p));
+                                setSuccessMessage(`PO "${po.poNumber}" cancelled`);
+                              } catch (err) { setError(err.message); }
+                            }} style={{ ...actionBtnStyle, border: "1px solid #fecaca", background: "#fef2f2", color: "#991b1b", fontSize: 11 }}>Cancel</button>}
+                            {(po.status === "draft" || po.status === "cancelled") && <button type="button" title="Delete" className="btn-icon-delete" onClick={async () => {
+                              if (!confirm(`Delete PO "${po.poNumber}"?`)) return;
+                              try {
+                                const r = await fetch(`/api/inventory/purchase-orders/${po._id}`, { method: "DELETE" });
+                                const d = await r.json();
+                                if (!r.ok) throw new Error(d.error);
+                                setPurchaseOrders((prev) => prev.filter((p) => p._id !== po._id));
+                                setSuccessMessage(`PO "${po.poNumber}" deleted`);
+                              } catch (err) { setError(err.message); }
+                            }}>🗑</button>}
+                          </div>
+                        ])
+                    }
+                  />
+                </>
+              }
+              formOnSubmit={async (e) => {
+                e.preventDefault();
+                const errors = {};
+                const poNum = (poForm.poNumber || "").trim();
+                if (!poNum) errors.poNumber = "PO number is required";
+                else if (poNum.length > 30) errors.poNumber = "Must not exceed 30 characters";
+                else if (!/^[A-Z0-9-]+$/.test(poNum)) errors.poNumber = "Only uppercase letters, numbers, and hyphens allowed";
+                if (!poForm.supplier) errors.supplier = "Supplier is required";
+                const validItems = poForm.items.filter((it) => it.item);
+                if (validItems.length === 0) errors.items = "At least one item is required";
+                if (Object.keys(errors).length) { setPoFormErrors(errors); return; }
+                const payload = {
+                  poNumber: poNum,
+                  supplier: poForm.supplier,
+                  items: validItems.map((it) => ({ item: it.item, quantityOrdered: Number(it.quantityOrdered) || 1, unitCost: Number(it.unitCost) || 0, notes: (it.notes || "").trim() || undefined })),
+                  orderDate: poForm.orderDate || undefined,
+                  expectedDeliveryDate: poForm.expectedDeliveryDate || undefined,
+                  notes: (poForm.notes || "").trim() || undefined,
+                };
+                setSaving(true);
+                try {
+                  const r = await fetch("/api/inventory/purchase-orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                  const d = await r.json();
+                  if (!r.ok) throw new Error(d.error);
+                  setPurchaseOrders((prev) => [d.purchaseOrder, ...prev]);
+                  setSuccessMessage(`PO "${d.purchaseOrder.poNumber}" created`);
+                  setEditingPoId(null);
+                  setPoForm({ poNumber: "", supplier: "", items: [{ item: "", quantityOrdered: 1, unitCost: 0, notes: "" }], orderDate: "", expectedDeliveryDate: "", notes: "" });
+                  setPoFormErrors({});
+                  setViewMode("list");
+                } catch (err) { setError(err.message); } finally { setSaving(false); }
+              }}
+            />
+          )}
+
+          {activeTab === "locations" && (
+            <MastersPanel
+              title={editingLocationId ? "Edit Location" : "Add Location"}
+              viewMode={viewMode}
+              onOpenForm={() => { setEditingLocationId(null); setLocationForm({ name: "", code: "", description: "", parentLocation: "" }); setLocationFormErrors({}); setViewMode("form"); }}
+              onBack={() => { setEditingLocationId(null); setViewMode("list"); }}
+              formContent={<>
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <Field label="Location Name">
+                      <input required className="lims-input" maxLength={120} value={locationForm.name} onChange={(e) => { const v = e.target.value; if (v && !isValidName(v)) { setLocationFormErrors((p) => ({ ...p, name: "Name contains invalid characters" })); return; } if (/https?:\/\//.test(v)) { setLocationFormErrors((p) => ({ ...p, name: "URLs are not allowed" })); return; } setLocationFormErrors((p) => ({ ...p, name: "" })); setLocationForm({ ...locationForm, name: v }); }} style={inputStyle()} />
+                      <ErrorMsg message={locationFormErrors.name} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Code">
+                      <input required className="lims-input" maxLength={20} value={locationForm.code} onChange={(e) => { let v = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""); setLocationFormErrors((p) => ({ ...p, code: "" })); setLocationForm({ ...locationForm, code: v }); }} style={inputStyle()} />
+                      <ErrorMsg message={locationFormErrors.code} />
+                    </Field>
+                  </div>
+                  <div className="col-md-6">
+                    <Field label="Parent Location">
+                      <select className="lims-input" value={locationForm.parentLocation} onChange={(e) => setLocationForm({ ...locationForm, parentLocation: e.target.value })} style={{ ...inputStyle(), width: "100%" }}>
+                        <option value="">None (top-level)</option>
+                        {locations.filter((l) => l.status === "active" && l._id !== editingLocationId).map((l) => <option key={l._id} value={l._id}>{l.code} — {l.name}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <div className="col-12">
+                    <Field label="Description">
+                      <input className="lims-input" maxLength={300} value={locationForm.description} onChange={(e) => setLocationForm({ ...locationForm, description: e.target.value })} style={inputStyle()} />
+                    </Field>
+                  </div>
+                </div>
+              </>}
+              listContent={
+                <>
+                  <input className="lims-input" maxLength={35} value={locationSearch} onChange={(e) => setLocationSearch(e.target.value)} placeholder="Search locations by name, code…" style={{ ...inputStyle(), maxWidth: 300 }} />
+                  <MasterTable
+                    headings={["Code", "Name", "Description", "Parent", "Status", "Action"]}
+                    rows={
+                      locations
+                        .filter((l) => {
+                          const q = locationSearch.toLowerCase();
+                          return !q || l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q);
+                        })
+                        .map((l) => [
+                          l.code,
+                          l.name,
+                          l.description || "—",
+                          l.parentLocation?.name || "—",
+                          <span key={`status-${l._id}`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: l.status === "active" ? "#dcfce7" : "#fee2e2", color: l.status === "active" ? "#166534" : "#991b1b" }}>{l.status}</span>,
+                          <div key={l._id} style={{ display: "flex", gap: 6 }}>
+                            <button type="button" title="Edit" onClick={() => {
+                              setEditingLocationId(l._id);
+                              setLocationForm({ name: l.name, code: l.code, description: l.description || "", parentLocation: l.parentLocation?._id || l.parentLocation || "" });
+                              setViewMode("form");
+                            }} style={{ ...actionBtnStyle, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1e40af" }}>✎</button>
+                            <button type="button" title="Delete" className="btn-icon-delete" onClick={async () => {
+                              if (!confirm(`Delete location "${l.name}"?`)) return;
+                              try {
+                                const r = await fetch(`/api/inventory/locations/${l._id}`, { method: "DELETE" });
+                                const d = await r.json();
+                                if (!r.ok) throw new Error(d.error);
+                                setLocations((prev) => prev.filter((x) => x._id !== l._id));
+                                setSuccessMessage(`Location "${l.name}" deleted`);
+                              } catch (err) { setError(err.message); }
+                            }}>🗑</button>
+                          </div>
+                        ])
+                    }
+                  />
+                </>
+              }
+              formOnSubmit={async (e) => {
+                e.preventDefault();
+                const errors = {};
+                const name = (locationForm.name || "").trim();
+                const code = (locationForm.code || "").trim().toUpperCase();
+                if (!name) errors.name = "Name is required";
+                else if (name.length > 120) errors.name = "Must not exceed 120 characters";
+                else if (!isValidName(name)) errors.name = "Name contains invalid characters";
+                else if (/https?:\/\//.test(name)) errors.name = "URLs are not allowed";
+                if (!code) errors.code = "Code is required";
+                else if (code.length > 20) errors.code = "Must not exceed 20 characters";
+                else if (!/^[A-Z0-9-]+$/.test(code)) errors.code = "Only uppercase letters, numbers, and hyphens allowed";
+                if (Object.keys(errors).length) { setLocationFormErrors(errors); return; }
+                const payload = { name, code, description: (locationForm.description || "").trim() || undefined, parentLocation: locationForm.parentLocation || undefined };
+                setSaving(true);
+                try {
+                  const url = editingLocationId ? `/api/inventory/locations/${editingLocationId}` : "/api/inventory/locations";
+                  const r = await fetch(url, { method: editingLocationId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                  const d = await r.json();
+                  if (!r.ok) throw new Error(d.error);
+                  if (editingLocationId) {
+                    setLocations((prev) => prev.map((l) => l._id === editingLocationId ? d.location : l));
+                    setSuccessMessage(`Location "${d.location.name}" updated`);
+                  } else {
+                    setLocations((prev) => [...prev, d.location]);
+                    setSuccessMessage(`Location "${d.location.name}" created`);
+                  }
+                  setEditingLocationId(null);
+                  setLocationForm({ name: "", code: "", description: "", parentLocation: "" });
+                  setLocationFormErrors({});
+                  setViewMode("list");
+                } catch (err) { setError(err.message); } finally { setSaving(false); }
+              }}
+            />
+          )}
+
           {activeTab === "stock" && (
             <StockPanel
               viewMode={viewMode}
@@ -1020,6 +1523,16 @@ export default function InventoryPage() {
               saving={saving}
               errors={movementFormErrors}
               setErrors={setMovementFormErrors}
+              locations={locations}
+              onRelease={async (itemId, batchId) => {
+                try {
+                  const r = await fetch("/api/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "release", itemId, batchId }) });
+                  const d = await r.json();
+                  if (!r.ok) throw new Error(d.error);
+                  setSuccessMessage("Batch released from quarantine");
+                  await loadInventory(itemPage);
+                } catch (err) { setError(err.message); }
+              }}
               onSubmit={(event) => {
                 event.preventDefault();
                 const errors = {};
@@ -1135,6 +1648,85 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
+
+      {showImportModal && (
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "grid", placeItems: "center", zIndex: 1000 }} onClick={() => setShowImportModal(false)}>
+          <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 520, width: "90%", maxHeight: "80vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h5 style={{ margin: 0, fontSize: 16 }}>CSV Import</h5>
+              <button type="button" onClick={() => setShowImportModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>{Icons.close}</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, display: "block" }}>Import Type</label>
+                <div style={{ display: "flex", gap: 12 }}>
+                  {[["items", "Items"], ["categories", "Categories"], ["uoms", "UOMs"]].map(([val, label]) => (
+                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, cursor: "pointer" }}>
+                      <input type="radio" name="importType" value={val} checked={importType === val} onChange={(e) => setImportType(e.target.value)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, display: "block" }}>CSV File</label>
+                <input type="file" accept=".csv" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResults(null); }} style={{ fontSize: 13 }} />
+              </div>
+              {importResults && (
+                <div style={{ fontSize: 13, padding: 12, borderRadius: 8, background: importResults.imported > 0 ? "#f0fdf4" : "#fef2f2", border: `1px solid ${importResults.imported > 0 ? "#bbf7d0" : "#fecaca"}` }}>
+                  {importResults.dryRun && <div style={{ fontWeight: 700, marginBottom: 6, color: "#1e40af" }}>Dry Run Results</div>}
+                  {!importResults.dryRun && <div style={{ fontWeight: 700, marginBottom: 6 }}>Import Complete</div>}
+                  <div>Total Rows: {importResults.totalRows} | Valid: {importResults.validCount ?? importResults.imported} | {importResults.dryRun ? "Errors" : "Skipped"}: {importResults.errors?.length || 0}</div>
+                  {importResults.errors?.length > 0 && (
+                    <div style={{ marginTop: 8, maxHeight: 150, overflow: "auto" }}>
+                      <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                        <thead><tr style={{ borderBottom: "1px solid #e5e7eb" }}><th style={{ textAlign: "left", padding: "4px 8px" }}>Row</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Issue</th></tr></thead>
+                        <tbody>
+                          {importResults.errors.map((err, i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}><td style={{ padding: "4px 8px", fontWeight: 600 }}>{err.row}</td><td style={{ padding: "4px 8px", color: "#b91c1c" }}>{err.errors.join("; ")}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button type="button" className="btn-lims-secondary" onClick={async () => {
+                  if (!importFile) return;
+                  setImporting(true);
+                  try {
+                    const fd = new FormData();
+                    fd.append("file", importFile);
+                    fd.append("type", importType);
+                    fd.append("dryRun", "true");
+                    const r = await fetch("/api/inventory/import", { method: "POST", body: fd });
+                    const d = await r.json();
+                    if (!r.ok) throw new Error(d.error);
+                    setImportResults(d);
+                  } catch (err) { setImportResults({ errors: [{ row: 0, errors: [err.message] }], totalRows: 0, validCount: 0, dryRun: true }); } finally { setImporting(false); }
+                }} disabled={!importFile || importing} style={{ flex: 1, height: 38 }}>{importing ? "Validating..." : "Validate First (Dry Run)"}</button>
+                <button type="button" className="btn-lims-primary" onClick={async () => {
+                  if (!importFile) return;
+                  setImporting(true);
+                  try {
+                    const fd = new FormData();
+                    fd.append("file", importFile);
+                    fd.append("type", importType);
+                    fd.append("dryRun", "false");
+                    const r = await fetch("/api/inventory/import", { method: "POST", body: fd });
+                    const d = await r.json();
+                    if (!r.ok) throw new Error(d.error);
+                    setImportResults(d);
+                    setSuccessMessage(`Imported ${d.imported} rows (${d.skipped} skipped)`);
+                    loadInventory(itemPage);
+                  } catch (err) { setImportResults({ errors: [{ row: 0, errors: [err.message] }], totalRows: 0, imported: 0, skipped: 0 }); } finally { setImporting(false); }
+                }} disabled={!importFile || importing} style={{ flex: 1, height: 38 }}>{importing ? "Importing..." : "Import Now"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1152,8 +1744,9 @@ function InventoryTable({ items, onEdit }) {
         </thead>
         <tbody>
           {items.map((item) => {
-            const low = item.stockOnHandBase <= item.minimumStockBase;
-            const reorder = item.reorderLevelBase && item.stockOnHandBase <= item.reorderLevelBase;
+            const availableStock = (item.stockOnHandBase || 0) - (item.reservedBase || 0);
+            const low = availableStock <= item.minimumStockBase;
+            const reorder = item.reorderLevelBase && availableStock <= item.reorderLevelBase;
             const expiryTone = item.expiredBatches ? "danger" : item.nearExpiryBatches ? "warn" : "good";
             return (
               <tr key={item._id} style={{ borderBottom: "1px solid var(--border-light)" }}>
@@ -1166,7 +1759,12 @@ function InventoryTable({ items, onEdit }) {
                   <small style={{ color: "var(--text-muted)" }}>{item.subCategory?.name || item.itemType}</small>
                 </td>
                 <td style={{ padding: "12px 14px", fontWeight: 800, color: low ? "#b91c1c" : "var(--text-primary)" }}>
-                  {formatNumber(item.stockOnHandBase)} {item.baseUom?.symbol}
+                  {formatNumber(availableStock)} {item.baseUom?.symbol}
+                  {(item.reservedBase || 0) > 0 && (
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
+                      ({formatNumber(item.stockOnHandBase)} total, {formatNumber(item.reservedBase)} reserved)
+                    </div>
+                  )}
                 </td>
                 <td style={{ padding: "12px 14px" }}>{formatNumber(item.minimumStockBase)} / {formatNumber(item.reorderLevelBase)}</td>
                 <td style={{ padding: "12px 14px" }}><Badge tone={expiryTone}>{item.expiredBatches ? "Expired" : item.nearExpiryBatches ? "Near expiry" : formatDate(item.nextExpiryDate)}</Badge></td>
@@ -1209,7 +1807,7 @@ function MasterTable({ headings, rows }) {
   );
 }
 
-function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {}, setErrors, viewMode }) {
+function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {}, setErrors, viewMode, onRelease, locations = [] }) {
   const isAdjustment = form.movementType === "adjustment";
   const isReceipt = form.movementType === "receipt";
   const baseUomSymbol = item?.baseUom?.symbol || "";
@@ -1232,7 +1830,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
           </select>
         </div>
         {!item ? <p style={{ color: "var(--text-muted)" }}>Select an item to view batches.</p> : (
-          <MasterTable headings={["Batch", "Qty", "Expiry", "Location", "Status"]} rows={(item.batches || []).map((batch) => {
+          <MasterTable headings={["Batch", "Qty", "Expiry", "Location", "Status", "Action"]} rows={(item.batches || []).map((batch) => {
             const statusColors = { available: "good", consumed: "neutral", wasted: "danger", expired: "danger", quarantine: "warn" };
             return [
               batch.batchNo || "-",
@@ -1240,6 +1838,9 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
               formatDate(batch.expiryDate),
               batch.location || "-",
               <Badge key="status" tone={statusColors[batch.status] || "neutral"}>{batch.status}</Badge>,
+              batch.status === "quarantine" && (batch.quantityBase || 0) > 0 ? (
+                <button key="release" type="button" title="Release from Quarantine" onClick={() => onRelease?.(item._id, batch._id)} style={{ ...actionBtnStyle, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", fontSize: 11 }}>Release</button>
+              ) : null,
             ];
           })} />
         )}
@@ -1336,7 +1937,14 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
       <div className="row g-3">
         <div className="col-md-6">
           <Field label={isReceipt ? "Supplier" : form.movementType === "issue" ? "Issued To" : form.movementType === "transfer" ? "To Location" : "Location"}>
-            <input className="lims-input" maxLength={isReceipt ? 35 : form.movementType === "issue" ? 25 : 100} value={isReceipt ? form.supplier : form.toLocation} onChange={(e) => { const v = e.target.value; const key = isReceipt ? "supplier" : "toLocation"; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, [key]: "URLs are not allowed" })); return; } if (v) { if (form.movementType === "issue") { if (!/^[A-Za-z0-9 -]*$/.test(v)) { setErrors?.((p) => ({ ...p, [key]: "Only letters, numbers and - allowed" })); return; } } else if (!(isReceipt ? isValidName(v) : isValidLocation(v))) { setErrors?.((p) => ({ ...p, [key]: "Field contains invalid characters" })); return; } } setErrors?.((p) => ({ ...p, [key]: "" })); setForm({ ...form, [key]: v }); }} style={inputStyle()} />
+            {locations.length > 0 && (isReceipt || form.movementType === "transfer" || form.movementType === "adjustment") ? (
+              <select className="lims-input" value={isReceipt ? "" : form.toLocation} onChange={(e) => { const v = e.target.value; const key = isReceipt ? "supplier" : "toLocation"; setErrors?.((p) => ({ ...p, [key]: "" })); setForm({ ...form, [key]: v }); }} style={{ ...inputStyle(), width: "100%" }}>
+                <option value="">-- Select --</option>
+                {locations.filter((l) => l.status === "active").map((l) => <option key={l._id} value={l.name}>{l.code} — {l.name}</option>)}
+              </select>
+            ) : (
+              <input className="lims-input" maxLength={isReceipt ? 35 : form.movementType === "issue" ? 25 : 100} value={isReceipt ? form.supplier : form.toLocation} onChange={(e) => { const v = e.target.value; const key = isReceipt ? "supplier" : "toLocation"; if (hasUrl(v)) { setErrors?.((p) => ({ ...p, [key]: "URLs are not allowed" })); return; } if (v) { if (form.movementType === "issue") { if (!/^[A-Za-z0-9 -]*$/.test(v)) { setErrors?.((p) => ({ ...p, [key]: "Only letters, numbers and - allowed" })); return; } } else if (!(isReceipt ? isValidName(v) : isValidLocation(v))) { setErrors?.((p) => ({ ...p, [key]: "Field contains invalid characters" })); return; } } setErrors?.((p) => ({ ...p, [key]: "" })); setForm({ ...form, [key]: v }); }} style={inputStyle()} />
+            )}
             <ErrorMsg message={isReceipt ? errors.supplier : errors.toLocation} />
           </Field>
         </div>
@@ -1360,6 +1968,22 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
           </Field>
         </div>
       </div>
+      {form.movementType === "transfer" && (
+        <div className="row g-3" style={{ marginTop: 8 }}>
+          <div className="col-md-6">
+            <Field label="From Location">
+              {locations.length > 0 ? (
+                <select className="lims-input" value={form.fromLocation || ""} onChange={(e) => setForm({ ...form, fromLocation: e.target.value })} style={{ ...inputStyle(), width: "100%" }}>
+                  <option value="">-- Select --</option>
+                  {locations.filter((l) => l.status === "active").map((l) => <option key={l._id} value={l.name}>{l.code} — {l.name}</option>)}
+                </select>
+              ) : (
+                <input className="lims-input" maxLength={100} value={form.fromLocation || ""} onChange={(e) => setForm({ ...form, fromLocation: e.target.value })} style={inputStyle()} />
+              )}
+            </Field>
+          </div>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
         <button className="btn-lims-primary" disabled={saving} style={{ height: 38, flex: 1 }}>{saving ? "Posting..." : "Post Transaction"}</button>
         <button type="button" className="btn-lims-secondary" onClick={() => setForm({ ...emptyMovement })} style={{ height: 38 }}>Reset</button>
@@ -1369,7 +1993,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
 }
 
 function ExpiryPanel({ items, onWaste }) {
-  const batches = items.flatMap((item) => (item.batches || []).map((batch) => ({ item, batch }))).filter(({ batch }) => batch.quantityBase > 0 && batch.expiryDate);
+  const batches = items.flatMap((item) => (item.batches || []).map((batch) => ({ item, batch }))).filter(({ batch }) => batch.quantityBase > 0);
   const today = new Date();
   const warning = new Date(today);
   warning.setDate(warning.getDate() + 30);
@@ -1383,13 +2007,19 @@ function ExpiryPanel({ items, onWaste }) {
             const expiry = new Date(batch.expiryDate);
             const expired = expiry < today;
             const near = expiry >= today && expiry <= warning;
+            const isQuarantine = batch.status === "quarantine";
+            let riskLabel = "Valid";
+            let riskTone = "good";
+            if (isQuarantine) { riskLabel = "Quarantine"; riskTone = "warn"; }
+            else if (expired) { riskLabel = "Expired"; riskTone = "danger"; }
+            else if (near) { riskLabel = "Near expiry"; riskTone = "warn"; }
             return (
               <tr key={`${item._id}-${batch._id}`} style={{ borderTop: "1px solid var(--border-light)" }}>
                 <td style={{ padding: 12 }}><strong>{item.name}</strong><br /><small>{item.itemCode}</small></td>
                 <td style={{ padding: 12 }}>{batch.batchNo || "-"}</td>
                 <td style={{ padding: 12 }}>{formatNumber(batch.quantityBase)} {item.baseUom?.symbol}</td>
-                <td style={{ padding: 12 }}>{formatDate(batch.expiryDate)}</td>
-                <td style={{ padding: 12 }}><Badge tone={expired ? "danger" : near ? "warn" : "good"}>{expired ? "Expired" : near ? "Near expiry" : "Valid"}</Badge></td>
+                <td style={{ padding: 12 }}>{batch.expiryDate ? formatDate(batch.expiryDate) : "—"}</td>
+                <td style={{ padding: 12 }}><Badge tone={riskTone}>{riskLabel}</Badge></td>
                 <td style={{ padding: 12 }}><button className="btn-lims-secondary" onClick={() => onWaste(item, batch)} style={{ height: 32 }}>Log Wastage</button></td>
               </tr>
             );

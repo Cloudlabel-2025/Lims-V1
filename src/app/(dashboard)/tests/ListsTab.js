@@ -28,6 +28,38 @@ function PaginationControls({ page, totalPages, onPageChange }) {
   );
 }
 
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, label, type }) {
+  if (!isOpen) return null;
+
+  const titles = {
+    category: "Delete Category?",
+    test: "Delete Test?",
+    package: "Delete Package?",
+  };
+
+  const messages = {
+    category: `Are you sure you want to delete the category "<strong>{label}</strong>"? This action cannot be undone.`,
+    test: `Are you sure you want to delete the test "<strong>{label}</strong>"? This action cannot be undone.`,
+    package: `Are you sure you want to delete the package "<strong>{label}</strong>"? This action cannot be undone.`,
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", zIndex: 1000 }}>
+      <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 420, width: "90%", display: "grid", gap: 16, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontSize: 28, color: "var(--error, #b91c1c)" }}>{Icons.trash}</div>
+        <div>
+          <h5 style={{ margin: 0, fontSize: 16 }}>{titles[type] || "Delete?"}</h5>
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: messages[type]?.replace("{label}", label) || "" }} />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="btn-lims-secondary" onClick={onClose} style={{ flex: 1, height: 38 }}>Cancel</button>
+          <button type="button" className="btn-lims-primary" style={{ flex: 1, height: 38, background: "var(--error, #b91c1c)", borderColor: "var(--error, #b91c1c)" }} onClick={onConfirm}>Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ListsTab({
   categories,
   categoryUsageCounts,
@@ -46,6 +78,8 @@ export default function ListsTab({
   const [activeListTab, setActiveListTab] = useState("categories");
   const [page, setPage] = useState({ categories: 1, tests: 1, packages: 1 });
   const [search, setSearch] = useState({ categories: "", tests: "", packages: "" });
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteType, setDeleteType] = useState(null);
 
   const filteredCategories = useMemo(
     () => {
@@ -91,6 +125,20 @@ export default function ListsTab({
   const handleSearch = (tab, value) => {
     setSearch((prev) => ({ ...prev, [tab]: value }));
     setPage((prev) => ({ ...prev, [tab]: 1 }));
+  };
+
+  const handleDelete = (type, id, label) => {
+    setDeleteTarget({ id, label });
+    setDeleteType(type);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget || !deleteType) return;
+    if (deleteType === "category" && onDeleteCategory) onDeleteCategory(deleteTarget.id);
+    if (deleteType === "test" && onDeleteTest) onDeleteTest(deleteTarget.id);
+    if (deleteType === "package" && onDeletePackage) onDeletePackage(deleteTarget.id);
+    setDeleteTarget(null);
+    setDeleteType(null);
   };
 
   const tabStyle = (isActive) => ({
@@ -151,7 +199,14 @@ export default function ListsTab({
                   <span>Used in {categoryUsageCounts.get(cat._id) || 0} tests</span>
                 </div>
                 {onDeleteCategory && (
-                  <button type="button" className="test-card-delete" onClick={() => onDeleteCategory(cat._id)} title="Delete category">{Icons.trash}</button>
+                  <button
+                    type="button"
+                    className="btn-icon-delete"
+                    onClick={() => handleDelete("category", cat._id, cat.name)}
+                    title="Delete category"
+                  >
+                    {Icons.trash}
+                  </button>
                 )}
               </article>
             ))}
@@ -190,7 +245,14 @@ export default function ListsTab({
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <strong>{test.status}</strong>
                   {onDeleteTest && (
-                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeleteTest(test._id); }} title="Delete test">{Icons.trash}</button>
+                    <button
+                      type="button"
+                      className="btn-icon-delete"
+                      onClick={(e) => { e.stopPropagation(); handleDelete("test", test._id, test.name); }}
+                      title="Delete test"
+                    >
+                      {Icons.trash}
+                    </button>
                   )}
                 </div>
               </article>
@@ -230,7 +292,14 @@ export default function ListsTab({
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <strong>{pkg.status}</strong>
                   {onDeletePackage && (
-                    <button type="button" className="test-card-delete" onClick={(e) => { e.stopPropagation(); onDeletePackage(pkg._id); }} title="Delete package">{Icons.trash}</button>
+                    <button
+                      type="button"
+                      className="btn-icon-delete"
+                      onClick={(e) => { e.stopPropagation(); handleDelete("package", pkg._id, pkg.name); }}
+                      title="Delete package"
+                    >
+                      {Icons.trash}
+                    </button>
                   )}
                 </div>
               </article>
@@ -239,6 +308,14 @@ export default function ListsTab({
           <PaginationControls page={page.packages} totalPages={totalPages.packages} onPageChange={(p) => setPage((prev) => ({ ...prev, packages: p }))} />
         </aside>
       )}
+
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => { setDeleteTarget(null); setDeleteType(null); }}
+        onConfirm={confirmDelete}
+        label={deleteTarget?.label || ""}
+        type={deleteType}
+      />
     </div>
   );
 }

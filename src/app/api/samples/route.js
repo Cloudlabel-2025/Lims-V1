@@ -62,7 +62,10 @@ export async function POST(req) {
 
     const [patient, test] = await Promise.all([
       Patient.findById(patientId),
-      TestDefinition.findById(testDefinitionId).populate("category", "name"),
+      TestDefinition.findById(testDefinitionId)
+        .populate("category", "name")
+        .populate("requiredInventoryItems.item")
+        .populate("requiredInventoryItems.uom"),
     ]);
 
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
@@ -86,6 +89,32 @@ export async function POST(req) {
       },
       status: "registered",
     });
+
+    if (test.requiredInventoryItems?.length) {
+      const { InventoryItem } = await getTenantModels(auth.tenantId);
+      const reservations = [];
+
+      for (const reqItem of test.requiredInventoryItems) {
+        const item = reqItem.item;
+        const uom = reqItem.uom;
+        if (!item || !uom) continue;
+
+        const quantityInBase = reqItem.quantityPerTest * (uom.conversionToBase || 1);
+        const available = (item.stockOnHandBase || 0) - (item.reservedBase || 0);
+
+        if (available >= quantityInBase) {
+          await InventoryItem.findOneAndUpdate(
+            { _id: item._id },
+            { $inc: { reservedBase: quantityInBase } }
+          );
+          reservations.push({ item: item._id, quantityBase: quantityInBase, uom: uom._id });
+        }
+      }
+
+      if (reservations.length > 0) {
+        sample.reservedInventory = reservations;
+      }
+    }
 
     sample.addCustodyEntry("status:created -> registered", auth.session.email, "Sample registered");
     await sample.save();

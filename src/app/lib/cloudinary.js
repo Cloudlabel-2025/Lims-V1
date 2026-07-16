@@ -118,17 +118,28 @@ async function uploadImageWithSdk(
   configureCloudinarySdk(cloudinaryConfig);
 
   try {
-    const result = await cloudinary.uploader.upload(
-      buffer,
-      {
-        folder,
-        public_id: publicIdPrefix,
-        overwrite: false,
-        resource_type: "image",
-        timeout: timeoutMs,
-        format: mimeType.replace("image/", ""),
-      }
-    );
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: publicIdPrefix,
+          overwrite: false,
+          resource_type: "image",
+          timeout: timeoutMs,
+          format: mimeType.replace("image/", ""),
+        },
+        (error, result) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve(result);
+        }
+      );
+
+      uploadStream.end(buffer);
+    });
 
     return buildUploadResult(result, file, { wasCompressed, compressedSize });
   } catch (error) {

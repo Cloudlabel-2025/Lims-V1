@@ -11,6 +11,8 @@ const expenseAccountByCategory = {
   overhead: "5004",
 };
 
+const DEFAULT_EXPENSE_ACCOUNT = "5001"; // default fallback
+
 function clean(value) {
   return String(value || "").trim();
 }
@@ -137,15 +139,16 @@ export async function POST(req) {
       ? body.paidFrom
       : "vendor-payable";
 
-    if (!expenseAccountByCategory[category] || amount <= 0) {
-      return Response.json({ error: "Valid category and amount are required" }, { status: 400 });
+    if (amount <= 0) {
+      return Response.json({ error: "Amount must be greater than zero" }, { status: 400 });
     }
 
     const { connection, ExpenseEntry } = await getTenantModels(auth.tenantId);
+    const expenseAccountCode = expenseAccountByCategory[category] || DEFAULT_EXPENSE_ACCOUNT;
     const result = await connection.transaction(async (session) => {
       const expenseAccount = body.accountId && mongoose.Types.ObjectId.isValid(body.accountId)
         ? { _id: body.accountId }
-        : await getAccountByCode(connection, auth.tenantId, expenseAccountByCategory[category], { session });
+        : await getAccountByCode(connection, auth.tenantId, expenseAccountCode, { session });
       const creditAccountCode = paidFrom === "cash" ? "1001" : paidFrom === "bank" ? "1002" : "2002";
       const creditAccount = await getAccountByCode(connection, auth.tenantId, creditAccountCode, { session });
       const totalAmount = money(amount + taxAmount);

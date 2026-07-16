@@ -9,11 +9,27 @@ function money(value) {
 }
 
 function getPaymentParts(payment) {
+  if (!payment) return [];
+  
+  // New format: { amount: number, method: string }
+  if (payment.amount !== undefined && payment.method) {
+    const methodMap = {
+      cash: { key: "cash", method: "cash", accountCode: "1001" },
+      card: { key: "card", method: "card", accountCode: "1002" },
+      upi: { key: "online", method: "upi", accountCode: "1002" },
+      "corporate-credit": { key: "corporate", method: "corporate-credit", accountCode: "1200" },
+    };
+    const config = methodMap[payment.method];
+    if (!config) return [];
+    return [{ ...config, amount: money(payment.amount) }].filter((part) => part.amount > 0);
+  }
+  
+  // Legacy format: { cash, card, online, corporate }
   return [
-    { key: "cash", method: "cash", accountCode: "1001", amount: money(payment?.cash) },
-    { key: "card", method: "card", accountCode: "1002", amount: money(payment?.card) },
-    { key: "online", method: "upi", accountCode: "1002", amount: money(payment?.online) },
-    { key: "corporate", method: "corporate-credit", accountCode: "1200", amount: money(payment?.corporate) },
+    { key: "cash", method: "cash", accountCode: "1001", amount: money(payment.cash) },
+    { key: "card", method: "card", accountCode: "1002", amount: money(payment.card) },
+    { key: "online", method: "upi", accountCode: "1002", amount: money(payment.online) },
+    { key: "corporate", method: "corporate-credit", accountCode: "1200", amount: money(payment.corporate) },
   ].filter((part) => part.amount > 0);
 }
 
@@ -52,7 +68,7 @@ export async function POST(req) {
       return Response.json({ error: `Payment amount cannot exceed Rs ${maxAllowed.toLocaleString("en-IN")}` }, { status: 400 });
     }
 
-    if (payment && (payment.cash < 0 || payment.card < 0 || payment.online < 0 || payment.corporate < 0)) {
+    if (payment && (payment.amount < 0 || payment.cash < 0 || payment.card < 0 || payment.online < 0 || payment.corporate < 0)) {
       return Response.json({ error: "Negative payment values are not allowed" }, { status: 400 });
     }
 

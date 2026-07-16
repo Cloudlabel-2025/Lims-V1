@@ -4,9 +4,11 @@ export const ExpenseEntrySchema = new mongoose.Schema(
   {
     category: {
       type: String,
-      enum: ["reagent", "staff", "equipment", "overhead"],
       required: true,
       index: true,
+      trim: true,
+      minlength: 1,
+      maxlength: 50,
     },
     vendorName: {
       type: String,

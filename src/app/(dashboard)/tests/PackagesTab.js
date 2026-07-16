@@ -43,21 +43,21 @@ export default function PackagesTab({
                     placeholder="Enter package name"
                     required
                     minLength={2}
-                    maxLength={35}
-                    pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*"
-                    title="Only letters, numbers, spaces, and . &amp; ' / , - allowed"
+                    maxLength={25}
+                    pattern="[A-Za-z0-9\-]+"
+                    title="Only letters, numbers, and hyphens allowed (max 25 characters, only one hyphen)"
                   />
                 </label>
                 <label>
                   Code
                   <input
                     value={packageForm.code}
-                    onChange={(e) => setPackageForm((p) => ({ ...p, code: e.target.value }))}
+                    onChange={(e) => setPackageForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
                     placeholder="Enter package code"
                     required
-                    maxLength={35}
-                    pattern="[A-Za-z0-9_-]+"
-                    title="Only letters, numbers, underscore, and hyphen"
+                    maxLength={20}
+                    pattern="[A-Z0-9]+"
+                    title="Only uppercase letters and numbers allowed (max 20 characters)"
                   />
                 </label>
               <label className="full-width">
@@ -76,9 +76,9 @@ export default function PackagesTab({
                   <input
                     type="number"
                     min="0"
-                    max="9999999999"
+                    max="99999999"
                     value={packageForm.price}
-                    onChange={(e) => setPackageForm((p) => ({ ...p, price: e.target.value }))}
+                    onChange={(e) => { const v = e.target.value; if (v.length <= 8) setPackageForm((p) => ({ ...p, price: v })); }}
                     placeholder="Enter price"
                     required
                     className="lims-input"

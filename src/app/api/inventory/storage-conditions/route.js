@@ -1,4 +1,5 @@
 import { jsonError } from "@/app/lib/api-response";
+import { writeAuditLog } from "@/app/lib/audit";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
 
@@ -58,6 +59,7 @@ export async function POST(req) {
     if (exists) return Response.json({ error: "Storage condition already exists" }, { status: 409 });
 
     const storageCondition = await InventoryStorageCondition.create({ name });
+    writeAuditLog(req, auth, { action: "create", resourceType: "InventoryStorageCondition", resourceId: storageCondition._id, metadata: { name } }).catch(() => {});
     return Response.json({ storageCondition }, { status: 201 });
   } catch (error) {
     return jsonError("Unable to create storage condition", error, 500);

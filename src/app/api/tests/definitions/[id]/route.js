@@ -1,6 +1,7 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import mongoose from "mongoose";
 
 function clean(value) {
   return String(value || "").trim();
@@ -34,6 +35,32 @@ function validateField(value, pattern, fieldName, errors) {
 function isExponentialNotation(value) {
   if (typeof value === "string" && /[eE]/.test(value)) return true;
   return false;
+}
+
+function normalizeRequiredInventoryItems(items, errors) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((entry, index) => {
+      if (!entry || !entry.item) {
+        errors.push(`Required inventory item ${index + 1}: item is required`);
+        return null;
+      }
+      if (!mongoose.Types.ObjectId.isValid(entry.item)) {
+        errors.push(`Required inventory item ${index + 1}: invalid item reference`);
+        return null;
+      }
+      const qty = Number(entry.quantityPerTest);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        errors.push(`Required inventory item ${index + 1}: quantity must be greater than 0`);
+        return null;
+      }
+      if (!entry.uom || !mongoose.Types.ObjectId.isValid(entry.uom)) {
+        errors.push(`Required inventory item ${index + 1}: valid UOM is required`);
+        return null;
+      }
+      return { item: entry.item, quantityPerTest: qty, uom: entry.uom };
+    })
+    .filter(Boolean);
 }
 
 function normalizeParameters(parameters, errors) {
@@ -84,6 +111,19 @@ function normalizeParameters(parameters, errors) {
           isExponentialNotation(parameter.femaleMin) || isExponentialNotation(parameter.femaleMax) ||
           isExponentialNotation(parameter.normalMin) || isExponentialNotation(parameter.normalMax)) {
         errors.push(`Parameter ${index + 1} range contains an invalid value`);
+        return null;
+      }
+
+      if (Number.isFinite(normalMin) && Number.isFinite(normalMax) && normalMin >= normalMax) {
+        errors.push(`Parameter ${index + 1} common range min must be less than max`);
+        return null;
+      }
+      if (Number.isFinite(maleMin) && Number.isFinite(maleMax) && maleMin >= maleMax) {
+        errors.push(`Parameter ${index + 1} male range min must be less than max`);
+        return null;
+      }
+      if (Number.isFinite(femaleMin) && Number.isFinite(femaleMax) && femaleMin >= femaleMax) {
+        errors.push(`Parameter ${index + 1} female range min must be less than max`);
         return null;
       }
 
@@ -162,6 +202,12 @@ export async function PUT(req, { params }) {
       return Response.json({ error: "At least one parameter is required" }, { status: 400 });
     }
 
+    const invErrors = [];
+    const requiredInventoryItems = normalizeRequiredInventoryItems(body.requiredInventoryItems, invErrors);
+    if (invErrors.length > 0) {
+      return Response.json({ error: invErrors[0] }, { status: 400 });
+    }
+
     const { TestDefinition } = await getTenantModels(auth.tenantId);
     const existingTest = await TestDefinition.findById(id).select("price");
     if (!existingTest) return Response.json({ error: "Test not found" }, { status: 404 });
@@ -189,6 +235,7 @@ export async function PUT(req, { params }) {
           sampleType,
           price: nextPrice,
           parameters,
+          requiredInventoryItems,
           status: body.status === "inactive" ? "inactive" : "active",
         },
       },

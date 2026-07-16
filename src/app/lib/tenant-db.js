@@ -7,6 +7,7 @@ import { getAuditLogModel } from "@/app/models/tenant/AuditLog";
 import { getBillingRecordModel } from "@/app/models/tenant/BillingRecord";
 import { getCorporateAccountModel } from "@/app/models/tenant/CorporateAccount";
 import { getExpenseEntryModel } from "@/app/models/tenant/ExpenseEntry";
+import { getExpenseCategoryModel } from "@/app/models/tenant/ExpenseCategory";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
 import { getJournalEntryModel } from "@/app/models/tenant/JournalEntry";
@@ -22,6 +23,9 @@ import { getInventoryMovementModel } from "@/app/models/tenant/InventoryMovement
 import { getInventoryUomModel } from "@/app/models/tenant/InventoryUom";
 import { getInventoryItemTypeModel } from "@/app/models/tenant/InventoryItemType";
 import { getInventoryStorageConditionModel } from "@/app/models/tenant/InventoryStorageCondition";
+import { getInventorySupplierModel } from "@/app/models/tenant/InventorySupplier";
+import { getInventoryPurchaseOrderModel } from "@/app/models/tenant/InventoryPurchaseOrder";
+import { getInventoryLocationModel } from "@/app/models/tenant/InventoryLocation";
 
 
 const tenantDbCache = globalThis.tenantDbCache || new Map();
@@ -84,6 +88,7 @@ export async function getTenantModels(tenantId) {
     CorporateAccount: getCorporateAccountModel(connection),
     Doctor: getDoctorModel(connection, { doctorPrefix: lab?.name ? `${lab.name.toUpperCase().replace(/\s+/g, "")}` : lab?.numbering?.doctorPrefix }),
     ExpenseEntry: getExpenseEntryModel(connection),
+    ExpenseCategory: getExpenseCategoryModel(connection),
     JournalEntry: getJournalEntryModel(connection),
     Patient: getPatientModel(connection, { patientPrefix: lab?.name ? `${lab.name.toUpperCase().replace(/\s+/g, "")}` : lab?.numbering?.patientPrefix }),
     PaymentReceipt: getPaymentReceiptModel(connection),
@@ -100,6 +105,9 @@ export async function getTenantModels(tenantId) {
     InventoryUom: getInventoryUomModel(connection),
     InventoryItemType: getInventoryItemTypeModel(connection),
     InventoryStorageCondition: getInventoryStorageConditionModel(connection),
+    InventorySupplier: getInventorySupplierModel(connection),
+    InventoryPurchaseOrder: getInventoryPurchaseOrderModel(connection),
+    InventoryLocation: getInventoryLocationModel(connection),
   };
 }
 

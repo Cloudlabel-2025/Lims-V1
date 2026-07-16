@@ -27,7 +27,8 @@ const s = {
     outline: "none",
     fontFamily: "var(--font-main)",
     boxSizing: "border-box",
-  } ,
+    MozAppearance: "textfield",
+  },
   textarea: {
     width: "100%",
     minHeight: "48px",
@@ -135,6 +136,7 @@ export default function CreateBillTab({
                 <input
                   type="number"
                   style={s.input}
+                  className="lims-input"
                   min="0"
                   max="95"
                   step="0.01"
@@ -151,6 +153,7 @@ export default function CreateBillTab({
                 <input
                   type="number"
                   style={s.input}
+                  className="lims-input"
                   min="0"
                   max="95"
                   step="0.01"
@@ -171,6 +174,7 @@ export default function CreateBillTab({
               <input
                 type="number"
                 style={s.input}
+                className="lims-input"
                 min="0"
                 max="95"
                 step="0.01"

@@ -7,6 +7,7 @@ import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
+import { uploadImageDirectToCloudinary } from "@/app/lib/client-image-upload";
 
 const defaultForm = {
   name: "",
@@ -386,28 +387,14 @@ export default function DeveloperCreateLabPage() {
     if (!logoFile) return form.logo;
 
     const tenantId = form.tenantId.trim();
-    const uploadForm = new FormData();
-    uploadForm.append("file", logoFile);
-    uploadForm.append("context", "lab-logo");
-    uploadForm.append("tenantId", tenantId);
 
     setUploadingLogo(true);
     try {
-      const response = await fetch("/api/uploads/image", {
-        method: "POST",
-        credentials: "include",
-        body: uploadForm,
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.details || data.error || "Unable to upload logo");
-      }
-
-      return {
-        ...data.image,
+      return await uploadImageDirectToCloudinary(logoFile, {
+        context: "lab-logo",
+        tenantId,
         altText: form.logoAltText || `${form.name} logo`,
-      };
+      });
     } finally {
       setUploadingLogo(false);
     }

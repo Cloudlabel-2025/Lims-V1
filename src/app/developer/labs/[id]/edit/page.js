@@ -7,6 +7,7 @@ import { Icons } from "@/app/components/Icons";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
 import CmsSuccessDialog from "@/app/developer/components/CmsSuccessDialog";
+import { uploadImageDirectToCloudinary } from "@/app/lib/client-image-upload";
 
 const loginHighlightOptions = [
   "Patient Registration & Tracking",
@@ -293,28 +294,14 @@ export default function DeveloperEditLabPage({ params }) {
     if (!logoFile) return null;
 
     const tenantId = form.tenantId.trim();
-    const uploadForm = new FormData();
-    uploadForm.append("file", logoFile);
-    uploadForm.append("context", "lab-logo");
-    uploadForm.append("tenantId", tenantId);
 
     setUploadingLogo(true);
     try {
-      const response = await fetch("/api/uploads/image", {
-        method: "POST",
-        credentials: "include",
-        body: uploadForm,
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.details || data.error || "Unable to upload logo");
-      }
-
-      return {
-        ...data.image,
+      return await uploadImageDirectToCloudinary(logoFile, {
+        context: "lab-logo",
+        tenantId,
         altText: logoAltText || `${form.name} logo`,
-      };
+      });
     } finally {
       setUploadingLogo(false);
     }

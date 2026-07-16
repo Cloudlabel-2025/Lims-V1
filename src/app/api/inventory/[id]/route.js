@@ -87,6 +87,7 @@ export async function PATCH(req, context) {
     if (body.reorderLevelBase !== undefined) item.reorderLevelBase = numberValue(body.reorderLevelBase, 0);
     if (body.maximumStockBase !== undefined) item.maximumStockBase = numberValue(body.maximumStockBase, 0);
     if (body.trackExpiry !== undefined) item.trackExpiry = Boolean(body.trackExpiry);
+    if (body.quarantineOnReceipt !== undefined) item.quarantineOnReceipt = Boolean(body.quarantineOnReceipt);
 
     if (body.name !== undefined && body.name !== null && clean(body.name) && hasUrl(body.name)) {
       return Response.json({ error: "URLs are not allowed in item name" }, { status: 400 });
@@ -178,6 +179,13 @@ export async function PATCH(req, context) {
     }
 
     await item.save();
+
+    writeAuditLog(req, auth, {
+      action: "update",
+      resourceType: "InventoryItem",
+      resourceId: item._id,
+      metadata: { name: item.name, itemCode: item.itemCode, changes: Object.keys(body) },
+    }).catch(() => {});
 
     const populated = await InventoryItem.findById(item._id)
       .populate("category", "name code")

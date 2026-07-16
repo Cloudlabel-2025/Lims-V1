@@ -1236,11 +1236,14 @@ body {
 }
 
 .lims-input[type="number"]::-webkit-inner-spin-button,
-.lims-input[type="number"]::-webkit-outer-spin-button {
+.lims-input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-.lims-input[type="number"] {
+.lims-input[type="number"],
+input[type="number"] {
   -moz-appearance: textfield;
 }
 
@@ -1648,6 +1651,58 @@ body {
 .table-scroll-hint:hover::after,
 .table-scroll-hint:active::after {
   opacity: 1;
+}
+
+/* Payment History Table */
+.payment-history-row {
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.payment-history-row:hover {
+  background: var(--primary-50) !important;
+  box-shadow: inset 4px 0 0 var(--brand-action, var(--primary));
+}
+
+.payment-history-row td {
+  transition: background 0.15s ease;
+}
+
+.view-history-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand-action, var(--primary));
+  background: var(--primary-50);
+  border: 1px solid var(--primary-100);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.view-history-btn:hover {
+  background: var(--primary-100);
+  border-color: var(--primary-200);
+  color: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.view-history-btn:active {
+  transform: translateY(0);
+}
+
+/* Modal animation */
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Spinner */

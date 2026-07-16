@@ -119,6 +119,17 @@ export const SampleSchema = new mongoose.Schema(
       type: [CustodyEntrySchema],
       default: [],
     },
+    reservedInventory: {
+      type: [
+        {
+          _id: false,
+          item: { type: mongoose.Schema.Types.ObjectId, ref: "InventoryItem" },
+          quantityBase: { type: Number, min: 0 },
+          uom: { type: mongoose.Schema.Types.ObjectId, ref: "InventoryUom" },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

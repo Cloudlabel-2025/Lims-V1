@@ -1,0 +1,19 @@
+
+> lims-core@0.1.0 dev
+> next dev
+
+⚠ Port 3000 is in use by an unknown process, using available port 3001 instead.
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.31.13:3001
+- Environments: .env.local
+✓ Ready in 1136ms
+⨯ Another next dev server is already running.
+
+- Local:        http://localhost:3000
+- PID:          19888
+- Dir:          D:\Projects\Lims-V1
+- Log:          .next\dev\logs\next-development.log
+
+Run taskkill /PID 19888 /F to stop it.
+[?25h
