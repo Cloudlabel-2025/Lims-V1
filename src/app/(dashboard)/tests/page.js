@@ -553,7 +553,6 @@ export default function TestsPage() {
   }
 
   async function deleteCategory(categoryId) {
-    if (!confirm("Delete this category? This action cannot be undone.")) return;
     setSaving(true);
     setError("");
     setSuccess("");
@@ -572,7 +571,6 @@ export default function TestsPage() {
   }
 
   async function deleteTest(testId) {
-    if (!confirm("Delete this test? This action cannot be undone.")) return;
     setSaving(true);
     setError("");
     setSuccess("");
@@ -590,8 +588,8 @@ export default function TestsPage() {
     }
   }
 
-  async function deletePackage(packageId) {
-    if (!confirm("Delete this package? This action cannot be undone.")) return;
+  async function deletePackage(packageId, { skipConfirm = false } = {}) {
+    if (!skipConfirm && !confirm("Delete this package? This action cannot be undone.")) return;
     setSaving(true);
     setError("");
     setSuccess("");
@@ -1003,7 +1001,7 @@ export default function TestsPage() {
           canDeleteTests={canDeleteTests}
           onDeleteCategory={canDeleteTests ? deleteCategory : null}
           onDeleteTest={canDeleteTests ? deleteTest : null}
-          onDeletePackage={canDeleteTests ? deletePackage : null}
+          onDeletePackage={canDeleteTests ? (id) => deletePackage(id, { skipConfirm: true }) : null}
         />
       )}
     </div>

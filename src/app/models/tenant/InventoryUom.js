@@ -25,7 +25,6 @@ export const InventoryUomSchema = new mongoose.Schema(
       required: true,
       trim: true,
       maxlength: 16,
-      unique: true,
       match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Symbol contains invalid characters"],
       validate: { validator: noUrl, message: "URLs are not allowed in UOM symbol" },
     },
@@ -56,7 +55,14 @@ export const InventoryUomSchema = new mongoose.Schema(
 );
 
 export function getInventoryUomModel(connection = mongoose) {
-  return connection.models.InventoryUom || connection.model("InventoryUom", InventoryUomSchema);
+  const model = connection.models.InventoryUom || connection.model("InventoryUom", InventoryUomSchema);
+
+  if (!connection.__uomSymbolIndexDropped) {
+    connection.__uomSymbolIndexDropped = true;
+    model.collection.dropIndex("symbol_1").catch(() => {});
+  }
+
+  return model;
 }
 
 const InventoryUom = getInventoryUomModel();

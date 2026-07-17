@@ -63,10 +63,8 @@ export const InventoryItemSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 120,
+      maxlength: 25,
       index: true,
-      match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Item name contains invalid characters"],
-      validate: { validator: noUrl, message: "URLs are not allowed in item name" },
     },
     genericName: {
       type: String,

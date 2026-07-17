@@ -65,7 +65,9 @@ function validateItemRow(row, headers, index, categoryMap, uomMap) {
   else if (itemCode.length > 15) errors.push("Item code must not exceed 15 characters");
 
   if (!name) errors.push("Name is required");
-  else if (name.length > 120) errors.push("Name must not exceed 120 characters");
+  else if (name.length > 25) errors.push("Name must not exceed 25 characters");
+  else if ((name.match(/-/g) || []).length > 1) errors.push("Name can contain at most one hyphen");
+  else if (!/^[A-Za-z0-9 -]*$/.test(name)) errors.push("Name must contain only letters, numbers, spaces, and one hyphen");
 
   if (!categoryVal) errors.push("Category is required");
   else if (!categoryMap.has(categoryVal.toLowerCase())) errors.push(`Category "${categoryVal}" not found`);
@@ -95,7 +97,9 @@ function validateCategoryRow(row, headers, index) {
   const code = get("code").toUpperCase();
 
   if (!name) errors.push("Name is required");
-  else if (name.length > 20) errors.push("Name must not exceed 20 characters");
+  else if (name.length > 25) errors.push("Name must not exceed 25 characters");
+  else if ((name.match(/-/g) || []).length > 1) errors.push("Name can contain at most one hyphen");
+  else if (!/^[A-Z][A-Za-z0-9 -]*$/.test(name)) errors.push("Name must start with a capital letter and contain only letters, numbers, spaces, and one hyphen");
 
   if (!code) errors.push("Code is required");
   else if (!/^[A-Z0-9]+$/.test(code)) errors.push("Code must contain only uppercase letters and numbers");

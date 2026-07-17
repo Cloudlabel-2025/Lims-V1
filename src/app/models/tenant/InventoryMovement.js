@@ -16,7 +16,7 @@ export const InventoryMovementSchema = new mongoose.Schema(
     batchId: { type: mongoose.Schema.Types.ObjectId },
     movementType: {
       type: String,
-      enum: ["opening", "receipt", "issue", "adjustment", "transfer", "wastage", "expiry"],
+      enum: ["opening", "receipt", "issue", "adjustment", "transfer", "wastage", "expiry", "purchase"],
       required: true,
       index: true,
     },

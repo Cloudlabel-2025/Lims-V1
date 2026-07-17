@@ -37,18 +37,17 @@ export async function PATCH(req, context) {
     if (Number(conv) <= 0) {
       return Response.json({ error: "Conversion factor must be greater than 0" }, { status: 400 });
     }
-    const baseSymbol = clean(body.baseSymbol);
-    if (!baseSymbol) return Response.json({ error: "Base symbol is required" }, { status: 400 });
+    const baseSymbol = clean(body.baseSymbol) || symbol;
 
     const { InventoryUom } = await getTenantModels(auth.tenantId);
     const uom = await InventoryUom.findById(id);
     if (!uom) return Response.json({ error: "UOM not found" }, { status: 404 });
 
     const duplicate = await InventoryUom.findOne({
-      symbol: new RegExp(`^${escapeRegex(symbol)}$`, "i"),
+      name: new RegExp(`^${escapeRegex(name)}$`, "i"),
       _id: { $ne: id },
     });
-    if (duplicate) return Response.json({ error: "UOM symbol already exists" }, { status: 409 });
+    if (duplicate) return Response.json({ error: `UOM "${name}" already exists` }, { status: 409 });
 
     uom.name = name;
     uom.symbol = symbol;

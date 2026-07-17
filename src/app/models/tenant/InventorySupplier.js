@@ -51,6 +51,8 @@ const InventorySupplierSchema = new mongoose.Schema(
     leadTimeDays: { type: Number, default: 7, min: 0 },
     rating: { type: Number, default: 3, min: 1, max: 5 },
     notes: { type: String, trim: true, maxlength: 500 },
+    manufacturer: { type: String, trim: true, maxlength: 120 },
+    items: [{ type: mongoose.Schema.Types.ObjectId, ref: "InventoryItem" }],
     status: { type: String, enum: ["active", "inactive"], default: "active", index: true },
   },
   { timestamps: true }

@@ -69,7 +69,7 @@ export async function POST(req) {
       return Response.json({ error: "At least one item is required" }, { status: 400 });
     }
 
-    const { InventoryPurchaseOrder, InventorySupplier } = await getTenantModels(auth.tenantId);
+    const { InventoryPurchaseOrder, InventorySupplier, InventoryMovement } = await getTenantModels(auth.tenantId);
 
     const supplierExists = await InventorySupplier.findById(body.supplier).lean();
     if (!supplierExists || supplierExists.status !== "active") {
@@ -114,6 +114,22 @@ export async function POST(req) {
       resourceId: purchaseOrder._id,
       metadata: { poNumber: purchaseOrder.poNumber, totalAmount },
     }).catch(() => {});
+
+    for (const lineItem of items) {
+      if (!lineItem.item || !Number.isFinite(lineItem.quantityOrdered) || lineItem.quantityOrdered <= 0) continue;
+      const existingMovement = await InventoryMovement.findOne({ referenceNo: poNumber.toUpperCase(), item: lineItem.item, movementType: "purchase" }).lean();
+      if (existingMovement) continue;
+      await InventoryMovement.create({
+        item: lineItem.item,
+        movementType: "purchase",
+        quantityBase: lineItem.quantityOrdered,
+        balanceAfterBase: 0,
+        reason: clean(body.notes) || "Purchase order",
+        referenceNo: poNumber.toUpperCase(),
+        performedBy: auth.user?.name || auth.user?.email,
+        movementDate: orderDate,
+      }).catch(() => {});
+    }
 
     return Response.json({ purchaseOrder }, { status: 201 });
   } catch (error) {

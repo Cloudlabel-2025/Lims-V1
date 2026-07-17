@@ -92,6 +92,8 @@ export async function PATCH(req, { params }) {
     }
 
     if (body.notes !== undefined) updates.notes = clean(body.notes) || undefined;
+    if (body.manufacturer !== undefined) updates.manufacturer = clean(body.manufacturer) || undefined;
+    if (body.items !== undefined) updates.items = Array.isArray(body.items) ? body.items : [];
     if (body.status !== undefined) {
       if (!["active", "inactive"].includes(body.status)) return Response.json({ error: "Invalid status" }, { status: 400 });
       updates.status = body.status;

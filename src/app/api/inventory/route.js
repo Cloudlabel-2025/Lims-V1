@@ -269,13 +269,15 @@ export async function POST(req) {
       let name = clean(body.name);
       if (!name) return Response.json({ error: "Category name is required" }, { status: 400 });
       name = name.charAt(0).toUpperCase() + name.slice(1);
-      if (name.length > 20) return Response.json({ error: "Category name must not exceed 20 characters" }, { status: 400 });
-      if (!/^[A-Z][A-Za-z\s]*$/.test(name)) return Response.json({ error: "Category name must start with a capital letter and contain only letters and spaces" }, { status: 400 });
+      if (name.length > 25) return Response.json({ error: "Category name must not exceed 25 characters" }, { status: 400 });
+      if ((name.match(/-/g) || []).length > 1) return Response.json({ error: "Category name can contain at most one hyphen" }, { status: 400 });
+      if (!/^[A-Z][A-Za-z0-9 -]*$/.test(name)) return Response.json({ error: "Category name must start with a capital letter and contain only letters, numbers, spaces, and one hyphen" }, { status: 400 });
 
-      const code = clean(body.code);
+      let code = clean(body.code);
       if (!code) return Response.json({ error: "Category code is required" }, { status: 400 });
-      if (!isValidName(code)) return Response.json({ error: "Code contains invalid characters" }, { status: 400 });
-      if (hasUrl(code)) return Response.json({ error: "URLs are not allowed in category code" }, { status: 400 });
+      code = code.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (code.length > 20) return Response.json({ error: "Category code must not exceed 20 characters" }, { status: 400 });
+      if (!/^[A-Z0-9]+$/.test(code)) return Response.json({ error: "Category code must contain only uppercase letters and numbers" }, { status: 400 });
 
       try {
         const category = await InventoryCategory.create({
@@ -289,6 +291,10 @@ export async function POST(req) {
         return Response.json({ category }, { status: 201 });
       } catch (err) {
         if (err.code === 11000) return Response.json({ error: "Category code already exists" }, { status: 409 });
+        if (err.name === "ValidationError") {
+          const msg = Object.values(err.errors).map((e) => e.message).join(", ");
+          return Response.json({ error: msg }, { status: 400 });
+        }
         throw err;
       }
     }
@@ -313,10 +319,11 @@ export async function POST(req) {
         return Response.json({ error: "Conversion factor must be greater than 0" }, { status: 400 });
       }
 
-      const baseSymbol = clean(body.baseSymbol);
-      if (!baseSymbol) return Response.json({ error: "Base symbol is required" }, { status: 400 });
-      if (!isValidName(baseSymbol)) return Response.json({ error: "Base symbol contains invalid characters" }, { status: 400 });
-      if (hasUrl(baseSymbol)) return Response.json({ error: "URLs are not allowed in base symbol" }, { status: 400 });
+      const baseSymbol = clean(body.baseSymbol) || symbol;
+
+      const { InventoryUom } = await getTenantModels(auth.tenantId);
+      const existingUom = await InventoryUom.findOne({ name: new RegExp(`^${escapeRegex(name)}$`, "i") });
+      if (existingUom) return Response.json({ error: `UOM "${name}" already exists` }, { status: 409 });
 
       const uom = await InventoryUom.create({
         name,
@@ -334,6 +341,7 @@ export async function POST(req) {
 
     if (action === "item") {
       const errors = [];
+      const fieldErrors = {};
 
       let itemCode = clean(body.itemCode).toUpperCase();
       const name = clean(body.name);
@@ -347,8 +355,9 @@ export async function POST(req) {
 
       if (!name) errors.push("Item name is required");
       else {
-        if (hasUrl(name)) errors.push("URLs are not allowed in item name");
-        if (!isValidName(name)) errors.push("Item name contains invalid characters");
+        if (name.length > 25) errors.push("Item name must not exceed 25 characters");
+        else if ((name.match(/-/g) || []).length > 1) errors.push("Item name can contain at most one hyphen");
+        else if (!/^[A-Za-z0-9 -]*$/.test(name)) errors.push("Item name must contain only letters, numbers, spaces, and one hyphen");
       }
 
       if (!mongoose.Types.ObjectId.isValid(body.category)) errors.push("Category is required");
@@ -505,7 +514,25 @@ export async function POST(req) {
       }
 
       if (errors.length > 0) {
-        return Response.json({ error: errors.join("; ") }, { status: 400 });
+        const fieldMap = {
+          "Item code": "itemCode", "Item name": "name", "Category": "category",
+          "Base UOM": "baseUom", "Generic name": "genericName", "Sub category": "subCategory",
+          "Purchase UOM": "purchaseUom", "Conversion factor": "purchaseToBaseFactor",
+          "Min stock": "minimumStockBase", "Reorder level": "reorderLevelBase",
+          "Max stock": "maximumStockBase", "Opening quantity": "openingQuantityBase",
+          "Manufacturer": "manufacturer", "Supplier": "preferredSupplier",
+          "Batch No": "batchNo", "Location": "defaultLocation",
+          "Storage condition": "storageCondition", "Notes": "notes",
+          "Item type": "itemType", "Status": "status", "Expiry": "expiryDate",
+          "Invalid storage condition": "storageCondition", "Invalid item type": "itemType",
+          "Invalid conversion factor": "conversionFactorUnit",
+        };
+        for (const msg of errors) {
+          for (const [prefix, field] of Object.entries(fieldMap)) {
+            if (msg.startsWith(prefix)) { fieldErrors[field] = msg; break; }
+          }
+        }
+        return Response.json({ error: errors.join("; "), fieldErrors }, { status: 400 });
       }
 
       const quarantineOnReceipt = body.quarantineOnReceipt === true;
@@ -525,31 +552,43 @@ export async function POST(req) {
 
       const effectiveOpeningQty = quarantineOnReceipt ? 0 : openingQty;
 
-      const item = await InventoryItem.create({
-        itemCode,
-        name,
-        genericName,
-        category: body.category,
-        subCategory: body.subCategory,
-        itemType,
-        baseUom: body.baseUom,
-        purchaseUom: body.purchaseUom,
-        purchaseToBaseFactor: numberValue(body.purchaseToBaseFactor, 1),
-        conversionFactorUnit,
-        stockOnHandBase: effectiveOpeningQty,
-        minimumStockBase: numberValue(body.minimumStockBase, 0),
-        reorderLevelBase: numberValue(body.reorderLevelBase, 0),
-        maximumStockBase: numberValue(body.maximumStockBase, 0),
-        preferredSupplier,
-        manufacturer,
-        storageCondition,
-        defaultLocation,
-        trackExpiry: body.trackExpiry !== false,
-        quarantineOnReceipt,
-        status: body.status === "inactive" ? "inactive" : "active",
-        notes: notes || undefined,
-        batches: openingBatch,
-      });
+      let item;
+      try {
+        item = await InventoryItem.create({
+          itemCode,
+          name,
+          genericName,
+          category: body.category,
+          subCategory: body.subCategory,
+          itemType,
+          baseUom: body.baseUom,
+          purchaseUom: body.purchaseUom,
+          purchaseToBaseFactor: numberValue(body.purchaseToBaseFactor, 1),
+          conversionFactorUnit,
+          stockOnHandBase: effectiveOpeningQty,
+          minimumStockBase: numberValue(body.minimumStockBase, 0),
+          reorderLevelBase: numberValue(body.reorderLevelBase, 0),
+          maximumStockBase: numberValue(body.maximumStockBase, 0),
+          preferredSupplier,
+          manufacturer,
+          storageCondition,
+          defaultLocation,
+          trackExpiry: body.trackExpiry !== false,
+          quarantineOnReceipt,
+          status: body.status === "inactive" ? "inactive" : "active",
+          notes: notes || undefined,
+          batches: openingBatch,
+        });
+      } catch (err) {
+        if (err.name === "ValidationError") {
+          const fe = {};
+          for (const [field, detail] of Object.entries(err.errors)) {
+            fe[field] = detail.message;
+          }
+          return Response.json({ error: Object.values(fe).join("; "), fieldErrors: fe }, { status: 400 });
+        }
+        throw err;
+      }
 
       if (openingQty > 0 && !quarantineOnReceipt) {
         await InventoryMovement.create({
@@ -584,14 +623,14 @@ export async function POST(req) {
       if (!item) return Response.json({ error: "Inventory item not found" }, { status: 404 });
 
       const movementType = clean(body.movementType);
-      const allowedTypes = new Set(["receipt", "issue", "adjustment", "transfer", "wastage", "expiry"]);
+      const allowedTypes = new Set(["receipt", "issue", "adjustment", "transfer", "wastage", "expiry", "purchase"]);
       if (!allowedTypes.has(movementType)) {
         return Response.json({ error: "Valid movement type is required" }, { status: 400 });
       }
 
-      if (movementType === "receipt") {
+      if (movementType === "receipt" || movementType === "purchase") {
         const supplier = clean(body.supplier);
-        if (!supplier) return Response.json({ error: "Supplier is required for receipt" }, { status: 400 });
+        if (!supplier) return Response.json({ error: "Supplier is required" }, { status: 400 });
         if (!isValidName(supplier)) return Response.json({ error: "Supplier contains invalid characters" }, { status: 400 });
         if (hasUrl(supplier)) return Response.json({ error: "URLs are not allowed in supplier" }, { status: 400 });
       } else {
@@ -630,7 +669,7 @@ export async function POST(req) {
         }
       }
 
-      if (movementType === "receipt") {
+      if (movementType === "receipt" || movementType === "purchase") {
         const batchData = {
           batchNo: clean(body.batchNo) || `BATCH-${Date.now()}`,
           supplier: clean(body.supplier),

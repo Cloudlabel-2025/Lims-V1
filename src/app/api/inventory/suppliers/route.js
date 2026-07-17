@@ -39,7 +39,7 @@ export async function GET(req) {
     }
 
     const { InventorySupplier } = await getTenantModels(auth.tenantId);
-    const suppliers = await InventorySupplier.find(query).sort({ name: 1 }).lean();
+    const suppliers = await InventorySupplier.find(query).populate("items", "name itemCode").sort({ name: 1 }).lean();
 
     return Response.json({ suppliers });
   } catch (error) {
@@ -86,6 +86,8 @@ export async function POST(req) {
       return Response.json({ error: "Rating must be between 1 and 5" }, { status: 400 });
     }
 
+    const manufacturer = clean(body.manufacturer);
+
     const { InventorySupplier } = await getTenantModels(auth.tenantId);
     const exists = await InventorySupplier.findOne({ code: code.toUpperCase() });
     if (exists) return Response.json({ error: "A supplier with this code already exists" }, { status: 409 });
@@ -100,6 +102,8 @@ export async function POST(req) {
       leadTimeDays: Number.isFinite(leadTimeDays) ? leadTimeDays : 7,
       rating: Number.isFinite(rating) ? rating : 3,
       notes: clean(body.notes) || undefined,
+      manufacturer: manufacturer || undefined,
+      items: Array.isArray(body.items) ? body.items : undefined,
     });
 
     writeAuditLog(req, auth, {
