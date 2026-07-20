@@ -3,6 +3,7 @@ import { jsonError } from "@/app/lib/api-response";
 import { writeAuditLog } from "@/app/lib/audit";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
+import { processExpiredBatches } from "@/app/lib/inventory-expiry";
 
 function clean(value) {
   return String(value || "").trim();
@@ -70,6 +71,8 @@ export async function PATCH(req, context) {
     const auth = await requireInventory(req);
     if (auth.error) return auth.error;
 
+    await processExpiredBatches(auth.tenantId);
+
     const { id } = await context.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return Response.json({ error: "Invalid item id" }, { status: 400 });
@@ -111,41 +114,26 @@ export async function PATCH(req, context) {
 
     if (body.name !== undefined && body.name !== null && clean(body.name)) {
       const v = clean(body.name);
-      if (v.length > 25) return Response.json(fieldError("Item name must not exceed 25 characters"), { status: 400 });
+      if (v.length > 60) return Response.json(fieldError("Item name must not exceed 60 characters"), { status: 400 });
       if ((v.match(/-/g) || []).length > 1) return Response.json(fieldError("Item name can contain at most one hyphen"), { status: 400 });
       if (!/^[A-Za-z0-9 -]*$/.test(v)) return Response.json(fieldError("Item name must contain only letters, numbers, spaces, and one hyphen"), { status: 400 });
     }
     if (body.genericName !== undefined && clean(body.genericName) && !/^[A-Za-z0-9]+$/.test(clean(body.genericName))) {
       return Response.json(fieldError("Generic name must contain only letters and numbers"), { status: 400 });
     }
-    if (body.genericName !== undefined && clean(body.genericName) && clean(body.genericName).length > 20) {
-      return Response.json(fieldError("Generic name must not exceed 20 characters"), { status: 400 });
+    if (body.genericName !== undefined && clean(body.genericName) && clean(body.genericName).length > 60) {
+      return Response.json(fieldError("Generic name must not exceed 60 characters"), { status: 400 });
     }
     if (body.itemCode !== undefined) {
       const code = clean(body.itemCode);
       if (!isValidItemCode(code)) return Response.json(fieldError("Item code must contain only capital letters, numbers, and hyphens"), { status: 400 });
       if (code.length > 15) return Response.json(fieldError("Item code must not exceed 15 characters"), { status: 400 });
     }
-    if (body.preferredSupplier !== undefined) {
-      const s = clean(body.preferredSupplier);
-      if (s.length > 20) return Response.json(fieldError("Supplier must not exceed 20 characters"), { status: 400 });
-      if (s && !/^[A-Z][A-Za-z\s]*$/.test(s)) return Response.json(fieldError("Supplier must contain only letters and spaces, starting with a capital letter"), { status: 400 });
-    }
-    if (body.manufacturer !== undefined) {
-      const m = clean(body.manufacturer);
-      if (m.length > 20) return Response.json(fieldError("Manufacturer must not exceed 20 characters"), { status: 400 });
-      if (m && !/^[A-Z][A-Za-z\s]*$/.test(m)) return Response.json(fieldError("Manufacturer must contain only letters and spaces, starting with a capital letter"), { status: 400 });
-    }
     if (body.storageCondition !== undefined && clean(body.storageCondition)) {
       const validConditions = await InventoryStorageCondition.find({}).lean();
       if (validConditions.length > 0 && !validConditions.some((c) => c.name === clean(body.storageCondition))) {
         return Response.json(fieldError("Invalid storage condition"), { status: 400 });
       }
-    }
-    if (body.defaultLocation !== undefined) {
-      const loc = clean(body.defaultLocation);
-      if (loc.length > 75) return Response.json(fieldError("Location must not exceed 75 characters"), { status: 400 });
-      if (loc && !/^[A-Za-z0-9 .,\/-]*$/.test(loc)) return Response.json(fieldError("Location must contain only letters, numbers, spaces, and symbols . , / -"), { status: 400 });
     }
     if (body.purchaseToBaseFactor !== undefined) {
       if (isExponential(body.purchaseToBaseFactor)) return Response.json(fieldError("Exponential notation is not allowed in conversion factor"), { status: 400 });
@@ -210,8 +198,8 @@ export async function PATCH(req, context) {
     const populated = await InventoryItem.findById(item._id)
       .populate("category", "name code")
       .populate("subCategory", "name code")
-      .populate("baseUom", "name symbol type conversionToBase")
-      .populate("purchaseUom", "name symbol type conversionToBase");
+      .populate("baseUom", "name symbol type baseSymbol conversionToBase")
+      .populate("purchaseUom", "name symbol type baseSymbol conversionToBase");
 
     return Response.json({ item: populated });
   } catch (error) {

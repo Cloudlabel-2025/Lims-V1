@@ -126,7 +126,11 @@ function renderBarHorizontal(data, dataKey, nameKey, height) {
         <XAxis type="number" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
         <YAxis dataKey={nameKey} type="category" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} width={140} />
         <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-        <Bar dataKey={dataKey} fill="var(--primary)" radius={[0, 4, 4, 0]} />
+        <Bar dataKey={dataKey} radius={[0, 4, 4, 0]}>
+          {data.map((entry, i) => (
+            <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
@@ -268,7 +272,11 @@ export default function AnalyticsPage() {
                 <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
+                  {data.revenueSeries.map((entry, i) => (
+                    <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Bar>
               </BarChart>
             ) : (
               <LineChart data={data.revenueSeries}>
@@ -318,7 +326,11 @@ export default function AnalyticsPage() {
                 <XAxis type="number" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <YAxis dataKey="_id" type="category" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} width={140} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="count" fill="#7c3aed" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {data.testVolume.map((entry, i) => (
+                    <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Bar>
               </BarChart>
             ) : (
               <PieChart>
@@ -343,7 +355,11 @@ export default function AnalyticsPage() {
                   <XAxis type="number" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} width={140} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="bills" fill="#0d9488" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="bills" radius={[0, 4, 4, 0]}>
+                    {data.doctorReferrals.map((entry, i) => (
+                      <Cell key={entry.doctorId || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               ) : (
                 <>
@@ -481,7 +497,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 18 }}>
             <div className="chart-card">
               <div className="chart-card-header">
                 <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.barChart}</span> Revenue Trend</div>
@@ -491,7 +507,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
               {data.revenueSeries?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={350}>
                   {revenueView === "area" ? (
                     <AreaChart data={data.revenueSeries}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -506,7 +522,11 @@ export default function AnalyticsPage() {
                       <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                      <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
+                          {data.revenueSeries.map((entry, i) => (
+                            <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Bar>
                     </BarChart>
                   ) : revenueView === "composed" ? (
                     <ComposedChart data={data.revenueSeries}>
@@ -515,7 +535,11 @@ export default function AnalyticsPage() {
                       <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                      <Bar yAxisId="left" dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="revenue" radius={[4, 4, 0, 0]}>
+                        {data.revenueSeries.map((entry, i) => (
+                          <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Bar>
                       <Line yAxisId="right" type="monotone" dataKey="bills" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
                     </ComposedChart>
             ) : revenueView === "composed" ? (
@@ -525,7 +549,11 @@ export default function AnalyticsPage() {
                 <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                <Bar yAxisId="left" dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="revenue" radius={[4, 4, 0, 0]}>
+                  {data.revenueSeries.map((entry, i) => (
+                    <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Bar>
                 <Line yAxisId="right" type="monotone" dataKey="bills" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
               </ComposedChart>
             ) : (
@@ -555,7 +583,7 @@ export default function AnalyticsPage() {
                 <StatusPills counts={data.reportStatusCounts} />
               ) : (
                 data.reportStatusCounts?.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
                         data={data.reportStatusCounts}
@@ -563,8 +591,8 @@ export default function AnalyticsPage() {
                         nameKey="_id"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
-                        innerRadius={reportView === "donut" ? 50 : 0}
+                        outerRadius={110}
+                        innerRadius={reportView === "donut" ? 60 : 0}
                         paddingAngle={2}
                       >
                         {data.reportStatusCounts.map((entry) => (
@@ -582,7 +610,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 18 }}>
             <div className="chart-card">
               <div className="chart-card-header">
                 <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.clock}</span> Sample Status</div>
@@ -595,7 +623,7 @@ export default function AnalyticsPage() {
                 <StatusPills counts={data.sampleStatusCounts} />
               ) : (
                 data.sampleStatusCounts?.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
                         data={data.sampleStatusCounts}
@@ -603,8 +631,8 @@ export default function AnalyticsPage() {
                         nameKey="_id"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
-                        innerRadius={sampleView === "donut" ? 50 : 0}
+                        outerRadius={110}
+                        innerRadius={sampleView === "donut" ? 60 : 0}
                         paddingAngle={2}
                       >
                         {data.sampleStatusCounts.map((entry) => (
@@ -631,13 +659,17 @@ export default function AnalyticsPage() {
               </div>
               {data.testVolume?.length > 0 ? (
                 testsView === "bar" ? (
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={350}>
                     <BarChart data={data.testVolume} layout="vertical" margin={{ left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis type="number" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <YAxis dataKey="_id" type="category" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} width={140} />
                       <Tooltip content={<ChartTooltip />} />
-                      <Bar dataKey="count" fill="#7c3aed" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                        {data.testVolume.map((entry, i) => (
+                          <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -659,7 +691,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div className="chart-card">
               <div className="chart-card-header">
                 <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.stethoscope}</span> Doctor Referrals</div>
@@ -671,13 +703,17 @@ export default function AnalyticsPage() {
               {data.doctorReferrals?.length > 0 ? (
                 <>
                   {doctorView === "bar" ? (
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer width="100%" height={350}>
                       <BarChart data={data.doctorReferrals} layout="vertical" margin={{ left: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                         <XAxis type="number" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                         <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} width={140} />
                         <Tooltip content={<ChartTooltip />} />
-                        <Bar dataKey="bills" fill="#0d9488" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="bills" radius={[0, 4, 4, 0]}>
+                          {data.doctorReferrals.map((entry, i) => (
+                            <Cell key={entry.doctorId || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -722,7 +758,7 @@ export default function AnalyticsPage() {
             </div>
 
             {(hasExpenses || hasInventory) && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <>
                 {hasExpenses ? (
                   <div className="chart-card">
                     <div className="chart-card-header">
@@ -733,8 +769,8 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
                     {expenseView === "bar"
-                      ? renderBarHorizontal(data.expenseBreakdown, "amount", "_id", 250)
-                      : renderPieDonut(data.expenseBreakdown, "amount", "_id", 250, expenseView === "donut" ? 50 : 0)}
+                      ? renderBarHorizontal(data.expenseBreakdown, "amount", "_id", 350)
+                      : renderPieDonut(data.expenseBreakdown, "amount", "_id", 350, expenseView === "donut" ? 60 : 0)}
                     <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                       <ExpenseTable data={data.expenseBreakdown} />
                     </div>
@@ -754,8 +790,8 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
                     {inventoryView === "bar"
-                      ? renderBarHorizontal(data.inventoryValuation, "totalValue", "_id", 250)
-                      : renderPieDonut(data.inventoryValuation, "totalValue", "_id", 250, inventoryView === "donut" ? 50 : 0)}
+                      ? renderBarHorizontal(data.inventoryValuation, "totalValue", "_id", 350)
+                      : renderPieDonut(data.inventoryValuation, "totalValue", "_id", 350, inventoryView === "donut" ? 60 : 0)}
                     <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                       <InventoryTable data={data.inventoryValuation} />
                     </div>
@@ -765,7 +801,7 @@ export default function AnalyticsPage() {
                     <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>No inventory data</div>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </>

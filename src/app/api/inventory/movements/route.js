@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { jsonError } from "@/app/lib/api-response";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
+import { processExpiredBatches } from "@/app/lib/inventory-expiry";
 
 function clean(value) {
   return String(value || "").trim();
@@ -23,6 +24,8 @@ export async function GET(req) {
   try {
     const auth = await requireInventory(req);
     if (auth.error) return auth.error;
+
+    await processExpiredBatches(auth.tenantId);
 
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
@@ -57,7 +60,7 @@ export async function GET(req) {
 
     const [movements, total] = await Promise.all([
       InventoryMovement.find(filter)
-        .populate("item", "name itemCode")
+        .populate({ path: "item", select: "name itemCode baseUom", populate: { path: "baseUom", select: "symbol baseSymbol" } })
         .sort({ movementDate: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)

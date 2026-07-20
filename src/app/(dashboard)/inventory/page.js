@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 
@@ -13,19 +13,20 @@ const emptyItem = {
   subCategory: "",
   baseUom: "",
   purchaseUom: "",
-  purchaseToBaseFactor: 1,
-  openingQuantityBase: 0,
+  purchaseToBaseFactor: "",
+  openingQuantityBase: "",
   conversionFactorUnit: "mg",
-  minimumStockBase: 0,
-  reorderLevelBase: 0,
-  maximumStockBase: 0,
+  minimumStockBase: "",
+  reorderLevelBase: "",
+  maximumStockBase: "",
   preferredSupplier: "",
+  preferredSupplierRef: "",
   manufacturer: "",
   storageCondition: "",
   defaultLocation: "",
   batchNo: "",
   expiryDate: "",
-  costPerBaseUnit: 0,
+  costPerBaseUnit: "",
   trackExpiry: true,
   quarantineOnReceipt: false,
   status: "active",
@@ -35,15 +36,15 @@ const emptyItem = {
 const emptyMovement = {
   itemId: "",
   batchId: "",
-  movementType: "receipt",
-  quantityBase: 0,
-  newBalanceBase: 0,
+  movementType: "purchase",
+  quantityBase: "",
+  newBalanceBase: "",
   batchNo: "",
   supplier: "",
   expiryDate: "",
   receivedDate: "",
   movementDate: new Date().toISOString().split("T")[0],
-  costPerBaseUnit: 0,
+  costPerBaseUnit: "",
   referenceNo: "",
   reason: "",
   toLocation: "",
@@ -51,7 +52,7 @@ const emptyMovement = {
   poNumber: "",
   orderDate: "",
   expectedDeliveryDate: "",
-  purchaseItems: [{ item: "", quantity: 1, unitCost: 0, notes: "" }],
+  purchaseItems: [{ item: "", quantity: "", unitCost: "", notes: "" }],
 };
 
 function Field({ label, children }) {
@@ -65,19 +66,20 @@ function Field({ label, children }) {
 
 function StatCard({ icon, label, value, tone }) {
   return (
-    <div className="form-card" style={{ padding: 18, borderRadius: 8, minHeight: 104 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 700 }}>{label}</div>
-          <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: "var(--text-primary)" }}>{value}</div>
+    <div className="form-card" style={{ padding: 18, borderRadius: 8, minHeight: 104, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+          <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
         </div>
         <div
           style={{
-            width: 42,
-            height: 42,
+            width: 40,
+            height: 40,
             borderRadius: 8,
             display: "grid",
             placeItems: "center",
+            flexShrink: 0,
             color: tone || "var(--brand-action, var(--primary))",
             background: "var(--surface)",
             border: "1px solid var(--border)",
@@ -113,6 +115,11 @@ function formatNumber(value) {
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function isExponential(value) {
@@ -165,7 +172,7 @@ function validateExpiryDate(value) {
 }
 
 function ErrorMsg({ message }) {
-  return message ? <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{message}</small> : null;
+  return message ? <small style={{ color: "#dc2626", fontSize: 10, display: "block", marginTop: 2 }}>{message}</small> : null;
 }
 
 function inputStyle() {
@@ -220,7 +227,7 @@ export default function InventoryPage() {
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryForm, setCategoryForm] = useState({ name: "", code: "", parentCategory: "", description: "" });
   const [categoryFormErrors, setCategoryFormErrors] = useState({});
-  const [uomForm, setUomForm] = useState({ name: "", symbol: "", type: "count", conversionToBase: 1, baseSymbol: "" });
+  const [uomForm, setUomForm] = useState({ name: "", symbol: "", type: "count", conversionToBase: "", baseSymbol: "" });
   const [uomFormErrors, setUomFormErrors] = useState({});
   const [editingUomId, setEditingUomId] = useState(null);
   const [deleteUomTarget, setDeleteUomTarget] = useState(null);
@@ -234,6 +241,12 @@ export default function InventoryPage() {
   const [movementFormErrors, setMovementFormErrors] = useState({});
   const [movementPage, setMovementPage] = useState(1);
   const [movementFilters, setMovementFilters] = useState({ type: "", search: "", dateFrom: "", dateTo: "" });
+  const movementFiltersRef = useRef(movementFilters);
+  function applyMovementFilters(patch) {
+    const next = typeof patch === "function" ? patch(movementFiltersRef.current) : patch;
+    movementFiltersRef.current = next;
+    setMovementFilters(next);
+  }
   const [movementData, setMovementData] = useState([]);
   const [movementPagination, setMovementPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
   const [suppliers, setSuppliers] = useState([]);
@@ -257,6 +270,8 @@ export default function InventoryPage() {
   const [editingStorageConditionId, setEditingStorageConditionId] = useState(null);
   const [showStorageConditionInput, setShowStorageConditionInput] = useState(false);
   const [deleteStorageConditionTarget, setDeleteStorageConditionTarget] = useState(null);
+  const [showExpiredBanner, setShowExpiredBanner] = useState(false);
+  const [dashboardFilter, setDashboardFilter] = useState("all");
 
   const actionBtnStyle = { width: 30, height: 30, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", border: "none" };
 
@@ -266,13 +281,21 @@ export default function InventoryPage() {
 
   const filteredItems = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase();
-    if (!needle) return inventory.items;
-    return inventory.items.filter((item) =>
-      [item.name, item.itemCode, item.genericName, item.manufacturer, item.category?.name, item.subCategory?.name]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle))
-    );
-  }, [inventory.items, searchQuery]);
+    let items = inventory.items;
+    if (needle) {
+      items = items.filter((item) =>
+        [item.name, item.itemCode, item.genericName, item.manufacturer, item.category?.name, item.subCategory?.name]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle))
+      );
+    }
+    if (dashboardFilter === "low") {
+      items = items.filter((item) => (item.stockOnHandBase || 0) <= item.minimumStockBase);
+    } else if (dashboardFilter === "reorder") {
+      items = items.filter((item) => item.reorderLevelBase && (item.stockOnHandBase || 0) <= item.reorderLevelBase);
+    }
+    return items;
+  }, [inventory.items, searchQuery, dashboardFilter]);
 
   async function loadInventory(page) {
     setLoading(true);
@@ -289,6 +312,10 @@ export default function InventoryPage() {
       setItemTypes(data.itemTypes || []);
       setStorageConditions(data.storageConditions || []);
       setItemPagination(data.pagination || { page: page || 1, limit: 20, total: data.items?.length || 0, totalPages: 1 });
+      const hasUnprocessedExpired = (data.items || []).some((item) =>
+        (item.batches || []).some((batch) => batch.expiryDate && new Date(batch.expiryDate) < new Date() && batch.status === "available" && batch.quantityBase > 0)
+      );
+      setShowExpiredBanner(hasUnprocessedExpired);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -307,6 +334,12 @@ export default function InventoryPage() {
   useEffect(() => {
     if (activeTab === "movements" || activeTab === "stock") loadMovements(1);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(""), 10000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   useEffect(() => {
     if (activeTab === "suppliers" || activeTab === "items" || activeTab === "stock") {
@@ -359,11 +392,12 @@ export default function InventoryPage() {
 
   async function loadMovements(pageNum) {
     const p = pageNum || movementPage;
+    const filters = movementFiltersRef.current;
     const params = new URLSearchParams({ page: p, limit: 50 });
-    if (movementFilters.type) params.set("type", movementFilters.type);
-    if (movementFilters.search) params.set("search", movementFilters.search);
-    if (movementFilters.dateFrom) params.set("dateFrom", movementFilters.dateFrom);
-    if (movementFilters.dateTo) params.set("dateTo", movementFilters.dateTo);
+    if (filters.type) params.set("type", filters.type);
+    if (filters.search) params.set("search", filters.search);
+    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+    if (filters.dateTo) params.set("dateTo", filters.dateTo);
     try {
       const r = await fetch(`/api/inventory/movements?${params}`);
       const d = await r.json();
@@ -381,12 +415,11 @@ export default function InventoryPage() {
     else if (itemForm.itemCode && !isValidItemCode(itemForm.itemCode)) errors.itemCode = "Item code must contain only capital letters, numbers, and hyphens";
     if (itemForm.itemCode && itemForm.itemCode.length > 15) errors.itemCode = "Item code must not exceed 15 characters";
     if (!itemForm.name) errors.name = "Item name is required";
-    else if (itemForm.name.length > 25) errors.name = "Name must not exceed 25 characters";
-    else if ((itemForm.name.match(/-/g) || []).length > 1) errors.name = "Name can contain at most one hyphen";
-    else if (!/^[A-Za-z0-9 -]*$/.test(itemForm.name)) errors.name = "Name must contain only letters, numbers, spaces, and one hyphen";
+    else if (itemForm.name.length > 60) errors.name = "Name must not exceed 60 characters";
+    else if (!/^[A-Za-z0-9 -]*$/.test(itemForm.name)) errors.name = "Name must contain only letters, numbers, spaces, and hyphens";
     if (!itemForm.genericName) errors.genericName = "Generic name is required";
     else if (!/^[A-Za-z0-9]*$/.test(itemForm.genericName)) errors.genericName = "Generic name must contain only letters and numbers";
-    else if (itemForm.genericName.length > 20) errors.genericName = "Generic name must not exceed 20 characters";
+    else if (itemForm.genericName.length > 60) errors.genericName = "Generic name must not exceed 60 characters";
     const validConvUnits = ["mg", "g", "kg", "ml", "l", "IU", "µg", "unit", "pack", "oz", "lb"];
     if (!itemForm.conversionFactorUnit) errors.conversionFactorUnit = "Conversion factor unit is required";
     else if (!validConvUnits.includes(itemForm.conversionFactorUnit)) errors.conversionFactorUnit = "Invalid conversion factor unit";
@@ -438,8 +471,6 @@ export default function InventoryPage() {
       else if (!/^[A-Za-z0-9]*$/.test(itemForm.batchNo)) errors.batchNo = "Only letters and numbers allowed";
       else if (itemForm.batchNo.length > 15) errors.batchNo = "Batch No must not exceed 15 characters";
     }
-    if (!itemForm.manufacturer) errors.manufacturer = "Manufacturer is required";
-    if (!itemForm.preferredSupplier) errors.preferredSupplier = "Supplier is required";
     if (!itemForm.storageCondition) errors.storageCondition = "Storage condition is required";
     else if (storageConditions.length > 0 && !storageConditions.some((c) => c.name === itemForm.storageCondition)) {
       errors.storageCondition = "Invalid storage condition";
@@ -518,12 +549,13 @@ export default function InventoryPage() {
       subCategory: item.subCategory?._id || "",
       baseUom: item.baseUom?._id || "",
       purchaseUom: item.purchaseUom?._id || "",
-      purchaseToBaseFactor: item.purchaseToBaseFactor || 1,
+      purchaseToBaseFactor: item.purchaseToBaseFactor ?? "",
       conversionFactorUnit: item.conversionFactorUnit || "mg",
-      minimumStockBase: item.minimumStockBase || 0,
-      reorderLevelBase: item.reorderLevelBase || 0,
-      maximumStockBase: item.maximumStockBase || 0,
-      preferredSupplier: item.preferredSupplier || "",
+      minimumStockBase: item.minimumStockBase ?? "",
+      reorderLevelBase: item.reorderLevelBase ?? "",
+      maximumStockBase: item.maximumStockBase ?? "",
+      preferredSupplier: item.preferredSupplierRef?.name || item.preferredSupplier || "",
+      preferredSupplierRef: item.preferredSupplierRef?._id || "",
       manufacturer: item.manufacturer || "",
       storageCondition: item.storageCondition || "",
       defaultLocation: item.defaultLocation || "",
@@ -601,6 +633,13 @@ export default function InventoryPage() {
       )}
       <SuccessDialog message={successMessage} onClose={() => setSuccessMessage("")} />
 
+      {showExpiredBanner && (
+        <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>⚠️</span>
+          Some batches have expired and will be processed automatically.
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         {tabs.map(([key, label, icon]) => (
           <button
@@ -630,7 +669,31 @@ export default function InventoryPage() {
                 <StatCard icon={Icons.trash} label="Expired Batches" value={inventory.stats.expiredBatches || 0} tone="#b91c1c" />
                 <StatCard icon={Icons.list} label="Stock Value" value={`Rs ${formatNumber(inventory.stats.inventoryValue)}`} />
               </div>
-              <InventoryTable items={filteredItems} onEdit={editItem} />
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>Filter:</span>
+                {[
+                  { key: "all", label: "All", tone: "info" },
+                  { key: "low", label: "Low Stock", tone: "warn" },
+                  { key: "reorder", label: "Reorder Due", tone: "danger" },
+                ].map((chip) => (
+                  <button key={chip.key} type="button" onClick={() => setDashboardFilter(chip.key)} style={{
+                    padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 700, transition: "all 0.15s",
+                    background: dashboardFilter === chip.key
+                      ? ({ info: "#eff6ff", warn: "#fffbeb", danger: "#fef2f2" })[chip.tone]
+                      : "var(--surface)",
+                    color: dashboardFilter === chip.key
+                      ? ({ info: "#1d4ed8", warn: "#b45309", danger: "#b91c1c" })[chip.tone]
+                      : "var(--text-muted)",
+                    boxShadow: dashboardFilter === chip.key ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                  }}>{chip.label}</button>
+                ))}
+              </div>
+              <InventoryTable items={filteredItems} onEdit={editItem} onOrder={(item) => {
+                setMovementForm({ ...emptyMovement, movementType: "purchase", purchaseItems: [{ item: item._id, quantity: "", unitCost: "", notes: "" }] });
+                setMovementFormErrors({});
+                setActiveTab("stock");
+              }} />
             </div>
           )}
 
@@ -675,13 +738,13 @@ export default function InventoryPage() {
                 </div>
                 <div className="col-md-6">
                   <Field label="Item Name">
-                    <input className="lims-input" required minLength={2} maxLength={25} value={itemForm.name} onChange={(e) => { const v = e.target.value; if (v.length > 25) return; if ((v.match(/-/g) || []).length > 1) return; if (v && !/^[A-Za-z0-9 -]*$/.test(v)) return; setItemFormErrors((p) => ({ ...p, name: "" })); setItemForm({ ...itemForm, name: v }); }} style={inputStyle()} />
+                    <input className="lims-input" required minLength={2} maxLength={60} value={itemForm.name} onChange={(e) => { const v = e.target.value; if (v.length > 60) return; if (v && !/^[A-Za-z0-9 -]*$/.test(v)) return; setItemFormErrors((p) => ({ ...p, name: "" })); setItemForm({ ...itemForm, name: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.name} />
                   </Field>
                 </div>
                 <div className="col-md-6">
                   <Field label="Generic / Alternate Name">
-                    <input className="lims-input" required maxLength={20} value={itemForm.genericName} onChange={(e) => { const v = e.target.value; if (v && !/^[A-Za-z0-9]*$/.test(v)) { setItemFormErrors((p) => ({ ...p, genericName: "Only letters and numbers allowed" })); return; } setItemFormErrors((p) => ({ ...p, genericName: "" })); setItemForm({ ...itemForm, genericName: v }); }} style={inputStyle()} />
+                    <input className="lims-input" required maxLength={60} value={itemForm.genericName} onChange={(e) => { const v = e.target.value; if (v && !/^[A-Za-z0-9]*$/.test(v)) { setItemFormErrors((p) => ({ ...p, genericName: "Only letters and numbers allowed" })); return; } setItemFormErrors((p) => ({ ...p, genericName: "" })); setItemForm({ ...itemForm, genericName: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.genericName} />
                   </Field>
                 </div>
@@ -807,20 +870,20 @@ export default function InventoryPage() {
                 )}
                 <div className="col-md-6">
                   <Field label="Manufacturer">
-                    <select required className="lims-input" value={itemForm.manufacturer} onChange={(e) => { setItemFormErrors((p) => ({ ...p, manufacturer: "" })); setItemForm({ ...itemForm, manufacturer: e.target.value }); }} style={{ ...inputStyle(), width: "100%" }}>
+                    <select className="lims-input" value={itemForm.manufacturer} onChange={(e) => { setItemFormErrors((p) => ({ ...p, manufacturer: "" })); setItemForm({ ...itemForm, manufacturer: e.target.value, preferredSupplierRef: "", preferredSupplier: "" }); }} style={{ ...inputStyle(), width: "100%" }}>
                       <option value="">-- Select --</option>
-                      {[...new Set(suppliers.filter((s) => s.manufacturer).map((s) => s.manufacturer))].map((m) => <option key={m} value={m}>{m}</option>)}
+                      {suppliers.filter((s) => s.manufacturer).reduce((acc, s) => { if (!acc.includes(s.manufacturer)) acc.push(s.manufacturer); return acc; }, []).map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                     <ErrorMsg message={itemFormErrors.manufacturer} />
                   </Field>
                 </div>
                 <div className="col-md-6">
                   <Field label="Supplier">
-                    <select required className="lims-input" value={itemForm.preferredSupplier} onChange={(e) => { setItemFormErrors((p) => ({ ...p, preferredSupplier: "" })); setItemForm({ ...itemForm, preferredSupplier: e.target.value }); }} style={{ ...inputStyle(), width: "100%" }}>
+                    <select className="lims-input" value={itemForm.preferredSupplierRef} onChange={(e) => { setItemFormErrors((p) => ({ ...p, preferredSupplierRef: "" })); const id = e.target.value; const s = suppliers.find((x) => x._id === id); setItemForm({ ...itemForm, preferredSupplierRef: id, preferredSupplier: s?.name || "" }); }} style={{ ...inputStyle(), width: "100%" }}>
                       <option value="">-- Select --</option>
-                      {suppliers.filter((s) => s.status === "active").map((s) => <option key={s._id} value={s.name}>{s.name}</option>)}
+                      {suppliers.filter((s) => s.status === "active" && (!itemForm.manufacturer || s.manufacturer === itemForm.manufacturer)).map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
                     </select>
-                    <ErrorMsg message={itemFormErrors.preferredSupplier} />
+                    <ErrorMsg message={itemFormErrors.preferredSupplierRef} />
                   </Field>
                 </div>
                 <div className="col-md-6">
@@ -1010,7 +1073,7 @@ export default function InventoryPage() {
                     const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
                     const d = await r.json();
                     if (!r.ok) throw new Error(d.error);
-                    setUomForm({ name: "", symbol: "", type: "count", conversionToBase: 1, baseSymbol: "" });
+                    setUomForm({ name: "", symbol: "", type: "count", conversionToBase: "", baseSymbol: "" });
                     setUomFormErrors({});
                     setEditingUomId(null);
                     setSuccessMessage(`UOM "${d.uom?.symbol || uomForm.symbol}" ${editingUomId ? "updated" : "created"} successfully.`);
@@ -1026,7 +1089,7 @@ export default function InventoryPage() {
                       <select className="lims-input" value={uomForm.type} onChange={(e) => {
                         const newType = e.target.value;
                         const currentMatch = COMMON_UOMS.find((u) => u.symbol === uomForm.symbol && u.type === newType);
-                        setUomForm({ ...uomForm, type: newType, symbol: currentMatch ? uomForm.symbol : "", name: "", baseSymbol: currentMatch ? uomForm.symbol : "", conversionToBase: 1 });
+                        setUomForm({ ...uomForm, type: newType, symbol: currentMatch ? uomForm.symbol : "", name: "", baseSymbol: currentMatch ? uomForm.symbol : "", conversionToBase: "" });
                       }} style={inputStyle()}>
                         {["count", "volume", "weight", "length", "time", "pack", "other"].map((type) => <option key={type} value={type}>{type}</option>)}
                       </select>
@@ -1134,12 +1197,12 @@ export default function InventoryPage() {
                 <>
                   <input className="lims-input" maxLength={35} value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Search suppliers by name, code, contact…" style={{ ...inputStyle(), maxWidth: 300 }} />
                   <MasterTable
-                    headings={["Code", "Name", "Manufacturer", "Items", "Contact", "Email", "Action"]}
+                    headings={["Code", "Name", "Manufacturer", "Items", "Contact", "Phone", "Email", "Action"]}
                     rows={
                       suppliers
                         .filter((s) => {
                           const q = supplierSearch.toLowerCase();
-                          return !q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || (s.contactPerson || "").toLowerCase().includes(q) || (s.manufacturer || "").toLowerCase().includes(q);
+                          return !q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || (s.contactPerson || "").toLowerCase().includes(q) || (s.manufacturer || "").toLowerCase().includes(q) || (s.phone || "").toLowerCase().includes(q) || (s.email || "").toLowerCase().includes(q);
                         })
                         .map((s) => [
                           s.code,
@@ -1147,6 +1210,7 @@ export default function InventoryPage() {
                           s.manufacturer || "—",
                           (s.items || []).map((it) => it.name || it).join(", ") || "—",
                           s.contactPerson || "—",
+                          s.phone || "—",
                           s.email || "—",
                           <div key={s._id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
                             <button type="button" title="Edit" onClick={() => {
@@ -1226,6 +1290,9 @@ export default function InventoryPage() {
               movements={movementData}
               movementPagination={movementPagination}
               onMovementPageChange={(p) => { setMovementPage(p); loadMovements(p); }}
+              filters={movementFilters}
+              setFilters={applyMovementFilters}
+              onFilterSearch={() => loadMovements(1)}
               locations={locations}
               setLocations={setLocations}
               suppliers={suppliers}
@@ -1267,7 +1334,14 @@ export default function InventoryPage() {
                   if (validItems.length === 0) errors.purchaseItems = "At least one line item with item and quantity > 0 is required";
                 } else {
                   if (!movementForm.itemId) errors.itemId = "Item is required";
-                  if (movementForm.movementType !== "receipt" && movementForm.movementType !== "adjustment" && !movementForm.batchId) errors.batchId = "Batch is required";
+                  if (movementForm.movementType === "adjustment") {
+                    const selItem = inventory.items.find((i) => i._id === movementForm.itemId);
+                    if (selItem && (selItem.batches || []).filter((b) => b.quantityBase > 0).length > 0 && !movementForm.batchId) {
+                      errors.batchId = "Batch is required for adjustment";
+                    }
+                  } else if (movementForm.movementType !== "receipt" && !movementForm.batchId) {
+                    errors.batchId = "Batch is required";
+                  }
                   const supplierVal = movementForm.supplier || "";
                   const toLocVal = movementForm.toLocation || "";
                   if (movementForm.movementType === "receipt") {
@@ -1303,6 +1377,22 @@ export default function InventoryPage() {
                     }
                   }
                   if (isExponential(movementForm.quantityBase)) errors.quantityBase = "Exponential notation is not allowed";
+                  if (movementForm.quantityBase !== "" && movementForm.quantityBase !== undefined && movementForm.quantityBase !== null) {
+                    const qtyNum = Number(movementForm.quantityBase);
+                    if (!Number.isInteger(qtyNum)) errors.quantityBase = "Only whole numbers are allowed";
+                    else if (qtyNum < 0) errors.quantityBase = "Quantity cannot be negative";
+                    else if (String(qtyNum).length > 7) errors.quantityBase = "Maximum 7 digits allowed";
+                    else if (selectedMovementItem && movementForm.batchId && movementForm.movementType !== "receipt" && movementForm.movementType !== "adjustment") {
+                      const selBatch = selectedMovementItem.batches?.find((b) => b._id === movementForm.batchId);
+                      if (selBatch) {
+                        const selUnit = movementForm.quantityUnit || selectedMovementItem.baseUom?.symbol || "";
+                        const uom = COMMON_UOMS.find((u) => u.symbol === selUnit);
+                        const conv = uom?.conversionToBase || 1;
+                        const available = selBatch.quantityBase / conv;
+                        if (qtyNum > available) errors.quantityBase = `Cannot exceed available quantity (${formatNumber(available)} ${selUnit})`;
+                      }
+                    }
+                  }
                   if (isExponential(movementForm.newBalanceBase)) errors.newBalanceBase = "Exponential notation is not allowed";
                   else if (movementForm.movementType === "adjustment") {
                     const nbStr = String(movementForm.newBalanceBase || "");
@@ -1351,22 +1441,34 @@ export default function InventoryPage() {
                           batchNo: `PO-${movementForm.poNumber}-${i + 1}`,
                           receivedDate: movementForm.orderDate || new Date().toISOString(),
                           referenceNo: movementForm.poNumber,
-                          reason: `Purchase: ${movementForm.poNumber}`,
+                          reason: `Purchase ${movementForm.poNumber}`,
                           movementDate: movementForm.orderDate || new Date().toISOString(),
                         };
                         const res = await fetch("/api/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(receiptPayload) });
-                        if (res.ok) received++; else failed++;
+                        if (res.ok) { received++; } else {
+                          try { const errData = await res.json(); console.error("Movement failed:", errData); } catch {}
+                          failed++;
+                        }
                       }
-                      setMovementForm({ ...emptyMovement });
+                      setMovementForm({ ...emptyMovement, purchaseItems: [{ item: "", quantity: "", unitCost: "", notes: "" }] });
                       setMovementFormErrors({});
-                      setSuccessMessage(failed > 0
-                        ? `Purchase "${movementForm.poNumber}" — ${received} item(s) received, ${failed} failed`
-                        : `Purchase "${movementForm.poNumber}" — ${received} item(s) received into stock`);
+                      if (failed === 0) {
+                        setSuccessMessage(`Purchase "${movementForm.poNumber}" — ${received} item(s) received into stock`);
+                      } else if (received === 0) {
+                        setError(`Purchase "${movementForm.poNumber}" failed — all ${failed} item(s) could not be received`);
+                      } else {
+                        setSuccessMessage(`Purchase "${movementForm.poNumber}" — ${received} item(s) received, ${failed} failed`);
+                      }
                       await loadInventory(itemPage);
+                      if (typeof loadMovements === "function") loadMovements(1);
                     } catch (err) { setError(err.message); } finally { setSaving(false); }
                   })();
                 } else {
                   let payload = { action: "movement", ...movementForm };
+                  if (payload.movementType === "receipt" && payload.supplier) {
+                    const supplierObj = suppliers.find((s) => s._id === payload.supplier);
+                    if (supplierObj) payload.supplier = supplierObj.name;
+                  }
                   const baseUomSym = selectedMovementItem?.baseUom?.symbol;
                   const qtyUom = payload.quantityUnit || baseUomSym;
                   if (baseUomSym && qtyUom && qtyUom !== baseUomSym) {
@@ -1380,6 +1482,8 @@ export default function InventoryPage() {
                     setMovementForm({ ...emptyMovement, itemId: movementForm.itemId, movementType: movementForm.movementType });
                     setMovementFormErrors({});
                     setSuccessMessage("Stock transaction posted successfully.");
+                  }, (fieldErrors) => {
+                    setMovementFormErrors((prev) => ({ ...prev, ...fieldErrors }));
                   });
                 }
               }}
@@ -1398,7 +1502,7 @@ export default function InventoryPage() {
               movements={movementData}
               pagination={movementPagination}
               filters={movementFilters}
-              setFilters={setMovementFilters}
+              setFilters={applyMovementFilters}
               onPageChange={(p) => { setMovementPage(p); loadMovements(p); }}
               onSearch={() => loadMovements(1)}
             />
@@ -1522,7 +1626,8 @@ export default function InventoryPage() {
   );
 }
 
-function InventoryTable({ items, onEdit }) {
+function InventoryTable({ items, onEdit, onOrder }) {
+  const supplierName = (item) => item.preferredSupplierRef?.name || item.preferredSupplier || "-";
   return (
     <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 1200 }}>
@@ -1562,10 +1667,17 @@ function InventoryTable({ items, onEdit }) {
                 <td style={{ padding: "12px 14px" }}>{formatNumber(item.minimumStockBase)} / {formatNumber(item.reorderLevelBase)} / {formatNumber(item.maximumStockBase)}</td>
                 <td style={{ padding: "12px 14px" }}>{latestBatch?.batchNo || "-"}</td>
                 <td style={{ padding: "12px 14px" }}>{item.manufacturer || "-"}</td>
-                <td style={{ padding: "12px 14px" }}>{item.preferredSupplier || "-"}</td>
+                <td style={{ padding: "12px 14px" }}>{supplierName(item)}</td>
                 <td style={{ padding: "12px 14px" }}>{item.defaultLocation || "-"}</td>
                 <td style={{ padding: "12px 14px" }}><Badge tone={expiryTone}>{item.expiredBatches ? "Expired" : item.nearExpiryBatches ? "Near expiry" : formatDate(item.nextExpiryDate)}</Badge></td>
-                <td style={{ padding: "12px 14px" }}><Badge tone={reorder ? "warn" : low ? "danger" : "good"}>{reorder ? "Reorder" : low ? "Low" : "OK"}</Badge></td>
+                <td style={{ padding: "12px 14px" }}>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <Badge tone={reorder ? "warn" : low ? "danger" : "good"}>{reorder ? "Reorder" : low ? "Low" : "OK"}</Badge>
+                    {onOrder && reorder && (
+                      <button type="button" title="Order" onClick={() => onOrder(item)} style={{ width: 30, height: 30, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534" }}>+</button>
+                    )}
+                  </div>
+                </td>
                 <td style={{ padding: "12px 14px" }}><button className="btn-lims-secondary" onClick={() => onEdit(item)} style={{ height: 32, padding: "0 10px" }}>{Icons.edit}</button></td>
               </tr>
             );
@@ -1624,18 +1736,17 @@ function MasterTable({ headings, rows }) {
   );
 }
 
-function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {}, setErrors, viewMode, onRelease, movements = [], movementPagination = {}, onMovementPageChange, locations = [], setLocations, suppliers = [], inventory = { items: [] } }) {
+function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {}, setErrors, viewMode, onRelease, movements = [], movementPagination = {}, onMovementPageChange, locations = [], setLocations, suppliers = [], inventory = { items: [] }, filters = {}, setFilters, onFilterSearch }) {
   const isAdjustment = form.movementType === "adjustment";
   const isReceipt = form.movementType === "receipt";
   const isPurchase = form.movementType === "purchase";
   const actionBtnStyle = { width: 30, height: 30, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", border: "none" };
   const baseUomSymbol = item?.baseUom?.symbol || "";
-  const baseUomBaseSymbol = item?.baseUom?.baseSymbol || baseUomSymbol;
   const availableUoms = useMemo(() => {
-    const fromCommon = COMMON_UOMS.filter((u) => u.baseSymbol === baseUomBaseSymbol);
-    if (fromCommon.length === 0 && baseUomSymbol) fromCommon.push({ symbol: baseUomSymbol, name: baseUomSymbol, baseSymbol: baseUomSymbol, conversionToBase: 1 });
+    const fromCommon = COMMON_UOMS.filter((u) => u.type === "count" || u.type === "pack");
+    if (baseUomSymbol && !fromCommon.some((u) => u.symbol === baseUomSymbol)) fromCommon.push({ symbol: baseUomSymbol, name: baseUomSymbol, baseSymbol: baseUomSymbol, conversionToBase: 1 });
     return fromCommon;
-  }, [baseUomBaseSymbol, baseUomSymbol]);
+  }, [baseUomSymbol]);
 
   const [locMode, setLocMode] = useState(null);
   const [locForm, setLocForm] = useState({ name: "", code: "" });
@@ -1698,22 +1809,43 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
     return (
       <div className="form-card" style={{ padding: 20, borderRadius: 8 }}>
         <h5 style={{ margin: "0 0 12px", fontSize: 16 }}>Stock Transactions</h5>
+        <div className="row g-3" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end", marginBottom: 12 }}>
+          <div style={{ flex: "1 1 160px", minWidth: 130 }}>
+            <select className="lims-input" value={filters.type} onChange={(e) => { setFilters?.(prev => ({ ...prev, type: e.target.value })); onFilterSearch?.(); }} style={inputStyle()}>
+              <option value="">All Types</option>
+              {["opening", "receipt", "purchase", "issue", "adjustment", "transfer", "wastage", "expiry"].map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 140px", minWidth: 120 }}>
+            <input className="lims-input" type="date" value={filters.dateFrom} onChange={(e) => { setFilters?.(prev => ({ ...prev, dateFrom: e.target.value })); onFilterSearch?.(); }} style={inputStyle()} placeholder="From" />
+          </div>
+          <div style={{ flex: "1 1 140px", minWidth: 120 }}>
+            <input className="lims-input" type="date" value={filters.dateTo} onChange={(e) => { setFilters?.(prev => ({ ...prev, dateTo: e.target.value })); onFilterSearch?.(); }} style={inputStyle()} placeholder="To" />
+          </div>
+          <div style={{ flex: "2 1 200px", minWidth: 160 }}>
+            <input className="lims-input" value={filters.search || ""} onChange={(e) => setFilters?.(prev => ({ ...prev, search: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") onFilterSearch?.(); }} placeholder="Search ref, reason, location…" style={inputStyle()} />
+          </div>
+          <button className="btn-lims-primary" onClick={onFilterSearch} style={{ height: 38, padding: "0 14px" }}>{Icons.search} Search</button>
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 900 }}>
             <thead>
               <tr style={{ background: "var(--surface)" }}>
-                {["Date", "Type", "Item", "Batch", "Qty", "Balance", "From / To", "Reason", "Ref No", "By"].map((h) => <th key={h} style={{ padding: 10, textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{h}</th>)}
+                {["Date", "Type", "Item", "Batch", "Qty", "Cost/Unit", "Total", "Supplier", "Prev Stock", "After Stock", "From / To", "Reason", "Ref No", "By"].map((h) => <th key={h} style={{ padding: 10, textAlign: "left", fontWeight: 600, fontSize: 12, color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {movements.length === 0 && (
-                <tr><td colSpan={10} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No transactions found.</td></tr>
+                <tr><td colSpan={14} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No transactions found.</td></tr>
               )}
               {movements.map((m) => {
                 const uomSym = m.item?.baseUom?.symbol || "";
-                const isNeg = ["issue", "wastage", "expiry"].includes(m.movementType);
-                const qtyStr = `${isNeg ? "-" : "+"}${formatNumber(m.quantityBase)} ${uomSym}`;
-                const fromTo = m.movementType === "transfer" ? `${m.fromLocation || "-"} → ${m.toLocation || "-"}` : m.movementType === "receipt" || m.movementType === "opening" ? (m.toLocation || "-") : (m.fromLocation || m.toLocation || "-");
+                const isNeg = ["issue", "wastage", "expiry"].includes(m.movementType) || m.quantityBase < 0;
+                const qtyStr = `${isNeg ? "-" : "+"}${formatNumber(Math.abs(m.quantityBase))} ${uomSym}`;
+                const prevStock = m.balanceAfterBase - m.quantityBase;
+                const fromTo = m.movementType === "transfer" ? `${m.fromLocation || "-"} → ${m.toLocation || "-"}` : m.movementType === "receipt" || m.movementType === "purchase" || m.movementType === "opening" ? (m.toLocation || "-") : (m.fromLocation || m.toLocation || "-");
+                const unitCost = m.costPerBaseUnit || 0;
+                const totalCost = Math.abs(m.quantityBase) * unitCost;
                 return (
                   <tr key={m._id} style={{ borderBottom: "1px solid var(--border-light)" }}>
                     <td style={{ padding: 10, whiteSpace: "nowrap" }}>{formatDate(m.movementDate)}</td>
@@ -1721,7 +1853,11 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
                     <td style={{ padding: 10 }}>{m.item?.name || "-"}</td>
                     <td style={{ padding: 10, fontSize: 12, color: "var(--text-muted)" }}>{m.batchId ? String(m.batchId).slice(-6) : "-"}</td>
                     <td style={{ padding: 10, fontWeight: 600, color: isNeg ? "#b91c1c" : "#166534" }}>{qtyStr}</td>
-                    <td style={{ padding: 10 }}>{formatNumber(m.balanceAfterBase)} {uomSym}</td>
+                    <td style={{ padding: 10, fontSize: 12, color: "var(--text-muted)" }}>{unitCost > 0 ? `Rs ${formatNumber(unitCost)}` : "-"}</td>
+                    <td style={{ padding: 10, fontWeight: 600, color: totalCost > 0 ? "#166534" : "var(--text-muted)" }}>{totalCost > 0 ? `Rs ${formatNumber(totalCost)}` : "-"}</td>
+                    <td style={{ padding: 10, fontSize: 12, color: "var(--text-muted)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={m.supplier || ""}>{m.supplier || "-"}</td>
+                    <td style={{ padding: 10, fontSize: 12, color: "var(--text-muted)" }}>{formatNumber(prevStock)} {uomSym}</td>
+                    <td style={{ padding: 10, fontWeight: 600 }}>{formatNumber(m.balanceAfterBase)} {uomSym}</td>
                     <td style={{ padding: 10, fontSize: 12, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fromTo}</td>
                     <td style={{ padding: 12, fontSize: 12, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={m.reason || ""}>{m.reason || "-"}</td>
                     <td style={{ padding: 10, fontSize: 12, color: "var(--text-muted)" }}>{m.referenceNo || "-"}</td>
@@ -1752,7 +1888,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
       <div className="row g-3">
         <div className="col-md-6">
           <Field label="Item">
-            <select required className="lims-input" value={form.itemId} onChange={(e) => { const newItemId = e.target.value; const newItem = items.find((i) => i._id === newItemId); const newUom = newItem?.baseUom?.symbol || ""; setErrors?.({}); setForm({ ...form, itemId: newItemId, batchId: "", quantityUnit: newUom, quantityBase: 0, newBalanceBase: 0, toLocation: form.movementType === "adjustment" ? (newItem?.defaultLocation || "") : form.toLocation }); }} style={inputStyle()}>
+            <select required className="lims-input" value={form.itemId} onChange={(e) => { const newItemId = e.target.value; const newItem = items.find((i) => i._id === newItemId); const newUom = newItem?.baseUom?.symbol || ""; const isReceiptType = form.movementType === "receipt"; const lastBatch = newItem?.batches?.length ? newItem.batches[newItem.batches.length - 1] : null; const batchQuantity = isReceiptType && lastBatch ? lastBatch.quantityBase : ""; const isAdj = form.movementType === "adjustment"; const autoBatchId = (isReceiptType || form.movementType === "transfer" || form.movementType === "wastage") && lastBatch ? lastBatch._id : ""; const adjBatch = isAdj && newItem ? (newItem.batches || []).filter((b) => b.quantityBase > 0).sort((a, b) => { if (!a.expiryDate) return 1; if (!b.expiryDate) return -1; return new Date(a.expiryDate) - new Date(b.expiryDate); })[0] : null; const adjBatchId = isAdj && adjBatch ? adjBatch._id : ""; const selUnit = form.quantityUnit || newUom; const uom = COMMON_UOMS.find((u) => u.symbol === selUnit); const conv = uom?.conversionToBase || 1; setErrors?.({}); setForm({ ...form, itemId: newItemId, batchId: isAdj ? adjBatchId : autoBatchId, quantityUnit: newUom, quantityBase: batchQuantity, newBalanceBase: isAdj && adjBatch ? (adjBatch.quantityBase / conv) : "", batchNo: lastBatch?.batchNo || "", expiryDate: lastBatch?.expiryDate ? lastBatch.expiryDate.split("T")[0] : "", toLocation: form.movementType === "adjustment" ? (newItem?.defaultLocation || "") : form.toLocation }); }} style={inputStyle()}>
               <option value="">Select item</option>
               {items.map((stockItem) => <option key={stockItem._id} value={stockItem._id}>{stockItem.itemCode} - {stockItem.name}</option>)}
             </select>
@@ -1762,7 +1898,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
         <div className="col-md-6">
           <Field label="Transaction">
             <select className="lims-input" value={form.movementType} onChange={(e) => { setLocMode(null); setLocErrors({}); setForm({ ...form, movementType: e.target.value }); }} style={inputStyle()}>
-              {["purchase", "receipt", "issue", "adjustment", "transfer", "wastage", "expiry"].map((type) => <option key={type} value={type}>{type}</option>)}
+              {["purchase", "adjustment", "transfer", "wastage"].map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
           </Field>
         </div>
@@ -1773,7 +1909,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
           <div className="col-md-6">
             <Field label="Transaction">
             <select className="lims-input" value={form.movementType} onChange={(e) => { const newType = e.target.value; const selItem = items.find((i) => i._id === form.itemId); setForm({ ...form, movementType: newType, toLocation: newType === "adjustment" && selItem ? (selItem.defaultLocation || "") : form.toLocation }); }} style={inputStyle()}>
-                {["purchase", "receipt", "issue", "adjustment", "transfer", "wastage", "expiry"].map((type) => <option key={type} value={type}>{type}</option>)}
+                {["purchase", "adjustment", "transfer", "wastage"].map((type) => <option key={type} value={type}>{type}</option>)}
               </select>
             </Field>
           </div>
@@ -1817,7 +1953,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <label style={{ fontWeight: 600, fontSize: 13 }}>Line Items *</label>
-              <button type="button" className="btn-lims-secondary" onClick={() => setForm({ ...form, purchaseItems: [...form.purchaseItems, { item: "", quantity: 1, unitCost: 0, notes: "" }] })} style={{ padding: "4px 10px", fontSize: 12 }}>+ Add Item</button>
+              <button type="button" className="btn-lims-secondary" onClick={() => setForm({ ...form, purchaseItems: [...form.purchaseItems, { item: "", quantity: "", unitCost: "", notes: "" }] })} style={{ padding: "4px 10px", fontSize: 12 }}>+ Add Item</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 36px", gap: 6, marginBottom: 4, fontSize: 11, fontWeight: 600, color: "#64748b", padding: "0 2px" }}>
               <span>Item</span><span>Qty</span><span>Unit Cost</span><span>Total</span><span></span>
@@ -1833,8 +1969,8 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
                         <option key={it._id} value={it._id}>{it.itemCode} — {it.name}</option>
                       ))}
                     </select>
-                    <input className="lims-input" type="number" min="1" value={pi.quantity} onChange={(e) => { const pItems = [...form.purchaseItems]; pItems[idx] = { ...pItems[idx], quantity: Number(e.target.value) || 1 }; setForm({ ...form, purchaseItems: pItems }); }} style={{ ...inputStyle(), fontSize: 12, padding: "4px 6px" }} />
-                    <input className="lims-input" type="number" min="0" step="0.01" value={pi.unitCost} onChange={(e) => { const pItems = [...form.purchaseItems]; pItems[idx] = { ...pItems[idx], unitCost: Number(e.target.value) || 0 }; setForm({ ...form, purchaseItems: pItems }); }} style={{ ...inputStyle(), fontSize: 12, padding: "4px 6px" }} />
+                    <input className="lims-input" type="number" min="1" value={pi.quantity} onChange={(e) => { const v = e.target.value; const pItems = [...form.purchaseItems]; pItems[idx] = { ...pItems[idx], quantity: v === "" ? "" : Number(v) }; setForm({ ...form, purchaseItems: pItems }); }} style={{ ...inputStyle(), fontSize: 12, padding: "4px 6px" }} />
+                    <input className="lims-input" type="number" min="0" step="0.01" value={pi.unitCost} onChange={(e) => { const v = e.target.value; const pItems = [...form.purchaseItems]; pItems[idx] = { ...pItems[idx], unitCost: v === "" ? "" : Number(v) }; setForm({ ...form, purchaseItems: pItems }); }} style={{ ...inputStyle(), fontSize: 12, padding: "4px 6px" }} />
                     <span style={{ fontSize: 12, fontWeight: 500, color: "#374151" }}>Rs {lineTotal}</span>
                     {form.purchaseItems.length > 1 && (
                       <button type="button" onClick={() => { const pItems = form.purchaseItems.filter((_, i) => i !== idx); setForm({ ...form, purchaseItems: pItems }); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1856,31 +1992,33 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
         <div className="row g-3">
           <div className="col-12">
             <Field label="Batch">
-              {item && (item?.batches || []).filter((batch) => batch.quantityBase > 0).length === 0 ? (
-                <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>No available batches with positive stock for this item.</p>
-              ) : (
-                <>
-                  <select required className="lims-input" value={form.batchId} onChange={(e) => { setErrors?.((p) => ({ ...p, batchId: "" })); setForm({ ...form, batchId: e.target.value }); }} style={inputStyle()}>
-                    <option value="">Auto select available batch</option>
-                    {(item?.batches || []).filter((batch) => batch.quantityBase > 0).map((batch) => (
-                      <option key={batch._id} value={batch._id}>{batch.batchNo || "Batch"} - {formatNumber(batch.quantityBase)} {item?.baseUom?.symbol}</option>
-                    ))}
-                  </select>
-                  <ErrorMsg message={errors.batchId} />
-                  {form.batchId && item && (() => {
-                    const selBatch = item.batches.find((b) => b._id === form.batchId);
-                    if (!selBatch) return null;
-                    return (
+              {(() => {
+                const batchList = (item?.batches || []).filter((batch) => batch.quantityBase > 0);
+                if (batchList.length === 0) {
+                  return <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>No available batches with positive stock for this item.</p>;
+                }
+                const autoBatch = batchList.sort((a, b) => {
+                  if (!a.expiryDate) return 1;
+                  if (!b.expiryDate) return -1;
+                  return new Date(a.expiryDate) - new Date(b.expiryDate);
+                })[0];
+                const batchId = form.batchId || autoBatch._id;
+                const selBatch = (item.batches || []).find((b) => b._id === batchId);
+                return (
+                  <>
+                    <input className="lims-input" disabled value={selBatch ? `${selBatch.batchNo || "Batch"} (available: ${formatNumber(selBatch.quantityBase)}${selBatch.expiryDate ? `, expires: ${new Date(selBatch.expiryDate).toISOString().split("T")[0]}` : ""})` : ""} style={{ ...inputStyle(), background: "#f3f4f6" }} />
+                    {selBatch && (
                       <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 12, color: "var(--text-muted)" }}>
                         <span>Qty: {formatNumber(selBatch.quantityBase)} {item.baseUom?.symbol}</span>
                         {selBatch.expiryDate && <span>Expiry: {formatDate(selBatch.expiryDate)}</span>}
                         {selBatch.location && <span>Location: {selBatch.location}</span>}
                         <span>Status: {selBatch.status}</span>
                       </div>
-                    );
-                  })()}
-                </>
-              )}
+                    )}
+                  </>
+                );
+              })()}
+              <ErrorMsg message={errors.batchId} />
             </Field>
           </div>
         </div>
@@ -1888,10 +2026,28 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
       {isReceipt && (
         <div className="row g-3">
           <div className="col-md-4">
-            <Field label="Batch No"><input className="lims-input" maxLength={15} value={form.batchNo} onChange={(e) => { const v = e.target.value.toUpperCase(); if (v && !/^[A-Za-z0-9]*$/.test(v)) { setErrors?.((p) => ({ ...p, batchNo: "Only letters and numbers allowed" })); return; } setErrors?.((p) => ({ ...p, batchNo: "" })); setForm({ ...form, batchNo: v }); }} style={inputStyle()} /></Field>
+            <Field label="Batch No">
+              <input className="lims-input" disabled value={(() => {
+                if (item && item.batches && item.batches.length > 0) {
+                  const lastBatch = item.batches[item.batches.length - 1];
+                  return lastBatch.batchNo || "";
+                }
+                return form.batchNo;
+              })()} style={{ ...inputStyle(), background: "#f3f4f6" }} />
+              <ErrorMsg message={errors.batchNo} />
+            </Field>
           </div>
           <div className="col-md-4">
-            <Field label="Expiry"><input className="lims-input" type="date" value={form.expiryDate} onChange={(e) => { const v = e.target.value; const msg = validateExpiryDate(v); if (msg) { setErrors?.((p) => ({ ...p, expiryDate: msg })); return; } setErrors?.((p) => ({ ...p, expiryDate: "" })); setForm({ ...form, expiryDate: v }); }} style={inputStyle()} /><ErrorMsg message={errors.expiryDate} /></Field>
+            <Field label="Expiry">
+              <input className="lims-input" type="date" disabled value={(() => {
+                if (item && item.batches && item.batches.length > 0) {
+                  const lastBatch = item.batches[item.batches.length - 1];
+                  return lastBatch.expiryDate ? lastBatch.expiryDate.split("T")[0] : "";
+                }
+                return form.expiryDate;
+              })()} style={{ ...inputStyle(), background: "#f3f4f6" }} />
+              <ErrorMsg message={errors.expiryDate} />
+            </Field>
           </div>
           <div className="col-md-4">
             <Field label="Received Date"><input className="lims-input" type="date" value={form.receivedDate} onChange={(e) => setForm({ ...form, receivedDate: e.target.value })} style={inputStyle()} /></Field>
@@ -1900,17 +2056,80 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
       )}
       {!isPurchase && (
       <div className="row g-3">
-        <div className="col-md-6">
-          <Field label={isAdjustment ? "Current Batch Balance" : "Quantity"}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <input required className="lims-input" type="number" min="0" max={isAdjustment ? "9999999" : "9999999999"} step={isAdjustment ? "1" : "0.001"} value={isAdjustment ? form.newBalanceBase : form.quantityBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, [isAdjustment ? "newBalanceBase" : "quantityBase"]: "Exponential notation is not allowed" })); return; } if (isAdjustment && v.includes(".")) { setErrors?.((p) => ({ ...p, newBalanceBase: "Only whole numbers are allowed" })); return; } if (isAdjustment && v && v.length > 7) { setErrors?.((p) => ({ ...p, newBalanceBase: "Maximum 7 digits allowed" })); return; } setErrors?.((p) => ({ ...p, [isAdjustment ? "newBalanceBase" : "quantityBase"]: "" })); setForm({ ...form, [isAdjustment ? "newBalanceBase" : "quantityBase"]: v }); }} style={{ ...inputStyle(), flex: 1 }} />
-              <select className="lims-input" value={form.quantityUnit || (item ? baseUomSymbol : "")} onChange={(e) => { const newUnit = e.target.value; const oldUnit = form.quantityUnit || baseUomSymbol; if (oldUnit && newUnit && oldUnit !== newUnit) { const oldUom = COMMON_UOMS.find((u) => u.symbol === oldUnit); const newUom = COMMON_UOMS.find((u) => u.symbol === newUnit); if (oldUom && newUom) { const currentVal = Number(isAdjustment ? form.newBalanceBase : form.quantityBase) || 0; const baseVal = currentVal * (oldUom.conversionToBase || 1); const newVal = baseVal / (newUom.conversionToBase || 1); setForm({ ...form, quantityUnit: newUnit, [isAdjustment ? "newBalanceBase" : "quantityBase"]: newVal }); return; } } setForm({ ...form, quantityUnit: newUnit }); }} style={{ width: 85, flexShrink: 0 }}>
-                {availableUoms.map((u) => <option key={u.symbol} value={u.symbol}>{u.symbol}</option>)}
-              </select>
+        {isAdjustment ? (
+          <>
+            {item && (item?.batches || []).filter((batch) => batch.quantityBase > 0).length > 0 ? (
+              <div className="col-12">
+                <Field label="Batch">
+                  {(() => {
+                    const batchList = (item?.batches || []).filter((batch) => batch.quantityBase > 0);
+                    const autoBatch = batchList.sort((a, b) => {
+                      if (!a.expiryDate) return 1;
+                      if (!b.expiryDate) return -1;
+                      return new Date(a.expiryDate) - new Date(b.expiryDate);
+                    })[0];
+                    const batchId = form.batchId || autoBatch._id;
+                    const selBatch = (item.batches || []).find((b) => b._id === batchId);
+                    return (
+                      <>
+                        <input className="lims-input" disabled value={selBatch ? `${selBatch.batchNo || "Batch"} (available: ${formatNumber(selBatch.quantityBase)}${selBatch.expiryDate ? `, expires: ${new Date(selBatch.expiryDate).toISOString().split("T")[0]}` : ""})` : ""} style={{ ...inputStyle(), background: "#f3f4f6" }} />
+                        {selBatch && (
+                          <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 12, color: "var(--text-muted)" }}>
+                            <span>Qty: {formatNumber(selBatch.quantityBase)} {item.baseUom?.symbol}</span>
+                            {selBatch.expiryDate && <span>Expiry: {formatDate(selBatch.expiryDate)}</span>}
+                            {selBatch.location && <span>Location: {selBatch.location}</span>}
+                            <span>Status: {selBatch.status}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <ErrorMsg message={errors.batchId} />
+                </Field>
+              </div>
+            ) : null}
+            <div className={item && (item?.batches || []).filter((batch) => batch.quantityBase > 0).length > 0 ? "col-md-6" : "col-md-3"}>
+              <Field label="Previous Stock">
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {(() => {
+                    const selUnit = form.quantityUnit || baseUomSymbol;
+                    const uom = COMMON_UOMS.find((u) => u.symbol === selUnit);
+                    const conv = uom?.conversionToBase || 1;
+                    const prevVal = conv ? (item?.stockOnHandBase ?? 0) / conv : 0;
+                    const rounded = prevVal % 1 === 0 ? prevVal : Number(prevVal.toFixed(3));
+                    return <input disabled className="lims-input" type="number" value={rounded} style={{ ...inputStyle(), flex: 1, background: "#f3f4f6" }} />;
+                  })()}
+                  <select className="lims-input" value={form.quantityUnit || (item ? baseUomSymbol : "")} onChange={(e) => { const newUnit = e.target.value; const oldUnit = form.quantityUnit || baseUomSymbol; if (oldUnit && newUnit && oldUnit !== newUnit) { const oldUom = COMMON_UOMS.find((u) => u.symbol === oldUnit); const newUom = COMMON_UOMS.find((u) => u.symbol === newUnit); if (oldUom && newUom) { if (form.newBalanceBase === "" || form.newBalanceBase === undefined || form.newBalanceBase === null) { setForm({ ...form, quantityUnit: newUnit }); return; } const currentVal = Number(form.newBalanceBase) || 0; const baseVal = currentVal * (oldUom.conversionToBase || 1); const newVal = baseVal / (newUom.conversionToBase || 1); setForm({ ...form, quantityUnit: newUnit, newBalanceBase: newVal }); return; } } setForm({ ...form, quantityUnit: newUnit }); }} style={{ width: 85, flexShrink: 0 }}>
+                    {availableUoms.map((u) => <option key={u.symbol} value={u.symbol}>{u.symbol}</option>)}
+                  </select>
+                </div>
+              </Field>
             </div>
-            <ErrorMsg message={isAdjustment ? errors.newBalanceBase : errors.quantityBase} />
-          </Field>
-        </div>
+            <div className={item && (item?.batches || []).filter((batch) => batch.quantityBase > 0).length > 0 ? "col-md-6" : "col-md-3"}>
+              <Field label="Current Stock">
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input required className="lims-input" type="number" min="0" max="9999999" step="1" value={form.newBalanceBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, newBalanceBase: "Exponential notation is not allowed" })); return; } if (v.includes(".")) { setErrors?.((p) => ({ ...p, newBalanceBase: "Only whole numbers are allowed" })); return; } if (v && v.length > 7) { setErrors?.((p) => ({ ...p, newBalanceBase: "Maximum 7 digits allowed" })); return; } setErrors?.((p) => ({ ...p, newBalanceBase: "" })); setForm({ ...form, newBalanceBase: v }); }} style={{ ...inputStyle(), flex: 1 }} />
+                  <select className="lims-input" value={form.quantityUnit || (item ? baseUomSymbol : "")} onChange={(e) => { const newUnit = e.target.value; const oldUnit = form.quantityUnit || baseUomSymbol; if (oldUnit && newUnit && oldUnit !== newUnit) { const oldUom = COMMON_UOMS.find((u) => u.symbol === oldUnit); const newUom = COMMON_UOMS.find((u) => u.symbol === newUnit); if (oldUom && newUom) { if (form.newBalanceBase === "" || form.newBalanceBase === undefined || form.newBalanceBase === null) { setForm({ ...form, quantityUnit: newUnit }); return; } const currentVal = Number(form.newBalanceBase) || 0; const baseVal = currentVal * (oldUom.conversionToBase || 1); const newVal = baseVal / (newUom.conversionToBase || 1); setForm({ ...form, quantityUnit: newUnit, newBalanceBase: newVal }); return; } } setForm({ ...form, quantityUnit: newUnit }); }} style={{ width: 85, flexShrink: 0 }}>
+                    {availableUoms.map((u) => <option key={u.symbol} value={u.symbol}>{u.symbol}</option>)}
+                  </select>
+                </div>
+                <ErrorMsg message={errors.newBalanceBase} />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <div className={isReceipt ? "col-md-6" : "col-md-6"}>
+            <Field label={isReceipt ? "Current Qty (Batch)" : "Quantity"}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input required className="lims-input" type="number" min="0" max="9999999" step="1" value={isReceipt ? (() => { if (item && item.batches && item.batches.length > 0) { const selUnit = form.quantityUnit || baseUomSymbol; const uom = COMMON_UOMS.find((u) => u.symbol === selUnit); const conv = uom?.conversionToBase || 1; const lastBatch = item.batches[item.batches.length - 1]; const val = conv ? lastBatch.quantityBase / conv : 0; return val % 1 === 0 ? val : Number(val.toFixed(3)); } return form.quantityBase; })() : form.quantityBase} onChange={isReceipt ? undefined : (e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, quantityBase: "Exponential notation is not allowed" })); return; } if (v.includes(".")) { setErrors?.((p) => ({ ...p, quantityBase: "Only whole numbers are allowed" })); return; } if (v && v.length > 7) { setErrors?.((p) => ({ ...p, quantityBase: "Maximum 7 digits allowed" })); return; } setErrors?.((p) => ({ ...p, quantityBase: "" })); setForm({ ...form, quantityBase: v }); }} disabled={isReceipt} style={{ ...inputStyle(), flex: 1, ...(isReceipt ? { background: "#f3f4f6" } : {}) }} />
+                <select className="lims-input" value={form.quantityUnit || (item ? baseUomSymbol : "")} onChange={(e) => { const newUnit = e.target.value; const oldUnit = form.quantityUnit || baseUomSymbol; if (oldUnit && newUnit && oldUnit !== newUnit) { const oldUom = COMMON_UOMS.find((u) => u.symbol === oldUnit); const newUom = COMMON_UOMS.find((u) => u.symbol === newUnit); if (oldUom && newUom) { if (form.quantityBase === "" || form.quantityBase === undefined || form.quantityBase === null) { setForm({ ...form, quantityUnit: newUnit }); return; } const currentVal = Number(form.quantityBase) || 0; const baseVal = currentVal * (oldUom.conversionToBase || 1); const newVal = baseVal / (newUom.conversionToBase || 1); setForm({ ...form, quantityUnit: newUnit, quantityBase: newVal }); return; } } setForm({ ...form, quantityUnit: newUnit }); }} style={{ width: 85, flexShrink: 0 }}>
+                  {availableUoms.map((u) => <option key={u.symbol} value={u.symbol}>{u.symbol}</option>)}
+                </select>
+              </div>
+              <ErrorMsg message={errors.quantityBase} />
+            </Field>
+          </div>
+        )}
         <div className="col-md-6">
           <Field label={isReceipt || isAdjustment ? "Unit Cost" : "Cost / Base Unit"}>
             <input className="lims-input" type="number" min="0" max="9999999" step="0.001" value={form.costPerBaseUnit} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, costPerBaseUnit: "Exponential notation is not allowed" })); return; } const parts = v.split("."); if (parts[0] && parts[0].length > 7) { setErrors?.((p) => ({ ...p, costPerBaseUnit: "Maximum 7 digits allowed" })); return; } if (parts[1] && parts[1].length > 3) { setErrors?.((p) => ({ ...p, costPerBaseUnit: "Maximum 3 decimal places allowed" })); return; } setErrors?.((p) => ({ ...p, costPerBaseUnit: "" })); setForm({ ...form, costPerBaseUnit: v }); }} style={inputStyle()} />
@@ -1958,8 +2177,13 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
                   </div>
                 )}
               </div>
-            ) : locations.length > 0 && (isReceipt || form.movementType === "transfer") ? (
-              <select className="lims-input" value={isReceipt ? "" : form.toLocation} onChange={(e) => { const v = e.target.value; const key = isReceipt ? "supplier" : "toLocation"; setErrors?.((p) => ({ ...p, [key]: "" })); setForm({ ...form, [key]: v }); }} style={{ ...inputStyle(), width: "100%" }}>
+            ) : isReceipt ? (
+              <select className="lims-input" value={form.supplier} onChange={(e) => { const v = e.target.value; setErrors?.((p) => ({ ...p, supplier: "" })); setForm({ ...form, supplier: v }); }} style={{ ...inputStyle(), width: "100%" }}>
+                <option value="">-- Select supplier --</option>
+                {suppliers.filter((s) => s.status === "active").map((s) => <option key={s._id} value={s._id}>{s.code} — {s.name}</option>)}
+              </select>
+            ) : locations.length > 0 && form.movementType === "transfer" ? (
+              <select className="lims-input" value={form.toLocation} onChange={(e) => { const v = e.target.value; setErrors?.((p) => ({ ...p, toLocation: "" })); setForm({ ...form, toLocation: v }); }} style={{ ...inputStyle(), width: "100%" }}>
                 <option value="">-- Select --</option>
                 {locations.filter((l) => l.status === "active").map((l) => <option key={l._id} value={l.name}>{l.code} — {l.name}</option>)}
               </select>
@@ -2038,13 +2262,19 @@ function ExpiryPanel({ items, onWaste }) {
             else if (expired) { riskLabel = "Expired"; riskTone = "danger"; }
             else if (near) { riskLabel = "Near expiry"; riskTone = "warn"; }
             return (
-              <tr key={`${item._id}-${batch._id}`} style={{ borderTop: "1px solid var(--border-light)" }}>
+              <tr key={`${item._id}-${batch._id}`} style={{ borderTop: "1px solid var(--border-light)", background: expired ? "#fef2f2" : near ? "#fffbeb" : "transparent" }}>
                 <td style={{ padding: 12 }}><strong>{item.name}</strong><br /><small>{item.itemCode}</small></td>
                 <td style={{ padding: 12 }}>{batch.batchNo || "-"}</td>
                 <td style={{ padding: 12 }}>{formatNumber(batch.quantityBase)} {item.baseUom?.symbol}</td>
                 <td style={{ padding: 12 }}>{batch.expiryDate ? formatDate(batch.expiryDate) : "—"}</td>
                 <td style={{ padding: 12 }}><Badge tone={riskTone}>{riskLabel}</Badge></td>
-                <td style={{ padding: 12 }}><button className="btn-lims-secondary" onClick={() => onWaste(item, batch)} style={{ height: 32 }}>Log Wastage</button></td>
+                <td style={{ padding: 12, whiteSpace: "nowrap" }}>
+                  {(expired || near || isQuarantine) ? (
+                    <button className="btn-lims-secondary" onClick={() => onWaste(item, batch)} style={{ height: 32, background: expired ? "#dc2626" : near ? "#f59e0b" : "#6b7280", color: "#fff", borderColor: "transparent" }}>Log Wastage</button>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "#9ca3af", fontStyle: "italic" }}>—</span>
+                  )}
+                </td>
               </tr>
             );
           })}
@@ -2057,7 +2287,7 @@ function ExpiryPanel({ items, onWaste }) {
 
 function MovementLedger({ movements, pagination, filters, setFilters, onPageChange, onSearch }) {
   const movementTypeColors = {
-    opening: "info", receipt: "good", issue: "warn",
+    opening: "info", receipt: "good", purchase: "good", issue: "warn",
     adjustment: "info", transfer: "neutral", wastage: "danger", expiry: "danger",
   };
   return (
@@ -2083,16 +2313,25 @@ function MovementLedger({ movements, pagination, filters, setFilters, onPageChan
         </div>
       </div>
       <MasterTable
-        headings={["Date", "Item", "Type", "Qty", "Balance", "Reference", "Reason"]}
-        rows={movements.map((movement) => [
-          formatDate(movement.movementDate),
-          movement.item ? `${movement.item.itemCode} - ${movement.item.name}` : "-",
-          <Badge key="type" tone={movementTypeColors[movement.movementType] || "neutral"}>{movement.movementType}</Badge>,
-          <span key="qty" style={{ fontWeight: 700, color: movement.quantityBase < 0 ? "#b91c1c" : "#047857" }}>{formatNumber(movement.quantityBase)}</span>,
-          formatNumber(movement.balanceAfterBase),
-          movement.referenceNo || "-",
-          movement.reason || "-",
-        ])}
+        headings={["Date", "Item", "Type", "Qty", "Cost/Unit", "Total", "Supplier", "Balance", "Reference", "Reason"]}
+        rows={movements.map((movement) => {
+          const uomSym = movement.item?.baseUom?.symbol || "";
+          const isNeg = movement.quantityBase < 0;
+          const unitCost = movement.costPerBaseUnit || 0;
+          const totalCost = Math.abs(movement.quantityBase) * unitCost;
+          return [
+            formatDate(movement.movementDate),
+            movement.item ? `${movement.item.itemCode} - ${movement.item.name}` : "-",
+            <Badge key="type" tone={movementTypeColors[movement.movementType] || "neutral"}>{movement.movementType}</Badge>,
+            <span key="qty" style={{ fontWeight: 700, color: isNeg ? "#b91c1c" : "#047857" }}>{formatNumber(movement.quantityBase)}</span>,
+            <span key="cost" style={{ fontSize: 12, color: "var(--text-muted)" }}>{unitCost > 0 ? `Rs ${formatNumber(unitCost)}` : "-"}</span>,
+            <span key="total" style={{ fontWeight: 600, color: totalCost > 0 ? "#166534" : "var(--text-muted)" }}>{totalCost > 0 ? `Rs ${formatNumber(totalCost)}` : "-"}</span>,
+            <span key="supplier" style={{ fontSize: 12, color: "var(--text-muted)", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={movement.supplier || ""}>{movement.supplier || "-"}</span>,
+            <span key="bal" style={{ fontWeight: 600, color: (movement.balanceAfterBase || 0) < 0 ? "#b91c1c" : "#166534" }}>{formatNumber(movement.balanceAfterBase)} {uomSym}</span>,
+            movement.referenceNo || "-",
+            movement.reason || "-",
+          ];
+        })}
       />
       <PaginationControls pagination={pagination} loading={false} onPageChange={onPageChange} />
     </div>

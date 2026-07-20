@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import PaginationControls from "../accounts/_components/PaginationControls";
 
 function formatDate(iso) {
   if (!iso) return "—";
@@ -35,10 +36,12 @@ export default function AuditPage() {
   const [error, setError] = useState("");
   const [resourceType, setResourceType] = useState("");
   const [allResourceTypes, setAllResourceTypes] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
 
   const loadAllTypes = useCallback(async () => {
     try {
-      const res = await fetch("/api/audit?limit=500", { credentials: "include" });
+      const res = await fetch("/api/audit?limit=500&page=1", { credentials: "include" });
       const data = await res.json();
       if (res.ok) {
         const types = [...new Set((data.logs || []).map((l) => l.resourceType).filter(Boolean))];
@@ -48,24 +51,26 @@ export default function AuditPage() {
     }
   }, []);
 
-  const load = useCallback(async (rt = resourceType) => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ limit: "100" });
-      if (rt) params.set("resourceType", rt);
+      const params = new URLSearchParams({ limit: "10", page });
+      if (resourceType) params.set("resourceType", resourceType);
       const res = await fetch(`/api/audit?${params}`, { credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to load audit logs");
       setLogs(data.logs || []);
+      setPagination(data.pagination || null);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [resourceType]);
+  }, [page, resourceType]);
 
-  useEffect(() => { loadAllTypes(); load(); }, [load, loadAllTypes]);
+  useEffect(() => { loadAllTypes(); }, [loadAllTypes]);
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div style={{ width: "100%", paddingBottom: 40 }}>
@@ -80,12 +85,12 @@ export default function AuditPage() {
             className="lims-input"
             style={{ height: 38, width: 180 }}
             value={resourceType}
-            onChange={(e) => { setResourceType(e.target.value); load(e.target.value); }}
+            onChange={(e) => { setResourceType(e.target.value); setPage(1); }}
           >
             <option value="">All resource types</option>
             {allResourceTypes.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
           </select>
-          <button className="dash-btn-secondary" onClick={() => load(resourceType)} style={{ height: 38 }}>
+          <button className="dash-btn-secondary" onClick={() => setPage(1)} style={{ height: 38 }}>
             {Icons.logo} Refresh
           </button>
         </div>
@@ -126,6 +131,9 @@ export default function AuditPage() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <PaginationControls pagination={pagination} loading={loading} onPageChange={setPage} />
       </div>
     </div>
   );

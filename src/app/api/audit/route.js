@@ -13,19 +13,33 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const resourceType = searchParams.get("resourceType") || "";
-    const limit = Math.min(parseInt(searchParams.get("limit") || "100", 10), 200);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(parseInt(searchParams.get("limit") || "15", 10), 200);
+    const skip = (page - 1) * limit;
 
     const { AuditLog } = await getTenantModels(auth.tenantId);
     const query = { tenantId: auth.tenantId };
     if (resourceType) query.resourceType = resourceType;
 
-    const logs = await AuditLog.find(query)
-      .populate("userId", "name email userId")
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .lean();
+    const [logs, total] = await Promise.all([
+      AuditLog.find(query)
+        .populate("userId", "name email userId")
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      AuditLog.countDocuments(query),
+    ]);
 
-    return Response.json({ logs });
+    return Response.json({
+      logs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (error) {
     return jsonError("Unable to load audit logs", error, 500);
   }

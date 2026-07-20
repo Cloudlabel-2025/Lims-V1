@@ -60,6 +60,8 @@ export const InventoryMovementSchema = new mongoose.Schema(
     },
     performedBy: { type: String, trim: true, maxlength: 120 },
     movementDate: { type: Date, default: Date.now, index: true },
+    costPerBaseUnit: { type: Number, default: 0 },
+    supplier: { type: String, trim: true, maxlength: 120 },
     expenseEntryId: { type: mongoose.Schema.Types.ObjectId, ref: "ExpenseEntry", default: null },
   },
   { timestamps: true }

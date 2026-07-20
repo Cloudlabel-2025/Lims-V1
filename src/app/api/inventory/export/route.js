@@ -59,8 +59,8 @@ export async function GET(req) {
       const items = await InventoryItem.find(query)
         .populate("category", "name code")
         .populate("subCategory", "name code")
-        .populate("baseUom", "symbol")
-        .populate("purchaseUom", "symbol")
+        .populate("baseUom", "symbol baseSymbol")
+        .populate("purchaseUom", "symbol baseSymbol")
         .sort({ itemCode: 1 })
         .lean();
 

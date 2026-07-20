@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/app/lib/audit";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { getAccountByCode, postJournalEntry } from "@/app/lib/accounting";
+import { processExpiredBatches } from "@/app/lib/inventory-expiry";
 
 function clean(value) {
   return String(value || "").trim();
@@ -123,8 +124,9 @@ async function loadInventory(auth, req) {
     InventoryItem.find(itemQuery)
       .populate("category", "name code")
       .populate("subCategory", "name code")
-      .populate("baseUom", "name symbol type conversionToBase")
-      .populate("purchaseUom", "name symbol type conversionToBase")
+      .populate("baseUom", "name symbol type baseSymbol conversionToBase")
+      .populate("purchaseUom", "name symbol type baseSymbol conversionToBase")
+      .populate("preferredSupplierRef", "name code")
       .sort({ updatedAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -208,46 +210,7 @@ export async function GET(req) {
     const auth = await requireInventory(req);
     if (auth.error) return auth.error;
 
-    const { InventoryItem, InventoryMovement } = await getTenantModels(auth.tenantId);
-    const now = new Date();
-
-    const expiredItems = await InventoryItem.updateMany(
-      { "batches.expiryDate": { $lt: now }, "batches.status": "available" },
-      { $set: { "batches.$[elem].status": "expired" } },
-      {
-        arrayFilters: [
-          { "elem.expiryDate": { $lt: now }, "elem.status": "available", "elem.quantityBase": { $gt: 0 } },
-        ],
-      }
-    );
-
-    if (expiredItems.modifiedCount > 0) {
-      const affectedItems = await InventoryItem.find({
-        batches: { $elemMatch: { expiryDate: { $lt: now }, status: "expired", quantityBase: { $gt: 0 } } },
-      });
-
-      for (const item of affectedItems) {
-        for (const batch of item.batches) {
-          if (batch.status === "expired" && batch.quantityBase > 0 && batch.expiryDate && new Date(batch.expiryDate) < now) {
-            const deductQty = batch.quantityBase;
-            await InventoryItem.findOneAndUpdate(
-              { _id: item._id, "batches._id": batch._id },
-              { $inc: { stockOnHandBase: -deductQty, "batches.$.quantityBase": -deductQty } }
-            );
-            await InventoryMovement.create({
-              item: item._id,
-              batchId: batch._id,
-              movementType: "expiry",
-              quantityBase: -deductQty,
-              balanceAfterBase: Math.max(0, (item.stockOnHandBase || 0) - deductQty),
-              reason: "Auto-expired by system",
-              performedBy: "system",
-              movementDate: now,
-            });
-          }
-        }
-      }
-    }
+    await processExpiredBatches(auth.tenantId);
 
     const inventory = await loadInventory(auth, req);
     return Response.json(inventory);
@@ -263,7 +226,10 @@ export async function POST(req) {
 
     const body = await req.json();
     const action = clean(body.action);
-  const { InventoryCategory, InventoryItem, InventoryMovement, InventoryUom, InventoryItemType, InventoryStorageCondition } = await getTenantModels(auth.tenantId);
+
+    await processExpiredBatches(auth.tenantId);
+
+    const { InventoryCategory, InventoryItem, InventoryMovement, InventoryUom, InventoryItemType, InventoryStorageCondition } = await getTenantModels(auth.tenantId);
 
     if (action === "category") {
       let name = clean(body.name);
@@ -355,9 +321,8 @@ export async function POST(req) {
 
       if (!name) errors.push("Item name is required");
       else {
-        if (name.length > 25) errors.push("Item name must not exceed 25 characters");
-        else if ((name.match(/-/g) || []).length > 1) errors.push("Item name can contain at most one hyphen");
-        else if (!/^[A-Za-z0-9 -]*$/.test(name)) errors.push("Item name must contain only letters, numbers, spaces, and one hyphen");
+        if (name.length > 60) errors.push("Item name must not exceed 60 characters");
+        else if (!/^[A-Za-z0-9 -]*$/.test(name)) errors.push("Item name must contain only letters, numbers, spaces, and hyphens");
       }
 
       if (!mongoose.Types.ObjectId.isValid(body.category)) errors.push("Category is required");
@@ -390,7 +355,7 @@ export async function POST(req) {
       if (!genericName) errors.push("Generic name is required");
       else {
         if (!/^[A-Za-z0-9]+$/.test(genericName)) errors.push("Generic name must contain only letters and numbers");
-        if (genericName.length > 20) errors.push("Generic name must not exceed 20 characters");
+        if (genericName.length > 60) errors.push("Generic name must not exceed 60 characters");
       }
 
       if (!mongoose.Types.ObjectId.isValid(body.subCategory)) {
@@ -440,14 +405,7 @@ export async function POST(req) {
       }
 
       const manufacturer = clean(body.manufacturer);
-      if (!manufacturer) errors.push("Manufacturer is required");
-      else if (manufacturer.length > 20) errors.push("Manufacturer must not exceed 20 characters");
-      else if (!/^[A-Z][A-Za-z\s]*$/.test(manufacturer)) errors.push("Manufacturer must contain only letters and spaces, starting with a capital letter");
-
       const preferredSupplier = clean(body.preferredSupplier);
-      if (!preferredSupplier) errors.push("Supplier is required");
-      else if (preferredSupplier.length > 20) errors.push("Supplier must not exceed 20 characters");
-      else if (!/^[A-Z][A-Za-z\s]*$/.test(preferredSupplier)) errors.push("Supplier must contain only letters and spaces, starting with a capital letter");
 
       const batchNo = clean(body.batchNo).toUpperCase();
       if (!batchNo) errors.push("Batch No is required");
@@ -457,9 +415,6 @@ export async function POST(req) {
       }
 
       const defaultLocation = clean(body.defaultLocation);
-      if (!defaultLocation) errors.push("Location is required");
-      else if (defaultLocation.length > 75) errors.push("Location must not exceed 75 characters");
-      else if (!/^[A-Za-z0-9 .,\/-]*$/.test(defaultLocation)) errors.push("Location must contain only letters, numbers, spaces, and symbols . , / -");
 
       const storageCondition = clean(body.storageCondition);
       if (!storageCondition) errors.push("Storage condition is required");
@@ -537,10 +492,16 @@ export async function POST(req) {
 
       const quarantineOnReceipt = body.quarantineOnReceipt === true;
       const openingQty = numberValue(body.openingQuantityBase, 0);
+      let preferredSupplierRef = null;
+      if (mongoose.Types.ObjectId.isValid(body.preferredSupplierRef)) {
+        preferredSupplierRef = body.preferredSupplierRef;
+      }
+
       const openingBatch = openingQty > 0
         ? [{
             batchNo: batchNo || "OPENING",
-            supplier: preferredSupplier || "N/A",
+            supplier: preferredSupplier || (preferredSupplierRef ? "Supplier" : "N/A"),
+            supplierRef: preferredSupplierRef,
             receivedDate: dateValue(body.receivedDate) || new Date(),
             expiryDate: dateValue(body.expiryDate),
             quantityBase: openingQty,
@@ -569,7 +530,8 @@ export async function POST(req) {
           minimumStockBase: numberValue(body.minimumStockBase, 0),
           reorderLevelBase: numberValue(body.reorderLevelBase, 0),
           maximumStockBase: numberValue(body.maximumStockBase, 0),
-          preferredSupplier,
+          preferredSupplierRef,
+          preferredSupplier: preferredSupplierRef ? "" : preferredSupplier,
           manufacturer,
           storageCondition,
           defaultLocation,
@@ -630,42 +592,43 @@ export async function POST(req) {
 
       if (movementType === "receipt" || movementType === "purchase") {
         const supplier = clean(body.supplier);
-        if (!supplier) return Response.json({ error: "Supplier is required" }, { status: 400 });
-        if (!isValidName(supplier)) return Response.json({ error: "Supplier contains invalid characters" }, { status: 400 });
-        if (hasUrl(supplier)) return Response.json({ error: "URLs are not allowed in supplier" }, { status: 400 });
+        if (!supplier) return Response.json({ error: "Supplier is required", fieldErrors: { supplier: "Supplier is required" } }, { status: 400 });
+        if (!isValidName(supplier)) return Response.json({ error: "Supplier contains invalid characters", fieldErrors: { supplier: "Supplier contains invalid characters" } }, { status: 400 });
+        if (hasUrl(supplier)) return Response.json({ error: "URLs are not allowed in supplier", fieldErrors: { supplier: "URLs are not allowed" } }, { status: 400 });
       } else {
         const toLocation = clean(body.toLocation);
-        if (!toLocation) return Response.json({ error: "To location is required" }, { status: 400 });
-        if (!isValidName(toLocation)) return Response.json({ error: "Location contains invalid characters" }, { status: 400 });
-        if (hasUrl(toLocation)) return Response.json({ error: "URLs are not allowed in location" }, { status: 400 });
+        if (!toLocation) return Response.json({ error: "To location is required", fieldErrors: { toLocation: "To location is required" } }, { status: 400 });
+        if (!isValidName(toLocation)) return Response.json({ error: "Location contains invalid characters", fieldErrors: { toLocation: "Location contains invalid characters" } }, { status: 400 });
+        if (hasUrl(toLocation)) return Response.json({ error: "URLs are not allowed in location", fieldErrors: { toLocation: "URLs are not allowed" } }, { status: 400 });
       }
 
       const referenceNo = clean(body.referenceNo);
-      if (!referenceNo) return Response.json({ error: "Reference No is required" }, { status: 400 });
-      if (!isValidName(referenceNo)) return Response.json({ error: "Reference No contains invalid characters" }, { status: 400 });
-      if (hasUrl(referenceNo)) return Response.json({ error: "URLs are not allowed in reference number" }, { status: 400 });
+      if (!referenceNo) return Response.json({ error: "Reference No is required", fieldErrors: { referenceNo: "Reference No is required" } }, { status: 400 });
+      if (!isValidName(referenceNo)) return Response.json({ error: "Reference No contains invalid characters", fieldErrors: { referenceNo: "Reference No contains invalid characters" } }, { status: 400 });
+      if (hasUrl(referenceNo)) return Response.json({ error: "URLs are not allowed in reference number", fieldErrors: { referenceNo: "URLs are not allowed" } }, { status: 400 });
 
       const reason = clean(body.reason);
-      if (!reason) return Response.json({ error: "Reason is required" }, { status: 400 });
-      if (!isValidName(reason)) return Response.json({ error: "Reason contains invalid characters" }, { status: 400 });
-      if (hasUrl(reason)) return Response.json({ error: "URLs are not allowed in reason" }, { status: 400 });
+      if (!reason) return Response.json({ error: "Reason is required", fieldErrors: { reason: "Reason is required" } }, { status: 400 });
+      if (!isValidName(reason)) return Response.json({ error: "Reason contains invalid characters", fieldErrors: { reason: "Reason contains invalid characters" } }, { status: 400 });
+      if (hasUrl(reason)) return Response.json({ error: "URLs are not allowed in reason", fieldErrors: { reason: "URLs are not allowed" } }, { status: 400 });
 
       if (isExponential(body.quantityBase)) {
-        return Response.json({ error: "Exponential notation is not allowed in quantity" }, { status: 400 });
+        return Response.json({ error: "Exponential notation is not allowed in quantity", fieldErrors: { quantityBase: "Exponential notation is not allowed" } }, { status: 400 });
       }
 
+      const isAdjustment = movementType === "adjustment";
       let quantityBase = numberValue(body.quantityBase, 0);
-      if (quantityBase <= 0) return Response.json({ error: "Quantity must be greater than zero" }, { status: 400 });
+      if (!isAdjustment && movementType !== "purchase" && quantityBase <= 0) return Response.json({ error: "Quantity must be greater than zero", fieldErrors: { quantityBase: "Quantity must be greater than zero" } }, { status: 400 });
 
       if (body.expiryDate) {
         const expErr = validateExpiryDate(body.expiryDate);
-        if (expErr) return Response.json({ error: expErr }, { status: 400 });
+        if (expErr) return Response.json({ error: expErr, fieldErrors: { expiryDate: expErr } }, { status: 400 });
         if (body.receivedDate) {
           const expiry = new Date(body.expiryDate);
           expiry.setHours(0, 0, 0, 0);
           const received = new Date(body.receivedDate);
           received.setHours(0, 0, 0, 0);
-          if (expiry <= received) return Response.json({ error: "Expiry date must be after received date" }, { status: 400 });
+          if (expiry <= received) return Response.json({ error: "Expiry date must be after received date", fieldErrors: { expiryDate: "Expiry date must be after received date" } }, { status: 400 });
         }
       }
 
@@ -701,6 +664,8 @@ export async function POST(req) {
           toLocation: createdBatch.location,
           performedBy,
           movementDate: receiptDate,
+          costPerBaseUnit: batchData.costPerBaseUnit || 0,
+          supplier: batchData.supplier || "",
         });
 
         const totalCost = quantityBase * (batchData.costPerBaseUnit || 0);
@@ -746,6 +711,16 @@ export async function POST(req) {
       }
 
       const availableBatches = (item.batches || []).filter((b) => b.quantityBase > 0);
+
+      if (movementType === "adjustment" && availableBatches.length > 0) {
+        if (!body.batchId) {
+          return Response.json({ error: "Batch is required for adjustment on batched items", fieldErrors: { batchId: "Batch is required for adjustment" } }, { status: 400 });
+        }
+        if (!item.batches.id(body.batchId)) {
+          return Response.json({ error: "Selected batch not found on this item", fieldErrors: { batchId: "Batch not found" } }, { status: 400 });
+        }
+      }
+
       let selectedBatch = body.batchId
         ? item.batches.id(body.batchId)
         : availableBatches.sort((a, b) => {
@@ -785,16 +760,17 @@ export async function POST(req) {
             toLocation: createdBatch.location,
             performedBy,
             movementDate: adjDate,
+            costPerBaseUnit: numberValue(body.costPerBaseUnit, 0),
           });
           writeAuditLog(req, auth, { action: "create", resourceType: "InventoryMovement", resourceId: movement._id, metadata: { item: item.name, movementType, quantityBase: newBalance } }).catch(() => {});
           return Response.json({ item: updatedItem, movement }, { status: 201 });
         }
-        return Response.json({ error: "A stock batch is required" }, { status: 400 });
+        return Response.json({ error: "A stock batch is required", fieldErrors: { batchId: "A stock batch is required" } }, { status: 400 });
       }
 
       if (movementType === "expiry") {
         if (!selectedBatch.expiryDate || new Date(selectedBatch.expiryDate) >= new Date()) {
-          return Response.json({ error: "Selected batch has not expired yet" }, { status: 400 });
+          return Response.json({ error: "Selected batch has not expired yet", fieldErrors: { batchId: "Selected batch has not expired yet" } }, { status: 400 });
         }
       }
 
@@ -806,12 +782,19 @@ export async function POST(req) {
       if (movementType === "adjustment") {
         const newBalance = numberValue(body.newBalanceBase, selectedBatch.quantityBase);
         const delta = newBalance - selectedBatch.quantityBase;
-        const batchUpdate = { $inc: { "batches.$.quantityBase": delta } };
-        if (newBalance <= 0) batchUpdate.$set = { "batches.$.status": "consumed" };
+        const update = { $inc: { stockOnHandBase: delta, "batches.$.quantityBase": delta } };
+        if (newBalance <= 0) update.$set = { "batches.$.status": "consumed" };
+        const costPerBaseUnit = body.costPerBaseUnit !== undefined && body.costPerBaseUnit !== null && body.costPerBaseUnit !== ""
+          ? Number(body.costPerBaseUnit)
+          : undefined;
+        if (costPerBaseUnit !== undefined && !isNaN(costPerBaseUnit)) {
+          if (!update.$set) update.$set = {};
+          update.$set["batches.$.costPerBaseUnit"] = costPerBaseUnit;
+        }
 
         await InventoryItem.findOneAndUpdate(
           { _id: item._id, "batches._id": selectedBatch._id },
-          { $inc: { stockOnHandBase: delta }, ...batchUpdate }
+          update
         );
 
         const updatedItem = await InventoryItem.findById(item._id);
@@ -826,6 +809,8 @@ export async function POST(req) {
           toLocation: toLocation || batchLocation,
           performedBy,
           movementDate,
+          costPerBaseUnit: costPerBaseUnit !== undefined && !isNaN(costPerBaseUnit) ? costPerBaseUnit : (selectedBatch.costPerBaseUnit || 0),
+          supplier: selectedBatch.supplier || "",
         });
         writeAuditLog(req, auth, { action: "create", resourceType: "InventoryMovement", resourceId: movement._id, metadata: { item: item.name, movementType: "adjustment", quantityBase: delta, batchNo: selectedBatch.batchNo } }).catch(() => {});
         return Response.json({ item: updatedItem, movement }, { status: 201 });
@@ -836,16 +821,16 @@ export async function POST(req) {
       }
 
       const deductQty = quantityBase;
-      const batchUpdate = { $inc: { "batches.$.quantityBase": -deductQty } };
+      const update = { $inc: { stockOnHandBase: -deductQty, "batches.$.quantityBase": -deductQty } };
       if (selectedBatch.quantityBase - deductQty <= 0) {
-        batchUpdate.$set = {
+        update.$set = {
           "batches.$.status": movementType === "wastage" || movementType === "expiry" ? "wasted" : "consumed",
         };
       }
 
       await InventoryItem.findOneAndUpdate(
         { _id: item._id, "batches._id": selectedBatch._id },
-        { $inc: { stockOnHandBase: -deductQty }, ...batchUpdate }
+        update
       );
 
       const updatedItem = await InventoryItem.findById(item._id);
@@ -861,6 +846,8 @@ export async function POST(req) {
         toLocation,
         performedBy,
         movementDate,
+        costPerBaseUnit: selectedBatch.costPerBaseUnit || 0,
+        supplier: selectedBatch.supplier || "",
       });
 
       writeAuditLog(req, auth, { action: "create", resourceType: "InventoryMovement", resourceId: movement._id, metadata: { item: item.name, movementType, quantityBase: -deductQty, batchNo: selectedBatch.batchNo } }).catch(() => {});

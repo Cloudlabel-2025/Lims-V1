@@ -17,7 +17,7 @@ const EMPTY_FORM = {
   clinicName: "",
   location: "",
   clinicAddress: "",
-  commission: "0",
+  commission: "",
   gender: "Male",
   genderIdentity: "",
   doctorType: "Non-Investor",
