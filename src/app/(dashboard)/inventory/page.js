@@ -19,9 +19,6 @@ const emptyItem = {
   minimumStockBase: "",
   reorderLevelBase: "",
   maximumStockBase: "",
-  preferredSupplier: "",
-  preferredSupplierRef: "",
-  manufacturer: "",
   storageCondition: "",
   defaultLocation: "",
   batchNo: "",
@@ -276,7 +273,7 @@ export default function InventoryPage() {
   const actionBtnStyle = { width: 30, height: 30, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", border: "none" };
 
   const parentCategories = inventory.categories.filter((category) => !category.parentCategory);
-  const subCategories = inventory.categories.filter((category) => category.parentCategory);
+  const subCategories = inventory.categories.filter((category) => category.parentCategory && itemForm.category && (category.parentCategory?._id || category.parentCategory) === itemForm.category);
   const selectedMovementItem = inventory.items.find((item) => item._id === movementForm.itemId);
 
   const filteredItems = useMemo(() => {
@@ -284,7 +281,7 @@ export default function InventoryPage() {
     let items = inventory.items;
     if (needle) {
       items = items.filter((item) =>
-        [item.name, item.itemCode, item.genericName, item.manufacturer, item.category?.name, item.subCategory?.name]
+        [item.name, item.itemCode, item.genericName, item.category?.name, item.subCategory?.name]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(needle))
       );
@@ -420,9 +417,6 @@ export default function InventoryPage() {
     if (!itemForm.genericName) errors.genericName = "Generic name is required";
     else if (!/^[A-Za-z0-9]*$/.test(itemForm.genericName)) errors.genericName = "Generic name must contain only letters and numbers";
     else if (itemForm.genericName.length > 60) errors.genericName = "Generic name must not exceed 60 characters";
-    const validConvUnits = ["mg", "g", "kg", "ml", "l", "IU", "µg", "unit", "pack", "oz", "lb"];
-    if (!itemForm.conversionFactorUnit) errors.conversionFactorUnit = "Conversion factor unit is required";
-    else if (!validConvUnits.includes(itemForm.conversionFactorUnit)) errors.conversionFactorUnit = "Invalid conversion factor unit";
     if (!itemForm.itemType) errors.itemType = "Item type is required";
     else if (!itemTypes.some((t) => t.name === itemForm.itemType)) errors.itemType = "Invalid item type";
     if (!itemForm.category) errors.category = "Category is required";
@@ -432,6 +426,9 @@ export default function InventoryPage() {
     else if (isExponential(itemForm.purchaseToBaseFactor)) errors.purchaseToBaseFactor = "Exponential notation is not allowed";
     else if (Number(itemForm.purchaseToBaseFactor) <= 0) errors.purchaseToBaseFactor = "Must be greater than 0";
     else if (!isValidDecimal(itemForm.purchaseToBaseFactor)) errors.purchaseToBaseFactor = "Max 4 digits before decimal, 3 after";
+    const validConvUnits = ["mg", "g", "kg", "ml", "l", "IU", "µg", "unit", "pack", "oz", "lb"];
+    if (!itemForm.conversionFactorUnit) errors.conversionFactorUnit = "Conversion factor unit is required";
+    else if (!validConvUnits.includes(itemForm.conversionFactorUnit)) errors.conversionFactorUnit = "Invalid conversion factor unit";
     if (itemForm.minimumStockBase === "" || itemForm.minimumStockBase === undefined || itemForm.minimumStockBase === null) errors.minimumStockBase = "Min stock is required";
     else if (isExponential(itemForm.minimumStockBase)) errors.minimumStockBase = "Exponential notation is not allowed";
     else if (Number(itemForm.minimumStockBase) < 0) errors.minimumStockBase = "Cannot be negative";
@@ -554,9 +551,6 @@ export default function InventoryPage() {
       minimumStockBase: item.minimumStockBase ?? "",
       reorderLevelBase: item.reorderLevelBase ?? "",
       maximumStockBase: item.maximumStockBase ?? "",
-      preferredSupplier: item.preferredSupplierRef?.name || item.preferredSupplier || "",
-      preferredSupplierRef: item.preferredSupplierRef?._id || "",
-      manufacturer: item.manufacturer || "",
       storageCondition: item.storageCondition || "",
       defaultLocation: item.defaultLocation || "",
       trackExpiry: item.trackExpiry !== false,
@@ -750,7 +744,7 @@ export default function InventoryPage() {
                 </div>
                 <div className="col-md-6">
                   <Field label="Category">
-                    <select required className="lims-input" value={itemForm.category} onChange={(e) => { setItemFormErrors((p) => ({ ...p, category: "" })); setItemForm({ ...itemForm, category: e.target.value }); }} style={inputStyle()}>
+                    <select required className="lims-input" value={itemForm.category} onChange={(e) => { setItemFormErrors((p) => ({ ...p, category: "" })); setItemForm({ ...itemForm, category: e.target.value, subCategory: "" }); }} style={inputStyle()}>
                       <option value="">Select</option>
                       {parentCategories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
                     </select>
@@ -869,24 +863,6 @@ export default function InventoryPage() {
                   </div>
                 )}
                 <div className="col-md-6">
-                  <Field label="Manufacturer">
-                    <select className="lims-input" value={itemForm.manufacturer} onChange={(e) => { setItemFormErrors((p) => ({ ...p, manufacturer: "" })); setItemForm({ ...itemForm, manufacturer: e.target.value, preferredSupplierRef: "", preferredSupplier: "" }); }} style={{ ...inputStyle(), width: "100%" }}>
-                      <option value="">-- Select --</option>
-                      {suppliers.filter((s) => s.manufacturer).reduce((acc, s) => { if (!acc.includes(s.manufacturer)) acc.push(s.manufacturer); return acc; }, []).map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                    <ErrorMsg message={itemFormErrors.manufacturer} />
-                  </Field>
-                </div>
-                <div className="col-md-6">
-                  <Field label="Supplier">
-                    <select className="lims-input" value={itemForm.preferredSupplierRef} onChange={(e) => { setItemFormErrors((p) => ({ ...p, preferredSupplierRef: "" })); const id = e.target.value; const s = suppliers.find((x) => x._id === id); setItemForm({ ...itemForm, preferredSupplierRef: id, preferredSupplier: s?.name || "" }); }} style={{ ...inputStyle(), width: "100%" }}>
-                      <option value="">-- Select --</option>
-                      {suppliers.filter((s) => s.status === "active" && (!itemForm.manufacturer || s.manufacturer === itemForm.manufacturer)).map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
-                    </select>
-                    <ErrorMsg message={itemFormErrors.preferredSupplierRef} />
-                  </Field>
-                </div>
-                <div className="col-md-6">
                   <Field label="Storage Condition">
                     <select required className="lims-input" value={itemForm.storageCondition} onChange={(e) => setItemForm({ ...itemForm, storageCondition: e.target.value })} style={{ ...inputStyle(), width: "100%" }}>
                       <option value="">-- Select --</option>
@@ -941,6 +917,7 @@ export default function InventoryPage() {
           {activeTab === "categories" && viewMode === "form" && (
             <MastersPanel
               title="Category & Sub Category"
+              viewMode={viewMode}
               onSubmit={(event) => {
                 event.preventDefault();
                 const errors = {};
@@ -1047,6 +1024,7 @@ export default function InventoryPage() {
           {activeTab === "uom" && viewMode === "form" && (
             <MastersPanel
               title="UOM Management & Conversion"
+              viewMode={viewMode}
               form={uomForm}
               setForm={setUomForm}
               onSubmit={(event) => {
@@ -1627,13 +1605,12 @@ export default function InventoryPage() {
 }
 
 function InventoryTable({ items, onEdit, onOrder }) {
-  const supplierName = (item) => item.preferredSupplierRef?.name || item.preferredSupplier || "-";
   return (
     <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 1200 }}>
         <thead>
           <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
-            {["Item", "Generic Name", "Category", "Stock", "Min/Reorder/Max", "Batch No", "Manufacturer", "Supplier", "Location", "Expiry", "Status", "Action"].map((heading) => (
+            {["Item", "Generic Name", "Category", "Stock", "Min/Reorder/Max", "Batch No", "Location", "Expiry", "Status", "Action"].map((heading) => (
               <th key={heading} style={{ padding: "12px 14px", textAlign: "left", color: "var(--text-secondary)", fontWeight: 700, whiteSpace: "nowrap" }}>{heading}</th>
             ))}
           </tr>
@@ -1666,8 +1643,6 @@ function InventoryTable({ items, onEdit, onOrder }) {
                 </td>
                 <td style={{ padding: "12px 14px" }}>{formatNumber(item.minimumStockBase)} / {formatNumber(item.reorderLevelBase)} / {formatNumber(item.maximumStockBase)}</td>
                 <td style={{ padding: "12px 14px" }}>{latestBatch?.batchNo || "-"}</td>
-                <td style={{ padding: "12px 14px" }}>{item.manufacturer || "-"}</td>
-                <td style={{ padding: "12px 14px" }}>{supplierName(item)}</td>
                 <td style={{ padding: "12px 14px" }}>{item.defaultLocation || "-"}</td>
                 <td style={{ padding: "12px 14px" }}><Badge tone={expiryTone}>{item.expiredBatches ? "Expired" : item.nearExpiryBatches ? "Near expiry" : formatDate(item.nextExpiryDate)}</Badge></td>
                 <td style={{ padding: "12px 14px" }}>
@@ -1897,7 +1872,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
         </div>
         <div className="col-md-6">
           <Field label="Transaction">
-            <select className="lims-input" value={form.movementType} onChange={(e) => { setLocMode(null); setLocErrors({}); setForm({ ...form, movementType: e.target.value }); }} style={inputStyle()}>
+            <select className="lims-input" value={form.movementType} onChange={(e) => { setLocMode(null); setLocErrors({}); const newType = e.target.value; const next = { ...form, movementType: newType }; if (form.itemId) { const selItem = items.find((i) => i._id === form.itemId); if (selItem) { if (newType === "adjustment") { const adjBatch = (selItem.batches || []).filter((b) => b.quantityBase > 0).sort((a, b) => { if (!a.expiryDate) return 1; if (!b.expiryDate) return -1; return new Date(a.expiryDate) - new Date(b.expiryDate); })[0]; if (adjBatch) { next.batchId = adjBatch._id; const selUnit = form.quantityUnit || selItem.baseUom?.symbol || ""; const uom = COMMON_UOMS.find((u) => u.symbol === selUnit); const conv = uom?.conversionToBase || 1; next.newBalanceBase = adjBatch.quantityBase / conv; } next.toLocation = selItem.defaultLocation || ""; } else if (newType === "transfer" || newType === "wastage") { const lastBatch = selItem.batches?.length ? selItem.batches[selItem.batches.length - 1] : null; if (lastBatch) { next.batchId = lastBatch._id; } } } } setForm(next); }} style={inputStyle()}>
               {["purchase", "adjustment", "transfer", "wastage"].map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
           </Field>
