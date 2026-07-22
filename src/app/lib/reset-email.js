@@ -118,3 +118,47 @@ export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
     }
   );
 }
+
+export async function sendDoctorInvitationEmail({ to, doctorName, labName, otp, expiresAt, activationUrl }) {
+  const config = getSmtpConfig();
+  if (!config.host || !config.user || !config.pass || !config.from) {
+    return { sent: false, reason: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM." };
+  }
+
+  const expiresText = expiresAt.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata",
+  });
+  const safeName = doctorName || "Doctor";
+  const safeLab = labName || "your laboratory";
+  const textBody = [
+    `Hello ${safeName},`,
+    "",
+    `${safeLab} created your doctor portal account.`,
+    `Activation OTP: ${otp}`,
+    `Activate your account: ${activationUrl}`,
+    `This invitation expires at ${expiresText}.`,
+    "",
+    "Do not share this OTP. If you were not expecting this invitation, contact the laboratory.",
+  ].join("\n");
+  const htmlBody = `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#172033;max-width:600px;margin:auto">
+      <h2 style="margin:0 0 12px">Welcome to ${safeLab}</h2>
+      <p>Hello <strong>${safeName}</strong>, your doctor portal account is ready.</p>
+      <div style="margin:20px 0;text-align:center">
+        <span style="display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:14px 32px;font-size:32px;font-weight:700;letter-spacing:10px;color:#0d9488">${otp}</span>
+      </div>
+      <p style="text-align:center"><a href="${activationUrl}" style="display:inline-block;background:#0d9488;color:white;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:700">Activate doctor portal</a></p>
+      <p>This invitation expires at <strong>${expiresText}</strong>. Do not share the OTP.</p>
+      <p>If you were not expecting this invitation, contact the laboratory.</p>
+    </div>`;
+
+  return sendMailWithRetry(() => createTransporter(config), {
+    from: config.from,
+    to,
+    subject: `${safeLab} doctor portal invitation`,
+    text: textBody,
+    html: htmlBody,
+  });
+}

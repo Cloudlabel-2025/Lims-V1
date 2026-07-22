@@ -207,6 +207,13 @@ function PatientSidebar({ patient, onClose }) {
         >
           {Icons.list} Visit History{visitCount !== null ? ` (${visitCount})` : ""}
         </button>
+        <button
+          className="btn-lims-secondary"
+          onClick={() => router.push(`/patients/${patient._id}/portal-access`)}
+          style={{ height: "42px", fontSize: "13px", fontWeight: 700, borderRadius: "8px", width: "100%" }}
+        >
+          Print Patient Portal QR
+        </button>
       </div>
     </div>
   );

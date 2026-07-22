@@ -21,11 +21,22 @@ export async function GET(req, { params }) {
     if (moduleAuth.error) return moduleAuth.error;
 
     const { id } = await params;
-    const { TestReport } = await getTenantModels(auth.tenantId);
+    const { TestReport, BillingRecord } = await getTenantModels(auth.tenantId);
     const report = await TestReport.findById(id).populate("patient", "name patientId age gender phone address");
 
     if (!report) {
       return Response.json({ error: "Report not found" }, { status: 404 });
+    }
+
+    if (auth.session.doctorId) {
+      const ownsReferral = report.status === "released" && report.billingRecord
+        ? await BillingRecord.exists({
+            _id: report.billingRecord,
+            tenantId: auth.tenantId,
+            referralDoctor: auth.session.doctorId,
+          })
+        : null;
+      if (!ownsReferral) return Response.json({ error: "Report not found" }, { status: 404 });
     }
 
     await writeAuditLog(req, auth, {

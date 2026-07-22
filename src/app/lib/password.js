@@ -41,9 +41,14 @@ export async function hashPassword(password) {
     throw new Error(policy.errors.join("; "));
   }
 
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derivedKey = await scryptAsync(password, salt, keyLength);
+  return hashSecret(password);
+}
 
+export async function hashSecret(value) {
+  const secret = String(value || "");
+  if (!secret) throw new Error("Secret is required");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derivedKey = await scryptAsync(secret, salt, keyLength);
   return `scrypt:${salt}:${derivedKey.toString("hex")}`;
 }
 

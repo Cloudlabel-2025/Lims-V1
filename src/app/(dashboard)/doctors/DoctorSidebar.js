@@ -18,6 +18,8 @@ function DoctorSidebar({
   onViewPayoutHistory,
   canEditDoctors,
   canDeleteDoctors,
+  canManageUsers,
+  onResendInvitation,
   onEdit,
   onDeleteClick,
 }) {
@@ -124,6 +126,15 @@ function DoctorSidebar({
         <div className="detail-item"><div className="detail-value">{doctor.location}</div><div className="detail-label">Practice Location</div></div>
         <div className="detail-item"><div className="detail-value">{formatDate(doctor.createdAt)}</div><div className="detail-label">Registered On</div></div>
       </div>
+
+      {canManageUsers && (
+        <div style={{ padding: "0 24px 16px" }}>
+          <button type="button" className="btn-lims-secondary" onClick={onResendInvitation} style={{ width: "100%" }}>
+            {Icons.mail} Resend portal invitation
+          </button>
+          {actionError && <p style={{ color: "#b91c1c", fontSize: 12, marginTop: 8 }}>{actionError}</p>}
+        </div>
+      )}
 
       <div style={{ padding: "0 24px 20px" }}>
         <div

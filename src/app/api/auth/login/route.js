@@ -178,7 +178,7 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     ? { email: normalizedLoginId.toLowerCase(), status: { $in: ["active", "locked"] } }
     : { userId: normalizedLoginId.toUpperCase(), status: { $in: ["active", "locked"] } };
   const user = await User.findOne(userQuery)
-    .select("_id userId firstName lastName email role +passwordHash failedLoginAttempts lockedUntil")
+    .select("_id userId firstName lastName email role doctorId +passwordHash failedLoginAttempts lockedUntil")
     .lean();
 
   if (!user) {
@@ -250,13 +250,16 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
   const permissions = role?.permissions || [];
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
 
-  let doctorId = null;
-  try {
+  const doctorId = user.doctorId ? String(user.doctorId) : null;
+  if (doctorId) {
     const Doctor = getDoctorModel(tenantConnection);
-    const doctorRecord = await Doctor.findOne({ email: user.email.toLowerCase() }).select("_id").lean();
-    if (doctorRecord) doctorId = String(doctorRecord._id);
-  } catch {
-    // doctor association is optional
+    const doctorRecord = await Doctor.findById(doctorId).select("status").lean();
+    if (!doctorRecord || doctorRecord.status !== "Active") {
+      return NextResponse.json(
+        { error: "Your doctor profile is not active. Contact your lab admin." },
+        { status: 403 }
+      );
+    }
   }
 
   const token = createSessionToken({
@@ -282,7 +285,7 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
   const response = NextResponse.json({
     userType: "tenant",
     tenantId,
-    redirectUrl: buildTenantUrl(tenantId, req.url, "/dashboard"),
+    redirectUrl: buildTenantUrl(tenantId, req.url, doctorId ? "/doctor/dashboard" : "/dashboard"),
     loginUrl: buildTenantUrl(tenantId, req.url),
     user: {
       id: user._id,

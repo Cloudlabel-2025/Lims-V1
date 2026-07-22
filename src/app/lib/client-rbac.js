@@ -25,11 +25,14 @@ export function getAllowedNavItems(user, theme) {
 }
 
 export function getFirstAllowedHref(user, theme) {
+  if (user?.doctorId) return "/doctor/dashboard";
   return getAllowedNavItems(user, theme)[0]?.href || (hasPermission(user, "users.manage") ? "/users" : hasPermission(user, "settings.manage") ? "/settings" : "");
 }
 
 export function getRequiredPermissionsForPath(pathname) {
   if (!pathname) return [];
+
+  if (pathname === "/doctor/dashboard" || pathname.startsWith("/doctor/patients/")) return ["reports.view"];
 
   if (pathname === "/users" || pathname.startsWith("/users/")) {
     return ["users.manage"];
@@ -58,6 +61,7 @@ export function getRequiredPermissionsForPath(pathname) {
 }
 
 export function canAccessPath(user, theme, pathname) {
+  if (pathname?.startsWith("/doctor/") && pathname !== "/doctor/profile" && !user?.doctorId) return false;
   const requiredPermissions = getRequiredPermissionsForPath(pathname);
   if (requiredPermissions.length === 0) return true;
 

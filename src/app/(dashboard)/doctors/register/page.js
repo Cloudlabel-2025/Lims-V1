@@ -104,7 +104,10 @@ export default function DoctorRegistration() {
       if (res.status === 201) {
         clearCachedApi("/api/doctor");
         clearCachedApi("/api/dashboard/stats");
-        setStatus({ type: "success", message: `Doctor registered successfully. Doctor ID: ${data.doctorId}.` });
+        const portalMessage = data.portalAccount?.invitationSent
+          ? ` Portal account created for ${data.portalAccount.email}; activation invitation sent.`
+          : ` Portal account created for ${data.portalAccount?.email || payload.email}, but the invitation email was not sent. Use Resend Invitation from the doctor record.`;
+        setStatus({ type: "success", message: `Doctor registered successfully. Doctor ID: ${data.doctorId}.${portalMessage}` });
         setForm(EMPTY_FORM);
         setShowErrors(false);
       } else {

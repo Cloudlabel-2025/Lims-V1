@@ -55,6 +55,7 @@ export async function GET(req) {
       query.patient = patientId
         ? { $in: referredPatientIds.map(String).includes(patientId) ? [patientId] : [] }
         : { $in: referredPatientIds };
+      query.status = "released";
     }
 
     const { TestReport } = await getTenantModels(auth.tenantId);

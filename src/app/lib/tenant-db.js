@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { getPatientModel } from "@/app/models/tenant/Patient";
+import { getPatientPortalAccountModel } from "@/app/models/tenant/PatientPortalAccount";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { getAccountModel } from "@/app/models/tenant/Account";
 import { getAuditLogModel } from "@/app/models/tenant/AuditLog";
@@ -91,6 +92,7 @@ export async function getTenantModels(tenantId) {
     ExpenseCategory: getExpenseCategoryModel(connection),
     JournalEntry: getJournalEntryModel(connection),
     Patient: getPatientModel(connection, { patientPrefix: lab?.name ? `${lab.name.toUpperCase().replace(/\s+/g, "")}` : lab?.numbering?.patientPrefix }),
+    PatientPortalAccount: getPatientPortalAccountModel(connection),
     PaymentReceipt: getPaymentReceiptModel(connection),
     Role: getRoleModel(connection),
     Sample: getSampleModel(connection),

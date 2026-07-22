@@ -73,7 +73,9 @@ export const UserSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: true,
+      required: function requirePasswordForActiveAccount() {
+        return this.status !== "invited";
+      },
       select: false,
     },
     role: {
@@ -124,6 +126,7 @@ export const UserSchema = new mongoose.Schema(
 
 UserSchema.index({ status: 1, role: 1 });
 UserSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
+UserSchema.index({ doctorId: 1 }, { unique: true, sparse: true });
 
 UserSchema.pre("save", async function generateUserId() {
   if (this.userId) return;

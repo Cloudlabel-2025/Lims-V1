@@ -35,6 +35,7 @@ export default function DoctorList() {
   const canRegisterDoctors = hasPermission(user, "doctors.register");
   const canEditDoctors = hasPermission(user, "doctors.edit");
   const canDeleteDoctors = hasPermission(user, "doctors.delete");
+  const canManageUsers = hasPermission(user, "users.manage");
 
   const fetchAllDoctors = useCallback(async (page = 1) => {
     setListLoading(true);
@@ -51,6 +52,8 @@ export default function DoctorList() {
   }, []);
 
   useEffect(() => {
+    // Client-only doctor list initialization.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     fetchAllDoctors(1);
   }, [fetchAllDoctors]);
@@ -74,6 +77,7 @@ export default function DoctorList() {
     if (!mounted) return;
 
     if (!searchTerm.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchAllDoctors(currentPage);
       return;
     }
@@ -148,6 +152,19 @@ export default function DoctorList() {
     }
   };
 
+  const handleResendInvitation = async () => {
+    if (!selectedDoctor) return;
+    setActionError("");
+    try {
+      const res = await fetch(`/api/doctor/${selectedDoctor._id}/resend-invitation`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to resend invitation");
+      window.alert(data.message);
+    } catch (error) {
+      setActionError(error.message || "Unable to resend invitation");
+    }
+  };
+
   const loadPayoutHistory = useCallback(async (doctorId) => {
     setPayoutHistoryLoading(true);
     try {
@@ -183,6 +200,8 @@ export default function DoctorList() {
             onViewPayoutHistory={() => { loadPayoutHistory(selectedDoctor._id); setShowPayoutHistory(true); }}
             canEditDoctors={canEditDoctors}
             canDeleteDoctors={canDeleteDoctors}
+            canManageUsers={canManageUsers}
+            onResendInvitation={handleResendInvitation}
             onEdit={() => { closeSidebar(); router.push(`/doctors/edit/${selectedDoctor._id}`); }}
             onDeleteClick={(doctor) => openDeleteModal(doctor)}
           />

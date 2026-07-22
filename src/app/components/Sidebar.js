@@ -22,11 +22,15 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
     accounts: Icons.wallet,
     inventory: Icons.flask,
   };
-  const navItems = getAllowedNavItems(user, theme)
-    .map((module) => ({ ...module, icon: iconByModule[module.id] || Icons.settings }));
+  const navItems = user?.doctorId
+    ? [{ id: "doctor-portal", label: "Doctor Portal", href: "/doctor/dashboard", icon: Icons.home }]
+    : getAllowedNavItems(user, theme)
+        .map((module) => ({ ...module, icon: iconByModule[module.id] || Icons.settings }));
   const allowedIds = new Set(navItems.map((item) => item.id));
 
-  const groupsWithItems = tenantModuleGroups
+  const groupsWithItems = (user?.doctorId
+    ? [{ id: "doctor", label: "Doctor Portal", items: ["doctor-portal"] }]
+    : tenantModuleGroups)
     .map((group) => ({
       ...group,
       items: group.items.filter((id) => allowedIds.has(id)),
@@ -35,7 +39,7 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
 
   const canOpenSettings = hasAnyPermission(user, ["settings.manage", "users.manage"]);
   const canViewAudit = hasAnyPermission(user, ["settings.manage"]);
-  const adminItems = [
+  const adminItems = user?.doctorId ? [] : [
     ...(canOpenSettings ? [{ id: "settings", label: "Settings", href: "/settings", icon: Icons.settings }] : []),
     ...(hasAnyPermission(user, ["users.manage"]) ? [{ id: "users", label: "User Assignment", href: "/users", icon: Icons.person }] : []),
     ...(canViewAudit ? [{ id: "audit", label: "Audit Log", href: "/audit", icon: Icons.list }] : []),

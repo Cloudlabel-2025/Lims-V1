@@ -1,6 +1,8 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { createPatientAccessCredential } from "@/app/lib/patient-portal";
+import { writeAuditLog } from "@/app/lib/audit";
 
 function clean(value) {
   return String(value || "").trim();
@@ -19,7 +21,7 @@ export async function POST(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "patients.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Patient } = await getTenantModels(tenantId);
+    const { connection, Patient, PatientPortalAccount } = await getTenantModels(tenantId);
     const body = await req.json();
 
     const { name, dob, age, gender, phone, receivedTime, address, force } = body;
@@ -108,14 +110,35 @@ export async function POST(req) {
       }
     }
 
-    const patient = await Patient.create({
-      ...body,
-      selectedTests: undefined,
-      phone: String(phone),
-      refDoctorName: body.refDoctorName || undefined,
+    const access = await createPatientAccessCredential(tenantId, req.url);
+    let patient;
+    await connection.transaction(async (session) => {
+      [patient] = await Patient.create([{
+        ...body,
+        selectedTests: undefined,
+        phone: String(phone),
+        refDoctorName: body.refDoctorName || undefined,
+      }], { session });
+      await PatientPortalAccount.create([{
+        patient: patient._id,
+        status: "invited",
+        activationTokenHash: access.tokenHash,
+        accessPinHash: access.accessPinHash,
+        activationExpiresAt: access.expiresAt,
+        lastAccessSlipIssuedAt: new Date(),
+      }], { session });
     });
 
-    return Response.json(patient.toObject(), { status: 201 });
+    await writeAuditLog(req, auth, {
+      action: "patient.portal_provisioned",
+      resourceType: "Patient",
+      resourceId: patient._id,
+      metadata: { expiresAt: access.expiresAt },
+    });
+    return Response.json({
+      ...patient.toObject(),
+      portalAccess: { activationUrl: access.activationUrl, accessPin: access.accessPin, expiresAt: access.expiresAt },
+    }, { status: 201 });
   } catch (err) {
     console.error("POST /api/patient error:", err);
 
@@ -141,7 +164,7 @@ export async function GET(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "patients.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Patient } = await getTenantModels(tenantId);
+    const { Patient, BillingRecord } = await getTenantModels(tenantId);
     const { searchParams } = new URL(req.url);
     const search = clean(searchParams.get("search"));
     const gender = clean(searchParams.get("gender"));
@@ -151,9 +174,17 @@ export async function GET(req) {
     const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
 
     let query = {};
+    if (auth.session.doctorId) {
+      const referredPatientIds = await BillingRecord.distinct("patient", {
+        tenantId,
+        referralDoctor: auth.session.doctorId,
+        status: { $ne: "cancelled" },
+      });
+      query._id = { $in: referredPatientIds };
+    }
     if (search) {
       const regex = new RegExp(escapeRegex(search), "i");
-      query = { $or: [{ name: regex }, { phone: regex }, { patientId: regex }, { barcode: regex }] };
+      query.$or = [{ name: regex }, { phone: regex }, { patientId: regex }, { barcode: regex }];
     }
     if (gender && ["Male", "Female", "Other"].includes(gender)) {
       query.gender = gender;
