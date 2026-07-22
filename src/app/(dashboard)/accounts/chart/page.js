@@ -7,6 +7,7 @@ import StatCard from "../_components/StatCard";
 import Badge from "../_components/Badge";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
 export default function ChartOfAccountsPage() {
   const router = useRouter();
@@ -71,6 +72,18 @@ export default function ChartOfAccountsPage() {
           <button type="button" className="dash-btn-secondary" onClick={() => fetchAccounts(page)} disabled={loading} style={{ height: 38, padding: "0 14px" }}>
             {Icons.refresh} Refresh
           </button>
+          <DownloadDropdown onDownload={async (format) => {
+            const params = new URLSearchParams({ export: format });
+            const res = await fetch(`/api/accounting/accounts?${params}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `chart-of-accounts.${format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv"}`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }} disabled={loading} />
         </div>
       </div>
 

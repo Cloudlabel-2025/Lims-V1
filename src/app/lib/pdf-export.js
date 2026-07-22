@@ -250,6 +250,76 @@ export async function exportCommissionsPdf(pendingDoctors, payoutHistory) {
   return toBuffer(doc);
 }
 
+export async function exportChartOfAccountsPdf(accounts) {
+  const doc = createDoc("Chart of Accounts");
+  const headers = ["Code", "Name", "Type", "Subtype", "Balance", "System"];
+  const colWidths = [60, 160, 80, 100, 100, 70];
+  const totals = { asset: 0, liability: 0, revenue: 0, expense: 0 };
+  const rows = accounts.map((a) => {
+    totals[a.type] = (totals[a.type] || 0) + Number(a.balance || 0);
+    return [a.code, a.name, a.type, a.subtype || "-", money(a.balance), a.isSystem ? "System" : "Custom"];
+  });
+  drawTable(doc, headers, rows, colWidths);
+  doc.moveDown(0.5);
+  doc.fontSize(9).font("Helvetica-Bold");
+  doc.text(`Asset: Rs ${money(totals.asset)}  |  Liability: Rs ${money(totals.liability)}  |  Revenue: Rs ${money(totals.revenue)}  |  Expense: Rs ${money(totals.expense)}`);
+  return toBuffer(doc);
+}
+
+export async function exportCorporateAccountsPdf(corporates) {
+  const doc = createDoc("Corporate Accounts");
+  const headers = ["Name", "Contact Person", "Credit Limit", "Outstanding", "Statement Cycle"];
+  const colWidths = [140, 120, 100, 100, 100];
+  let totalCredit = 0;
+  let totalOutstanding = 0;
+  const rows = corporates.map((c) => {
+    totalCredit += Number(c.creditLimit || 0);
+    totalOutstanding += Number(c.outstandingBalance || 0);
+    return [c.name, c.contactPerson || "-", money(c.creditLimit), money(c.outstandingBalance), c.statementCycle || "monthly"];
+  });
+  rows.push(["Total", "", money(totalCredit), money(totalOutstanding), ""]);
+  drawTable(doc, headers, rows, colWidths);
+  doc.moveDown(0.5);
+  doc.fontSize(9).font("Helvetica-Bold");
+  doc.text(`Total Credit Limit: Rs ${money(totalCredit)}  |  Total Outstanding: Rs ${money(totalOutstanding)}`);
+  return toBuffer(doc);
+}
+
+export async function exportDashboardPdf(accounts, recentBills) {
+  const doc = createDoc("Accounts Dashboard Summary");
+
+  doc.fontSize(11).font("Helvetica-Bold").text("Account Balances", { underline: true });
+  doc.moveDown(0.3);
+  const totals = { asset: 0, liability: 0, revenue: 0, expense: 0 };
+  for (const a of accounts) {
+    totals[a.type] = (totals[a.type] || 0) + Number(a.balance || 0);
+  }
+  const balanceHeaders = ["Type", "Total Balance"];
+  const balanceWidths = [200, 200];
+  const balanceRows = Object.entries(totals).map(([type, total]) => [
+    type.charAt(0).toUpperCase() + type.slice(1),
+    money(total),
+  ]);
+  drawTable(doc, balanceHeaders, balanceRows, balanceWidths);
+
+  doc.moveDown(0.5);
+  doc.fontSize(11).font("Helvetica-Bold").text("Recent Bills", { underline: true });
+  doc.moveDown(0.3);
+  const billHeaders = ["Bill ID", "Patient", "Amount", "Paid", "Status", "Date"];
+  const billWidths = [80, 120, 80, 80, 70, 90];
+  const billRows = recentBills.map((b) => [
+    b.billId || "-",
+    b.patient?.name || "-",
+    money(b.totalAmount),
+    money(b.totalPaid || 0),
+    b.billingStatus || "-",
+    b.createdAt ? new Date(b.createdAt).toLocaleDateString("en-IN") : "",
+  ]);
+  drawTable(doc, billHeaders, billRows, billWidths);
+
+  return toBuffer(doc);
+}
+
 export function generateCsv(headers, rows) {
   function escape(val) {
     const s = String(val != null ? val : "");

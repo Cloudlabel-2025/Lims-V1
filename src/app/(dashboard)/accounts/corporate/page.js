@@ -5,6 +5,7 @@ import SuccessDialog from "@/app/components/SuccessDialog";
 import { money, inputStyle, sanitizeCorporateName, sanitizeAmountInput } from "../_components/helpers";
 import Field from "../_components/Field";
 import Table from "../_components/Table";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
 const emptyCorporate = { name: "", contactPerson: "", creditLimit: "", statementCycle: "monthly" };
 
@@ -187,6 +188,20 @@ export default function CorporatePage() {
                 <option value="half-yearly">Half-Yearly</option>
                 <option value="yearly">Yearly</option>
               </select>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+              <DownloadDropdown onDownload={async (format) => {
+                const params = new URLSearchParams({ export: format });
+                const res = await fetch(`/api/corporate-accounts?${params}`, { credentials: "include" });
+                if (!res.ok) throw new Error("Download failed");
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `corporate-accounts.${format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv"}`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }} disabled={loading} />
             </div>
             <CorporateTable
               corporates={corporates.filter((c) => {

@@ -1,6 +1,8 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { exportCorporateAccounts } from "@/app/lib/excel-export";
+import { exportCorporateAccountsPdf, generateCsv } from "@/app/lib/pdf-export";
 
 function clean(value) {
   return String(value || "").trim();
@@ -31,10 +33,43 @@ export async function GET(req) {
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "accounts.view");
     if (moduleAuth.error) return moduleAuth.error;
 
+    const { searchParams } = new URL(req.url);
+    const exportFormat = searchParams.get("export");
+
     const { CorporateAccount } = await getTenantModels(auth.tenantId);
     const corporateAccounts = await CorporateAccount.find({ tenantId: auth.tenantId })
       .sort({ name: 1 })
       .lean();
+
+    if (exportFormat === "xlsx") {
+      const buffer = await exportCorporateAccounts(corporateAccounts);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": 'attachment; filename="corporate-accounts.xlsx"',
+        },
+      });
+    }
+    if (exportFormat === "pdf") {
+      const buffer = await exportCorporateAccountsPdf(corporateAccounts);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": 'attachment; filename="corporate-accounts.pdf"',
+        },
+      });
+    }
+    if (exportFormat === "csv") {
+      const headers = ["Name", "Contact Person", "Credit Limit", "Outstanding", "Statement Cycle"];
+      const rows = corporateAccounts.map((c) => [c.name, c.contactPerson || "-", String(c.creditLimit || 0), String(c.outstandingBalance || 0), c.statementCycle || "monthly"]);
+      const csv = generateCsv(headers, rows);
+      return new Response(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="corporate-accounts.csv"',
+        },
+      });
+    }
 
     return Response.json({ corporateAccounts });
   } catch (error) {

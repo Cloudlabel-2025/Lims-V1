@@ -268,6 +268,93 @@ export async function exportCommissions(pendingDoctors, payoutHistory) {
   return buffer;
 }
 
+export async function exportChartOfAccounts(accounts) {
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet("Chart of Accounts");
+
+  addHeaderRow(ws, "Chart of Accounts", ["Code", "Name", "Type", "Subtype", "Balance", "System"]);
+  addColumnHeaders(ws, ["Code", "Name", "Type", "Subtype", "Balance", "System"]);
+
+  const totals = { asset: 0, liability: 0, revenue: 0, expense: 0 };
+
+  for (const a of accounts) {
+    ws.addRow([a.code, a.name, a.type, a.subtype || "-", Number(a.balance || 0), a.isSystem ? "System" : "Custom"]);
+    totals[a.type] = (totals[a.type] || 0) + Number(a.balance || 0);
+  }
+
+  ws.addRow([]);
+  ws.addRow(["", "Asset Total", "", "", totals.asset, ""]);
+  ws.addRow(["", "Liability Total", "", "", totals.liability, ""]);
+  ws.addRow(["", "Revenue Total", "", "", totals.revenue, ""]);
+  ws.addRow(["", "Expense Total", "", "", totals.expense, ""]);
+
+  ws.columns.forEach((col) => { if (col) col.width = 18; });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer;
+}
+
+export async function exportCorporateAccounts(corporates) {
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet("Corporate Accounts");
+
+  addHeaderRow(ws, "Corporate Accounts", ["Name", "Contact Person", "Credit Limit", "Outstanding", "Statement Cycle"]);
+  addColumnHeaders(ws, ["Name", "Contact Person", "Credit Limit", "Outstanding", "Statement Cycle"]);
+
+  let totalCredit = 0;
+  let totalOutstanding = 0;
+
+  for (const c of corporates) {
+    ws.addRow([c.name, c.contactPerson || "-", c.creditLimit || 0, c.outstandingBalance || 0, c.statementCycle || "monthly"]);
+    totalCredit += Number(c.creditLimit || 0);
+    totalOutstanding += Number(c.outstandingBalance || 0);
+  }
+
+  ws.addRow([]);
+  ws.addRow(["Total", "", totalCredit, totalOutstanding, ""]);
+
+  ws.columns.forEach((col) => { if (col) col.width = 20; });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer;
+}
+
+export async function exportDashboardSummary(accounts, recentBills) {
+  const workbook = new ExcelJS.Workbook();
+
+  const wsAccounts = workbook.addWorksheet("Account Summary");
+  addHeaderRow(wsAccounts, "Account Summary", ["Type", "Total Balance"]);
+  addColumnHeaders(wsAccounts, ["Type", "Total Balance"]);
+
+  const totals = { asset: 0, liability: 0, revenue: 0, expense: 0 };
+  for (const a of accounts) {
+    totals[a.type] = (totals[a.type] || 0) + Number(a.balance || 0);
+  }
+  for (const [type, total] of Object.entries(totals)) {
+    wsAccounts.addRow([type.charAt(0).toUpperCase() + type.slice(1), total]);
+  }
+  wsAccounts.columns.forEach((col) => { if (col) col.width = 22; });
+
+  const wsBills = workbook.addWorksheet("Recent Bills");
+  addHeaderRow(wsBills, "Recent Bills", ["Bill ID", "Patient", "Amount", "Paid", "Status", "Date"]);
+  addColumnHeaders(wsBills, ["Bill ID", "Patient", "Amount", "Paid", "Status", "Date"]);
+
+  for (const b of recentBills) {
+    wsBills.addRow([
+      b.billId || "-",
+      b.patient?.name || "-",
+      b.totalAmount,
+      b.totalPaid || 0,
+      b.billingStatus || "-",
+      b.createdAt ? new Date(b.createdAt).toLocaleDateString("en-IN") : "",
+    ]);
+  }
+  wsBills.columns.forEach((col) => { if (col) col.width = 18; });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer;
+}
+
 export async function exportConsolidated({ daily, weekly, monthly }) {
   const workbook = new ExcelJS.Workbook();
 

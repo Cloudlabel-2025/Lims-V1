@@ -2,6 +2,8 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { accountTypes } from "@/app/models/tenant/Account";
+import { exportChartOfAccounts } from "@/app/lib/excel-export";
+import { exportChartOfAccountsPdf, generateCsv } from "@/app/lib/pdf-export";
 
 function clean(value) {
   return String(value || "").trim();
@@ -31,11 +33,46 @@ export async function GET(req) {
     const { Account } = await getTenantModels(auth.tenantId);
     const { searchParams } = new URL(req.url);
     const type = clean(searchParams.get("type"));
+    const exportFormat = searchParams.get("export");
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
     const query = { tenantId: auth.tenantId };
 
     if (type && type !== "all") query.type = type;
+
+    if (exportFormat) {
+      const accounts = await Account.find(query).sort({ code: 1 }).lean();
+
+      if (exportFormat === "xlsx") {
+        const buffer = await exportChartOfAccounts(accounts);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition": 'attachment; filename="chart-of-accounts.xlsx"',
+          },
+        });
+      }
+      if (exportFormat === "pdf") {
+        const buffer = await exportChartOfAccountsPdf(accounts);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": 'attachment; filename="chart-of-accounts.pdf"',
+          },
+        });
+      }
+      if (exportFormat === "csv") {
+        const headers = ["Code", "Name", "Type", "Subtype", "Balance", "System"];
+        const rows = accounts.map((a) => [a.code, a.name, a.type, a.subtype || "-", String(a.balance || 0), a.isSystem ? "System" : "Custom"]);
+        const csv = generateCsv(headers, rows);
+        return new Response(csv, {
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": 'attachment; filename="chart-of-accounts.csv"',
+          },
+        });
+      }
+    }
 
     const [accounts, total] = await Promise.all([
       Account.find(query).sort({ code: 1 }).skip((page - 1) * limit).limit(limit).lean(),

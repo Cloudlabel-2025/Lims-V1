@@ -6,6 +6,7 @@ import { money, formatDate } from "./_components/helpers";
 import StatCard from "./_components/StatCard";
 import Badge from "./_components/Badge";
 import Table from "./_components/Table";
+import DownloadDropdown from "./_components/DownloadDropdown";
 
 export default function AccountsDashboard() {
   const router = useRouter();
@@ -78,9 +79,23 @@ export default function AccountsDashboard() {
             <small style={{ color: "var(--text-muted)" }}>Financial overview at a glance</small>
           </div>
         </div>
-        <button type="button" className="dash-btn-secondary" onClick={loadDashboard} style={{ height: 38, padding: "0 14px", borderRadius: 8 }}>
-          {Icons.refresh} Refresh
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="dash-btn-secondary" onClick={loadDashboard} style={{ height: 38, padding: "0 14px", borderRadius: 8 }}>
+            {Icons.refresh} Refresh
+          </button>
+          <DownloadDropdown onDownload={async (format) => {
+            const params = new URLSearchParams({ export: format });
+            const res = await fetch(`/api/accounting/reports/dashboard?${params}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `accounts-dashboard.${format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv"}`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }} disabled={loading} />
+        </div>
       </div>
 
       {error && <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 800 }}>{error}</div>}
