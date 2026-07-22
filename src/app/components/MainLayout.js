@@ -146,6 +146,11 @@ export default function MainLayout({ children }) {
       }
     }
 
+    if (user.doctorId && pathname === "/dashboard") {
+      router.replace(buildTenantQueryPath("/doctor/dashboard", user.tenantId));
+      return;
+    }
+
     if (canAccessPath(user, theme, pathname)) return;
 
     const firstAllowedHref = getFirstAllowedHref(user, theme);

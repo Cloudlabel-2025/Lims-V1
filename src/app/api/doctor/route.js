@@ -2,6 +2,11 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { formatDoctorValidationErrors, validateDoctorPayload } from "@/app/utils/doctor-validation";
+import { createDoctorInvitation, splitDoctorName } from "@/app/lib/doctor-invitation";
+import { sendDoctorInvitationEmail } from "@/app/lib/reset-email";
+import { buildTenantUrl } from "@/app/lib/subdomain";
+import { getTenantConfig } from "@/app/lib/tenant-cache";
+import { writeAuditLog } from "@/app/lib/audit";
 
 function clean(value) {
   return String(value || "").trim();
@@ -21,7 +26,7 @@ export async function POST(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "doctors.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Doctor } = await getTenantModels(tenantId);
+    const { connection, Doctor, User, Role } = await getTenantModels(tenantId);
     const body = await req.json();
     const payload = Object.fromEntries(
       Object.entries(body).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
@@ -39,11 +44,14 @@ export async function POST(req) {
     if (!payload.genderIdentity) delete payload.genderIdentity;
 
     const { mciNumber, phone } = payload;
+    const email = String(payload.email).toLowerCase();
 
     // --- Duplicate Checks ---
-    const [existingMCI, existingPhone] = await Promise.all([
+    const [existingMCI, existingPhone, existingDoctorEmail, existingUser] = await Promise.all([
       Doctor.findOne({ mciNumber: String(mciNumber) }),
-      Doctor.findOne({ phone: String(phone) })
+      Doctor.findOne({ phone: String(phone) }),
+      Doctor.findOne({ email }),
+      User.findOne({ email }).select("_id doctorId status"),
     ]);
 
     const conflicts = [];
@@ -53,6 +61,8 @@ export async function POST(req) {
     if (existingPhone) {
       conflicts.push(`Mobile Number "${phone}" (belongs to ${existingPhone.name})`);
     }
+    if (existingDoctorEmail) conflicts.push(`Email "${email}" (belongs to ${existingDoctorEmail.name})`);
+    if (existingUser) conflicts.push(`Email "${email}" is already used by a portal account`);
 
     if (conflicts.length > 0) {
       return Response.json(
@@ -61,16 +71,79 @@ export async function POST(req) {
       );
     }
 
-    const doctor = await Doctor.create({
-      ...payload,
-      email: String(payload.email).toLowerCase(),
-      phone: String(phone),
-      mciNumber: String(mciNumber).toUpperCase(),
-      experience: Number(payload.experience),
-      commission: payload.commission !== undefined ? Number(payload.commission) : 0,
+    const doctorRole = await Role.findOne({ name: "Doctor Regular", status: "active" });
+    if (!doctorRole) {
+      return Response.json(
+        { error: "Doctor Regular role is not configured. Seed or create the role before registering doctors." },
+        { status: 409 }
+      );
+    }
+
+    const invitation = createDoctorInvitation();
+    const { firstName, lastName } = splitDoctorName(payload.name);
+    let doctor;
+    let portalUser;
+
+    await connection.transaction(async (session) => {
+      [doctor] = await Doctor.create([{
+        ...payload,
+        email,
+        phone: String(phone),
+        mciNumber: String(mciNumber).toUpperCase(),
+        experience: Number(payload.experience),
+        commission: payload.commission !== undefined ? Number(payload.commission) : 0,
+      }], { session });
+
+      [portalUser] = await User.create([{
+        firstName,
+        lastName,
+        email,
+        role: doctorRole._id,
+        status: "invited",
+        doctorId: doctor._id,
+        createdBy: auth.session.userId,
+        passwordResetTokenHash: invitation.otpHash,
+        passwordResetExpiresAt: invitation.expiresAt,
+      }], { session });
     });
 
-    return Response.json(doctor, { status: 201 });
+    const lab = await getTenantConfig(tenantId);
+    const activationPath = `/activate-account?tenantId=${encodeURIComponent(tenantId)}&email=${encodeURIComponent(email)}`;
+    const activationUrl = buildTenantUrl(tenantId, req.url, activationPath);
+    let invitationSent = false;
+    let invitationError = "";
+    try {
+      const result = await sendDoctorInvitationEmail({
+        to: email,
+        doctorName: doctor.name,
+        labName: lab?.name,
+        otp: invitation.otp,
+        expiresAt: invitation.expiresAt,
+        activationUrl,
+      });
+      invitationSent = Boolean(result?.sent);
+      invitationError = result?.reason || "";
+    } catch (emailError) {
+      invitationError = emailError.message || "Unable to send invitation email";
+    }
+
+    await writeAuditLog(req, auth, {
+      action: "doctor.registered_with_portal",
+      resourceType: "Doctor",
+      resourceId: doctor._id,
+      metadata: { userId: portalUser._id, email, invitationSent },
+    });
+
+    return Response.json({
+      ...doctor.toObject(),
+      portalAccount: {
+        userId: portalUser.userId,
+        status: portalUser.status,
+        email,
+        invitationSent,
+        invitationError: invitationSent ? "" : invitationError,
+      },
+    }, { status: 201 });
 
   } catch (err) {
     console.error("POST /api/doctor error:", err);

@@ -12,8 +12,17 @@ export async function GET(req, { params }) {
     if (auth.error) return auth.error;
 
     const { tenantId } = auth;
-    const { Patient } = await getTenantModels(tenantId);
+    const { Patient, BillingRecord } = await getTenantModels(tenantId);
     const { id } = await params;
+    if (auth.session.doctorId) {
+      const ownsReferral = await BillingRecord.exists({
+        tenantId,
+        referralDoctor: auth.session.doctorId,
+        patient: id,
+        status: { $ne: "cancelled" },
+      });
+      if (!ownsReferral) return Response.json({ error: "Patient not found" }, { status: 404 });
+    }
     const patient = await Patient.findById(id);
     if (!patient) {
       return Response.json({ error: "Patient not found" }, { status: 404 });
