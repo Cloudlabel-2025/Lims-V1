@@ -2,6 +2,7 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { exportOutstanding } from "@/app/lib/excel-export";
+import { exportOutstandingPdf, generateCsv } from "@/app/lib/pdf-export";
 
 export async function GET(req) {
   try {
@@ -15,7 +16,7 @@ export async function GET(req) {
     const fullView = searchParams.get("fullView") === "true";
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = fullView ? 9999 : Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
-    const isExport = searchParams.get("export") === "xlsx";
+    const exportFormat = searchParams.get("export");
 
     const { JournalEntry } = await getTenantModels(auth.tenantId);
 
@@ -81,12 +82,35 @@ export async function GET(req) {
       isReversed: { $ne: true },
     });
 
-    if (isExport) {
+    if (exportFormat === "xlsx") {
       const buffer = await exportOutstanding(rows, totalOutstanding, totalBilled, totalCollected);
       return new Response(buffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="outstanding-dues.xlsx"`,
+        },
+      });
+    }
+    if (exportFormat === "pdf") {
+      const buffer = await exportOutstandingPdf(rows, totalOutstanding, totalBilled, totalCollected);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="outstanding-dues.pdf"`,
+        },
+      });
+    }
+    if (exportFormat === "csv") {
+      const headers = ["Entry", "Bill ID", "Description", "Amount", "Date"];
+      const csvRows = rows.map((r) => [r.entryNumber || "", r.billId || "", r.description || "", r.amount, r.date ? new Date(r.date).toLocaleDateString("en-IN") : ""]);
+      csvRows.push(["Total Outstanding", "", "", totalOutstanding, ""]);
+      csvRows.push(["Total Billed", "", "", totalBilled, ""]);
+      csvRows.push(["Total Collected", "", "", totalCollected, ""]);
+      const buffer = generateCsv(headers, csvRows);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="outstanding-dues.csv"`,
         },
       });
     }

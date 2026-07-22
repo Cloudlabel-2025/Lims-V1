@@ -2,6 +2,7 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { exportMonthlyRevenue } from "@/app/lib/excel-export";
+import { exportMonthlyRevenuePdf, generateCsv } from "@/app/lib/pdf-export";
 
 export async function GET(req) {
   try {
@@ -14,7 +15,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from");
     const to = searchParams.get("to");
-    const isExport = searchParams.get("export") === "xlsx";
+    const exportFormat = searchParams.get("export");
     const fullView = searchParams.get("fullView") === "true";
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = fullView ? 9999 : Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
@@ -84,12 +85,33 @@ export async function GET(req) {
     const totalRevenue = monthly.reduce((s, m) => s + m.revenue, 0);
     const totalBills = monthly.reduce((s, m) => s + m.bills, 0);
 
-    if (isExport) {
+    if (exportFormat === "xlsx") {
       const buffer = await exportMonthlyRevenue(monthly, totalRevenue, totalBills);
       return new Response(buffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="monthly-revenue-${from || "all"}-${to || "all"}.xlsx"`,
+        },
+      });
+    }
+    if (exportFormat === "pdf") {
+      const buffer = await exportMonthlyRevenuePdf(monthly, totalRevenue, totalBills);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="monthly-revenue-${from || "all"}-${to || "all"}.pdf"`,
+        },
+      });
+    }
+    if (exportFormat === "csv") {
+      const headers = ["Month", "Bills", "Revenue", "Collection", "Outstanding"];
+      const csvRows = monthly.map((m) => [m.month, m.bills, m.revenue, m.collection, m.outstanding]);
+      csvRows.push(["Total", totalBills, totalRevenue, "", ""]);
+      const buffer = generateCsv(headers, csvRows);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="monthly-revenue-${from || "all"}-${to || "all"}.csv"`,
         },
       });
     }

@@ -762,6 +762,44 @@ export async function POST(req) {
             movementDate: adjDate,
             costPerBaseUnit: numberValue(body.costPerBaseUnit, 0),
           });
+
+          const initCost = numberValue(body.costPerBaseUnit, 0);
+          if (initCost > 0 && newBalance > 0) {
+            try {
+              const { connection: tenantConn, ExpenseEntry } = await getTenantModels(auth.tenantId);
+              const expenseAmount = Math.round(newBalance * initCost * 100) / 100;
+              if (expenseAmount > 0) {
+                const expenseAccount = await getAccountByCode(tenantConn, auth.tenantId, "5001");
+                const creditAccount = await getAccountByCode(tenantConn, auth.tenantId, "2002");
+                const [expense] = await ExpenseEntry.create([{
+                  category: "reagent",
+                  vendorName: item.name || "Stock Adjustment",
+                  amount: expenseAmount,
+                  taxAmount: 0,
+                  paidFrom: "vendor-payable",
+                  date: adjDate,
+                  accountId: expenseAccount._id,
+                  tenantId: auth.tenantId,
+                }]);
+                const journalEntry = await postJournalEntry(tenantConn, {
+                  tenantId: auth.tenantId,
+                  postedBy: auth.session?.userId || performedBy || "system",
+                  sourceType: "expense",
+                  sourceId: expense._id,
+                  description: `Initial stock: ${item.name} (${newBalance})`,
+                  lines: [
+                    { accountId: expenseAccount._id, debit: expenseAmount, credit: 0 },
+                    { accountId: creditAccount._id, debit: 0, credit: expenseAmount },
+                  ],
+                });
+                expense.journalEntryId = journalEntry._id;
+                await expense.save();
+                movement.expenseEntryId = expense._id;
+                await movement.save();
+              }
+            } catch (_) {}
+          }
+
           writeAuditLog(req, auth, { action: "create", resourceType: "InventoryMovement", resourceId: movement._id, metadata: { item: item.name, movementType, quantityBase: newBalance } }).catch(() => {});
           return Response.json({ item: updatedItem, movement }, { status: 201 });
         }
@@ -812,6 +850,45 @@ export async function POST(req) {
           costPerBaseUnit: costPerBaseUnit !== undefined && !isNaN(costPerBaseUnit) ? costPerBaseUnit : (selectedBatch.costPerBaseUnit || 0),
           supplier: selectedBatch.supplier || "",
         });
+
+        const effectiveCost = costPerBaseUnit !== undefined && !isNaN(costPerBaseUnit) ? costPerBaseUnit : (selectedBatch.costPerBaseUnit || 0);
+        if (effectiveCost > 0 && delta !== 0) {
+          try {
+            const { connection: tenantConn, ExpenseEntry } = await getTenantModels(auth.tenantId);
+            const expenseAmount = Math.round(Math.abs(delta) * effectiveCost * 100) / 100;
+            if (expenseAmount > 0) {
+              const expenseAccount = await getAccountByCode(tenantConn, auth.tenantId, "5001");
+              const creditAccount = await getAccountByCode(tenantConn, auth.tenantId, "2002");
+              const totalAmount = expenseAmount;
+              const [expense] = await ExpenseEntry.create([{
+                category: "reagent",
+                vendorName: item.name || "Stock Adjustment",
+                amount: expenseAmount,
+                taxAmount: 0,
+                paidFrom: "vendor-payable",
+                date: movementDate || new Date(),
+                accountId: expenseAccount._id,
+                tenantId: auth.tenantId,
+              }]);
+              const journalEntry = await postJournalEntry(tenantConn, {
+                tenantId: auth.tenantId,
+                postedBy: auth.session?.userId || performedBy || "system",
+                sourceType: "expense",
+                sourceId: expense._id,
+                description: `Stock adjustment: ${item.name} (${delta > 0 ? "+" : ""}${delta})`,
+                lines: [
+                  { accountId: expenseAccount._id, debit: totalAmount, credit: 0 },
+                  { accountId: creditAccount._id, debit: 0, credit: totalAmount },
+                ],
+              });
+              expense.journalEntryId = journalEntry._id;
+              await expense.save();
+              movement.expenseEntryId = expense._id;
+              await movement.save();
+            }
+          } catch (_) {}
+        }
+
         writeAuditLog(req, auth, { action: "create", resourceType: "InventoryMovement", resourceId: movement._id, metadata: { item: item.name, movementType: "adjustment", quantityBase: delta, batchNo: selectedBatch.batchNo } }).catch(() => {});
         return Response.json({ item: updatedItem, movement }, { status: 201 });
       }

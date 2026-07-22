@@ -8,22 +8,18 @@ import Badge from "../_components/Badge";
 import Table from "../_components/Table";
 import Field from "../_components/Field";
 import PaginationControls from "../_components/PaginationControls";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
-async function downloadExcel(url) {
-  try {
-    const res = await fetch(url, { credentials: "include" });
-    if (!res.ok) throw new Error("Download failed");
-    const blob = await res.blob();
+function downloadBlob(res, filename) {
+  return res.blob().then((blob) => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "report.xlsx";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
-  } catch (err) {
-    console.error(err);
-  }
+  });
 }
 
 function DailyCollectionReport({ from, to, loadTrigger }) {
@@ -62,9 +58,13 @@ function DailyCollectionReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
-        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/daily-collection?from=${from}&to=${to}&export=xlsx`)}>
-          {Icons.download} Excel
-        </button>
+        <DownloadDropdown
+          onDownload={async (format) => {
+            const res = await fetch(`/api/accounting/reports/daily-collection?from=${from}&to=${to}&export=${format}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            await downloadBlob(res, `daily-collection.${format}`);
+          }}
+        />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         <StatCard label="Total Collection" value={`Rs ${money(data.totalCollection)}`} icon={Icons.wallet} />
@@ -126,9 +126,13 @@ function MonthlyRevenueReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
-        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/monthly-revenue?from=${from}&to=${to}&export=xlsx`)}>
-          {Icons.download} Excel
-        </button>
+        <DownloadDropdown
+          onDownload={async (format) => {
+            const res = await fetch(`/api/accounting/reports/monthly-revenue?from=${from}&to=${to}&export=${format}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            await downloadBlob(res, `monthly-revenue.${format}`);
+          }}
+        />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         <StatCard label="Total Revenue" value={`Rs ${money(data.totalRevenue)}`} icon={Icons.barChart} />
@@ -187,9 +191,13 @@ function WeeklyCollectionReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
-        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/weekly?from=${from}&to=${to}&export=xlsx`)}>
-          {Icons.download} Excel
-        </button>
+        <DownloadDropdown
+          onDownload={async (format) => {
+            const res = await fetch(`/api/accounting/reports/weekly?from=${from}&to=${to}&export=${format}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            await downloadBlob(res, `weekly-collection.${format}`);
+          }}
+        />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         <StatCard label="Total Collection" value={`Rs ${money(data.totalCollection)}`} icon={Icons.wallet} />
@@ -251,9 +259,13 @@ function IncomeExpenseReport({ from, to, loadTrigger }) {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); setPage(1); }} />
           Full View
         </label>
-        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel(`/api/accounting/reports/income-expense?from=${from}&to=${to}&export=xlsx`)}>
-          {Icons.download} Excel
-        </button>
+        <DownloadDropdown
+          onDownload={async (format) => {
+            const res = await fetch(`/api/accounting/reports/income-expense?from=${from}&to=${to}&export=${format}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            await downloadBlob(res, `income-expense.${format}`);
+          }}
+        />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         <StatCard label="Revenue" value={`Rs ${money(totals?.netRevenue || 0)}`} icon={Icons.barChart} />
@@ -316,9 +328,13 @@ function OutstandingReport() {
           <input type="checkbox" checked={fullView} onChange={(e) => { setFullView(e.target.checked); }} />
           Full View
         </label>
-        <button type="button" className="dash-btn-secondary" style={{ height: 34, padding: "0 14px", fontSize: 12, border: "1px solid #16a34a", background: "#f0fdf4", color: "#16a34a" }} onClick={() => downloadExcel("/api/accounting/reports/outstanding?export=xlsx")}>
-          {Icons.download} Excel
-        </button>
+        <DownloadDropdown
+          onDownload={async (format) => {
+            const res = await fetch(`/api/accounting/reports/outstanding?export=${format}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            await downloadBlob(res, `outstanding-dues.${format}`);
+          }}
+        />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         <StatCard label="Total Outstanding" value={`Rs ${money(data.totalOutstanding)}`} icon={Icons.barChart} />

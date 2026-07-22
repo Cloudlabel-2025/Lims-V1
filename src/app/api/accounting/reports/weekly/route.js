@@ -2,6 +2,7 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { exportWeeklyCollection } from "@/app/lib/excel-export";
+import { exportWeeklyCollectionPdf, generateCsv } from "@/app/lib/pdf-export";
 
 export async function GET(req) {
   try {
@@ -14,7 +15,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from");
     const to = searchParams.get("to");
-    const isExport = searchParams.get("export") === "xlsx";
+    const exportFormat = searchParams.get("export");
     const fullView = searchParams.get("fullView") === "true";
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = fullView ? 9999 : Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
@@ -79,12 +80,33 @@ export async function GET(req) {
       { cash: 0, card: 0, other: 0 }
     );
 
-    if (isExport) {
+    if (exportFormat === "xlsx") {
       const buffer = await exportWeeklyCollection(weekly, totalCollection, breakdown);
       return new Response(buffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="weekly-collection-${from || "all"}-${to || "all"}.xlsx"`,
+        },
+      });
+    }
+    if (exportFormat === "pdf") {
+      const buffer = await exportWeeklyCollectionPdf(weekly, totalCollection, breakdown);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="weekly-collection-${from || "all"}-${to || "all"}.pdf"`,
+        },
+      });
+    }
+    if (exportFormat === "csv") {
+      const headers = ["Week", "Cash", "Card", "Other", "Total"];
+      const csvRows = weekly.map((w) => [w.week, w.cash, w.card, w.other, w.total]);
+      csvRows.push(["Total", "", "", "", totalCollection]);
+      const buffer = generateCsv(headers, csvRows);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="weekly-collection-${from || "all"}-${to || "all"}.csv"`,
         },
       });
     }

@@ -9,6 +9,7 @@ import Badge from "../_components/Badge";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 import Field from "../_components/Field";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
 export default function CommissionsPage() {
   const router = useRouter();
@@ -21,6 +22,8 @@ export default function CommissionsPage() {
   const [success, setSuccess] = useState("");
   const [payoutPage, setPayoutPage] = useState(1);
   const [payoutPagination, setPayoutPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 });
+  const [exportingPending, setExportingPending] = useState(false);
+  const [exportingHistory, setExportingHistory] = useState(false);
 
   async function fetchJson(url, options) {
     const res = await fetch(url, { cache: "no-store", ...options });
@@ -51,6 +54,46 @@ export default function CommissionsPage() {
 
   const pendingDoctors = doctors.filter((d) => Number(d.pendingPayout || 0) > 0);
   const totalPending = pendingDoctors.reduce((s, d) => s + Number(d.pendingPayout || 0), 0);
+
+  async function handleExportPending(format) {
+    setExportingPending(true);
+    try {
+      const res = await fetch(`/api/accounting/reports/commissions?section=pending&export=${format}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Export failed");
+      const ext = format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv";
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `commissions-pending.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExportingPending(false);
+    }
+  }
+
+  async function handleExportHistory(format) {
+    setExportingHistory(true);
+    try {
+      const res = await fetch(`/api/accounting/reports/commissions?section=history&export=${format}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Export failed");
+      const ext = format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv";
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `commissions-history.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExportingHistory(false);
+    }
+  }
 
   async function handleRelease(doctorId, paymentMethod) {
     setReleasing(null);
@@ -99,7 +142,10 @@ export default function CommissionsPage() {
           </div>
 
           <div style={{ marginBottom: 24 }}>
-            <h5 style={{ margin: "0 0 12px 0", fontSize: 15, color: "var(--text-main)" }}>Pending Payouts</h5>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h5 style={{ margin: 0, fontSize: 15, color: "var(--text-main)" }}>Pending Payouts</h5>
+              <DownloadDropdown onDownload={handleExportPending} disabled={exportingPending} label="Export Pending" />
+            </div>
             <Table
               minWidth={700}
               headings={["Doctor", "ID", "Commission", "Pending Amount", "Action"]}
@@ -123,7 +169,10 @@ export default function CommissionsPage() {
           </div>
 
           <div>
-            <h5 style={{ margin: "0 0 12px 0", fontSize: 15, color: "var(--text-main)" }}>Payout History</h5>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h5 style={{ margin: 0, fontSize: 15, color: "var(--text-main)" }}>Payout History</h5>
+              <DownloadDropdown onDownload={handleExportHistory} disabled={exportingHistory} label="Export History" />
+            </div>
             <Table
               minWidth={750}
               headings={["Entry", "Date", "Doctor", "Amount", "Description"]}

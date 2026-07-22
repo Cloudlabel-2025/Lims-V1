@@ -7,6 +7,7 @@ import { money, formatDate, inputStyle, sanitizeVendorName, sanitizeAmountInput,
 import Field from "../_components/Field";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
 const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxPercentage: "", paidFrom: "vendor-payable", attachmentUrl: "" };
 
@@ -409,6 +410,23 @@ export default function ExpensesPage() {
                 <option value="cash">Cash</option>
                 <option value="bank">Bank</option>
               </select>
+              <DownloadDropdown
+                onDownload={async (format) => {
+                  const params = new URLSearchParams({ export: format });
+                  if (categoryFilter) params.set("category", categoryFilter);
+                  if (creditFilter) params.set("paidFrom", creditFilter);
+                  const res = await fetch(`/api/expenses?${params}`, { credentials: "include" });
+                  if (!res.ok) throw new Error("Download failed");
+                  const blob = await res.blob();
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `expenses.${format}`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(a.href);
+                }}
+              />
             </div>
             <ExpensesTable
               expenses={filteredExpenses}

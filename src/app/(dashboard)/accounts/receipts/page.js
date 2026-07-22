@@ -7,6 +7,7 @@ import Badge from "../_components/Badge";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 import Field from "../_components/Field";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
 const methodColors = {
   cash: ["#ecfdf5", "#047857"],
@@ -23,6 +24,7 @@ export default function ReceiptsPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [methodFilter, setMethodFilter] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const fetchReceipts = useCallback(async (p) => {
     setLoading(true);
@@ -42,6 +44,28 @@ export default function ReceiptsPage() {
   }, [methodFilter]);
 
   useEffect(() => { fetchReceipts(page); }, [page, fetchReceipts]);
+
+  async function handleDownloadReceipts(format) {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ export: format });
+      if (methodFilter) params.set("method", methodFilter);
+      const res = await fetch(`/api/accounting/receipts?${params.toString()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Export failed");
+      const ext = format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv";
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `receipts.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="patients-page" style={{ paddingBottom: 40 }}>
@@ -71,6 +95,10 @@ export default function ReceiptsPage() {
             <option value="corporate-credit">Corporate Credit</option>
           </select>
         </Field>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+        <DownloadDropdown onDownload={handleDownloadReceipts} disabled={exporting || loading} />
       </div>
 
       {loading ? (

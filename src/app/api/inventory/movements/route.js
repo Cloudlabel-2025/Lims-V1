@@ -35,17 +35,20 @@ export async function GET(req) {
     const dateFrom = clean(searchParams.get("dateFrom"));
     const dateTo = clean(searchParams.get("dateTo"));
 
-    const { InventoryMovement } = await getTenantModels(auth.tenantId);
+    const { InventoryMovement, InventoryItem } = await getTenantModels(auth.tenantId);
     const filter = {};
 
     if (type) filter.movementType = type;
     if (search) {
       const regex = new RegExp(escapeRegex(search), "i");
+      const matchedItems = await InventoryItem.find({ $or: [{ name: regex }, { itemCode: regex }, { genericName: regex }] }).select("_id").lean();
+      const itemIds = matchedItems.map((i) => i._id);
       filter.$or = [
         { referenceNo: regex },
         { reason: regex },
         { fromLocation: regex },
         { toLocation: regex },
+        ...(itemIds.length ? [{ item: { $in: itemIds } }] : []),
       ];
     }
     if (dateFrom || dateTo) {

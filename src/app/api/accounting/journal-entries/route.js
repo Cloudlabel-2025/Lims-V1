@@ -3,6 +3,8 @@ import { postJournalEntry } from "@/app/lib/accounting";
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { exportLedger } from "@/app/lib/excel-export";
+import { exportLedgerPdf, generateCsv } from "@/app/lib/pdf-export";
 
 function clean(value) {
   return String(value || "").trim();
@@ -33,6 +35,7 @@ export async function GET(req) {
     const to = dateValue(searchParams.get("to"));
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(250, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
+    const exportFormat = searchParams.get("export");
     const query = { tenantId: auth.tenantId };
 
     if (sourceType && sourceType !== "all") query.sourceType = sourceType;
@@ -44,6 +47,59 @@ export async function GET(req) {
     }
 
     const { JournalEntry } = await getTenantModels(auth.tenantId);
+
+    if (exportFormat) {
+      const allEntries = await JournalEntry.find(query)
+        .populate("lines.accountId", "code name type subtype")
+        .populate("postedBy", "firstName lastName email userId")
+        .sort({ date: -1, createdAt: -1 })
+        .lean();
+
+      if (exportFormat === "xlsx") {
+        const buffer = await exportLedger(allEntries);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition": `attachment; filename="ledger.xlsx"`,
+          },
+        });
+      }
+      if (exportFormat === "pdf") {
+        const buffer = await exportLedgerPdf(allEntries);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="ledger.pdf"`,
+          },
+        });
+      }
+      if (exportFormat === "csv") {
+        const headers = ["Entry", "Date", "Account", "Debit", "Credit", "Source", "Description"];
+        const csvRows = [];
+        for (const entry of allEntries) {
+          for (let i = 0; i < (entry.lines || []).length; i++) {
+            const line = entry.lines[i];
+            csvRows.push([
+              i === 0 ? entry.entryNumber : "",
+              i === 0 ? new Date(entry.date).toLocaleDateString("en-IN") : "",
+              line.accountId ? `${line.accountId.code} - ${line.accountId.name}` : "-",
+              line.debit || 0,
+              line.credit || 0,
+              i === 0 ? entry.sourceType : "",
+              i === 0 ? entry.description : "",
+            ]);
+          }
+        }
+        const buffer = generateCsv(headers, csvRows);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "text/csv",
+            "Content-Disposition": `attachment; filename="ledger.csv"`,
+          },
+        });
+      }
+    }
+
     const [journalEntries, total] = await Promise.all([
       JournalEntry.find(query)
         .populate("lines.accountId", "code name type subtype")

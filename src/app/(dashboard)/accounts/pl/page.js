@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Icons } from "@/app/components/Icons";
 import { money, inputStyle } from "../_components/helpers";
 import Field from "../_components/Field";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
 function PlStatement({ pl }) {
   const { revenue, expenses, totalRevenue, totalExpenses, netProfit } = pl;
@@ -124,6 +125,24 @@ export default function PlPage() {
         <button type="button" className="btn-lims-primary" onClick={() => loadPl(plFilter.from, plFilter.to)} style={{ height: 38 }}>
           {plLoading ? "Loading..." : "Apply"}
         </button>
+        <DownloadDropdown
+          disabled={!pl}
+          onDownload={async (format) => {
+            const params = new URLSearchParams({ export: format });
+            if (plFilter.from) params.set("from", plFilter.from);
+            if (plFilter.to) params.set("to", plFilter.to);
+            const res = await fetch(`/api/accounting/pl?${params}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            const blob = await res.blob();
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `profit-and-loss.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+          }}
+        />
       </div>
       {error && <div style={{ padding: "10px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>{error}</div>}
       {plLoading ? (

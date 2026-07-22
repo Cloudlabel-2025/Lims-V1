@@ -586,17 +586,11 @@ export default function InventoryPage() {
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {activeTab !== "categories" && <div style={{ position: "relative", minWidth: 280, flex: "0 1 360px" }}>
+          {activeTab === "dashboard" && <div style={{ position: "relative", minWidth: 280, flex: "0 1 360px" }}>
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>{Icons.search}</span>
             <input className="lims-input" maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setItemPage(1); loadInventory(1); } }} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
           </div>}
           <button className="dash-btn-secondary" onClick={() => { loadInventory(itemPage); if (activeTab === "movements") loadMovements(movementPage); }} disabled={loading} style={{ height: 34, padding: "0 14px", fontSize: 12 }}><span className={loading ? "icon-spin" : ""}>{Icons.refresh}</span> Refresh</button>
-          {["items", "categories", "uom", "movements"].includes(activeTab) && (
-            <button className="dash-btn-secondary" onClick={() => { const typeMap = { items: "items", categories: "categories", uom: "uoms", movements: "movements" }; window.open(`/api/inventory/export?type=${typeMap[activeTab]}&search=${encodeURIComponent(searchQuery)}`, "_blank"); }} style={{ height: 34, padding: "0 14px", fontSize: 12 }}>{Icons.download} Export CSV</button>
-          )}
-          {["items", "categories", "uom"].includes(activeTab) && (
-            <button className="dash-btn-secondary" onClick={() => { const typeMap = { items: "items", categories: "categories", uom: "uoms" }; setImportType(typeMap[activeTab] || "items"); setImportFile(null); setImportResults(null); setShowImportModal(true); }} style={{ height: 34, padding: "0 14px", fontSize: 12 }}>{Icons.plus} Import CSV</button>
-          )}
         </div>
       </div>
 
@@ -693,6 +687,10 @@ export default function InventoryPage() {
 
           {activeTab === "items" && viewMode === "list" && (
             <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ position: "relative", minWidth: 280, maxWidth: 360 }}>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>{Icons.search}</span>
+                <input className="lims-input" maxLength={35} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setItemPage(1); loadInventory(1); } }} placeholder="Search items by name, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
+              </div>
               <InventoryTable items={filteredItems} onEdit={editItem} />
               <PaginationControls pagination={itemPagination} loading={loading} onPageChange={setItemPage} />
             </div>
@@ -1357,9 +1355,8 @@ export default function InventoryPage() {
                   if (isExponential(movementForm.quantityBase)) errors.quantityBase = "Exponential notation is not allowed";
                   if (movementForm.quantityBase !== "" && movementForm.quantityBase !== undefined && movementForm.quantityBase !== null) {
                     const qtyNum = Number(movementForm.quantityBase);
-                    if (!Number.isInteger(qtyNum)) errors.quantityBase = "Only whole numbers are allowed";
+                    if (!isValidDecimal(String(movementForm.quantityBase), 4, 3)) errors.quantityBase = "Maximum 4 integer digits and 3 decimal places allowed";
                     else if (qtyNum < 0) errors.quantityBase = "Quantity cannot be negative";
-                    else if (String(qtyNum).length > 7) errors.quantityBase = "Maximum 7 digits allowed";
                     else if (selectedMovementItem && movementForm.batchId && movementForm.movementType !== "receipt" && movementForm.movementType !== "adjustment") {
                       const selBatch = selectedMovementItem.batches?.find((b) => b._id === movementForm.batchId);
                       if (selBatch) {
@@ -1374,8 +1371,7 @@ export default function InventoryPage() {
                   if (isExponential(movementForm.newBalanceBase)) errors.newBalanceBase = "Exponential notation is not allowed";
                   else if (movementForm.movementType === "adjustment") {
                     const nbStr = String(movementForm.newBalanceBase || "");
-                    if (nbStr.includes(".")) errors.newBalanceBase = "Only whole numbers are allowed";
-                    else if (nbStr && nbStr.length > 7) errors.newBalanceBase = "Maximum 7 digits allowed";
+                    if (nbStr && !isValidDecimal(nbStr, 4, 3)) errors.newBalanceBase = "Maximum 4 integer digits and 3 decimal places allowed";
                   }
                   const costStr = String(movementForm.costPerBaseUnit || "");
                   if (isExponential(costStr)) errors.costPerBaseUnit = "Exponential notation is not allowed";
@@ -1798,7 +1794,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
             <input className="lims-input" type="date" value={filters.dateTo} onChange={(e) => { setFilters?.(prev => ({ ...prev, dateTo: e.target.value })); onFilterSearch?.(); }} style={inputStyle()} placeholder="To" />
           </div>
           <div style={{ flex: "2 1 200px", minWidth: 160 }}>
-            <input className="lims-input" value={filters.search || ""} onChange={(e) => setFilters?.(prev => ({ ...prev, search: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") onFilterSearch?.(); }} placeholder="Search ref, reason, location…" style={inputStyle()} />
+            <input className="lims-input" value={filters.search || ""} onChange={(e) => { setFilters?.(prev => ({ ...prev, search: e.target.value })); onFilterSearch?.(); }} onKeyDown={(e) => { if (e.key === "Enter") onFilterSearch?.(); }} placeholder="Search ref, reason, location…" style={inputStyle()} />
           </div>
           <button className="btn-lims-primary" onClick={onFilterSearch} style={{ height: 38, padding: "0 14px" }}>{Icons.search} Search</button>
         </div>
@@ -2083,7 +2079,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
             <div className={item && (item?.batches || []).filter((batch) => batch.quantityBase > 0).length > 0 ? "col-md-6" : "col-md-3"}>
               <Field label="Current Stock">
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <input required className="lims-input" type="number" min="0" max="9999999" step="1" value={form.newBalanceBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, newBalanceBase: "Exponential notation is not allowed" })); return; } if (v.includes(".")) { setErrors?.((p) => ({ ...p, newBalanceBase: "Only whole numbers are allowed" })); return; } if (v && v.length > 7) { setErrors?.((p) => ({ ...p, newBalanceBase: "Maximum 7 digits allowed" })); return; } setErrors?.((p) => ({ ...p, newBalanceBase: "" })); setForm({ ...form, newBalanceBase: v }); }} style={{ ...inputStyle(), flex: 1 }} />
+                  <input required className="lims-input" type="number" min="0" max="9999999" step="any" value={form.newBalanceBase} onChange={(e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, newBalanceBase: "Exponential notation is not allowed" })); return; } if (v && !isValidDecimal(v, 4, 3)) { setErrors?.((p) => ({ ...p, newBalanceBase: "Maximum 4 integer digits and 3 decimal places allowed" })); return; } setErrors?.((p) => ({ ...p, newBalanceBase: "" })); setForm({ ...form, newBalanceBase: v }); }} style={{ ...inputStyle(), flex: 1 }} />
                   <select className="lims-input" value={form.quantityUnit || (item ? baseUomSymbol : "")} onChange={(e) => { const newUnit = e.target.value; const oldUnit = form.quantityUnit || baseUomSymbol; if (oldUnit && newUnit && oldUnit !== newUnit) { const oldUom = COMMON_UOMS.find((u) => u.symbol === oldUnit); const newUom = COMMON_UOMS.find((u) => u.symbol === newUnit); if (oldUom && newUom) { if (form.newBalanceBase === "" || form.newBalanceBase === undefined || form.newBalanceBase === null) { setForm({ ...form, quantityUnit: newUnit }); return; } const currentVal = Number(form.newBalanceBase) || 0; const baseVal = currentVal * (oldUom.conversionToBase || 1); const newVal = baseVal / (newUom.conversionToBase || 1); setForm({ ...form, quantityUnit: newUnit, newBalanceBase: newVal }); return; } } setForm({ ...form, quantityUnit: newUnit }); }} style={{ width: 85, flexShrink: 0 }}>
                     {availableUoms.map((u) => <option key={u.symbol} value={u.symbol}>{u.symbol}</option>)}
                   </select>
@@ -2096,7 +2092,7 @@ function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {},
           <div className={isReceipt ? "col-md-6" : "col-md-6"}>
             <Field label={isReceipt ? "Current Qty (Batch)" : "Quantity"}>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <input required className="lims-input" type="number" min="0" max="9999999" step="1" value={isReceipt ? (() => { if (item && item.batches && item.batches.length > 0) { const selUnit = form.quantityUnit || baseUomSymbol; const uom = COMMON_UOMS.find((u) => u.symbol === selUnit); const conv = uom?.conversionToBase || 1; const lastBatch = item.batches[item.batches.length - 1]; const val = conv ? lastBatch.quantityBase / conv : 0; return val % 1 === 0 ? val : Number(val.toFixed(3)); } return form.quantityBase; })() : form.quantityBase} onChange={isReceipt ? undefined : (e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, quantityBase: "Exponential notation is not allowed" })); return; } if (v.includes(".")) { setErrors?.((p) => ({ ...p, quantityBase: "Only whole numbers are allowed" })); return; } if (v && v.length > 7) { setErrors?.((p) => ({ ...p, quantityBase: "Maximum 7 digits allowed" })); return; } setErrors?.((p) => ({ ...p, quantityBase: "" })); setForm({ ...form, quantityBase: v }); }} disabled={isReceipt} style={{ ...inputStyle(), flex: 1, ...(isReceipt ? { background: "#f3f4f6" } : {}) }} />
+                <input required className="lims-input" type="number" min="0" max="9999999" step="any" value={isReceipt ? (() => { if (item && item.batches && item.batches.length > 0) { const selUnit = form.quantityUnit || baseUomSymbol; const uom = COMMON_UOMS.find((u) => u.symbol === selUnit); const conv = uom?.conversionToBase || 1; const lastBatch = item.batches[item.batches.length - 1]; const val = conv ? lastBatch.quantityBase / conv : 0; return val % 1 === 0 ? val : Number(val.toFixed(3)); } return form.quantityBase; })() : form.quantityBase} onChange={isReceipt ? undefined : (e) => { const v = e.target.value; if (isExponential(v)) { setErrors?.((p) => ({ ...p, quantityBase: "Exponential notation is not allowed" })); return; } if (v && !isValidDecimal(v, 4, 3)) { setErrors?.((p) => ({ ...p, quantityBase: "Maximum 4 integer digits and 3 decimal places allowed" })); return; } setErrors?.((p) => ({ ...p, quantityBase: "" })); setForm({ ...form, quantityBase: v }); }} disabled={isReceipt} style={{ ...inputStyle(), flex: 1, ...(isReceipt ? { background: "#f3f4f6" } : {}) }} />
                 <select className="lims-input" value={form.quantityUnit || (item ? baseUomSymbol : "")} onChange={(e) => { const newUnit = e.target.value; const oldUnit = form.quantityUnit || baseUomSymbol; if (oldUnit && newUnit && oldUnit !== newUnit) { const oldUom = COMMON_UOMS.find((u) => u.symbol === oldUnit); const newUom = COMMON_UOMS.find((u) => u.symbol === newUnit); if (oldUom && newUom) { if (form.quantityBase === "" || form.quantityBase === undefined || form.quantityBase === null) { setForm({ ...form, quantityUnit: newUnit }); return; } const currentVal = Number(form.quantityBase) || 0; const baseVal = currentVal * (oldUom.conversionToBase || 1); const newVal = baseVal / (newUom.conversionToBase || 1); setForm({ ...form, quantityUnit: newUnit, quantityBase: newVal }); return; } } setForm({ ...form, quantityUnit: newUnit }); }} style={{ width: 85, flexShrink: 0 }}>
                   {availableUoms.map((u) => <option key={u.symbol} value={u.symbol}>{u.symbol}</option>)}
                 </select>
@@ -2276,13 +2272,13 @@ function MovementLedger({ movements, pagination, filters, setFilters, onPageChan
             </select>
           </div>
           <div style={{ flex: "1 1 140px", minWidth: 120 }}>
-            <input className="lims-input" type="date" value={filters.dateFrom} onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })} style={inputStyle()} placeholder="From" />
+            <input className="lims-input" type="date" value={filters.dateFrom} onChange={(e) => { setFilters({ ...filters, dateFrom: e.target.value }); onSearch?.(); }} style={inputStyle()} placeholder="From" />
           </div>
           <div style={{ flex: "1 1 140px", minWidth: 120 }}>
-            <input className="lims-input" type="date" value={filters.dateTo} onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })} style={inputStyle()} placeholder="To" />
+            <input className="lims-input" type="date" value={filters.dateTo} onChange={(e) => { setFilters({ ...filters, dateTo: e.target.value }); onSearch?.(); }} style={inputStyle()} placeholder="To" />
           </div>
           <div style={{ flex: "2 1 200px", minWidth: 160 }}>
-            <input className="lims-input" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="Search ref, reason, location…" style={inputStyle()} />
+            <input className="lims-input" value={filters.search} onChange={(e) => { setFilters({ ...filters, search: e.target.value }); onSearch?.(); }} onKeyDown={(e) => { if (e.key === "Enter") onSearch?.(); }} placeholder="Search ref, reason, location…" style={inputStyle()} />
           </div>
           <button className="btn-lims-primary" onClick={onSearch} style={{ height: 38, padding: "0 14px" }}>{Icons.search} Search</button>
         </div>

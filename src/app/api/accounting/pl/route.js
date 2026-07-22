@@ -1,6 +1,8 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { exportPl } from "@/app/lib/excel-export";
+import { exportPlPdf, generateCsv } from "@/app/lib/pdf-export";
 
 function dateValue(value) {
   if (!value) return null;
@@ -19,6 +21,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const from = dateValue(searchParams.get("from"));
     const to = dateValue(searchParams.get("to"));
+    const exportFormat = searchParams.get("export");
 
     if (from && to && from > to) {
       return Response.json({ error: "From date must be before To date" }, { status: 400 });
@@ -89,6 +92,43 @@ export async function GET(req) {
     const totalRevenue = Math.round(revenue.reduce((s, a) => s + a.balance, 0) * 100) / 100;
     const totalExpenses = Math.round(expenses.reduce((s, a) => s + a.balance, 0) * 100) / 100;
     const netProfit = Math.round((totalRevenue - totalExpenses) * 100) / 100;
+
+    if (exportFormat === "xlsx") {
+      const buffer = await exportPl(revenue, expenses, totalRevenue, totalExpenses, netProfit);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="profit-and-loss.xlsx"`,
+        },
+      });
+    }
+    if (exportFormat === "pdf") {
+      const buffer = await exportPlPdf(revenue, expenses, totalRevenue, totalExpenses, netProfit);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="profit-and-loss.pdf"`,
+        },
+      });
+    }
+    if (exportFormat === "csv") {
+      const headers = ["Code", "Name", "Balance"];
+      const csvRows = [];
+      csvRows.push(["--- Revenue ---", "", ""]);
+      for (const r of revenue) csvRows.push([r.code, r.name, r.balance]);
+      csvRows.push(["", "Total Revenue", totalRevenue]);
+      csvRows.push(["--- Expenses ---", "", ""]);
+      for (const e of expenses) csvRows.push([e.code, e.name, e.balance]);
+      csvRows.push(["", "Total Expenses", totalExpenses]);
+      csvRows.push(["", "Net Profit/Loss", netProfit]);
+      const buffer = generateCsv(headers, csvRows);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="profit-and-loss.csv"`,
+        },
+      });
+    }
 
     return Response.json({ revenue, expenses, totalRevenue, totalExpenses, netProfit });
   } catch (error) {

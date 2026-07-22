@@ -3,6 +3,8 @@ import { getAccountByCode, postJournalEntry } from "@/app/lib/accounting";
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { exportExpenses } from "@/app/lib/excel-export";
+import { exportExpensesPdf, generateCsv } from "@/app/lib/pdf-export";
 
 const expenseAccountByCategory = {
   reagent: "5001",
@@ -51,8 +53,61 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(200, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
+    const exportFormat = searchParams.get("export");
     const { ExpenseEntry } = await getTenantModels(auth.tenantId);
     const query = { tenantId: auth.tenantId };
+
+    if (exportFormat) {
+      const allExpenses = await ExpenseEntry.find(query)
+        .populate("accountId", "code name type subtype")
+        .populate("journalEntryId", "entryNumber date")
+        .sort({ date: -1, createdAt: -1 })
+        .lean();
+
+      if (exportFormat === "xlsx") {
+        const buffer = await exportExpenses(allExpenses);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition": `attachment; filename="expenses.xlsx"`,
+          },
+        });
+      }
+      if (exportFormat === "pdf") {
+        const buffer = await exportExpensesPdf(allExpenses);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="expenses.pdf"`,
+          },
+        });
+      }
+      if (exportFormat === "csv") {
+        const headers = ["Date", "Category", "Vendor", "Amount", "Tax %", "Tax Amt", "Total", "Credit Mode", "Journal #"];
+        const csvRows = allExpenses.map((e) => {
+          const taxPct = e.amount && Number(e.amount) > 0 ? Math.round((Number(e.taxAmount || 0) / Number(e.amount)) * 100) : 0;
+          const total = Number(e.amount || 0) + Number(e.taxAmount || 0);
+          return [
+            e.date ? new Date(e.date).toLocaleDateString("en-IN") : "",
+            e.category,
+            e.vendorName || "-",
+            e.amount,
+            `${taxPct}%`,
+            e.taxAmount,
+            total,
+            e.paidFrom,
+            e.journalEntryId?.entryNumber || "",
+          ];
+        });
+        const buffer = generateCsv(headers, csvRows);
+        return new Response(buffer, {
+          headers: {
+            "Content-Type": "text/csv",
+            "Content-Disposition": `attachment; filename="expenses.csv"`,
+          },
+        });
+      }
+    }
     const [expenses, total] = await Promise.all([
       ExpenseEntry.find(query)
         .populate("accountId", "code name type subtype")

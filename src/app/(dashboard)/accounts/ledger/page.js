@@ -5,6 +5,7 @@ import { money, formatDate, inputStyle } from "../_components/helpers";
 import Field from "../_components/Field";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
+import DownloadDropdown from "../_components/DownloadDropdown";
 
 function LedgerTable({ entries }) {
   const rows = entries.flatMap((entry) =>
@@ -76,6 +77,26 @@ export default function LedgerPage() {
             {accounts.map((a) => <option key={a._id} value={a._id}>{a.code} - {a.name}</option>)}
           </select>
         </Field>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <DownloadDropdown
+          onDownload={async (format) => {
+            const params = new URLSearchParams({ export: format });
+            if (filter.sourceType !== "all") params.set("sourceType", filter.sourceType);
+            if (filter.accountId) params.set("accountId", filter.accountId);
+            const res = await fetch(`/api/accounting/journal-entries?${params}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            const blob = await res.blob();
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `ledger.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+          }}
+        />
       </div>
 
       {error && <div style={{ padding: "10px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>{error}</div>}
