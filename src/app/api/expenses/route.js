@@ -176,8 +176,8 @@ export async function POST(req) {
     if (amount > maxAllowed) {
       return Response.json({ error: `Amount cannot exceed Rs ${maxAllowed.toLocaleString("en-IN")}` }, { status: 400 });
     }
-    if (vendorName.length > 30) {
-      return Response.json({ error: "Vendor name must be 30 characters or less" }, { status: 400 });
+    if (vendorName.length > 75) {
+      return Response.json({ error: "Vendor name must be 75 characters or less" }, { status: 400 });
     }
     if (vendorName.length < 3) {
       return Response.json({ error: "Vendor name must be at least 3 characters" }, { status: 400 });

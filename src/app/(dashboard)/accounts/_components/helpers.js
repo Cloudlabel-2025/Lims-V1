@@ -24,10 +24,7 @@ export function inputStyle() {
 }
 
 export function sanitizeVendorName(value) {
-  const cleaned = (value || "").replace(/[^A-Za-z0-9-]/g, "");
-  const parts = cleaned.split("-");
-  if (parts.length > 2) return parts[0] + "-" + parts.slice(1).join("");
-  return cleaned;
+  return (value || "").replace(/[^A-Za-z0-9\s\-&.,/]/g, "").slice(0, 75);
 }
 
 export function sanitizeCorporateName(value) {

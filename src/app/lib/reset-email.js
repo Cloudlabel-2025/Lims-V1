@@ -1,10 +1,14 @@
 import nodemailer from "nodemailer";
 
-const MAX_RETRIES = 3;
-const BASE_DELAY_MS = 1000;
+const MAX_RETRIES = 2;
+const BASE_DELAY_MS = 2000;
 
 function cleanEnv(name) {
   return String(process.env[name] || "").trim();
+}
+
+function cleanPassword(value) {
+  return String(value || "").replace(/\s+/g, "").trim();
 }
 
 function getSmtpConfig() {
@@ -12,7 +16,7 @@ function getSmtpConfig() {
     host: cleanEnv("SMTP_HOST"),
     port: parseInt(cleanEnv("SMTP_PORT") || "587", 10),
     user: cleanEnv("SMTP_USER"),
-    pass: cleanEnv("SMTP_PASS"),
+    pass: cleanPassword(process.env.SMTP_PASS),
     from: cleanEnv("SMTP_FROM"),
   };
 }
@@ -22,9 +26,15 @@ function createTransporter(config) {
     host: config.host,
     port: config.port,
     secure: config.port === 465,
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
+    requireTLS: true,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
     auth: { user: config.user, pass: config.pass },
+    tls: {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: false,
+    },
   });
 }
 
@@ -81,6 +91,14 @@ export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
     };
   }
 
+  console.log("[reset-email] SMTP config:", {
+    host: config.host,
+    port: config.port,
+    user: config.user ? config.user.substring(0, 3) + "***" : "(empty)",
+    passLength: config.pass?.length || 0,
+    from: config.from,
+  });
+
   const expiresText = expiresAt.toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -107,16 +125,27 @@ export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
       <p>If you did not request this, you can ignore this email.</p>
     </div>`;
 
-  return sendMailWithRetry(
-    () => createTransporter(config),
-    {
-      from: config.from,
+  try {
+    return await sendMailWithRetry(
+      () => createTransporter(config),
+      {
+        from: config.from,
+        to,
+        subject: "Your LIMS password reset OTP",
+        text: textBody,
+        html: htmlBody,
+      }
+    );
+  } catch (error) {
+    console.error("[reset-email] Send failed:", {
+      code: error.code,
+      message: error.message,
+      command: error.command,
+      response: error.response,
       to,
-      subject: "Your LIMS password reset OTP",
-      text: textBody,
-      html: htmlBody,
-    }
-  );
+    });
+    return { sent: false, reason: error.message || "Unable to send password reset email" };
+  }
 }
 
 export async function sendDoctorInvitationEmail({ to, doctorName, labName, otp, expiresAt, activationUrl }) {
@@ -124,6 +153,14 @@ export async function sendDoctorInvitationEmail({ to, doctorName, labName, otp, 
   if (!config.host || !config.user || !config.pass || !config.from) {
     return { sent: false, reason: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM." };
   }
+
+  console.log("[reset-email] SMTP config:", {
+    host: config.host,
+    port: config.port,
+    user: config.user ? config.user.substring(0, 3) + "***" : "(empty)",
+    passLength: config.pass?.length || 0,
+    from: config.from,
+  });
 
   const expiresText = expiresAt.toLocaleString("en-IN", {
     dateStyle: "medium",
@@ -154,11 +191,22 @@ export async function sendDoctorInvitationEmail({ to, doctorName, labName, otp, 
       <p>If you were not expecting this invitation, contact the laboratory.</p>
     </div>`;
 
-  return sendMailWithRetry(() => createTransporter(config), {
-    from: config.from,
-    to,
-    subject: `${safeLab} doctor portal invitation`,
-    text: textBody,
-    html: htmlBody,
-  });
+  try {
+    return await sendMailWithRetry(() => createTransporter(config), {
+      from: config.from,
+      to,
+      subject: `${safeLab} doctor portal invitation`,
+      text: textBody,
+      html: htmlBody,
+    });
+  } catch (error) {
+    console.error("[reset-email] Send failed:", {
+      code: error.code,
+      message: error.message,
+      command: error.command,
+      response: error.response,
+      to,
+    });
+    return { sent: false, reason: error.message || "Unable to send invitation email" };
+  }
 }

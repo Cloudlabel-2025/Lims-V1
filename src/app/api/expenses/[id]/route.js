@@ -82,7 +82,7 @@ export async function PUT(req, { params }) {
       const vn = clean(body.vendorName);
       if (!vn) return Response.json({ error: "Vendor name is required" }, { status: 400 });
       if (vn.length < 3) return Response.json({ error: "Vendor name must be at least 3 characters" }, { status: 400 });
-      if (vn.length > 30) return Response.json({ error: "Vendor name must be 30 characters or less" }, { status: 400 });
+      if (vn.length > 75) return Response.json({ error: "Vendor name must be 75 characters or less" }, { status: 400 });
       if (hasUrl(vn)) return Response.json({ error: "URLs are not allowed in vendor name" }, { status: 400 });
       if (!isValidName(vn)) return Response.json({ error: "Vendor name contains invalid characters" }, { status: 400 });
       expense.vendorName = vn;

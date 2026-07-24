@@ -47,10 +47,11 @@ function ExpensesTable({ expenses, onEdit, onDelete }) {
   );
 }
 
-function CategorySelectWithActions({ categories, value, onChange, onCategoriesChange, loadingCategories, savingCategory }) {
+function CategorySelectWithActions({ categories, value, onChange, onCategoriesChange, loadingCategories }) {
   const [showInput, setShowInput] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [inputValue, setInputValue] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -207,12 +208,11 @@ export default function ExpensesPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
-  const [savingCategory, setSavingCategory] = useState(false);
 
   async function fetchJson(url, options) {
     const response = await fetch(url, { cache: "no-store", ...options });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Request failed");
+    if (!response.ok) throw new Error(data.details || data.error || "Request failed");
     return data;
   }
 
@@ -348,13 +348,12 @@ export default function ExpensesPage() {
               onChange={(v) => setForm({ ...form, category: v })}
               onCategoriesChange={setCategories}
               loadingCategories={loadingCategories}
-              savingCategory={savingCategory}
             />
             {categories.length === 0 && <small style={{ color: "var(--text-muted)", fontSize: 11 }}>Loading categories...</small>}
           </Field>
 
           <Field label="Vendor" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <input required className="lims-input" minLength={3} maxLength={30} value={form.vendorName} onChange={(e) => { const v = sanitizeVendorName(e.target.value); setFormErrors((p) => ({ ...p, vendorName: "" })); setForm({ ...form, vendorName: v }); }} style={inputStyle()} />
+            <input required className="lims-input" minLength={3} maxLength={75} value={form.vendorName} onChange={(e) => { const v = sanitizeVendorName(e.target.value); setFormErrors((p) => ({ ...p, vendorName: "" })); setForm({ ...form, vendorName: v }); }} style={inputStyle()} />
             {formErrors.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.vendorName}</small>}
           </Field>
 
@@ -455,7 +454,7 @@ export default function ExpensesPage() {
               </select>
             </Field>
             <Field label="Vendor" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <input required className="lims-input" minLength={3} maxLength={30} value={editForm.vendorName} onChange={(e) => { const v = sanitizeVendorName(e.target.value); setFormErrorsEdit((p) => ({ ...p, vendorName: "" })); setEditForm({ ...editForm, vendorName: v }); }} style={inputStyle()} />
+              <input required className="lims-input" minLength={3} maxLength={75} value={editForm.vendorName} onChange={(e) => { const v = sanitizeVendorName(e.target.value); setFormErrorsEdit((p) => ({ ...p, vendorName: "" })); setEditForm({ ...editForm, vendorName: v }); }} style={inputStyle()} />
               {formErrorsEdit.vendorName && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrorsEdit.vendorName}</small>}
             </Field>
             <Field label="Amount" style={{ display: "flex", flexDirection: "column", gap: 6 }}>

@@ -14,8 +14,8 @@ export const ExpenseEntrySchema = new mongoose.Schema(
       type: String,
       trim: true,
       minlength: 3,
-      maxlength: 30,
-      match: [/^[A-Za-z0-9 .&'\/,()@_-]*$/, "Vendor name contains invalid characters"],
+      maxlength: 75,
+      match: [/^[A-Za-z0-9\s\-&.,/]*$/, "Vendor name contains invalid characters"],
       validate: {
         validator: function (v) {
           if (!v) return true;
