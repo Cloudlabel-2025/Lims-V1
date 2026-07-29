@@ -46,9 +46,9 @@ export const getInitials = (name) => {
 export const formatDate = (d) => {
   if (!d) return "—";
   const date = new Date(d);
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
+  return date.toLocaleDateString("en-US", {
     month: "short",
+    day: "numeric",
     year: "numeric",
   });
 };

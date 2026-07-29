@@ -1,6 +1,6 @@
 export const DOCTOR_LIMITS = {
   maxNameLength: 30,
-  maxExperienceYears: 99,
+  maxExperienceYears: 80,
 };
 
 export function cleanDoctorValue(value) {
@@ -15,7 +15,7 @@ export function isValidMciNumber(value) {
   const cleaned = cleanDoctorValue(value);
   if (/https?:\/\//i.test(cleaned) || /www\./i.test(cleaned)) return false;
   if (cleaned.length < 5 || cleaned.length > 20) return false;
-  return /^[A-Za-z0-9/]+$/.test(cleaned);
+  return /^[A-Za-z0-9/ ]+$/.test(cleaned);
 }
 
 export function isValidDoctorDegree(value) {
