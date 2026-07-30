@@ -27,7 +27,7 @@ function ExpensesTable({ expenses, onEdit, onDelete }) {
           `Rs ${money(Number(expense.amount || 0))}`,
           `${taxPct}%`,
           `Rs ${money(Number(expense.taxAmount || 0))}`,
-          <strong>Rs {money(total)}</strong>,
+          <strong key="total">Rs {money(total)}</strong>,
           expense.paidFrom,
           expense.attachmentUrl ? (
             <a href={expense.attachmentUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--brand-action)", fontSize: 12, textDecoration: "underline" }}>
@@ -502,7 +502,7 @@ export default function ExpensesPage() {
             <div>
               <h5 style={{ margin: 0, fontSize: 16 }}>Delete Expense</h5>
               <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                Are you sure you want to delete <strong>"{deleteTarget.label}"</strong>? This action cannot be undone.
+                Are you sure you want to delete <strong>{deleteTarget.label}</strong>? This action cannot be undone.
               </p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>

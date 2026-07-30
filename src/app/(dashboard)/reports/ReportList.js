@@ -11,11 +11,17 @@ const statusColors = {
 };
 
 const STATUS_OPTIONS = ["all", "draft", "reviewed", "approved", "released"];
+const RANGE_OPTIONS = ["7", "30", "90"];
+
+function dateDaysAgo(baseDate, days) {
+  return new Date(baseDate.getTime() - Number(days) * 86400000).toISOString().split("T")[0];
+}
 
 export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange, onDateToChange }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [today] = useState(() => new Date());
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -49,15 +55,14 @@ export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange
       <div style={{ marginBottom: 8 }}>
         <select
           className="lims-input"
-          value={dateFrom && !dateTo ? ["7", "30", "90"].find((d) => dateFrom === new Date(Date.now() - Number(d) * 86400000).toISOString().split("T")[0]) || "all" : "all"}
+          value={dateFrom && !dateTo ? RANGE_OPTIONS.find((d) => dateFrom === dateDaysAgo(today, d)) || "all" : "all"}
           onChange={(e) => {
             const days = Number(e.target.value);
             if (!days) {
               onDateFromChange?.("");
               onDateToChange?.("");
             } else {
-              const d = new Date(Date.now() - days * 86400000);
-              onDateFromChange?.(d.toISOString().split("T")[0]);
+              onDateFromChange?.(dateDaysAgo(today, days));
               onDateToChange?.("");
             }
           }}

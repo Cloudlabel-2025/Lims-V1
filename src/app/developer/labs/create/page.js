@@ -7,7 +7,7 @@ import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
-import { uploadImageDirectToCloudinary } from "@/app/lib/client-image-upload";
+import { uploadImageThroughServer } from "@/app/lib/client-image-upload";
 
 const defaultForm = {
   name: "",
@@ -390,7 +390,7 @@ export default function DeveloperCreateLabPage() {
 
     setUploadingLogo(true);
     try {
-      return await uploadImageDirectToCloudinary(logoFile, {
+      return await uploadImageThroughServer(logoFile, {
         context: "lab-logo",
         tenantId,
         altText: form.logoAltText || `${form.name} logo`,

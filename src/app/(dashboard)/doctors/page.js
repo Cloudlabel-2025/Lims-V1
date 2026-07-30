@@ -53,7 +53,6 @@ export default function DoctorList() {
 
   useEffect(() => {
     // Client-only doctor list initialization.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     fetchAllDoctors(1);
   }, [fetchAllDoctors]);
@@ -77,7 +76,6 @@ export default function DoctorList() {
     if (!mounted) return;
 
     if (!searchTerm.trim()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchAllDoctors(currentPage);
       return;
     }

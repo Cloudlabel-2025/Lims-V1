@@ -15,6 +15,12 @@ const emptyJournal = {
   ],
 };
 
+const todayDate = new Date();
+const journalMaxDate = todayDate.toISOString().slice(0, 10);
+const journalMinDate = new Date(todayDate.getTime() - 5 * 365 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
+
 export default function ManualPage() {
   const [form, setForm] = useState(emptyJournal);
   const [accounts, setAccounts] = useState([]);
@@ -102,7 +108,7 @@ export default function ManualPage() {
       ) : (
         <>
           <Field label="Date">
-            <input type="date" className="lims-input" min={new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)} max={new Date().toISOString().slice(0, 10)} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={inputStyle()} />
+            <input type="date" className="lims-input" min={journalMinDate} max={journalMaxDate} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={inputStyle()} />
           </Field>
 
           <Field label="Description">
