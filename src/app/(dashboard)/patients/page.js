@@ -40,7 +40,7 @@ export default function PatientList() {
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
   const debounceRef = useRef(null);
 
-  function buildQuery(page) {
+  const buildQuery = useCallback((page) => {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("limit", "15");
@@ -49,7 +49,7 @@ export default function PatientList() {
     if (ageMinFilter) params.set("ageMin", ageMinFilter);
     if (ageMaxFilter) params.set("ageMax", ageMaxFilter);
     return params.toString();
-  }
+  }, [searchQuery, genderFilter, ageMinFilter, ageMaxFilter]);
 
   const fetchPatients = useCallback(async (page = 1) => {
     setListLoading(true);
@@ -63,7 +63,7 @@ export default function PatientList() {
     } finally {
       setListLoading(false);
     }
-  }, [searchQuery, genderFilter, ageMinFilter, ageMaxFilter]);
+  }, [buildQuery]);
 
   useEffect(() => {
     setMounted(true);

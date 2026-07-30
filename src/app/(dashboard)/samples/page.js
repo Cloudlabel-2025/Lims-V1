@@ -72,12 +72,8 @@ export default function SamplesPage() {
   }, [status]);
 
   useEffect(() => {
-    loadSamples(1);
-  }, [loadSamples]);
-
-  useEffect(() => {
     loadSamples(samplePage);
-  }, [samplePage]);
+  }, [loadSamples, samplePage]);
 
   return (
     <div className="module-page">

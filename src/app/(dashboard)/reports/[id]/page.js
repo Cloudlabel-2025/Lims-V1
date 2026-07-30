@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { hasPermission } from "@/app/lib/client-rbac";
@@ -277,7 +278,7 @@ export default function ReportViewPage() {
       <div id="report-print-area" ref={printRef} className="report-print-area">
         <div className="report-print-header">
           <div className="report-print-header-fallback">
-            {labLogo && <img src={labLogo} alt={labName} className="report-logo-img" />}
+            {labLogo && <Image src={labLogo} alt={labName} width={120} height={48} className="report-logo-img" unoptimized />}
             <h1>{labName} Laboratory Report</h1>
           </div>
           <p className="report-print-header-date">{now.toLocaleDateString("en-IN")} {now.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true })}</p>

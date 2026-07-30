@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 
@@ -294,7 +294,7 @@ export default function InventoryPage() {
     return items;
   }, [inventory.items, searchQuery, dashboardFilter]);
 
-  async function loadInventory(page) {
+  const loadInventory = useCallback(async (page) => {
     setLoading(true);
     setError("");
     try {
@@ -318,25 +318,42 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [searchQuery]);
 
   useEffect(() => {
     loadInventory(1);
-  }, []);
+  }, [loadInventory]);
 
   useEffect(() => {
     loadInventory(itemPage);
-  }, [itemPage]);
-
-  useEffect(() => {
-    if (activeTab === "movements" || activeTab === "stock") loadMovements(1);
-  }, [activeTab]);
+  }, [itemPage, loadInventory]);
 
   useEffect(() => {
     if (!error) return;
     const timer = setTimeout(() => setError(""), 10000);
     return () => clearTimeout(timer);
   }, [error]);
+
+  const loadMovements = useCallback(async (pageNum) => {
+    const p = pageNum || movementPage;
+    const filters = movementFiltersRef.current;
+    const params = new URLSearchParams({ page: p, limit: 50 });
+    if (filters.type) params.set("type", filters.type);
+    if (filters.search) params.set("search", filters.search);
+    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+    if (filters.dateTo) params.set("dateTo", filters.dateTo);
+    try {
+      const r = await fetch(`/api/inventory/movements?${params}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      setMovementData(d.movements);
+      setMovementPagination(d.pagination);
+    } catch (e) { setError(e.message); }
+  }, [movementPage]);
+
+  useEffect(() => {
+    if (activeTab === "movements" || activeTab === "stock") loadMovements(1);
+  }, [activeTab, loadMovements]);
 
   useEffect(() => {
     if (activeTab === "suppliers" || activeTab === "items" || activeTab === "stock") {
@@ -357,7 +374,7 @@ export default function InventoryPage() {
         } catch {}
       })();
     }
-  }, [activeTab]);
+  }, [activeTab, locations]);
 
   async function postInventory(payload, success, onFieldErrors) {
     setSaving(true);
@@ -385,23 +402,6 @@ export default function InventoryPage() {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function loadMovements(pageNum) {
-    const p = pageNum || movementPage;
-    const filters = movementFiltersRef.current;
-    const params = new URLSearchParams({ page: p, limit: 50 });
-    if (filters.type) params.set("type", filters.type);
-    if (filters.search) params.set("search", filters.search);
-    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
-    if (filters.dateTo) params.set("dateTo", filters.dateTo);
-    try {
-      const r = await fetch(`/api/inventory/movements?${params}`);
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      setMovementData(d.movements);
-      setMovementPagination(d.pagination);
-    } catch (e) { setError(e.message); }
   }
 
   async function saveItem(event) {

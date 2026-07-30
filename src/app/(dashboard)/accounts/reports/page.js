@@ -28,7 +28,7 @@ function DailyCollectionReport({ from, to, loadTrigger }) {
   const [page, setPage] = useState(1);
   const [fullView, setFullView] = useState(false);
 
-  async function fetchDaily() {
+  const fetchDaily = useCallback(async () => {
     if (!from || !to) return;
     setLoading(true);
     try {
@@ -43,10 +43,10 @@ function DailyCollectionReport({ from, to, loadTrigger }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [from, to, page, fullView]);
 
   useEffect(() => { setPage(1); }, [from, to, fullView, loadTrigger]);
-  useEffect(() => { fetchDaily(); }, [from, to, page, fullView, loadTrigger]);
+  useEffect(() => { fetchDaily(); }, [fetchDaily, loadTrigger]);
 
   if (loading) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center" }}>Loading...</div>;
   if (!data) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center", color: "var(--text-muted)" }}>Select a date range and click Load</div>;
@@ -96,7 +96,7 @@ function MonthlyRevenueReport({ from, to, loadTrigger }) {
   const [page, setPage] = useState(1);
   const [fullView, setFullView] = useState(false);
 
-  async function fetchMonthly() {
+  const fetchMonthly = useCallback(async () => {
     if (!from || !to) return;
     setLoading(true);
     try {
@@ -111,10 +111,10 @@ function MonthlyRevenueReport({ from, to, loadTrigger }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [from, to, page, fullView]);
 
   useEffect(() => { setPage(1); }, [from, to, fullView, loadTrigger]);
-  useEffect(() => { fetchMonthly(); }, [from, to, page, fullView, loadTrigger]);
+  useEffect(() => { fetchMonthly(); }, [fetchMonthly, loadTrigger]);
 
   if (loading) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center" }}>Loading...</div>;
   if (!data) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center", color: "var(--text-muted)" }}>Select a date range and click Load</div>;
@@ -161,7 +161,7 @@ function WeeklyCollectionReport({ from, to, loadTrigger }) {
   const [page, setPage] = useState(1);
   const [fullView, setFullView] = useState(false);
 
-  async function fetchWeekly() {
+  const fetchWeekly = useCallback(async () => {
     if (!from || !to) return;
     setLoading(true);
     try {
@@ -176,10 +176,10 @@ function WeeklyCollectionReport({ from, to, loadTrigger }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [from, to, page, fullView]);
 
   useEffect(() => { setPage(1); }, [from, to, fullView, loadTrigger]);
-  useEffect(() => { fetchWeekly(); }, [from, to, page, fullView, loadTrigger]);
+  useEffect(() => { fetchWeekly(); }, [fetchWeekly, loadTrigger]);
 
   if (loading) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center" }}>Loading...</div>;
   if (!data) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center", color: "var(--text-muted)" }}>Select a date range and click Load</div>;
@@ -227,7 +227,7 @@ function IncomeExpenseReport({ from, to, loadTrigger }) {
   const [page, setPage] = useState(1);
   const [fullView, setFullView] = useState(false);
 
-  async function fetchPnL() {
+  const fetchPnL = useCallback(async () => {
     if (!from || !to) return;
     setLoading(true);
     try {
@@ -242,10 +242,10 @@ function IncomeExpenseReport({ from, to, loadTrigger }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [from, to, page, fullView]);
 
   useEffect(() => { setPage(1); }, [from, to, fullView, loadTrigger]);
-  useEffect(() => { fetchPnL(); }, [from, to, page, fullView, loadTrigger]);
+  useEffect(() => { fetchPnL(); }, [fetchPnL, loadTrigger]);
 
   if (loading) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center" }}>Loading...</div>;
   if (!data) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center", color: "var(--text-muted)" }}>Select a date range and click Load</div>;
