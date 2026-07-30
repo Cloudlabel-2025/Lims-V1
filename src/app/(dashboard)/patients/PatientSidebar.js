@@ -18,13 +18,14 @@ const DetailRow = memo(function DetailRow({ icon, value, truncate = false }) {
 function PatientSidebar({ patient, onClose }) {
   const router = useRouter();
   const [visitCount, setVisitCount] = useState(null);
+  const patientId = patient?._id;
 
   useEffect(() => {
-    if (!patient) return;
+    if (!patientId) return;
     let cancelled = false;
     async function loadVisitCount() {
       try {
-        const { response, data } = await cachedJsonFetch(`/api/patient/${patient._id}/billing`, { ttl: 10_000 });
+        const { response, data } = await cachedJsonFetch(`/api/patient/${patientId}/billing`, { ttl: 10_000 });
         if (!cancelled && response.ok) {
           setVisitCount((data.billingRecords || []).length);
         }
@@ -35,7 +36,7 @@ function PatientSidebar({ patient, onClose }) {
     }
     loadVisitCount();
     return () => { cancelled = true; };
-  }, [patient?._id]);
+  }, [patientId]);
 
   if (!patient) return null;
 
