@@ -269,7 +269,7 @@ export default function CorporatePage() {
             <div>
               <h5 style={{ margin: 0, fontSize: 16 }}>Delete Corporate Account</h5>
               <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                Are you sure you want to delete <strong>"{deleteTarget.name}"</strong>? This action cannot be undone.
+                Are you sure you want to delete <strong>{deleteTarget.name}</strong>? This action cannot be undone.
               </p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>

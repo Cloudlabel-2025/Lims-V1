@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useCallback } from "react";
+import { memo, useCallback } from "react";
 import { Icons } from "@/app/components/Icons";
 
 const paymentMethods = [
@@ -18,14 +18,12 @@ function SettlementModal({
   onPaymentChange,
   onSubmit,
 }) {
-  if (!billingRecord) return null;
-
-  const netPayable = billingRecord.totalAmount || 0;
+  const netPayable = billingRecord?.totalAmount || 0;
   const alreadyPaid =
-    Number(billingRecord.paymentBreakdown?.cash || 0) +
-    Number(billingRecord.paymentBreakdown?.card || 0) +
-    Number(billingRecord.paymentBreakdown?.online || 0) +
-    Number(billingRecord.paymentBreakdown?.corporate || 0);
+    Number(billingRecord?.paymentBreakdown?.cash || 0) +
+    Number(billingRecord?.paymentBreakdown?.card || 0) +
+    Number(billingRecord?.paymentBreakdown?.online || 0) +
+    Number(billingRecord?.paymentBreakdown?.corporate || 0);
   const remainingDue = Math.max(0, netPayable - alreadyPaid);
   const totalPaid = Number(payment.amount);
   const remaining = remainingDue - totalPaid;
@@ -56,6 +54,8 @@ function SettlementModal({
     },
     [onPaymentChange]
   );
+
+  if (!billingRecord) return null;
 
   return (
     <div className="modal-overlay">

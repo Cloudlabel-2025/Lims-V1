@@ -7,7 +7,7 @@ import { Icons } from "@/app/components/Icons";
 import PasswordField from "@/app/components/PasswordField";
 import { clearCachedApi } from "@/app/lib/use-current-user";
 import CmsSuccessDialog from "@/app/developer/components/CmsSuccessDialog";
-import { uploadImageDirectToCloudinary } from "@/app/lib/client-image-upload";
+import { uploadImageThroughServer } from "@/app/lib/client-image-upload";
 
 const loginHighlightOptions = [
   "Patient Registration & Tracking",
@@ -297,7 +297,7 @@ export default function DeveloperEditLabPage({ params }) {
 
     setUploadingLogo(true);
     try {
-      return await uploadImageDirectToCloudinary(logoFile, {
+      return await uploadImageThroughServer(logoFile, {
         context: "lab-logo",
         tenantId,
         altText: logoAltText || `${form.name} logo`,
