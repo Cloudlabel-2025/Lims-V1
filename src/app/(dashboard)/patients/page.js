@@ -114,13 +114,15 @@ export default function PatientList() {
     }
   }, []);
 
+  const hasActiveFilters = Boolean(searchQuery.trim() || genderFilter || ageMinFilter || ageMaxFilter);
+
   if (!mounted) return null;
 
   return (
     <div className="patients-page">
       <div className={`sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={closeSidebar} />
 
-      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+      <aside className={`sidebar patient-detail-shell ${sidebarOpen ? "open" : ""}`} aria-label="Patient details">
         <PatientSidebar patient={selectedPatient} onClose={closeSidebar} />
       </aside>
 
@@ -132,7 +134,7 @@ export default function PatientList() {
       )}
 
       <div
-        className="page-header"
+        className="page-header patient-directory-header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -141,11 +143,12 @@ export default function PatientList() {
           gap: "20px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div className="patient-directory-heading" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <div className="page-header-icon">{Icons.users}</div>
           <div className="page-header-text">
-            <h4>Patient Master List</h4>
-            <small>{allPatients.length} patients registered</small>
+            <span className="module-kicker">Patient management</span>
+            <h4>Patients</h4>
+            <small>{pagination.total || allPatients.length} registered patient records</small>
           </div>
         </div>
 
@@ -161,6 +164,7 @@ export default function PatientList() {
           }}
         >
           <div
+            className="patient-view-toggle"
             style={{
               display: "flex",
               background: "var(--border-light)",
@@ -170,6 +174,9 @@ export default function PatientList() {
             }}
           >
             <button
+              type="button"
+              aria-label="Grid view"
+              aria-pressed={viewState === "grid"}
               onClick={() => setViewState("grid")}
               style={{
                 padding: "6px 10px",
@@ -190,6 +197,9 @@ export default function PatientList() {
               {Icons.grid}
             </button>
             <button
+              type="button"
+              aria-label="Table view"
+              aria-pressed={viewState === "list"}
               onClick={() => setViewState("list")}
               style={{
                 padding: "6px 10px",
@@ -211,7 +221,7 @@ export default function PatientList() {
             </button>
           </div>
 
-          <div className="search-container" style={{ position: "relative", flex: 1, maxWidth: "320px" }}>
+          <div className="search-container patient-directory-search" style={{ position: "relative", flex: 1, maxWidth: "320px" }}>
             <span
               style={{
                 position: "absolute",
@@ -227,7 +237,7 @@ export default function PatientList() {
             <input
               type="text"
               className="lims-input"
-              placeholder="Search patients..."
+              placeholder="Search by name, patient ID or phone"
               value={searchQuery}
               onChange={(event) => {
                 setSearchQuery(event.target.value);
@@ -238,12 +248,12 @@ export default function PatientList() {
           </div>
 
           <select
-            className="lims-input"
+            className="lims-input patient-directory-gender"
             value={genderFilter}
             onChange={(e) => { setGenderFilter(e.target.value); setCurrentPage(1); }}
             style={{ height: "40px", fontSize: "12px", width: "100px" }}
           >
-            <option value="">All Genders</option>
+            <option value="">All genders</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
             <option value="Other">Other</option>
@@ -253,7 +263,7 @@ export default function PatientList() {
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            className="lims-input"
+            className="lims-input patient-directory-age-min"
             placeholder="Min Age"
             value={ageMinFilter}
             onChange={(e) => {
@@ -274,7 +284,7 @@ export default function PatientList() {
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            className="lims-input"
+            className="lims-input patient-directory-age-max"
             placeholder="Max Age"
             value={ageMaxFilter}
             onChange={(e) => {
@@ -291,23 +301,40 @@ export default function PatientList() {
             maxLength={3}
           />
 
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="patient-filter-clear"
+              onClick={() => {
+                setSearchQuery("");
+                setGenderFilter("");
+                setAgeMinFilter("");
+                setAgeMaxFilter("");
+                setCurrentPage(1);
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+
           {canCreatePatient && (
           <button
             className="btn-lims-primary"
             onClick={() => router.push("/patients/register")}
             style={{ height: "40px", padding: "0 16px", fontSize: "13px", whiteSpace: "nowrap" }}
           >
-            {Icons.plus} Create New Patient
+            {Icons.plus} Register patient
           </button>
           )}
         </div>
       </div>
 
-      <div className="patient-list-container">
+      <section className="patient-list-container patient-directory-panel">
         <div className="patient-list-header" style={{ marginBottom: "16px" }}>
-          <span className="patient-list-count">
-            {listLoading ? "Loading..." : `${pagination.total || allPatients.length} patients`}
-          </span>
+          <div>
+            <span className="patient-list-count">Patient directory</span>
+            <small>{listLoading ? "Updating records..." : `Showing ${allPatients.length} of ${pagination.total || allPatients.length} patients`}</small>
+          </div>
           <button
             className="dash-btn-secondary"
             onClick={() => fetchPatients(currentPage)}
@@ -321,10 +348,14 @@ export default function PatientList() {
           </button>
         </div>
 
-        {!listLoading && allPatients.length === 0 ? (
+        {listLoading && allPatients.length === 0 ? (
+          <div className="patient-directory-loading" aria-label="Loading patient records">
+            {[0, 1, 2, 3, 4, 5].map((item) => <div key={item} className="lims-skeleton" />)}
+          </div>
+        ) : !listLoading && allPatients.length === 0 ? (
           <div className="patient-list-empty">
             {Icons.noResults}
-            {searchQuery.trim() || genderFilter || ageMinFilter || ageMaxFilter ? (
+            {hasActiveFilters ? (
               <div className="patient-list-empty-title">No patient found</div>
             ) : (
               <>
@@ -355,7 +386,7 @@ export default function PatientList() {
           />
         )}
         <PaginationControls pagination={pagination} loading={listLoading} onPageChange={setCurrentPage} />
-      </div>
+      </section>
     </div>
   );
 }
@@ -364,7 +395,7 @@ function PaginationControls({ pagination, loading, onPageChange }) {
   if (!pagination || pagination.totalPages <= 1) return null;
 
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginTop: "18px", flexWrap: "wrap" }}>
+    <div className="patient-directory-pagination" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginTop: "18px", flexWrap: "wrap" }}>
       <span style={{ color: "var(--text-muted)", fontSize: "13px", fontWeight: 600 }}>
         Page {pagination.page} of {pagination.totalPages}
       </span>

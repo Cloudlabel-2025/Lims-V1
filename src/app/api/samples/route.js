@@ -18,7 +18,7 @@ export async function GET(req) {
     if (status && status !== "all") query.status = status;
 
     const { Sample } = await getTenantModels(auth.tenantId);
-    const [samples, total] = await Promise.all([
+    const [samples, total, statusSummary] = await Promise.all([
       Sample.find(query)
         .populate("patient", "name patientId age gender phone")
         .populate("billingRecord", "billId priority status")
@@ -26,11 +26,20 @@ export async function GET(req) {
         .skip((page - 1) * limit)
         .limit(limit),
       Sample.countDocuments(query),
+      Sample.aggregate([
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
     ]);
+
+    const statusCounts = statusSummary.reduce((counts, entry) => {
+      counts[entry._id] = entry.count;
+      return counts;
+    }, {});
 
     return Response.json({
       samples,
       pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+      statusCounts,
     });
   } catch (error) {
     return jsonError("Unable to load samples", error, 500);

@@ -105,8 +105,8 @@ export default function DeveloperLayout({ children }) {
         <div className="developer-sidebar-brand">
           <div className="developer-sidebar-logo">{Icons.logo}</div>
           <div>
-            <strong>Developer</strong>
-            <span>Control Panel</span>
+            <strong>UTHIRAM</strong>
+            <span>Developer Console</span>
           </div>
         </div>
 
@@ -153,6 +153,10 @@ export default function DeveloperLayout({ children }) {
           <div>
             <p className="developer-kicker">Developer Access</p>
             <h1>{pageTitle}</h1>
+          </div>
+          <div className="developer-system-indicator" aria-label="System status online">
+            <i />
+            <span>System online</span>
           </div>
           <Link href="/developer/profile" className="developer-user-pill">
             {Icons.shield}

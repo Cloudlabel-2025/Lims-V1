@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Icons } from "@/app/components/Icons";
 
 function slugifySubdomain(value) {
   return String(value || "")
@@ -173,35 +175,59 @@ export default function TenantOnboardingPage() {
 
   return (
     <main className="tenant-onboarding-page">
-      <section className="tenant-onboarding-panel">
-        <div className="tenant-onboarding-header">
-          <p>Developer Access</p>
-          <h1>Create Tenant Lab</h1>
-          <span>Provision a lab and activate its subdomain instantly.</span>
+      <aside className="tenant-onboarding-aside">
+        <div className="tenant-onboarding-brand">
+          <span>{Icons.logo}</span>
+          <div><strong>UTHIRAM</strong><small>Provisioning console</small></div>
         </div>
+        <div className="tenant-onboarding-progress">
+          <p>Onboarding progress</p>
+          <div className="active"><i>1</i><span><strong>Identity setup</strong><small>Lab name and tenant URL</small></span></div>
+          <div><i>2</i><span><strong>Subscription package</strong><small>Capabilities and limits</small></span></div>
+          <div><i>3</i><span><strong>Administrator</strong><small>Workspace owner access</small></span></div>
+        </div>
+        <div className="tenant-onboarding-help"><strong>Developer context</strong><span>Create the tenant identity first. Package assignment and administrator setup remain controlled workflows.</span></div>
+      </aside>
 
-        <form className="tenant-onboarding-form" onSubmit={handleSubmit}>
+      <section className="tenant-onboarding-workspace">
+        <header className="tenant-onboarding-topbar">
+          <Link href="/developer/dashboard">{Icons.arrowLeft} Back to console</Link>
+          <span>New tenant provisioning</span>
+        </header>
+
+        <div className="tenant-onboarding-panel">
+          <div className="tenant-onboarding-header">
+            <p>Laboratory onboarding</p>
+            <h1>Provision new laboratory tenant</h1>
+            <span>Create a dedicated laboratory workspace and verify its tenant address.</span>
+          </div>
+
+          <div className="tenant-onboarding-grid">
+          <form className="tenant-onboarding-form" onSubmit={handleSubmit}>
           <label>
-            Lab Name
+            Laboratory legal name
             <input
               value={labName}
               onChange={(event) => setLabName(event.target.value)}
-              placeholder="Enter lab name"
+              placeholder="e.g. City General Pathlabs"
               required
             />
           </label>
 
           <label>
-            Subdomain
-            <input
-              value={subdomain}
-              onChange={(event) => {
-                setSubdomainTouched(true);
-                setSubdomain(slugifySubdomain(event.target.value));
-              }}
-              placeholder="Enter subdomain"
-              required
-            />
+            Tenant subdomain
+            <div className="tenant-onboarding-domain-field">
+              <input
+                value={subdomain}
+                onChange={(event) => {
+                  setSubdomainTouched(true);
+                  setSubdomain(slugifySubdomain(event.target.value));
+                }}
+                placeholder="your-lab"
+                required
+              />
+              <span>.lims.store</span>
+            </div>
           </label>
 
           <div className={`tenant-onboarding-status ${status.state}`}>
@@ -214,7 +240,7 @@ export default function TenantOnboardingPage() {
           </div>
 
           <div className="tenant-onboarding-preview">
-            <span>Tenant URL</span>
+            <span>{Icons.mapPin} Tenant URL preview</span>
             <strong>{previewUrl || "Generated after entering a tenant ID"}</strong>
           </div>
 
@@ -223,7 +249,20 @@ export default function TenantOnboardingPage() {
           </button>
 
           {createdUrl && <a href={createdUrl}>Open tenant login</a>}
-        </form>
+          </form>
+
+          <aside className="tenant-onboarding-summary">
+            <h2>Deployment summary</h2>
+            <dl>
+              <div><dt>Environment</dt><dd>Tenant production</dd></div>
+              <div><dt>Authentication</dt><dd>Native secure access</dd></div>
+              <div><dt>Tenant isolation</dt><dd>Dedicated subdomain</dd></div>
+              <div><dt>Provisioning status</dt><dd>{status.state === "available" ? "Ready" : "Awaiting details"}</dd></div>
+            </dl>
+            <p>{Icons.shield} The tenant remains inaccessible until provisioning and access setup complete.</p>
+          </aside>
+          </div>
+        </div>
       </section>
     </main>
   );

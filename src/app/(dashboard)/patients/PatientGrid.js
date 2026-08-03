@@ -6,110 +6,71 @@ import { formatDate, getInitials } from "@/app/utils/patient-helpers";
 
 function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatient, onDeletePatient }) {
   return (
-    <div
-      className="patient-list-grid"
-      style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}
-    >
-      {patients.map((patient) => (
-        <div
-          key={patient._id}
-          className={`form-card ${selectedPatientId === patient._id ? "selected" : ""}`}
-          onClick={() => onSelectPatient(patient)}
-          style={{
-            padding: "20px",
-            marginBottom: "0",
-            cursor: "pointer",
-            position: "relative",
-            border:
-              selectedPatientId === patient._id
-                ? "2px solid var(--brand-action, var(--primary))"
-                : "1.5px solid var(--border)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            <div
-              className="patient-photo-card"
-              style={{ width: "60px", height: "60px", margin: "0", background: "var(--primary-50)" }}
-            >
-              <div style={{ fontSize: "20px", fontWeight: "700", color: "var(--brand-action, var(--primary))" }}>
-                {getInitials(patient.name)}
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>
-                {patient.name}
-              </div>
-              <div style={{ fontSize: "12px", color: "var(--brand-action, var(--primary))", fontWeight: "600" }}>
-                {patient.patientId}
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: "15px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              fontSize: "12px",
-              color: "var(--text-secondary)",
-            }}
+    <div className="patient-directory-grid">
+      {patients.map((patient) => {
+        const isSelected = selectedPatientId === patient._id;
+        return (
+          <article
+            key={patient._id}
+            className={`patient-directory-card ${isSelected ? "selected" : ""}`}
+            onClick={() => onSelectPatient(patient)}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              <span>
-                <strong>
-                  {patient.age} Y / {patient.gender}
-                </strong>
-              </span>
-              <span style={{ opacity: 0.8 }}>{patient.phone}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button
-                className="patient-list-edit-btn"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onEditPatient(patient._id);
-                }}
-                style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-                title="Update Patient Record"
-              >
-                {Icons.edit}
-              </button>
-              {onDeletePatient && (
+            <header>
+              <span className="patient-directory-avatar">{getInitials(patient.name)}</span>
+              <div>
+                <strong>{patient.name}</strong>
+                <span>{patient.patientId}</span>
+              </div>
+              {isSelected && <em>Selected</em>}
+            </header>
+
+            <dl>
+              <div>
+                <dt>Age / Gender</dt>
+                <dd>{patient.age} Y / {patient.gender}</dd>
+              </div>
+              <div>
+                <dt>Contact</dt>
+                <dd>{patient.phone || "Not provided"}</dd>
+              </div>
+            </dl>
+
+            <footer>
+              <span>Registered {formatDate(patient.createdAt)}</span>
+              <div className="patient-directory-actions">
                 <button
-                  className="btn-icon-delete"
+                  type="button"
+                  className="patient-directory-edit"
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (window.confirm(`Delete patient ${patient.patientId} (${patient.name})?`)) {
-                      onDeletePatient(patient._id);
-                    }
+                    onEditPatient(patient._id);
                   }}
-                  title="Delete Patient"
+                  aria-label={`Edit ${patient.name}`}
+                  title="Edit patient"
                 >
-                  {Icons.trash}
+                  {Icons.edit}
                 </button>
-              )}
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: "12px",
-              paddingTop: "12px",
-              borderTop: "1px solid var(--border-light)",
-              fontSize: "10px",
-              color: "var(--text-muted)",
-              display: "flex",
-              justifyContent: "space-between",
-            }}
-          >
-            <span>Registered: {formatDate(patient.createdAt)}</span>
-            {selectedPatientId === patient._id && (
-              <span style={{ color: "var(--brand-action, var(--primary))", fontWeight: "700" }}>SELECTED</span>
-            )}
-          </div>
-        </div>
-      ))}
+                {onDeletePatient && (
+                  <button
+                    type="button"
+                    className="patient-directory-delete"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (window.confirm(`Delete patient ${patient.patientId} (${patient.name})?`)) {
+                        onDeletePatient(patient._id);
+                      }
+                    }}
+                    aria-label={`Delete ${patient.name}`}
+                    title="Delete patient"
+                  >
+                    {Icons.trash}
+                  </button>
+                )}
+              </div>
+            </footer>
+          </article>
+        );
+      })}
     </div>
   );
 }

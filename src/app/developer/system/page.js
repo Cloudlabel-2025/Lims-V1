@@ -5,6 +5,7 @@ import rbacConfig from "@/app/lib/rbac-config.json";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 import CmsSuccessDialog from "@/app/developer/components/CmsSuccessDialog";
+import { Icons } from "@/app/components/Icons";
 
 function groupBy(items, key) {
   return items.reduce((groups, item) => {
@@ -74,6 +75,7 @@ export default function DeveloperSystemPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [expandedPermissionModules, setExpandedPermissionModules] = useState(new Set(["dashboard"]));
+  const [activeConfigView, setActiveConfigView] = useState("modules");
 
   const selectedLab = labs.find((lab) => lab.id === selectedLabId);
   const activeDraftModules = useMemo(() => draftAccess?.enabledModules || [], [draftAccess]);
@@ -289,19 +291,20 @@ export default function DeveloperSystemPage() {
   }
 
   return (
-    <section className="developer-page">
+    <section className="developer-page developer-system-page">
       <div className="developer-page-actions">
         <div>
           <p className="developer-kicker">System</p>
           <h2>System Configuration</h2>
-          <span>Lab-wise admin access and module assignment.</span>
+          <span>Control laboratory capabilities and administrator access from one governed workspace.</span>
         </div>
+        <div className="developer-system-safety">{Icons.shield}<span><strong>Access controls</strong><small>Changes apply only after saving</small></span></div>
       </div>
 
       {error && <div className="developer-alert">{error}</div>}
       <CmsSuccessDialog message={success} onClose={() => setSuccess("")} />
 
-      <div className="developer-summary-grid">
+      <div className="developer-summary-grid developer-system-summary-grid">
         <article className="developer-summary-card">
           <span>Active Labs</span>
           <strong>{loadingLabs ? "—" : labs.length}</strong>
@@ -310,161 +313,96 @@ export default function DeveloperSystemPage() {
           <span>Lab Permissions</span>
           <strong>{labPermissions.length}</strong>
         </article>
+        <article className="developer-summary-card">
+          <span>Current Selection</span>
+          <strong>{draftAccess?.enabledModules?.length || 0}</strong>
+          <small>enabled modules</small>
+        </article>
       </div>
 
-      {/* Lab Wise Access Control */}
-      <section className="developer-panel developer-config-section">
-        <div className="developer-panel-header">
-          <h2>Lab Wise Access Control</h2>
-          <p>Select a lab, then modify its enabled modules and Lab Admin role permissions.</p>
-        </div>
-
-        <div className="developer-form-grid">
+      <div className="developer-system-workspace">
+        <aside className="developer-system-context">
+          <div className="developer-system-context-heading">
+            <span>{Icons.settings}</span>
+            <div><strong>Configuration target</strong><small>Select one active laboratory</small></div>
+          </div>
           <label>
-            Select Lab
-            <select
-              value={selectedLabId}
-              onChange={(event) => setSelectedLabId(event.target.value)}
-              disabled={loadingLabs || labs.length === 0}
-            >
-              {labs.length === 0 ? (
-                <option value="">No labs available</option>
-              ) : (
-                labs.map((lab) => (
-                  <option key={lab.id} value={lab.id}>
-                    {lab.name} ({lab.tenantId})
-                  </option>
-                ))
-              )}
+            Laboratory
+            <select value={selectedLabId} onChange={(event) => setSelectedLabId(event.target.value)} disabled={loadingLabs || labs.length === 0}>
+              {labs.length === 0 ? <option value="">No labs available</option> : labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name} ({lab.tenantId})</option>)}
             </select>
           </label>
-          <label>
-            Lab Admin Role
-            <input value={selectedLab ? `${selectedLab.name} Admin` : "Select a lab"} readOnly />
-          </label>
-        </div>
+          <div className="developer-system-lab-card">
+            <small>Selected workspace</small>
+            <strong>{selectedLab?.name || "No laboratory selected"}</strong>
+            <span>{selectedLab?.tenantId || "Choose a laboratory above"}</span>
+          </div>
+          <dl className="developer-system-context-facts">
+            <div><dt>Administrator role</dt><dd>{selectedLab ? `${selectedLab.name} Admin` : "Not available"}</dd></div>
+            <div><dt>Enabled modules</dt><dd>{draftAccess?.enabledModules?.length || 0}</dd></div>
+            <div><dt>Granted permissions</dt><dd>{draftAccess?.adminPermissions?.length || 0}</dd></div>
+          </dl>
+          <div className="developer-system-context-note">{Icons.alertCircle}<span>Removing a module also removes its related administrator permissions.</span></div>
+        </aside>
 
-        {loadingAccess ? (
-          <p className="developer-empty">Loading lab access...</p>
-        ) : draftAccess ? (
-          <>
-            <div className="developer-panel-header developer-subsection-header">
-              <h2>Enabled Modules</h2>
-              <p>Removing a module also removes its permissions from the Lab Admin draft.</p>
-            </div>
-            <div className="developer-module-grid">
-              {availableLabModules.map((moduleConfig) => (
-                <label key={moduleConfig.id} className="developer-module-option">
-                  <input
-                    type="checkbox"
-                    checked={draftAccess.enabledModules.includes(moduleConfig.id)}
-                    disabled={moduleConfig.id === "dashboard"}
-                    onChange={() => toggleLabModule(moduleConfig.id)}
-                  />
-                  <span>{moduleConfig.label}</span>
-                </label>
-              ))}
-            </div>
+        <section className="developer-panel developer-config-section developer-system-config-panel">
+          <header className="developer-system-config-header">
+            <div><p className="developer-kicker">Lab access policy</p><h2>{selectedLab?.name || "Select a laboratory"}</h2><span>Configure available capabilities and Lab Admin permissions.</span></div>
+            <span className={`developer-config-state ${accessDirty ? "changed" : "saved"}`}><i />{accessDirty ? "Unsaved changes" : "Configuration saved"}</span>
+          </header>
 
-            <div className="developer-panel-header developer-subsection-header">
-              <h2>Lab Admin Permissions</h2>
-              <p>Open a module card to choose the permissions required for this lab.</p>
-            </div>
-            <div className="cms-permission-card-list">
-              {orderedPermissionGroups.map(([moduleId, permissions]) => {
-                const selectedCount = permissions.filter((permission) =>
-                  draftAccess.adminPermissions.includes(permission.key)
-                ).length;
-                const expanded = expandedPermissionModules.has(moduleId);
+          <nav className="developer-config-tabs" aria-label="System configuration sections">
+            <button type="button" className={activeConfigView === "modules" ? "active" : ""} onClick={() => setActiveConfigView("modules")}>{Icons.grid}<span><strong>Modules</strong><small>{draftAccess?.enabledModules?.length || 0} enabled</small></span></button>
+            <button type="button" className={activeConfigView === "permissions" ? "active" : ""} onClick={() => setActiveConfigView("permissions")}>{Icons.shield}<span><strong>Admin permissions</strong><small>{draftAccess?.adminPermissions?.length || 0} granted</small></span></button>
+          </nav>
 
-                return (
-                  <article className="cms-permission-card" key={moduleId}>
-                    <button
-                      type="button"
-                      className="cms-permission-card-header"
-                      onClick={() => togglePermissionModule(moduleId)}
-                      aria-expanded={expanded}
-                    >
-                      <span className="cms-permission-toggle">{expanded ? "-" : "+"}</span>
-                      <span className="cms-permission-title">
-                        <strong>{getModuleLabel(moduleId)}</strong>
-                        <small>{selectedCount} selected of {permissions.length}</small>
-                      </span>
-                      <span className="cms-permission-status">
-                        {selectedCount === permissions.length ? "Full access" : "Custom"}
-                      </span>
-                    </button>
+          {loadingAccess ? <p className="developer-empty">Loading lab access...</p> : draftAccess ? <>
+            <div className="developer-system-config-body">
+              {activeConfigView === "modules" && <section className="developer-config-view">
+                <div className="developer-config-view-heading"><div><h3>Enabled modules</h3><p>Choose the functional areas available inside this laboratory workspace.</p></div><span>{draftAccess.enabledModules.length} of {availableLabModules.length}</span></div>
+                <div className="developer-module-grid developer-system-module-grid">
+                  {availableLabModules.map((moduleConfig) => (
+                    <label key={moduleConfig.id} className="developer-module-option">
+                      <input type="checkbox" checked={draftAccess.enabledModules.includes(moduleConfig.id)} disabled={moduleConfig.id === "dashboard"} onChange={() => toggleLabModule(moduleConfig.id)} />
+                      <span><strong>{moduleConfig.label}</strong><small>{moduleConfig.id === "dashboard" ? "Required foundation" : "Workspace capability"}</small></span>
+                    </label>
+                  ))}
+                </div>
+              </section>}
 
-                    {expanded && (
-                      <div className="cms-permission-card-body">
-                        <div className="cms-permission-card-tools">
-                          <button
-                            type="button"
-                            className="developer-secondary-link"
-                            onClick={() => setModulePermissions(permissions, true)}
-                          >
-                            Select All
-                          </button>
-                          <button
-                            type="button"
-                            className="developer-secondary-link"
-                            onClick={() => setModulePermissions(permissions, false)}
-                          >
-                            Clear
-                          </button>
-                        </div>
-
-                        <div className="permission-matrix cms-permission-matrix">
-                          <article className="permission-group" key={moduleId}>
-                            <div className="permission-group-header">
-                              <strong>{getModuleLabel(moduleId)} Permission Matrix</strong>
-                              <span>{permissions.length} permissions</span>
-                            </div>
-                            {permissions.map((permission) => (
-                              <label className="permission-checkbox" key={permission.key}>
-                                <input
-                                  type="checkbox"
-                                  checked={draftAccess.adminPermissions.includes(permission.key)}
-                                  onChange={() => toggleLabAdminPermission(permission.key)}
-                                />
-                                <span>
-                                  <strong>{permission.name}</strong>
-                                  <small>{permission.key}</small>
-                                </span>
-                              </label>
-                            ))}
-                          </article>
-                        </div>
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
+              {activeConfigView === "permissions" && <section className="developer-config-view">
+                <div className="developer-config-view-heading"><div><h3>Lab Admin permissions</h3><p>Expand a module to review its available actions.</p></div><span>{draftAccess.adminPermissions.length} granted</span></div>
+                <div className="cms-permission-card-list developer-system-permissions">
+                  {orderedPermissionGroups.map(([moduleId, permissions]) => {
+                    const selectedCount = permissions.filter((permission) => draftAccess.adminPermissions.includes(permission.key)).length;
+                    const expanded = expandedPermissionModules.has(moduleId);
+                    return <article className="cms-permission-card" key={moduleId}>
+                      <button type="button" className="cms-permission-card-header" onClick={() => togglePermissionModule(moduleId)} aria-expanded={expanded}>
+                        <span className="cms-permission-toggle">{expanded ? "−" : "+"}</span>
+                        <span className="cms-permission-title"><strong>{getModuleLabel(moduleId)}</strong><small>{selectedCount} selected of {permissions.length}</small></span>
+                        <span className="cms-permission-status">{selectedCount === permissions.length ? "Full access" : selectedCount === 0 ? "No access" : "Custom"}</span>
+                      </button>
+                      {expanded && <div className="cms-permission-card-body">
+                        <div className="cms-permission-card-tools"><button type="button" className="developer-secondary-link" onClick={() => setModulePermissions(permissions, true)}>Select all</button><button type="button" className="developer-secondary-link" onClick={() => setModulePermissions(permissions, false)}>Clear</button></div>
+                        <div className="permission-matrix cms-permission-matrix"><article className="permission-group">
+                          <div className="permission-group-header"><strong>{getModuleLabel(moduleId)} actions</strong><span>{permissions.length} permissions</span></div>
+                          {permissions.map((permission) => <label className="permission-checkbox" key={permission.key}><input type="checkbox" checked={draftAccess.adminPermissions.includes(permission.key)} onChange={() => toggleLabAdminPermission(permission.key)} /><span><strong>{permission.name}</strong><small>{permission.key}</small></span></label>)}
+                        </article></div>
+                      </div>}
+                    </article>;
+                  })}
+                </div>
+              </section>}
             </div>
 
-            <div className="developer-config-actions">
-              <button
-                type="button"
-                className="developer-secondary-link"
-                disabled={!accessDirty || savingAccess}
-                onClick={cancelAccessChanges}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="developer-primary-link"
-                disabled={!accessDirty || savingAccess}
-                onClick={saveAccessChanges}
-              >
-                {savingAccess ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="developer-empty">Select an active lab to configure access.</p>
-        )}
-      </section>
+            <footer className="developer-config-actions developer-system-savebar">
+              <div><strong>{accessDirty ? "Review and save your changes" : "No pending configuration changes"}</strong><span>{accessDirty ? "Updates affect the selected laboratory after saving." : "The current laboratory configuration is up to date."}</span></div>
+              <button type="button" className="developer-secondary-link" disabled={!accessDirty || savingAccess} onClick={cancelAccessChanges}>Discard</button>
+              <button type="button" className="developer-primary-link" disabled={!accessDirty || savingAccess} onClick={saveAccessChanges}>{savingAccess ? "Saving..." : "Save changes"}</button>
+            </footer>
+          </> : <p className="developer-empty">Select an active lab to configure access.</p>}
+        </section>
+      </div>
 
     </section>
   );

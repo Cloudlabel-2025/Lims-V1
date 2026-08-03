@@ -241,7 +241,7 @@ export default function LoginPage({
             </div>
             <h1 className="login-brand-title">{labName}</h1>
             <p className="login-brand-subtitle">
-              {isTenantLogin ? "Secure Lab Workspace" : "Developer CMS Access"}
+              {isTenantLogin ? "Secure laboratory workspace" : "Platform administration console"}
             </p>
 
             {loginFeatures.length > 0 && (
@@ -263,7 +263,7 @@ export default function LoginPage({
               <span className="login-brand-badge">
                 {isTenantLogin ? "Lab Portal" : "CMS Portal"}
               </span>
-              <span className="login-brand-version">v0.1.0</span>
+              <span className="login-brand-version">Secure access</span>
             </div>
           </div>
         </div>
@@ -289,8 +289,9 @@ export default function LoginPage({
             </div>
 
             <div className="login-form-header">
-              <h2>Welcome back</h2>
-              <p>Sign in to your account to continue</p>
+              <p className="login-form-eyebrow">Authorized access</p>
+              <h2>Sign in to your console</h2>
+              <p>Enter your credentials to access your workspace.</p>
             </div>
 
             {/* Error Alert */}

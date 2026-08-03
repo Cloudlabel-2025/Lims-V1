@@ -23,6 +23,7 @@ export default function DeletedLabsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -46,71 +47,160 @@ export default function DeletedLabsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(labs.length / LABS_PER_PAGE));
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredLabs = normalizedSearch
+    ? labs.filter((lab) =>
+        [lab.name, lab.tenantId, lab.adminEmail, lab.dbName, lab.subscriptionPlan]
+          .some((value) => String(value || "").toLowerCase().includes(normalizedSearch))
+      )
+    : labs;
+  const totalPages = Math.max(1, Math.ceil(filteredLabs.length / LABS_PER_PAGE));
   const pageStart = (currentPage - 1) * LABS_PER_PAGE;
-  const paginatedLabs = labs.slice(pageStart, pageStart + LABS_PER_PAGE);
+  const paginatedLabs = filteredLabs.slice(pageStart, pageStart + LABS_PER_PAGE);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
   return (
-    <section className="developer-page">
+    <section className="developer-page developer-deleted-page">
       <div className="developer-page-actions">
         <div>
           <p className="developer-kicker">Lab Management</p>
           <h2>Deleted Labs</h2>
-          <span>Labs moved out of archive. Restore is not available from this list.</span>
+          <span>Review final-state tenant records retained for governance and audit history.</span>
         </div>
-        <Link className="developer-secondary-link" href="/developer/labs/archived">
-          {Icons.trash}
-          Archived Labs
-        </Link>
+        <div className="developer-page-action-group">
+          <Link className="developer-secondary-link" href="/developer/labs/archived">
+            {Icons.undo}
+            Archived Labs
+          </Link>
+          <Link className="developer-secondary-link" href="/developer/labs">
+            {Icons.list}
+            Back to Lab List
+          </Link>
+        </div>
       </div>
 
       {error && <div className="developer-alert">{error}</div>}
 
-      <section className="developer-panel">
+      <div className="developer-archive-summary developer-deleted-summary" aria-label="Deleted lab overview">
+        <article>
+          <span>Deleted records</span>
+          <strong>{labs.length}</strong>
+          <small>Final-state tenant records in this directory</small>
+        </article>
+        <article>
+          <span>Recovery state</span>
+          <strong>Unavailable</strong>
+          <small>CMS restoration is no longer available</small>
+        </article>
+        <article>
+          <span>Record purpose</span>
+          <strong>Audit</strong>
+          <small>Identity and lifecycle history remain visible</small>
+        </article>
+      </div>
+
+      <aside className="developer-deleted-notice">
+        <span>{Icons.lock}</span>
+        <div>
+          <strong>Deleted labs are locked in a final lifecycle state.</strong>
+          <p>These records cannot be restored from the developer console. They remain visible only for traceability and audit review.</p>
+        </div>
+      </aside>
+
+      <section className="developer-panel developer-archive-directory developer-deleted-directory">
         <div className="developer-panel-header">
-          <h2>Deleted Lab List</h2>
-          <p>These tenant records are retained for audit/history only and cannot be restored from CMS.</p>
+          <div>
+            <h2>Deleted records directory</h2>
+            <p>Search tenant identity, plan, administrator, or database information.</p>
+          </div>
+          <span className="developer-panel-count">{labs.length} {labs.length === 1 ? "record" : "records"}</span>
         </div>
 
+        {!loading && labs.length > 0 && (
+          <div className="developer-archive-toolbar">
+            <label>
+              <span>{Icons.search}</span>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search deleted labs"
+                aria-label="Search deleted labs"
+              />
+            </label>
+            <small>{filteredLabs.length} matching {filteredLabs.length === 1 ? "record" : "records"}</small>
+          </div>
+        )}
+
         {loading ? (
-          <p className="developer-empty">Loading deleted labs...</p>
+          <div className="developer-archive-loading" aria-live="polite">
+            <span />
+            <div><strong>Loading deleted records</strong><small>Retrieving tenant lifecycle and audit information...</small></div>
+          </div>
         ) : labs.length === 0 ? (
           <div className="developer-empty-state">
             <strong>No deleted labs.</strong>
-            <span>Labs moved from archive to deleted will appear here.</span>
+            <span>Labs moved from the archive into their final state will appear here.</span>
+            <Link className="developer-secondary-link" href="/developer/labs/archived">{Icons.undo} View Archived Labs</Link>
+          </div>
+        ) : filteredLabs.length === 0 ? (
+          <div className="developer-empty-state">
+            <strong>No deleted records match “{searchQuery}”.</strong>
+            <span>Try a lab name, tenant ID, plan, administrator email, or database name.</span>
+            <button type="button" className="developer-secondary-link" onClick={() => setSearchQuery("")}>Clear search</button>
           </div>
         ) : (
           <>
-            <div className="developer-lab-list">
+            <div className="developer-deleted-list">
               {paginatedLabs.map((lab) => (
-                <article key={lab.tenantId} className="developer-lab-card">
-                  <div
-                    className="developer-lab-swatch"
-                    style={{ background: lab.primaryColor || "#6b7280" }}
-                  />
-                  <div>
-                    <h3>{lab.name}</h3>
-                    <span>
-                      {lab.tenantId} - {lab.subscriptionPlan} -{" "}
-                      <em style={{ color: "var(--danger, #dc2626)" }}>deleted</em>
-                    </span>
-                    <small>Created {formatDate(lab.createdAt)}</small>
-                    <small>Archived {formatDate(lab.archivedAt)}</small>
-                    <small style={{ color: "var(--danger, #dc2626)" }}>
-                      Deleted {formatDate(lab.deletedAt)}
-                    </small>
-                    {lab.adminEmail && <small>Admin: {lab.adminEmail}</small>}
-                    <small>DB: {lab.dbName}</small>
+                <article key={lab.tenantId} className="developer-deleted-card">
+                  <header>
+                    <div className="developer-archive-identity">
+                      <div className="developer-archive-avatar developer-deleted-avatar" style={{ borderColor: lab.primaryColor || "#94a3b8" }}>
+                        {(lab.name || lab.tenantId || "L").trim().charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3>{lab.name}</h3>
+                        <span>{lab.tenantId}</span>
+                      </div>
+                    </div>
+                    <span className="developer-deleted-status"><i /> Deleted</span>
+                  </header>
+
+                  <div className="developer-deleted-facts">
+                    <div><small>Subscription plan</small><strong>{lab.subscriptionPlan || "Not assigned"}</strong></div>
+                    <div><small>Created</small><strong>{formatDate(lab.createdAt)}</strong></div>
+                    <div><small>Archived</small><strong>{formatDate(lab.archivedAt)}</strong></div>
+                    <div className="deleted-date"><small>Deleted</small><strong>{formatDate(lab.deletedAt)}</strong></div>
                   </div>
-                  <div className="developer-link-actions">
-                    <button type="button" disabled>
-                      Restore Not Available
-                    </button>
-                  </div>
+
+                  <details className="developer-archive-details developer-deleted-details">
+                    <summary>Audit and technical information <span>{Icons.chevronRight}</span></summary>
+                    <div>
+                      <article><small>Administrator</small><strong>{lab.adminEmail || "Not assigned"}</strong></article>
+                      <article><small>Database</small><strong>{lab.dbName || "Not available"}</strong></article>
+                      <article><small>Lab ID</small><strong>{lab.labId || lab.id || "Not available"}</strong></article>
+                      <article><small>Contact email</small><strong>{lab.contactEmail || "Not provided"}</strong></article>
+                      <article><small>Contact phone</small><strong>{lab.contactPhone || "Not provided"}</strong></article>
+                      <article className="wide"><small>Last recorded modules</small><strong>{lab.enabledModules?.length ? lab.enabledModules.join(", ") : "No modules recorded"}</strong></article>
+                    </div>
+                  </details>
+
+                  <footer>
+                    <span>{Icons.lock}</span>
+                    <div>
+                      <strong>Final state - restore unavailable</strong>
+                      <small>This record is retained for audit visibility only.</small>
+                    </div>
+                    <span className="developer-deleted-audit-badge">Audit record</span>
+                  </footer>
                 </article>
               ))}
             </div>
@@ -118,8 +208,8 @@ export default function DeletedLabsPage() {
             {totalPages > 1 && (
               <nav className="developer-pagination" aria-label="Deleted lab list pagination">
                 <span>
-                  Showing {pageStart + 1}-{Math.min(pageStart + LABS_PER_PAGE, labs.length)} of{" "}
-                  {labs.length}
+                  Showing {pageStart + 1}-{Math.min(pageStart + LABS_PER_PAGE, filteredLabs.length)} of{" "}
+                  {filteredLabs.length}
                 </span>
                 <div>
                   <button

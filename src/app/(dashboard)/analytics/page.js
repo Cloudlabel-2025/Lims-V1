@@ -83,19 +83,19 @@ function StatusPills({ counts }) {
 
 function SkeletonGrid() {
   return (
-    <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
+    <div className="analytics-skeleton-layout">
+      <div className="analytics-kpi-grid">
         {[1, 2, 3, 4].map((i) => <div key={i} className="lims-skeleton" style={{ height: 100 }} />)}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18 }}>
+      <div className="analytics-chart-grid analytics-chart-grid-primary">
         <div className="lims-skeleton" style={{ height: 320 }} />
         <div className="lims-skeleton" style={{ height: 320 }} />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      <div className="analytics-chart-grid">
         <div className="lims-skeleton" style={{ height: 340 }} />
         <div className="lims-skeleton" style={{ height: 340 }} />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -118,8 +118,8 @@ function ChartToggle({ views, active, onChange }) {
 
 function ExpandButton({ onClick }) {
   return (
-    <button type="button" onClick={onClick} style={{ all: "unset", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, padding: "2px 6px", borderRadius: 4 }} title="Expand">
-      ⛶
+    <button type="button" onClick={onClick} className="analytics-expand-button" title="Expand chart" aria-label="Expand chart">
+      {Icons.grid}
     </button>
   );
 }
@@ -456,19 +456,19 @@ export default function AnalyticsPage() {
   const hasInventory = data?.inventoryValuation?.length > 0;
 
   return (
-    <div style={{ width: "100%", paddingBottom: 40 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+    <div className="analytics-page">
+      <div className="analytics-page-header">
         <div>
           <p className="module-kicker">Business Intelligence</p>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Analytics</h1>
-          <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>Revenue, test volume, referrals, and workflow metrics.</span>
+          <h1>Analytics</h1>
+          <span>Revenue, patient activity, test demand, referrals, and workflow performance.</span>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="analytics-page-controls">
           <select
             value={range}
             onChange={(e) => setRange(e.target.value)}
             className="lims-input"
-            style={{ height: 38, width: 140 }}
+            aria-label="Analytics reporting period"
           >
             <option value="7">Last 7 days</option>
             <option value="30">Last 30 days</option>
@@ -476,7 +476,7 @@ export default function AnalyticsPage() {
             <option value="180">Last 180 days</option>
             <option value="365">Last 365 days</option>
           </select>
-          <button className="dash-btn-secondary" onClick={() => load(range)} style={{ height: 38 }}>
+          <button className="dash-btn-secondary" onClick={() => load(range)} disabled={loading}>
             {Icons.refresh} Refresh
           </button>
         </div>
@@ -486,8 +486,8 @@ export default function AnalyticsPage() {
 
       {loading ? <SkeletonGrid /> : data && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
-            <div className="stat-card-upgraded">
+          <div className="analytics-kpi-grid">
+            <div className="stat-card-upgraded analytics-kpi-card revenue">
               <div className="accent-bar" style={{ background: "var(--primary)" }} />
               <div className="label">Revenue Collected</div>
               <div className="value" style={{ color: "var(--primary)" }}>₹{money(data.summary.totalRevenue)}</div>
@@ -499,19 +499,19 @@ export default function AnalyticsPage() {
                 )}
               </div>
             </div>
-            <div className="stat-card-upgraded">
+            <div className="stat-card-upgraded analytics-kpi-card bills">
               <div className="accent-bar" style={{ background: "#2563eb" }} />
               <div className="label">Total Bills</div>
               <div className="value">{data.summary.totalBills || 0}</div>
               <div className="sub">{data.summary.paidBills || 0} paid</div>
             </div>
-            <div className="stat-card-upgraded">
+            <div className="stat-card-upgraded analytics-kpi-card patients">
               <div className="accent-bar" style={{ background: "#7c3aed" }} />
               <div className="label">New Patients</div>
               <div className="value">{data.summary.newPatients || 0}</div>
               <div className="sub">{data.summary.totalPatients || 0} total</div>
             </div>
-            <div className="stat-card-upgraded">
+            <div className="stat-card-upgraded analytics-kpi-card collection">
               <div className="accent-bar" style={{ background: "#d97706" }} />
               <div className="label">Collection Rate</div>
               <div className="value" style={{ color: "#d97706" }}>{collectionPct}%</div>
@@ -519,7 +519,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 18 }}>
+          <div className="analytics-chart-grid analytics-chart-grid-primary">
             <div className="chart-card">
               <div className="chart-card-header">
                 <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.barChart}</span> Revenue Trend</div>
@@ -564,21 +564,7 @@ export default function AnalyticsPage() {
                       </Bar>
                       <Line yAxisId="right" type="monotone" dataKey="bills" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
                     </ComposedChart>
-            ) : revenueView === "composed" ? (
-              <ComposedChart data={data.revenueSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
-                <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                <Bar yAxisId="left" dataKey="revenue" radius={[4, 4, 0, 0]} isAnimationActive animationDuration={800} animationEasing="ease-out">
-                  {data.revenueSeries.map((entry, i) => (
-                    <Cell key={entry._id || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Bar>
-                <Line yAxisId="right" type="monotone" dataKey="bills" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
-              </ComposedChart>
-            ) : (
+                  ) : (
                     <LineChart data={data.revenueSeries}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
@@ -635,7 +621,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 18 }}>
+          <div className="analytics-chart-grid">
             <div className="chart-card">
               <div className="chart-card-header">
                 <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.clock}</span> Sample Status</div>
@@ -719,7 +705,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div className="analytics-chart-grid analytics-chart-grid-business">
             <div className="chart-card">
               <div className="chart-card-header">
                 <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.stethoscope}</span> Doctor Referrals</div>
@@ -837,15 +823,15 @@ export default function AnalyticsPage() {
 
       {expanded && (
         <div
-          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}
+          className="analytics-modal-backdrop"
           onClick={() => setExpanded(null)}
         >
-          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "90%", maxWidth: 900, maxHeight: "90vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <strong style={{ fontSize: 16 }}>{expandedTitle}</strong>
-              <button onClick={() => setExpanded(null)} style={{ all: "unset", cursor: "pointer", fontSize: 20, color: "var(--text-muted)" }}>✕</button>
+          <div className="analytics-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="analytics-modal-header">
+              <div><small>Expanded analytics</small><strong>{expandedTitle}</strong></div>
+              <button type="button" onClick={() => setExpanded(null)} aria-label="Close expanded chart">{Icons.close}</button>
             </div>
-            {renderExpandedChart()}
+            <div className="analytics-modal-body">{renderExpandedChart()}</div>
           </div>
         </div>
       )}

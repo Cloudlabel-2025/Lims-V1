@@ -1,27 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Icons } from "@/app/components/Icons";
-import SuccessDialog from "@/app/components/SuccessDialog";
 import { hasPermission } from "@/app/lib/client-rbac";
 import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-current-user";
-
-const PackagesTab = dynamic(() => import("./PackagesTab"), {
-  ssr: false,
-  loading: () => <div className="module-panel">Loading packages...</div>,
-});
-const CategoriesTab = dynamic(() => import("./CategoriesTab"), {
-  ssr: false,
-  loading: () => <div className="module-panel">Loading categories...</div>,
-});
-const ListsTab = dynamic(() => import("./ListsTab"), {
-  ssr: false,
-  loading: () => <div className="module-panel">Loading lists...</div>,
-});
+import TestMasterWorkspace, { TestMasterLoading } from "./TestMasterWorkspace";
 
 const NAME_PATTERN = /^[A-Za-z0-9-]+$/;
-const CODE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const UNIT_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
 const URL_RE = /https?:\/\/|www\./i;
 
@@ -617,405 +601,56 @@ export default function TestsPage() {
     }
   }
 
-  if (loading) return <div className="module-page">Loading tests...</div>;
+  if (loading) return <TestMasterLoading />;
 
   return (
-    <div className="module-page">
-      <div className="module-header">
-        <div>
-          <p className="module-kicker">Test Master Configuration</p>
-          <h1>Test Master</h1>
-          <span>Configure tests, parameters, categories, and health packages.</span>
-        </div>
-        <div className="module-header-actions">
-          {activeTab === "tests" && canEditTests && (
-            <button className="dash-btn-secondary" type="button" onClick={resetForm}>
-              {Icons.plus} New Test
-            </button>
-          )}
-          {activeTab === "packages" && canEditTests && (
-            <button className="dash-btn-secondary" type="button" onClick={resetPackageForm}>
-              {Icons.plus} New Package
-            </button>
-          )}
-        </div>
-      </div>
-
-      <SuccessDialog message={success} onClose={() => setSuccess("")} />
-      <div className="module-tabs" style={{ display: "flex", gap: "24px", marginBottom: "28px", borderBottom: "1px solid var(--border-light)", padding: "0 4px" }}>
-        <button
-          onClick={() => setActiveTab("categories")}
-          style={{
-            padding: "12px 4px",
-            background: "none",
-            border: "none",
-            borderBottom: activeTab === "categories" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
-            color: activeTab === "categories" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-            fontWeight: activeTab === "categories" ? "700" : "500",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          Categories
-        </button>
-        <button
-          onClick={() => setActiveTab("tests")}
-          style={{
-            padding: "12px 4px",
-            background: "none",
-            border: "none",
-            borderBottom: activeTab === "tests" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
-            color: activeTab === "tests" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-            fontWeight: activeTab === "tests" ? "700" : "500",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          Tests & Parameters
-        </button>
-        <button
-          onClick={() => setActiveTab("packages")}
-          style={{
-            padding: "12px 4px",
-            background: "none",
-            border: "none",
-            borderBottom: activeTab === "packages" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
-            color: activeTab === "packages" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-            fontWeight: activeTab === "packages" ? "700" : "500",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          Test Packages
-        </button>
-        <button
-          onClick={() => setActiveTab("lists")}
-          style={{
-            padding: "12px 4px",
-            background: "none",
-            border: "none",
-            borderBottom: activeTab === "lists" ? "2.5px solid var(--brand-action, var(--primary))" : "2.5px solid transparent",
-            color: activeTab === "lists" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-            fontWeight: activeTab === "lists" ? "700" : "500",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          View Lists
-        </button>
-      </div>
-
-      {error && <div className="module-alert">{error}</div>}
-
-      {activeTab === "categories" && (
-        <CategoriesTab
-          canEditTests={canEditTests}
-          editingCategoryId={editingCategoryId}
-          saveCategory={saveCategory}
-          categoryForm={categoryForm}
-          setCategoryForm={setCategoryForm}
-          saving={saving}
-          onCancelEdit={() => { setEditingCategoryId(""); setCategoryForm({ name: "", description: "", status: "active" }); }}
-        />
-      )}
-
-      {activeTab === "tests" && (
-        <div>
-          {canEditTests && (
-          <section className="module-panel">
-            <div className="module-panel-header">
-              <h2>{editingId ? "Edit Test" : "Create Test"}</h2>
-              <p>Parameters here drive result entry and reporting.</p>
-            </div>
-
-            <form onSubmit={saveTest} className="module-form">
-              <div className="module-form-grid">
-                <label>
-                  Test Name
-                  <input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Enter test name" required maxLength={25} pattern="[A-Za-z0-9\-]+" title="Only letters, numbers, and hyphens allowed (max 25 characters, only one hyphen)" />
-                </label>
-                <label>
-                  Code
-                  <input value={form.code} onChange={(e) => updateField("code", e.target.value.toUpperCase())} placeholder="Enter test code" required maxLength={20} pattern="[A-Z0-9]+" title="Only uppercase letters and numbers allowed (max 20 characters)" />
-                </label>
-                <label>
-                  Category
-                  <select value={form.category} onChange={(e) => updateField("category", e.target.value)} required>
-                    <option value="">Select category</option>
-                    {categories.map((category) => (
-                      <option key={category._id} value={category._id}>{category.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Sample Type
-                  <input value={form.sampleType} onChange={(e) => updateField("sampleType", e.target.value)} placeholder="Enter sample type" required maxLength={20} pattern="[A-Za-z0-9]+" title="Only letters and numbers allowed (max 20 characters)" />
-                </label>
-                <label>
-                  Price
-                  <input type="number" min="0" max="999999999" value={form.price} onChange={(e) => updateField("price", e.target.value)} placeholder="Enter price" required />
-                </label>
-                <label>
-                  Status
-                  <select value={form.status} onChange={(e) => updateField("status", e.target.value)}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </label>
-              </div>
-
-              <div className="module-subhead">
-                <h3>Parameters</h3>
-                <button type="button" className="module-icon-btn" onClick={addParameter} title="Add parameter">
-                  {Icons.plus}
-                </button>
-              </div>
-
-              <div className="parameter-list" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                {form.parameters.map((parameter, index) => (
-                  <div key={index} className="parameter-group" style={{ 
-                    padding: "20px", 
-                    background: "var(--surface)", 
-                    borderRadius: "var(--radius-lg)",
-                    border: "1px solid var(--border)",
-                    boxShadow: "var(--shadow-sm)"
-                  }}>
-                    <div className="parameter-row-main" style={{ 
-                      display: "flex", 
-                      gap: "16px", 
-                      marginBottom: "20px", 
-                      alignItems: "center",
-                      flexWrap: "wrap"
-                    }}>
-                      <div style={{ flex: "1 1 200px" }}>
-                        <input 
-                          className="lims-input"
-                          value={parameter.name} 
-                          onChange={(e) => updateParameter(index, "name", e.target.value)} 
-                          placeholder="Enter parameter name" 
-                          required 
-                          pattern="[A-Za-z][A-Za-z0-9 .&'\/,-]*"
-                          title="Only letters, numbers, spaces, and . &amp; ' / , - allowed"
-                          style={{ width: "100%" }}
-                        />
-                      </div>
-                      <div style={{ flex: "1 1 120px" }}>
-                        <input 
-                          className="lims-input"
-                          value={parameter.unit} 
-                          onChange={(e) => updateParameter(index, "unit", e.target.value)} 
-                          placeholder="Enter unit" 
-                          required
-                          pattern="[0-9]+(\.[0-9]+)?"
-                          title="Unit should be only measured in numerals"
-                          style={{ width: "100%" }}
-                        />
-                      </div>
-                      <label className="parameter-check" style={{ 
-                        display: "flex", 
-                        alignItems: "center", 
-                        gap: "8px", 
-                        whiteSpace: "nowrap", 
-                        fontSize: "13px",
-                        fontWeight: "600",
-                        color: "var(--text)",
-                        cursor: "pointer",
-                        userSelect: "none"
-                      }}>
-                        <input 
-                          type="checkbox" 
-                          checked={parameter.required !== false} 
-                          onChange={(e) => updateParameter(index, "required", e.target.checked)} 
-                          style={{ width: "16px", height: "16px", cursor: "pointer" }}
-                        />
-                        Required
-                      </label>
-                      <button 
-                        type="button" 
-                        className="module-icon-btn danger" 
-                        onClick={() => removeParameter(index)} 
-                        title="Remove"
-                        style={{ 
-                          width: "38px", 
-                          height: "38px", 
-                          display: "flex", 
-                          alignItems: "center", 
-                          justifyContent: "center",
-                          borderRadius: "var(--radius-sm)",
-                          flexShrink: 0
-                        }}
-                      >
-                        {Icons.trash}
-                      </button>
-                    </div>
-                    
-                    <div className="parameter-ranges-grid" style={{ 
-                      display: "grid", 
-                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", 
-                      gap: "24px" 
-                    }}>
-                      <div className="range-col">
-                        <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", marginBottom: "8px", display: "block", letterSpacing: "0.5px" }}>COMMON RANGE</label>
-                        <div style={{ display: "flex", gap: "10px" }}>
-                          <input className="lims-input" type="number" step="any" value={parameter.normalMin ?? ""} onChange={(e) => updateParameter(index, "normalMin", e.target.value)} placeholder="Enter min" style={{ width: "100%", textAlign: "center" }} />
-                          <input className="lims-input" type="number" step="any" value={parameter.normalMax ?? ""} onChange={(e) => updateParameter(index, "normalMax", e.target.value)} placeholder="Enter max" style={{ width: "100%", textAlign: "center" }} />
-                        </div>
-                      </div>
-                      
-                      <div className="range-col">
-                        <label style={{ fontSize: "11px", fontWeight: "700", color: "#2563eb", marginBottom: "8px", display: "block", letterSpacing: "0.5px" }}>MALE RANGE</label>
-                        <div style={{ display: "flex", gap: "10px" }}>
-                          <input className="lims-input" type="number" step="any" value={parameter.maleMin ?? ""} onChange={(e) => updateParameter(index, "maleMin", e.target.value)} placeholder="Enter min" style={{ width: "100%", textAlign: "center", borderColor: "#bfdbfe" }} />
-                          <input className="lims-input" type="number" step="any" value={parameter.maleMax ?? ""} onChange={(e) => updateParameter(index, "maleMax", e.target.value)} placeholder="Enter max" style={{ width: "100%", textAlign: "center", borderColor: "#bfdbfe" }} />
-                        </div>
-                      </div>
-
-                      <div className="range-col">
-                        <label style={{ fontSize: "11px", fontWeight: "700", color: "#db2777", marginBottom: "8px", display: "block", letterSpacing: "0.5px" }}>FEMALE RANGE</label>
-                        <div style={{ display: "flex", gap: "10px" }}>
-                          <input className="lims-input" type="number" step="any" value={parameter.femaleMin ?? ""} onChange={(e) => updateParameter(index, "femaleMin", e.target.value)} placeholder="Enter min" style={{ width: "100%", textAlign: "center", borderColor: "#fbcfe8" }} />
-                          <input className="lims-input" type="number" step="any" value={parameter.femaleMax ?? ""} onChange={(e) => updateParameter(index, "femaleMax", e.target.value)} placeholder="Enter max" style={{ width: "100%", textAlign: "center", borderColor: "#fbcfe8" }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="module-subhead">
-                <h3>Required Inventory Items</h3>
-                <button type="button" className="module-icon-btn" onClick={addRequiredItem} title="Add required inventory item">
-                  {Icons.plus}
-                </button>
-              </div>
-
-              {form.requiredInventoryItems.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {form.requiredInventoryItems.map((entry, index) => (
-                    <div key={index} style={{
-                      display: "flex",
-                      gap: "12px",
-                      alignItems: "center",
-                      padding: "14px",
-                      background: "var(--surface)",
-                      borderRadius: "var(--radius-lg)",
-                      border: "1px solid var(--border)",
-                      flexWrap: "wrap",
-                    }}>
-                      <div style={{ flex: "2 1 200px" }}>
-                        <select
-                          className="lims-input"
-                          value={entry.item}
-                          onChange={(e) => updateRequiredItem(index, "item", e.target.value)}
-                          required
-                          style={{ width: "100%" }}
-                        >
-                          <option value="">Select inventory item</option>
-                          {inventoryItems.map((item) => (
-                            <option key={item._id} value={item._id}>{item.itemCode} - {item.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div style={{ flex: "1 1 100px" }}>
-                        <input
-                          className="lims-input"
-                          type="number"
-                          step="any"
-                          min="0"
-                          value={entry.quantityPerTest}
-                          onChange={(e) => updateRequiredItem(index, "quantityPerTest", e.target.value)}
-                          placeholder="Qty per test"
-                          required
-                          style={{ width: "100%" }}
-                        />
-                      </div>
-                      <div style={{ flex: "1 1 120px" }}>
-                        <select
-                          className="lims-input"
-                          value={entry.uom}
-                          onChange={(e) => updateRequiredItem(index, "uom", e.target.value)}
-                          required
-                          style={{ width: "100%" }}
-                        >
-                          <option value="">Select UOM</option>
-                          {inventoryUoms.filter(u => u.status === "active").map((uom) => (
-                            <option key={uom._id} value={uom._id}>{uom.name} ({uom.symbol})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <button
-                        type="button"
-                        className="module-icon-btn danger"
-                        onClick={() => removeRequiredItem(index)}
-                        title="Remove"
-                        style={{
-                          width: "38px",
-                          height: "38px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          borderRadius: "var(--radius-sm)",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {Icons.trash}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button type="submit" className="dash-btn-primary module-save" disabled={!canSave || saving}>
-                {saving ? "Saving..." : editingId ? "Update Test" : "Create Test"}
-              </button>
-            </form>
-          </section>
-          )}
-        </div>
-      )}
-
-      {activeTab === "packages" && (
-        <PackagesTab
-          canEditTests={canEditTests}
-          packageForm={packageForm}
-          setPackageForm={setPackageForm}
-          savePackage={savePackage}
-          canSavePackage={canSavePackage}
-          saving={saving}
-          editingPackageId={editingPackageId}
-          selectedTestsTotal={selectedTestsTotal}
-          packageTestOptions={packageTestOptions}
-          packages={packages}
-          editPackage={editPackage}
-          showList={false}
-          canDeleteTests={canDeleteTests}
-          onDeletePackage={canDeleteTests ? deletePackage : null}
-        />
-      )}
-
-      {activeTab === "lists" && (
-        <ListsTab
-          categories={categories}
-          categoryUsageCounts={categoryUsageCounts}
-          tests={tests}
-          packages={packages}
-          canEditTests={canEditTests}
-          editingId={editingId}
-          editingPackageId={editingPackageId}
-          editTest={editTest}
-          editPackage={editPackage}
-          canDeleteTests={canDeleteTests}
-          editCategory={editCategory}
-          editingCategoryId={editingCategoryId}
-          onDeleteCategory={canDeleteTests ? deleteCategory : null}
-          onDeleteTest={canDeleteTests ? deleteTest : null}
-          onDeletePackage={canDeleteTests ? (id) => deletePackage(id, { skipConfirm: true }) : null}
-        />
-      )}
-    </div>
+    <TestMasterWorkspace
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      categories={categories}
+      tests={tests}
+      packages={packages}
+      inventoryItems={inventoryItems}
+      inventoryUoms={inventoryUoms}
+      form={form}
+      packageForm={packageForm}
+      setPackageForm={setPackageForm}
+      categoryForm={categoryForm}
+      setCategoryForm={setCategoryForm}
+      editingId={editingId}
+      editingPackageId={editingPackageId}
+      editingCategoryId={editingCategoryId}
+      setEditingCategoryId={setEditingCategoryId}
+      saving={saving}
+      error={error}
+      success={success}
+      setSuccess={setSuccess}
+      canSave={canSave}
+      canSavePackage={canSavePackage}
+      selectedTestsTotal={selectedTestsTotal}
+      packageTestOptions={packageTestOptions}
+      categoryUsageCounts={categoryUsageCounts}
+      canEditTests={canEditTests}
+      canDeleteTests={canDeleteTests}
+      loadData={loadData}
+      updateField={updateField}
+      updateParameter={updateParameter}
+      addParameter={addParameter}
+      removeParameter={removeParameter}
+      addRequiredItem={addRequiredItem}
+      removeRequiredItem={removeRequiredItem}
+      updateRequiredItem={updateRequiredItem}
+      saveCategory={saveCategory}
+      saveTest={saveTest}
+      savePackage={savePackage}
+      editPackage={editPackage}
+      resetPackageForm={resetPackageForm}
+      editTest={editTest}
+      resetForm={resetForm}
+      editCategory={editCategory}
+      deleteCategory={deleteCategory}
+      deleteTest={deleteTest}
+      deletePackage={deletePackage}
+    />
   );
 }

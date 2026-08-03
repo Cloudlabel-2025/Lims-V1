@@ -30,6 +30,10 @@ function formatDate(value) {
   });
 }
 
+function normalizeStatus(status) {
+  return String(status || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
 export default function DeveloperLabsListPage() {
   const [labs, setLabs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,15 +62,6 @@ export default function DeveloperLabsListPage() {
     return () => { cancelled = true; };
   }, []);
 
-  async function copyLoginUrl(loginUrl) {
-    if (!loginUrl) return;
-    await copyValue(loginUrl, "Unable to copy login link. Please copy it manually.");
-    setCopiedLoginUrl(loginUrl);
-    window.setTimeout(() => {
-      setCopiedLoginUrl((current) => (current === loginUrl ? "" : current));
-    }, 1800);
-  }
-
   async function copyValue(value, failureMessage = "Unable to copy value. Please copy it manually.") {
     if (!value) return;
     try {
@@ -74,6 +69,15 @@ export default function DeveloperLabsListPage() {
     } catch {
       setError(failureMessage);
     }
+  }
+
+  async function copyLoginUrl(loginUrl) {
+    if (!loginUrl) return;
+    await copyValue(loginUrl, "Unable to copy login link. Please copy it manually.");
+    setCopiedLoginUrl(loginUrl);
+    window.setTimeout(() => {
+      setCopiedLoginUrl((current) => (current === loginUrl ? "" : current));
+    }, 1800);
   }
 
   function openLoginUrl(lab) {
@@ -121,14 +125,14 @@ export default function DeveloperLabsListPage() {
   }, [totalPages]);
 
   return (
-    <section className="developer-page">
+    <section className="developer-page developer-labs-page">
       <div className="developer-page-actions">
         <div>
           <p className="developer-kicker">Lab Management</p>
           <h2>Created Labs</h2>
-          <span>Review tenant labs, login URLs, modules, status, and plan details.</span>
+          <span>Review tenant workspaces, subscriptions, access, and service state.</span>
         </div>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+        <div className="developer-page-action-group">
           <Link className="developer-secondary-link" href="/developer/labs/archived">
             {Icons.trash}
             Archived Labs
@@ -143,25 +147,19 @@ export default function DeveloperLabsListPage() {
       {error && <div className="developer-alert">{error}</div>}
       <SuccessDialog message={success} onClose={() => setSuccess("")} />
 
-      <div className="developer-summary-grid">
-        <article className="developer-summary-card">
-          <span>Total Labs</span>
-          <strong>{visibleLabs.length}</strong>
-        </article>
-        <article className="developer-summary-card">
-          <span>Active Labs</span>
-          <strong>{activeLabs}</strong>
-        </article>
-        <article className="developer-summary-card">
-          <span>Assigned Modules</span>
-          <strong>{assignedModuleCount}</strong>
-        </article>
+      <div className="developer-summary-grid developer-labs-summary-grid">
+        <article className="developer-summary-card"><span>Total Labs</span><strong>{visibleLabs.length}</strong></article>
+        <article className="developer-summary-card"><span>Active Labs</span><strong>{activeLabs}</strong></article>
+        <article className="developer-summary-card"><span>Available Modules</span><strong>{assignedModuleCount}</strong></article>
       </div>
 
-      <section className="developer-panel">
+      <section className="developer-panel developer-labs-directory">
         <div className="developer-panel-header">
-          <h2>Lab List</h2>
-          <p>Each card gives the lab login URL and module summary.</p>
+          <div>
+            <h2>Laboratory directory</h2>
+            <p>Essential workspace information is visible. Technical data stays available on demand.</p>
+          </div>
+          <span className="developer-panel-count">{visibleLabs.length} labs</span>
         </div>
 
         {loading ? (
@@ -170,85 +168,76 @@ export default function DeveloperLabsListPage() {
           <div className="developer-empty-state">
             <strong>No labs created yet.</strong>
             <span>Create the first tenant lab to initialize its database and admin user.</span>
-            <Link className="developer-primary-link" href="/developer/labs/create">
-              {Icons.plus}
-              Create First Lab
-            </Link>
+            <Link className="developer-primary-link" href="/developer/labs/create">{Icons.plus} Create First Lab</Link>
           </div>
         ) : (
           <>
             <div className="developer-lab-list">
               {paginatedLabs.map((lab) => {
                 const loginUrl = getActiveLabLoginUrl(lab);
+                const enabledModules = lab.enabledModules || defaultLabModules;
+                const visibleModules = enabledModules.slice(0, 4);
+                const hiddenModuleCount = Math.max(0, enabledModules.length - visibleModules.length);
+                const status = lab.subscriptionStatus || lab.status || "unknown";
+
                 return (
                   <article key={lab.tenantId} className="developer-lab-card">
-                    <div className="developer-lab-swatch" style={{ background: lab.primaryColor }} />
-                    <div>
-                      <h3>{lab.name}</h3>
-                      <span>
-                        {lab.tenantId} · {lab.subscriptionPackageName}{lab.subscriptionReleaseVersion ? ` ${lab.subscriptionReleaseVersion}` : ""} · {lab.subscriptionStatus || lab.status}
-                      </span>
-                      <small>Created {formatDate(lab.createdAt)}</small>
-                      <small>{(lab.enabledModules || defaultLabModules).join(", ")}</small>
-                      <button
-                        type="button"
-                        className="developer-url-link"
-                        onClick={() => openLoginUrl(lab)}
-                      >
-                        {loginUrl}
-                      </button>
-                      {getLocalLabLoginUrl(lab.tenantId) && (
-                        <small className="developer-production-url">Production: {lab.loginUrl}</small>
-                      )}
-                      <div className="developer-lab-domain-summary">
-                        <span>Default Subdomain</span>
-                        <button
-                          type="button"
-                          onClick={() => copyValue(lab.defaultDomain || lab.loginUrl, "Unable to copy default subdomain.")}
-                        >
-                          {lab.defaultDomain || lab.loginUrl}
-                          {Icons.copy}
-                        </button>
-                      </div>
-                      <div className="developer-credential-grid">
-                        <div>
-                          <span>Lab Admin User ID</span>
-                          <button
-                            type="button"
-                            onClick={() => copyValue(lab.adminEmail, "Unable to copy lab admin user ID.")}
-                            disabled={!lab.adminEmail}
-                            title="Copy lab admin user ID"
-                          >
-                            <span>{lab.adminEmail || "Not set"}</span>
-                            {lab.adminEmail && Icons.copy}
-                          </button>
+                    <header className="developer-lab-card-header">
+                      <div className="developer-lab-identity">
+                        <div className="developer-lab-avatar" style={{ borderColor: lab.primaryColor || "#0d9488" }}>
+                          {(lab.name || lab.tenantId || "L").trim().charAt(0).toUpperCase()}
                         </div>
+                        <div><h3>{lab.name}</h3><span>{lab.tenantId}</span></div>
                       </div>
+                      <span className={`developer-lab-status status-${normalizeStatus(status)}`}>
+                        <i /> {String(status).replace(/_/g, " ")}
+                      </span>
+                    </header>
+
+                    <div className="developer-lab-facts">
+                      <div><small>Package</small><strong>{lab.subscriptionPackageName || "Not assigned"}{lab.subscriptionReleaseVersion ? ` ${lab.subscriptionReleaseVersion}` : ""}</strong></div>
+                      <div><small>Created</small><strong>{formatDate(lab.createdAt)}</strong></div>
+                      <div><small>Modules</small><strong>{enabledModules.length} enabled</strong></div>
+                      <div><small>Administrator</small><strong>{lab.adminEmail || "Not set"}</strong></div>
                     </div>
-                    <div className="developer-link-actions">
-                      <button type="button" onClick={() => openLoginUrl(lab)}>
-                        Open
-                      </button>
-                      <button type="button" onClick={() => copyLoginUrl(loginUrl)}>
-                        {copiedLoginUrl === loginUrl ? "Copied" : "Copy Link"}
-                      </button>
-                      <Link href={`/developer/labs/${encodeURIComponent(lab.id)}/edit`}>
-                        {Icons.edit}
-                        Edit
-                      </Link>
-                      <Link href={`/developer/labs/${encodeURIComponent(lab.tenantId)}/subscription`}>
-                        Usage
-                      </Link>
-                      <button
-                        type="button"
-                        className="danger"
-                        disabled={deletingLabId === lab.id}
-                        onClick={() => deleteLab(lab)}
-                      >
-                        {Icons.trash}
-                        {deletingLabId === lab.id ? "Archiving..." : "Delete"}
+
+                    <div className="developer-lab-modules" aria-label="Enabled modules">
+                      {visibleModules.map((module) => <span key={module}>{module}</span>)}
+                      {hiddenModuleCount > 0 && <span className="more">+{hiddenModuleCount} more</span>}
+                    </div>
+
+                    <div className="developer-lab-access-row">
+                      <div>
+                        <small>Workspace login</small>
+                        <button type="button" className="developer-url-link" onClick={() => openLoginUrl(lab)}>{loginUrl}</button>
+                      </div>
+                      <button type="button" className="developer-icon-button" onClick={() => copyLoginUrl(loginUrl)} title="Copy workspace login URL" aria-label="Copy workspace login URL">
+                        {copiedLoginUrl === loginUrl ? "✓" : Icons.copy}
                       </button>
                     </div>
+
+                    <details className="developer-lab-details">
+                      <summary>Technical details <span>{Icons.chevronRight}</span></summary>
+                      <div className="developer-lab-details-grid">
+                        <div><small>Default subdomain</small><button type="button" onClick={() => copyValue(lab.defaultDomain || lab.loginUrl, "Unable to copy default subdomain.")}>{lab.defaultDomain || lab.loginUrl}{Icons.copy}</button></div>
+                        <div><small>Lab administrator</small><button type="button" onClick={() => copyValue(lab.adminEmail, "Unable to copy lab admin user ID.")} disabled={!lab.adminEmail}>{lab.adminEmail || "Not set"}{lab.adminEmail && Icons.copy}</button></div>
+                        {getLocalLabLoginUrl(lab.tenantId) && <div className="wide"><small>Production URL</small><span>{lab.loginUrl}</span></div>}
+                        <div className="wide"><small>All enabled modules</small><span>{enabledModules.join(", ")}</span></div>
+                      </div>
+                    </details>
+
+                    <footer className="developer-lab-card-actions">
+                      <button type="button" className="primary" onClick={() => openLoginUrl(lab)}>Open workspace {Icons.arrowRight}</button>
+                      <Link href={`/developer/labs/${encodeURIComponent(lab.id)}/edit`}>{Icons.edit} Edit</Link>
+                      <Link href={`/developer/labs/${encodeURIComponent(lab.tenantId)}/subscription`}>Usage</Link>
+                      <details className="developer-lab-action-menu">
+                        <summary>More {Icons.dots}</summary>
+                        <div>
+                          <button type="button" onClick={() => copyLoginUrl(loginUrl)}>{Icons.copy}{copiedLoginUrl === loginUrl ? "Copied" : "Copy login link"}</button>
+                          <button type="button" className="danger" disabled={deletingLabId === lab.id} onClick={() => deleteLab(lab)}>{Icons.trash}{deletingLabId === lab.id ? "Archiving..." : "Archive lab"}</button>
+                        </div>
+                      </details>
+                    </footer>
                   </article>
                 );
               })}
@@ -256,36 +245,13 @@ export default function DeveloperLabsListPage() {
 
             {totalPages > 1 && (
               <nav className="developer-pagination" aria-label="Lab list pagination">
-                <span>
-                  Showing {pageStart + 1}-{Math.min(pageStart + LABS_PER_PAGE, visibleLabs.length)} of{" "}
-                  {visibleLabs.length}
-                </span>
+                <span>Showing {pageStart + 1}-{Math.min(pageStart + LABS_PER_PAGE, visibleLabs.length)} of {visibleLabs.length}</span>
                 <div>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </button>
+                  <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}>Previous</button>
                   {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-                    <button
-                      type="button"
-                      className={page === currentPage ? "active" : ""}
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      aria-current={page === currentPage ? "page" : undefined}
-                    >
-                      {page}
-                    </button>
+                    <button type="button" className={page === currentPage ? "active" : ""} key={page} onClick={() => setCurrentPage(page)} aria-current={page === currentPage ? "page" : undefined}>{page}</button>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </button>
+                  <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages}>Next</button>
                 </div>
               </nav>
             )}

@@ -127,7 +127,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="login-page">
+    <div className="login-page recovery-page">
       <div className="login-bg">
         <div className="login-bg-orb login-bg-orb-1" />
         <div className="login-bg-orb login-bg-orb-2" />
@@ -171,13 +171,23 @@ export default function ForgotPasswordPage() {
 
         <div className="login-form-panel">
           <div className="login-form-wrapper">
+            <div className="recovery-mark">{Icons.shield}</div>
             <div className="login-form-header">
+              <p className="login-form-eyebrow">Secure account recovery</p>
               <h2>{step === "request" ? "Forgot password" : "Enter OTP"}</h2>
               <p>
                 {step === "request"
                   ? "Enter your email to receive a 6-digit OTP"
                   : `OTP sent to ${email}. Check your inbox.`}
               </p>
+            </div>
+
+            <div className="recovery-steps" aria-label="Password recovery progress">
+              <span className={step === "request" ? "active" : "complete"}><i>{step === "request" ? "1" : "✓"}</i>Verify</span>
+              <b />
+              <span className={step === "verify" ? "active" : ""}><i>2</i>Reset</span>
+              <b />
+              <span><i>3</i>Done</span>
             </div>
 
             {error && (

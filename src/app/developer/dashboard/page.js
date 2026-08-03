@@ -65,6 +65,11 @@ export default function DeveloperDashboardPage() {
         </Link>
       </div>
 
+      <div className="developer-dashboard-status">
+        <span><i /> Platform services operational</span>
+        <small>Tenant and subscription controls are available</small>
+      </div>
+
       {error && <div className="developer-alert">{error}</div>}
 
       <div className="developer-summary-grid">

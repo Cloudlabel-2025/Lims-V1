@@ -86,9 +86,10 @@ export default function DashboardPage() {
       permission: "samples.view",
       trend: "up",
       change: "Today",
+      detail: "Collected since midnight",
       icon: Icons.flask,
       color: "#0d9488",
-      bg: "linear-gradient(135deg, #f0fdfa, #ccfbf1)",
+      bg: "#f0fdfa",
       href: "/samples",
     },
     {
@@ -97,9 +98,10 @@ export default function DashboardPage() {
       permission: "samples.view",
       trend: "down",
       change: "Needs attention",
+      detail: "Awaiting processing",
       icon: Icons.clock,
       color: "#7c3aed",
-      bg: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
+      bg: "#f5f3ff",
       href: "/samples",
     },
     {
@@ -108,9 +110,10 @@ export default function DashboardPage() {
       permission: "reports.view",
       trend: "down",
       change: "Review",
+      detail: "Awaiting authorization",
       icon: Icons.report,
       color: "#ea580c",
-      bg: "linear-gradient(135deg, #fff7ed, #ffedd5)",
+      bg: "#fff7ed",
       href: "/reports",
     },
     {
@@ -119,9 +122,10 @@ export default function DashboardPage() {
       permission: "patients.view",
       trend: "up",
       change: "New",
+      detail: "Registered since midnight",
       icon: Icons.users,
       color: "#f43f5e",
-      bg: "linear-gradient(135deg, #fff1f2, #ffe4e6)",
+      bg: "#fff1f2",
       href: "/patients",
     },
   ];
@@ -136,11 +140,21 @@ export default function DashboardPage() {
     type: "register",
   }));
 
-  if (loading) return <div className="p-5">Loading dashboard data...</div>;
+  if (loading) {
+    return (
+      <div className="tenant-dashboard dashboard-loading" aria-label="Loading dashboard data">
+        <div className="dashboard-loading-header lims-skeleton" />
+        <div className="dashboard-loading-grid">
+          {[0, 1, 2, 3].map((item) => <div key={item} className="lims-skeleton" />)}
+        </div>
+        <div className="dashboard-loading-body lims-skeleton" />
+      </div>
+    );
+  }
 
   if (error) {
     return (
-      <div className="dash-card">
+      <div className="dash-card dashboard-error-state">
         <div className="dash-card-header">
           <h3>{Icons.alertCircle} Dashboard unavailable</h3>
         </div>
@@ -150,164 +164,166 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
-      <div className="dash-welcome">
-        <div className="dash-welcome-text">
+    <div className="tenant-dashboard">
+      <header className="dashboard-page-header">
+        <div className="dashboard-heading">
+          <span className="dashboard-eyebrow">Laboratory overview</span>
           <h1>
             {getGreeting()},{" "}
-            <span className="dash-welcome-name">{(user?.email || "Admin").split("@")[0]}</span>
+            <span>{(user?.email || "Admin").split("@")[0]}</span>
           </h1>
-          <p className="dash-welcome-date">
-            {Icons.calendar} {today}
-          </p>
+          <p>Review today&apos;s workload, pending actions and latest registrations.</p>
+          <span className="dashboard-current-date">{Icons.calendar} {today}</span>
         </div>
-        <div className="dash-welcome-actions">
-          {canRegisterPatients && (
-            <button className="dash-btn-primary" onClick={() => router.push("/patients/register")}>
-              {Icons.plus} Register Patient
-            </button>
-          )}
-        </div>
-      </div>
+        {canRegisterPatients && (
+          <button className="dash-btn-primary dashboard-register-button" onClick={() => router.push("/patients/register")}>
+            {Icons.plus} Register Patient
+          </button>
+        )}
+      </header>
 
-      <div className="dash-stats-grid">
-        {visibleStatCards.map((stat) => (
-          <Link key={stat.label} href={stat.href} className="dash-stat-card">
-            <div className="dash-stat-header">
-              <div className="dash-stat-icon" style={{ background: stat.bg, color: stat.color }}>
-                {stat.icon}
-              </div>
-              <span className={`dash-stat-change ${stat.trend}`}>
-                {stat.trend === "up" ? Icons.trendUp : Icons.trendDown}
-                {stat.change}
-              </span>
-            </div>
-            <div className="dash-stat-value">{stat.value}</div>
-            <div className="dash-stat-label">{stat.label}</div>
-          </Link>
-        ))}
-      </div>
-
-      <div className="dash-content-grid">
-        {canViewPatients && (
-        <div className="dash-card dash-recent-patients" onClick={() => router.push("/patients")}>
-          <div className="dash-card-header">
-            <h3>{Icons.activity} Recent Patients</h3>
-            {canViewPatients && (
-              <button className="dash-card-action" onClick={() => router.push("/patients")}>
-                View All {Icons.chevronRight}
-              </button>
-            )}
+      <section className="dashboard-kpi-section" aria-label="Today's operational summary">
+        <div className="dashboard-section-heading">
+          <div>
+            <span>Today&apos;s operations</span>
+            <h2>Workload summary</h2>
           </div>
+          <small>Live tenant activity</small>
+        </div>
+        <div className="dashboard-kpi-grid">
+          {visibleStatCards.map((stat) => (
+            <Link key={stat.label} href={stat.href} className="dashboard-kpi-card">
+              <div className="dashboard-kpi-topline">
+                <span className="dashboard-kpi-icon" style={{ background: stat.bg, color: stat.color }}>
+                  {stat.icon}
+                </span>
+                <span className={`dashboard-kpi-status ${stat.trend}`}>{stat.change}</span>
+              </div>
+              <strong className="dashboard-kpi-value">{stat.value}</strong>
+              <span className="dashboard-kpi-label">{stat.label}</span>
+              <small>{stat.detail}</small>
+            </Link>
+          ))}
+        </div>
+      </section>
 
-          <div className="dash-patient-table">
-            <div className="dash-table-header">
-              <span className="dash-th" style={{ flex: 2 }}>
-                Patient
-              </span>
-              <span className="dash-th" style={{ flex: 1.2 }}>
-                Record ID
-              </span>
-              <span className="dash-th" style={{ flex: 1 }}>
-                Status
-              </span>
-              <span className="dash-th" style={{ flex: 0.8, textAlign: "right" }}>
-                Registered
-              </span>
-            </div>
-
-            {recentPatients.length === 0 ? (
-              <div className="dash-table-row">
-                <div className="dash-td" style={{ flex: 1 }}>
-                  No patients registered yet.
+      <div className="dashboard-workspace-grid">
+        {canViewPatients && (
+          <section className="dashboard-panel dashboard-patients-panel">
+            <div className="dashboard-panel-header">
+              <div>
+                <span className="dashboard-panel-icon">{Icons.activity}</span>
+                <div>
+                  <h2>Recent patients</h2>
+                  <p>Latest patient records created by your team.</p>
                 </div>
               </div>
-            ) : (
-              recentPatients.map((patient) => (
-                <div
-                  key={patient._id || patient.patientId}
-                  className="dash-table-row"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const id = patient._id || patient.patientId;
-                    if (id) router.push(`/patients/${id}/visits`);
-                  }}
-                >
-                  <div className="dash-td" style={{ flex: 2 }}>
-                    <div className="dash-patient-cell">
-                      <div className="dash-mini-avatar">{getInitials(patient.name)}</div>
-                      <div>
-                        <div className="dash-patient-name">{patient.name}</div>
-                        <div className="dash-patient-meta">
-                          {patient.age} Yrs - {patient.gender}
+              <button className="dashboard-text-action" onClick={() => router.push("/patients")}>
+                View all {Icons.chevronRight}
+              </button>
+            </div>
+
+            <div className="dashboard-patient-table">
+              <div className="dashboard-table-header">
+                <span style={{ flex: 2 }}>Patient</span>
+                <span style={{ flex: 1.2 }}>Record ID</span>
+                <span style={{ flex: 1 }}>Status</span>
+                <span style={{ flex: 0.8, textAlign: "right" }}>Registered</span>
+              </div>
+
+              {recentPatients.length === 0 ? (
+                <div className="dashboard-empty-state">
+                  <span>{Icons.users}</span>
+                  <strong>No patients registered yet</strong>
+                  <p>New registrations will appear here.</p>
+                </div>
+              ) : (
+                recentPatients.map((patient) => (
+                  <div
+                    key={patient._id || patient.patientId}
+                    className="dashboard-patient-row"
+                    onClick={() => {
+                      const id = patient._id || patient.patientId;
+                      if (id) router.push(`/patients/${id}/visits`);
+                    }}
+                  >
+                    <div style={{ flex: 2 }}>
+                      <div className="dash-patient-cell">
+                        <div className="dash-mini-avatar">{getInitials(patient.name)}</div>
+                        <div>
+                          <div className="dash-patient-name">{patient.name}</div>
+                          <div className="dash-patient-meta">{patient.age} Yrs · {patient.gender}</div>
                         </div>
                       </div>
                     </div>
+                    <div className="dashboard-record-id" style={{ flex: 1.2 }}>{patient.patientId}</div>
+                    <div style={{ flex: 1 }}>
+                      <span className="dash-status-badge">
+                        <span className="dash-status-dot" /> Active
+                      </span>
+                    </div>
+                    <div style={{ flex: 0.8, textAlign: "right" }}>
+                      <span className="dash-time">{getTimeAgo(patient.createdAt)}</span>
+                    </div>
                   </div>
-                  <div className="dash-td" style={{ flex: 1.2 }}>
-                    <span className="dash-test-name">{patient.patientId}</span>
-                  </div>
-                  <div className="dash-td" style={{ flex: 1 }}>
-                    <span className="dash-status-badge" style={{ background: "#ecfdf5", color: "#065f46" }}>
-                      <span className="dash-status-dot" style={{ background: "#10b981" }} />
-                      Active
-                    </span>
-                  </div>
-                  <div className="dash-td" style={{ flex: 0.8, textAlign: "right" }}>
-                    <span className="dash-time">{getTimeAgo(patient.createdAt)}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+                ))
+              )}
+            </div>
+          </section>
         )}
 
-        <div className="dash-card dash-activity-feed" onClick={() => router.push("/patients")}>
-          <div className="dash-card-header">
-            <h3>{Icons.clock} Activity Feed</h3>
+        <aside className="dashboard-panel dashboard-activity-panel">
+          <div className="dashboard-panel-header">
+            <div>
+              <span className="dashboard-panel-icon">{Icons.clock}</span>
+              <div>
+                <h2>Activity feed</h2>
+                <p>Latest tenant updates.</p>
+              </div>
+            </div>
+            <span className="dashboard-count-badge">{activityFeed.length}</span>
           </div>
 
-          <div className="dash-activity-list">
+          <div className="dashboard-queue-summary">
+            <div>
+              <span>Pending samples</span>
+              <strong>{hasPermission(user, "samples.view") ? stats?.pendingSamples || 0 : "—"}</strong>
+            </div>
+            <div>
+              <span>Reports to review</span>
+              <strong>{hasPermission(user, "reports.view") ? stats?.pendingReports || 0 : "—"}</strong>
+            </div>
+          </div>
+
+          <div className="dashboard-activity-list">
             {activityFeed.length === 0 ? (
-              <div className="dash-activity-item">
-                <div className="dash-activity-content">
-                  <div className="dash-activity-text">No recent activity yet.</div>
-                </div>
+              <div className="dashboard-empty-state compact">
+                <strong>No recent activity</strong>
+                <p>Updates will appear as work is completed.</p>
               </div>
             ) : (
               activityFeed.map((activity, index) => (
-                <div key={`${activity.text}-${activity.time}`} className="dash-activity-item">
-                  <div className="dash-activity-icon-wrap">
-                    <div className={`dash-activity-dot ${activity.type}`} />
-                    {index < activityFeed.length - 1 && <div className="dash-activity-line" />}
+                <div key={`${activity.text}-${activity.time}`} className="dashboard-activity-item">
+                  <div className="dashboard-activity-marker">
+                    <i />
+                    {index < activityFeed.length - 1 && <span />}
                   </div>
-                  <div className="dash-activity-content">
-                    <div className="dash-activity-text">{activity.text}</div>
-                    <div className="dash-activity-time">{activity.time}</div>
+                  <div>
+                    <strong>{activity.text}</strong>
+                    <span>{activity.time}</span>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="dash-quick-stats">
-            <div className="dash-quick-title">Quick Summary</div>
-            <div className="dash-quick-row">
-              <span className="dash-quick-label">Samples Today</span>
-              <span className="dash-quick-value">
-                {hasPermission(user, "samples.view") ? stats?.samplesToday || 0 : "Hidden"}
-              </span>
-            </div>
-            <div className="dash-quick-row">
-              <span className="dash-quick-label">Registrations Today</span>
-              <span className="dash-quick-value">
-                {canViewPatients ? stats?.todayPatients || 0 : "Hidden"}
-              </span>
-            </div>
-          </div>
-        </div>
+          {canViewPatients && (
+            <button className="dashboard-panel-footer" onClick={() => router.push("/patients")}>
+              Open patient directory {Icons.chevronRight}
+            </button>
+          )}
+        </aside>
       </div>
-    </>
+    </div>
   );
 }

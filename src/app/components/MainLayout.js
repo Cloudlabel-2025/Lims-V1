@@ -205,16 +205,18 @@ export default function MainLayout({ children }) {
             theme={theme}
           />
           <div className="dash-content">
-            {hasPageAccess ? (
-              children
-            ) : (
-              <section className="dash-card">
-                <div className="dash-card-header">
-                  <h3>Access denied</h3>
-                </div>
-                <p>Your role does not have permission to view this page.</p>
-              </section>
-            )}
+            <main className="tenant-page-viewport">
+              {hasPageAccess ? (
+                children
+              ) : (
+                <section className="dash-card tenant-access-denied">
+                  <div className="dash-card-header">
+                    <h3>Access denied</h3>
+                  </div>
+                  <p>Your role does not have permission to view this page.</p>
+                </section>
+              )}
+            </main>
           </div>
         </div>
       </div>
