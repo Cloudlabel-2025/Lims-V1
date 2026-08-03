@@ -87,7 +87,7 @@ export const LabSchema = new mongoose.Schema(
     },
     subscriptionPlan: {
       type: String,
-      enum: ["trial", "basic", "professional", "enterprise"],
+      enum: ["trial", "basic", "professional", "enterprise", "standard", "premium", "custom"],
       default: "trial",
     },
     enabledModules: {

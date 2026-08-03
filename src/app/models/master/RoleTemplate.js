@@ -72,10 +72,10 @@ export const RoleTemplateSchema = new mongoose.Schema(
       type: [
         {
           type: String,
-          enum: ["trial", "basic", "professional", "enterprise"],
+          enum: ["trial", "basic", "professional", "enterprise", "standard", "premium", "custom"],
         },
       ],
-      default: ["trial", "basic", "professional", "enterprise"],
+      default: ["trial", "basic", "professional", "enterprise", "standard", "premium", "custom"],
     },
     isDefaultAdmin: {
       type: Boolean,

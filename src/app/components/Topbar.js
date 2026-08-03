@@ -87,9 +87,7 @@ export default function Topbar({ onToggleSidebar, user, theme }) {
       if (resp.ok) {
         const next = data.notifications || [];
         const nextVersion = next.map((n) => n.id).join(",");
-        if (nextVersion !== notifVersion.current && notifVersion.current !== "") {
-          setHasUnread(true);
-        }
+        if (nextVersion !== notifVersion.current && next.length > 0) setHasUnread(true);
         notifVersion.current = nextVersion;
         setNotifications(next);
       }

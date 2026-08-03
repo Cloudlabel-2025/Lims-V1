@@ -7230,3 +7230,558 @@ input[type="number"] {
     border-top-color: #ccc;
   }
 }
+
+/* Subscription package catalog */
+.subscription-page {
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.subscription-page-header,
+.subscription-labs-heading,
+.subscription-card-header,
+.subscription-card-footer,
+.subscription-section-label,
+.subscription-drawer-header,
+.subscription-drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.subscription-page-header {
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+.subscription-page-header h2 {
+  margin: 0 0 4px;
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.subscription-page-header > div > p:last-child,
+.subscription-labs-heading p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.subscription-page-header > button,
+.subscription-empty-state button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 18px;
+  background: var(--primary);
+  color: #fff;
+  font: 800 13px var(--font-main);
+  cursor: pointer;
+}
+
+.subscription-feedback {
+  margin-bottom: 16px;
+}
+
+.subscription-notice {
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 13px 16px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.subscription-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-xs);
+}
+
+.subscription-summary-strip > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 18px;
+  border-right: 1px solid var(--border-light);
+}
+
+.subscription-summary-strip > div:last-child { border-right: 0; }
+.subscription-summary-strip span { color: var(--text-secondary); font-size: 12px; font-weight: 700; }
+.subscription-summary-strip strong { font-size: 20px; font-weight: 900; }
+
+.subscription-package-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.subscription-package-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.subscription-package-card:hover {
+  border-color: var(--primary-200);
+  box-shadow: var(--shadow-md);
+}
+
+.subscription-card-header { align-items: flex-start; }
+.subscription-package-identity { min-width: 0; }
+.subscription-badge-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.subscription-version-badge,
+.subscription-status-badge {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+.subscription-version-badge { background: #f1f5f9; color: #475569; }
+.subscription-status-badge { background: var(--primary-50); color: var(--primary-dark); text-transform: capitalize; }
+.subscription-package-identity h3 { margin: 0; font-size: 19px; font-weight: 900; letter-spacing: -0.02em; }
+.subscription-package-identity p { margin: 4px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+
+.subscription-icon-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 12px;
+  color: var(--primary-dark);
+  font: 800 12px var(--font-main);
+  cursor: pointer;
+}
+
+.subscription-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 18px 0;
+  border-block: 1px solid var(--border-light);
+}
+.subscription-price-grid > div { min-width: 0; padding: 14px 0; }
+.subscription-price-grid > div + div { border-left: 1px solid var(--border-light); padding-left: 18px; }
+.subscription-price-grid span,
+.subscription-limit-grid span,
+.subscription-section-label > span { display: block; color: var(--text-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.subscription-price-grid strong { display: block; margin-top: 4px; font-size: clamp(17px, 2vw, 22px); font-weight: 900; line-height: 1.2; overflow-wrap: anywhere; }
+.subscription-price-grid small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; line-height: 1.35; }
+.subscription-price-grid.pricing-missing > div:first-child strong,
+.subscription-price-grid.pricing-missing > div:first-child small { color: #b45309; }
+
+.subscription-limit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.subscription-limit-grid > div { min-width: 0; border-radius: 8px; background: #f8fafc; padding: 11px; }
+.subscription-limit-grid strong { display: block; margin-top: 3px; font-size: 15px; font-weight: 900; overflow-wrap: anywhere; }
+.subscription-limit-grid small { display: block; color: var(--text-muted); font-size: 9px; }
+
+.subscription-module-section { margin-top: 18px; }
+.subscription-section-label small { color: var(--text-muted); font-size: 11px; }
+.subscription-module-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.subscription-module-chips > span { border: 1px solid var(--border); border-radius: 6px; padding: 4px 7px; color: #475569; font-size: 10px; font-weight: 700; }
+
+.subscription-card-footer { margin-top: 18px; border-top: 1px solid var(--border-light); padding-top: 14px; }
+.subscription-card-footer div { color: var(--text-secondary); font-size: 12px; }
+.subscription-card-footer div strong { color: var(--text-primary); font-size: 13px; }
+.subscription-card-footer button { border: 0; background: transparent; color: var(--primary-dark); padding: 4px 0; font: 800 12px var(--font-main); cursor: pointer; }
+
+.subscription-labs-panel { margin-top: 22px; border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 20px; box-shadow: var(--shadow-xs); }
+.subscription-labs-heading { align-items: flex-start; margin-bottom: 14px; }
+.subscription-labs-heading h2 { margin: 0 0 3px; font-size: 18px; font-weight: 900; }
+.subscription-labs-heading > a { color: var(--primary-dark); font-size: 12px; font-weight: 800; }
+.subscription-lab-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.subscription-lab-list article { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; border: 1px solid var(--border-light); border-radius: 8px; background: #f8fafc; padding: 11px 12px; }
+.subscription-lab-list article div { min-width: 0; }
+.subscription-lab-list strong,
+.subscription-lab-list span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subscription-lab-list strong { font-size: 12px; }
+.subscription-lab-list span { color: var(--text-muted); font-size: 10px; text-transform: capitalize; }
+.subscription-lab-list a { flex: 0 0 auto; color: var(--primary-dark); font-size: 11px; font-weight: 800; }
+
+.subscription-drawer-backdrop { position: fixed; inset: 0; z-index: 70; border: 0; background: rgba(15, 23, 42, .42); cursor: default; }
+.subscription-drawer { position: fixed; inset: 0 0 0 auto; z-index: 71; width: min(560px, 100%); display: flex; flex-direction: column; background: #fff; box-shadow: -18px 0 50px rgba(15, 23, 42, .18); }
+.subscription-drawer-header { flex: 0 0 auto; border-bottom: 1px solid var(--border); padding: 18px 22px; }
+.subscription-drawer-header span { color: var(--primary-dark); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.subscription-drawer-header h2 { margin: 2px 0 0; font-size: 20px; font-weight: 900; }
+.subscription-drawer-header button { border: 1px solid var(--border); border-radius: 8px; background: #fff; min-height: 34px; padding: 0 10px; color: var(--text-secondary); font: 700 11px var(--font-main); cursor: pointer; }
+.subscription-drawer-form { flex: 1; overflow-y: auto; padding: 22px; background: #f8fafc; }
+.subscription-form-section { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 17px; }
+.subscription-form-heading { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 15px; }
+.subscription-form-heading > span { width: 24px; height: 24px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 7px; background: var(--primary-50); color: var(--primary-dark); font-size: 11px; font-weight: 900; }
+.subscription-form-heading h3 { margin: 0; font-size: 13px; font-weight: 900; }
+.subscription-form-heading p { margin: 2px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.4; }
+.subscription-form-grid,
+.subscription-pricing-fields,
+.subscription-quota-fields { display: grid; gap: 12px; }
+.subscription-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.subscription-pricing-fields { grid-template-columns: 100px repeat(2, minmax(0, 1fr)); }
+.subscription-quota-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.subscription-form-grid label,
+.subscription-pricing-fields label,
+.subscription-quota-fields label { display: flex; min-width: 0; flex-direction: column; gap: 5px; color: var(--text-secondary); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.subscription-form-grid em,
+.subscription-pricing-fields em { color: #dc2626; font-style: normal; }
+.subscription-form-grid small,
+.subscription-pricing-fields small,
+.subscription-quota-fields small { color: var(--text-muted); font-size: 9px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.subscription-form-grid input,
+.subscription-form-grid textarea,
+.subscription-pricing-fields input,
+.subscription-pricing-fields select,
+.subscription-quota-fields input { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text-primary); font: 600 13px var(--font-main); outline: 0; }
+.subscription-form-grid input,
+.subscription-pricing-fields input,
+.subscription-pricing-fields select,
+.subscription-quota-fields input { height: 42px; padding: 0 11px; }
+.subscription-form-grid textarea { min-height: 72px; resize: vertical; padding: 10px 11px; }
+.subscription-form-grid input:focus,
+.subscription-form-grid textarea:focus,
+.subscription-pricing-fields input:focus,
+.subscription-pricing-fields select:focus,
+.subscription-quota-fields input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent); }
+.subscription-field-wide { grid-column: 1 / -1; }
+.subscription-module-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.subscription-module-picker label { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: #475569; font-size: 11px; font-weight: 700; cursor: pointer; }
+.subscription-module-picker label:has(input:checked) { border-color: var(--primary-200); background: var(--primary-50); color: var(--primary-dark); }
+.subscription-module-picker label.locked { opacity: .65; cursor: not-allowed; }
+.subscription-module-picker input { accent-color: var(--primary); }
+.subscription-drawer-footer { flex: 0 0 auto; border-top: 1px solid var(--border); background: #fff; padding: 14px 18px; }
+.subscription-drawer-footer button { flex: 1; min-height: 42px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text-secondary); font: 800 12px var(--font-main); cursor: pointer; }
+.subscription-drawer-footer button:last-child { border-color: var(--primary); background: var(--primary); color: #fff; }
+.subscription-drawer-footer button:disabled { opacity: .6; cursor: wait; }
+.subscription-empty-state,
+.subscription-loading { border: 1px dashed var(--border); border-radius: 12px; background: #fff; padding: 40px 20px; text-align: center; }
+.subscription-empty-state h3 { margin: 0; font-size: 17px; }
+.subscription-empty-state p { margin: 4px 0 16px; color: var(--text-secondary); font-size: 13px; }
+
+@media (max-width: 1100px) {
+  .subscription-package-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .subscription-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .subscription-summary-strip > div:nth-child(2) { border-right: 0; }
+  .subscription-summary-strip > div:nth-child(-n + 2) { border-bottom: 1px solid var(--border-light); }
+  .subscription-lab-list { grid-template-columns: 1fr; }
+  .subscription-pricing-fields { grid-template-columns: 1fr 1fr; }
+  .subscription-pricing-fields label:first-child { grid-column: 1 / -1; }
+  .subscription-quota-fields { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .subscription-page-header,
+  .subscription-labs-heading { align-items: stretch; flex-direction: column; }
+  .subscription-page-header > button { width: 100%; }
+  .subscription-summary-strip { grid-template-columns: 1fr 1fr; }
+  .subscription-summary-strip > div { padding: 12px; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .subscription-price-grid,
+  .subscription-limit-grid { grid-template-columns: 1fr; }
+  .subscription-price-grid > div + div { border-top: 1px solid var(--border-light); border-left: 0; padding-left: 0; }
+  .subscription-limit-grid { gap: 6px; }
+  .subscription-limit-grid > div { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 10px; }
+  .subscription-limit-grid > div small { grid-column: 1; }
+  .subscription-limit-grid > div strong { grid-column: 2; grid-row: 1 / span 2; }
+  .subscription-card-footer { align-items: stretch; flex-direction: column; }
+  .subscription-card-footer button { width: 100%; min-height: 36px; border: 1px solid var(--border); border-radius: 8px; }
+  .subscription-drawer { width: 100%; }
+  .subscription-drawer-form { padding: 12px; }
+  .subscription-form-section { padding: 14px; }
+  .subscription-form-grid,
+  .subscription-pricing-fields { grid-template-columns: 1fr; }
+  .subscription-pricing-fields label:first-child { grid-column: auto; }
+  .subscription-module-picker { grid-template-columns: 1fr 1fr; }
+}
+/* Tenant subscription and usage */
+.tenant-subscription-page { display: grid; gap: 22px; }
+.tenant-subscription-heading { align-items: flex-start; }
+.tenant-subscription-heading-actions { display: flex; align-items: center; gap: 10px; }
+.tenant-upgrade-button { min-height: 38px; padding: 8px 14px; border: 0; border-radius: 9px; color: #fff; background: #0d9488; font-size: 13px; font-weight: 800; cursor: pointer; }
+.tenant-upgrade-button:hover { background: #0f766e; }
+.tenant-upgrade-button:disabled { color: #64748b; background: #e2e8f0; cursor: not-allowed; }
+.tenant-subscription-status { display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: capitalize; color: #047857; background: #d1fae5; }
+.tenant-subscription-status.status-past_due,
+.tenant-subscription-status.status-grace_period { color: #92400e; background: #fef3c7; }
+.tenant-subscription-status.status-paused,
+.tenant-subscription-status.status-expired,
+.tenant-subscription-status.status-cancelled { color: #b91c1c; background: #fee2e2; }
+.tenant-plan-summary { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.2fr) minmax(260px, 1.2fr); gap: 24px; align-items: center; padding: 26px; }
+.tenant-subscription-eyebrow { display: block; color: var(--text-muted); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.tenant-plan-summary h2 { margin: 5px 0 2px; font-size: 28px; }
+.tenant-plan-summary p { margin: 0; color: var(--text-muted); }
+.tenant-plan-pricing { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tenant-plan-pricing div,
+.tenant-period-box { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-subtle, #f8fafc); }
+.tenant-plan-pricing span,
+.tenant-period-box span { display: block; color: var(--text-muted); font-size: 12px; margin-bottom: 5px; }
+.tenant-plan-pricing strong { font-size: 17px; }
+.tenant-period-box strong { display: block; font-size: 14px; }
+.tenant-period-box small { display: block; color: var(--text-muted); margin-top: 5px; }
+.tenant-subscription-section-heading { display: flex; align-items: center; justify-content: space-between; }
+.tenant-subscription-section-heading h2 { margin: 0; font-size: 19px; }
+.tenant-subscription-section-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
+.tenant-usage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.tenant-usage-card { padding: 20px; border-top: 3px solid #0d9488; }
+.tenant-usage-card.attention { border-top-color: #d97706; }
+.tenant-usage-card.warning { border-top-color: #ea580c; }
+.tenant-usage-card.critical { border-top-color: #dc2626; }
+.tenant-usage-card-top,
+.tenant-usage-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tenant-usage-card-top span { color: var(--text-muted); font-size: 13px; font-weight: 700; }
+.tenant-usage-card-top strong { font-size: 20px; }
+.tenant-usage-track { height: 8px; margin: 18px 0 10px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.tenant-usage-track span { display: block; height: 100%; border-radius: inherit; background: #0d9488; }
+.tenant-usage-card.attention .tenant-usage-track span { background: #d97706; }
+.tenant-usage-card.warning .tenant-usage-track span { background: #ea580c; }
+.tenant-usage-card.critical .tenant-usage-track span { background: #dc2626; }
+.tenant-usage-card-bottom { color: var(--text-muted); font-size: 12px; }
+.tenant-usage-card p { margin: 12px 0 0; color: #b91c1c; font-size: 12px; line-height: 1.45; }
+.tenant-included-modules { padding: 22px; }
+.tenant-module-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.tenant-module-chips span { padding: 7px 11px; border: 1px solid #99f6e4; border-radius: 999px; color: #0f766e; background: #f0fdfa; font-size: 12px; font-weight: 700; }
+.tenant-subscription-help { display: grid; gap: 4px; padding: 16px 18px; border: 1px solid #bae6fd; border-radius: 12px; color: #0c4a6e; background: #f0f9ff; }
+.tenant-subscription-help span { font-size: 13px; line-height: 1.5; }
+.tenant-upgrade-pending { display: grid; gap: 3px; padding: 14px 16px; border: 1px solid #fde68a; border-radius: 12px; color: #854d0e; background: #fffbeb; }
+.tenant-upgrade-pending span { font-size: 13px; }
+.tenant-upgrade-modal { position: fixed; z-index: 1200; inset: 0; display: grid; place-items: center; padding: 24px; }
+.tenant-upgrade-backdrop { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(15, 23, 42, .58); backdrop-filter: blur(3px); cursor: default; }
+.tenant-upgrade-dialog { position: relative; width: min(1040px, 100%); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid #dbe4ee; border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .22); }
+.tenant-upgrade-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 26px 18px; border-bottom: 1px solid #e2e8f0; }
+.tenant-upgrade-dialog-header h2 { margin: 5px 0 4px; font-size: 23px; }
+.tenant-upgrade-dialog-header p { margin: 0; color: #64748b; font-size: 13px; }
+.tenant-upgrade-close { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; border: 1px solid #e2e8f0; border-radius: 9px; color: #475569; background: #fff; font-size: 22px; cursor: pointer; }
+.tenant-upgrade-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 22px 26px; }
+.tenant-upgrade-empty { grid-column: 1 / -1; padding: 28px; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; }
+.tenant-upgrade-plan { display: flex; min-width: 0; flex-direction: column; gap: 13px; padding: 18px; text-align: left; color: #0f172a; border: 1px solid #dbe4ee; border-radius: 14px; background: #fff; cursor: pointer; }
+.tenant-upgrade-plan:hover:not(:disabled) { border-color: #5eead4; box-shadow: 0 8px 22px rgba(15, 118, 110, .08); }
+.tenant-upgrade-plan.selected { border: 2px solid #0d9488; padding: 17px; background: #f0fdfa; box-shadow: 0 0 0 3px rgba(13, 148, 136, .1); }
+.tenant-upgrade-plan.current { background: #f8fafc; cursor: default; }
+.tenant-upgrade-plan-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.tenant-upgrade-plan-heading > span { display: grid; gap: 3px; }
+.tenant-upgrade-plan-heading strong { font-size: 18px; }
+.tenant-upgrade-plan-heading small { color: #64748b; font-size: 11px; font-weight: 700; }
+.tenant-upgrade-plan-heading em { padding: 4px 7px; border-radius: 999px; color: #0f766e; background: #ccfbf1; font-size: 10px; font-style: normal; font-weight: 800; text-transform: uppercase; }
+.tenant-upgrade-plan-heading em.unavailable { color: #64748b; background: #e2e8f0; }
+.tenant-upgrade-plan-prices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tenant-upgrade-plan-prices > span { display: grid; min-width: 0; gap: 2px; padding: 10px; border: 1px solid #dbe4ee; border-radius: 10px; background: #f8fafc; }
+.tenant-upgrade-plan-prices small { color: #64748b; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.tenant-upgrade-plan-prices strong { color: #0f766e; font-size: clamp(15px, 1.35vw, 19px); font-weight: 850; line-height: 1.25; overflow-wrap: anywhere; }
+.tenant-upgrade-plan-prices em { color: #64748b; font-size: 9px; font-style: normal; font-weight: 600; }
+.tenant-upgrade-plan-description { min-height: 38px; color: #64748b; font-size: 12px; line-height: 1.5; }
+.tenant-upgrade-plan-quotas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tenant-upgrade-plan-quotas > span { display: grid; gap: 3px; padding: 8px; border-radius: 8px; background: #f8fafc; }
+.tenant-upgrade-plan-quotas small { color: #64748b; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.tenant-upgrade-plan-quotas strong { font-size: 12px; }
+.tenant-upgrade-plan-modules { color: #475569; font-size: 11px; font-weight: 700; }
+.tenant-upgrade-dialog-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 26px 22px; border-top: 1px solid #e2e8f0; }
+.tenant-upgrade-error { margin: 0 26px 16px; }
+.tenant-upgrade-cancel,
+.tenant-upgrade-submit { min-height: 40px; padding: 9px 16px; border-radius: 9px; font-size: 13px; font-weight: 800; cursor: pointer; }
+.tenant-upgrade-cancel { color: #475569; border: 1px solid #cbd5e1; background: #fff; }
+.tenant-upgrade-submit { color: #fff; border: 1px solid #0d9488; background: #0d9488; }
+.tenant-upgrade-submit:disabled { border-color: #cbd5e1; color: #94a3b8; background: #e2e8f0; cursor: not-allowed; }
+.subscription-tenant-state { padding: 24px; }
+.developer-assignment-package-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.subscription-upgrade-requests { padding: 20px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
+.subscription-upgrade-request-list { display: grid; gap: 10px; margin-top: 16px; }
+.subscription-upgrade-request-list article { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 11px; }
+.subscription-upgrade-request-list article > div:first-child { display: grid; gap: 3px; }
+.subscription-upgrade-request-list span,
+.subscription-upgrade-request-list small { color: #64748b; font-size: 12px; }
+.subscription-upgrade-request-actions { display: flex; gap: 8px; }
+.subscription-upgrade-request-actions button { min-height: 36px; padding: 7px 13px; border: 1px solid #0d9488; border-radius: 8px; color: #fff; background: #0d9488; font-size: 12px; font-weight: 800; cursor: pointer; }
+.subscription-upgrade-request-actions button.reject { color: #b91c1c; border-color: #fecaca; background: #fff; }
+.subscription-upgrade-request-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.developer-assignment-package { display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 18px; text-align: left; color: var(--text, #0f172a); border: 1px solid var(--border, #dbe4ee); border-radius: 14px; background: #fff; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.developer-assignment-package:hover { border-color: #5eead4; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(15, 118, 110, .08); }
+.developer-assignment-package.selected { border: 2px solid #0d9488; padding: 17px; background: #f0fdfa; box-shadow: 0 0 0 3px rgba(13, 148, 136, .1); }
+.developer-assignment-package-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.developer-assignment-package-top strong { font-size: 18px; }
+.developer-assignment-package-top small { flex: 0 0 auto; padding: 4px 7px; color: #475569; border-radius: 999px; background: #e2e8f0; font-weight: 700; }
+.developer-assignment-price { color: #0f766e; font-size: 22px; font-weight: 850; }
+.developer-assignment-price small { color: #64748b; font-size: 12px; font-weight: 600; }
+.developer-assignment-description { min-height: 38px; color: #64748b; font-size: 13px; line-height: 1.45; }
+.developer-assignment-limits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.developer-assignment-limits small { display: grid; gap: 3px; padding: 8px; color: #64748b; border-radius: 8px; background: #f8fafc; font-size: 10px; text-transform: uppercase; }
+.developer-assignment-limits strong { color: #0f172a; font-size: 12px; text-transform: none; }
+.developer-assignment-modules { color: #475569; font-size: 11px; line-height: 1.5; }
+@media (max-width: 1100px) { .developer-assignment-package-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .developer-assignment-package-grid { grid-template-columns: 1fr; } }
+@media (max-width: 650px) {
+  .subscription-upgrade-request-list article { align-items: stretch; flex-direction: column; }
+  .subscription-upgrade-request-actions button { flex: 1; }
+}
+@media (max-width: 1050px) {
+  .tenant-plan-summary { grid-template-columns: 1fr 1.5fr; }
+  .tenant-period-box { grid-column: 1 / -1; }
+  .tenant-usage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .tenant-plan-summary,
+  .tenant-usage-grid { grid-template-columns: 1fr; }
+  .tenant-period-box { grid-column: auto; }
+  .tenant-plan-pricing { grid-template-columns: 1fr; }
+  .tenant-subscription-heading { gap: 12px; }
+  .tenant-subscription-heading-actions { width: 100%; justify-content: space-between; }
+  .tenant-upgrade-modal { align-items: end; padding: 0; }
+  .tenant-upgrade-dialog { width: 100%; max-height: 92vh; border-radius: 18px 18px 0 0; }
+  .tenant-upgrade-plan-grid { grid-template-columns: 1fr; padding: 18px; }
+  .tenant-upgrade-plan-prices strong { font-size: 17px; }
+  .tenant-upgrade-dialog-header { padding: 20px 18px 16px; }
+  .tenant-upgrade-dialog-footer { position: sticky; bottom: 0; padding: 14px 18px; background: #fff; }
+  .tenant-upgrade-cancel,
+  .tenant-upgrade-submit { flex: 1; }
+}
+
+/* Corporate tenant subscription portal */
+.tenant-subscription-page { width: min(1280px, 100%); margin: 0 auto; gap: 20px; }
+.tenant-account-hero { margin: -28px -28px 0; border-bottom: 1px solid #dbe4ee; background: #fff; }
+.tenant-account-hero-inner { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; width: min(1280px, calc(100% - 56px)); margin: 0 auto; padding: 30px 0; }
+.tenant-account-identity { min-width: 0; }
+.tenant-account-title-row { display: flex; align-items: center; gap: 12px; margin-top: 5px; }
+.tenant-account-title-row h1 { margin: 0; color: #0f172a; font-size: clamp(26px, 3vw, 34px); font-weight: 850; letter-spacing: -.035em; }
+.tenant-plan-version { padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; color: #475569; background: #f8fafc; font-size: 10px; font-weight: 800; }
+.tenant-account-facts { display: flex; align-items: stretch; gap: 0; margin-top: 20px; }
+.tenant-account-facts > div { display: grid; gap: 4px; min-width: 142px; padding: 0 24px; border-right: 1px solid #e2e8f0; }
+.tenant-account-facts > div:first-child { padding-left: 0; }
+.tenant-account-facts > div:last-child { border-right: 0; }
+.tenant-account-facts small,
+.tenant-account-actions > span { color: #94a3b8; font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.tenant-account-facts strong { color: #0f172a; font-size: 14px; font-weight: 800; }
+.tenant-service-state { display: flex; align-items: center; gap: 7px; text-transform: capitalize; }
+.tenant-service-state i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.tenant-service-state.status-active,
+.tenant-service-state.status-trialing { color: #047857; background: transparent; }
+.tenant-service-state.status-grace_period { color: #b45309; }
+.tenant-service-state.status-suspended,
+.tenant-service-state.status-cancelled { color: #b91c1c; }
+.tenant-account-actions { display: grid; justify-items: end; min-width: 280px; }
+.tenant-account-actions .tenant-upgrade-button { min-width: 210px; margin-bottom: 14px; }
+.tenant-account-actions > strong { margin-top: 4px; color: #334155; font-size: 12px; }
+.tenant-account-actions > small { margin-top: 3px; color: #94a3b8; font-size: 10px; }
+.tenant-upgrade-button { min-height: 42px; padding: 10px 18px; border: 1px solid #0d9488; border-radius: 8px; color: #fff; background: #0d9488; box-shadow: 0 1px 2px rgba(15, 23, 42, .08); font-size: 12px; font-weight: 800; cursor: pointer; }
+.tenant-upgrade-button:hover:not(:disabled) { border-color: #0f766e; background: #0f766e; }
+.tenant-upgrade-button:disabled { border-color: #cbd5e1; color: #64748b; background: #e2e8f0; box-shadow: none; cursor: not-allowed; }
+.tenant-corporate-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, .85fr); gap: 20px; align-items: start; }
+.tenant-capacity-panel,
+.tenant-entitlements-panel { overflow: hidden; border-radius: 10px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.tenant-corporate-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 22px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.tenant-corporate-panel-header h2 { margin: 0; color: #0f172a; font-size: 15px; font-weight: 850; }
+.tenant-corporate-panel-header p { margin: 4px 0 0; color: #64748b; font-size: 11px; }
+.tenant-corporate-panel-header > span { flex: 0 0 auto; padding: 5px 8px; border: 1px solid #dbe4ee; border-radius: 6px; color: #64748b; background: #fff; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.tenant-capacity-list { display: grid; }
+.tenant-capacity-row { display: grid; grid-template-columns: minmax(190px, .8fr) minmax(280px, 1.2fr); gap: 32px; align-items: center; min-height: 126px; padding: 22px; border-bottom: 1px solid #e2e8f0; }
+.tenant-capacity-row:last-child { border-bottom: 0; }
+.tenant-capacity-row.warning,
+.tenant-capacity-row.critical { background: #fffaf5; }
+.tenant-capacity-label { display: grid; gap: 5px; }
+.tenant-capacity-label strong { color: #0f172a; font-size: 13px; font-weight: 800; }
+.tenant-capacity-label span { color: #64748b; font-size: 11px; line-height: 1.45; }
+.tenant-capacity-metric { display: grid; gap: 8px; }
+.tenant-capacity-values,
+.tenant-capacity-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tenant-capacity-values strong { color: #0f172a; font-size: 12px; }
+.tenant-capacity-values strong span { color: #64748b; font-weight: 650; }
+.tenant-capacity-values > span { color: #64748b; font-size: 11px; font-weight: 800; }
+.tenant-capacity-foot { color: #64748b; font-size: 10px; }
+.tenant-capacity-foot span:last-child { color: #047857; font-weight: 800; }
+.tenant-capacity-row.attention .tenant-capacity-foot span:last-child,
+.tenant-capacity-row.warning .tenant-capacity-foot span:last-child { color: #b45309; }
+.tenant-capacity-row.critical .tenant-capacity-foot span:last-child { color: #b91c1c; }
+.tenant-usage-track { height: 6px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.tenant-usage-track span { display: block; height: 100%; border-radius: inherit; background: #0d9488; }
+.tenant-capacity-row.attention .tenant-usage-track span,
+.tenant-capacity-row.warning .tenant-usage-track span { background: #d97706; }
+.tenant-capacity-row.critical .tenant-usage-track span { background: #dc2626; }
+.tenant-capacity-unlimited { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+.tenant-capacity-unlimited strong { color: #334155; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.tenant-capacity-unlimited span { color: #64748b; font-size: 11px; }
+.tenant-account-sidebar { display: grid; gap: 16px; }
+.tenant-entitlements-panel header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.tenant-entitlements-panel header span { color: #0f172a; font-size: 13px; font-weight: 850; }
+.tenant-entitlements-panel header strong { color: #64748b; font-size: 10px; }
+.tenant-entitlement-list { display: grid; gap: 8px; max-height: 330px; overflow: auto; padding: 14px; }
+.tenant-entitlement-list > div { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 1px solid #edf2f7; border-radius: 8px; background: #f8fafc; }
+.tenant-entitlement-list i,
+.tenant-upgrade-plan-modules i { display: grid; flex: 0 0 auto; width: 18px; height: 18px; place-items: center; border-radius: 50%; color: #0f766e; background: #ccfbf1; font-size: 10px; font-style: normal; font-weight: 900; }
+.tenant-entitlement-list span { color: #475569; font-size: 11px; font-weight: 700; }
+.tenant-account-support { padding: 20px; border: 1px solid #bae6fd; border-radius: 10px; background: #f0f9ff; }
+.tenant-account-support > span { color: #0369a1; font-size: 9px; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+.tenant-account-support h2 { margin: 6px 0; color: #0c4a6e; font-size: 14px; }
+.tenant-account-support p { margin: 0; color: #075985; font-size: 11px; line-height: 1.55; }
+.tenant-account-support button { width: 100%; min-height: 38px; margin-top: 14px; border: 1px solid #075985; border-radius: 7px; color: #fff; background: #075985; font-size: 11px; font-weight: 800; cursor: pointer; }
+.tenant-account-support button:disabled { opacity: .55; cursor: not-allowed; }
+.tenant-upgrade-pending { border-radius: 8px; box-shadow: none; }
+
+/* Corporate package comparison workspace */
+.tenant-upgrade-dialog { width: min(1100px, 100%); border-radius: 14px; }
+.tenant-upgrade-dialog-header { padding: 24px 26px 20px; }
+.tenant-upgrade-dialog-header h2 { margin: 4px 0; font-size: 22px; letter-spacing: -.02em; }
+.tenant-upgrade-plan-grid { gap: 16px; padding: 24px 26px 18px; }
+.tenant-upgrade-plan { gap: 14px; min-height: 350px; padding: 20px; border-radius: 10px; box-shadow: none; }
+.tenant-upgrade-plan:disabled { opacity: 1; }
+.tenant-upgrade-plan.current { border-style: dashed; color: #475569; background: #f8fafc; }
+.tenant-upgrade-plan.selected { padding: 19px; border-width: 2px; background: #f0fdfa; box-shadow: 0 0 0 3px rgba(13, 148, 136, .08); }
+.tenant-upgrade-plan-heading { min-height: 42px; }
+.tenant-upgrade-plan-heading strong { font-size: 17px; }
+.tenant-upgrade-plan-heading em.selected { color: #fff; background: #0d9488; }
+.tenant-upgrade-plan-prices { gap: 0; border: 1px solid #dbe4ee; border-radius: 8px; background: #f8fafc; }
+.tenant-upgrade-plan-prices > span { gap: 3px; padding: 12px; border: 0; border-right: 1px solid #dbe4ee; border-radius: 0; background: transparent; }
+.tenant-upgrade-plan-prices > span:last-child { border-right: 0; }
+.tenant-upgrade-plan-prices strong { font-size: clamp(14px, 1.25vw, 18px); }
+.tenant-upgrade-plan-description { min-height: 52px; line-height: 1.55; }
+.tenant-upgrade-plan-quotas { border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+.tenant-upgrade-plan-quotas > span { padding: 10px 6px; border-radius: 0; background: transparent; }
+.tenant-upgrade-plan-modules { display: flex; align-items: center; gap: 7px; margin-top: auto; }
+.tenant-upgrade-approval-note { display: flex; align-items: center; gap: 14px; margin: 0 26px 18px; padding: 13px 15px; border: 1px solid #dbe4ee; border-radius: 8px; background: #f8fafc; }
+.tenant-upgrade-approval-note strong { flex: 0 0 auto; color: #334155; font-size: 11px; }
+.tenant-upgrade-approval-note span { color: #64748b; font-size: 10px; }
+.tenant-upgrade-dialog-footer { align-items: center; padding: 16px 26px; }
+.tenant-upgrade-selection-summary { display: grid; gap: 2px; margin-right: auto; }
+.tenant-upgrade-selection-summary span { color: #94a3b8; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.tenant-upgrade-selection-summary strong { color: #334155; font-size: 12px; }
+
+@media (max-width: 1050px) {
+  .tenant-account-hero-inner { align-items: stretch; }
+  .tenant-corporate-layout { grid-template-columns: 1fr; }
+  .tenant-account-sidebar { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 760px) {
+  .tenant-account-hero { margin: -16px -16px 0; }
+  .tenant-account-hero-inner { width: calc(100% - 32px); flex-direction: column; gap: 24px; padding: 24px 0; }
+  .tenant-account-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .tenant-account-facts > div { min-width: 0; padding: 0; border: 0; }
+  .tenant-account-facts > div:first-child { grid-column: 1 / -1; }
+  .tenant-account-actions { justify-items: stretch; min-width: 0; }
+  .tenant-account-actions .tenant-upgrade-button { width: 100%; margin-bottom: 10px; }
+  .tenant-account-sidebar { grid-template-columns: 1fr; }
+  .tenant-capacity-row { grid-template-columns: 1fr; gap: 16px; min-height: 0; padding: 18px; }
+  .tenant-upgrade-approval-note { align-items: flex-start; flex-direction: column; margin: 0 18px 14px; }
+  .tenant-upgrade-dialog-footer { flex-wrap: wrap; }
+  .tenant-upgrade-selection-summary { flex: 1 0 100%; }
+}
+
+@media (max-width: 520px) {
+  .tenant-account-title-row { align-items: flex-start; flex-direction: column; }
+  .tenant-account-facts { grid-template-columns: 1fr; }
+  .tenant-account-facts > div:first-child { grid-column: auto; }
+  .tenant-capacity-unlimited { align-items: flex-start; flex-direction: column; }
+  .tenant-corporate-panel-header { align-items: flex-start; flex-direction: column; }
+  .tenant-upgrade-plan-prices { grid-template-columns: 1fr; }
+  .tenant-upgrade-plan-prices > span { border-right: 0; border-bottom: 1px solid #dbe4ee; }
+  .tenant-upgrade-plan-prices > span:last-child { border-bottom: 0; }
+}

@@ -30,6 +30,10 @@ import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { buildTenantUrl } from "@/app/lib/subdomain";
 import rbacConfig from "@/app/lib/rbac-config.json";
+import { assignLabSubscription, getSubscriptionPackageDefinition } from "@/app/lib/subscription-service";
+import { getQuotaPeriodModel } from "@/app/models/tenant/QuotaPeriod";
+import { getQuotaUsageEventModel } from "@/app/models/tenant/QuotaUsageEvent";
+import { getLabSubscriptionModel } from "@/app/models/master/LabSubscription";
 
 export const maxDuration = 60;
 
@@ -42,6 +46,11 @@ const connectionOptions = {
 
 function cleanString(value) {
   return String(value || "").trim();
+}
+
+function legacyPlanForPackage(pkg) {
+  const normalized = String(pkg?.name || "").trim().toLowerCase();
+  return ["basic", "standard", "premium"].includes(normalized) ? normalized : "custom";
 }
 
 function isContactEmail(value) {
@@ -149,6 +158,8 @@ async function initializeTenantCollections(tenantConnection) {
     getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
     getSampleModel(tenantConnection).init(),
+    getQuotaPeriodModel(tenantConnection).init(),
+    getQuotaUsageEventModel(tenantConnection).init(),
   ]);
 }
 
@@ -230,7 +241,7 @@ export async function GET(req) {
 
     const masterConnection = await connectMasterDB();
     const Lab = getLabModel(masterConnection);
-    const labs = await Lab.find({})
+    const [labs, subscriptions] = await Promise.all([Lab.find({})
       .sort({ createdAt: -1 })
       .select({
         labId: 1,
@@ -245,7 +256,8 @@ export async function GET(req) {
         branding: 1,
         enabledModules: 1,
         createdAt: 1,
-      });
+      }), getLabSubscriptionModel(masterConnection).find({}).select("tenantId packageName packageReleaseVersion status").lean()]);
+    const subscriptionByTenant = new Map(subscriptions.map((item) => [item.tenantId, item]));
 
     return NextResponse.json({
       labs: labs.map((lab) => ({
@@ -256,6 +268,9 @@ export async function GET(req) {
         dbName: lab.dbName,
         status: lab.status,
         subscriptionPlan: lab.subscriptionPlan,
+        subscriptionPackageName: subscriptionByTenant.get(lab.tenantId)?.packageName || lab.subscriptionPlan,
+        subscriptionReleaseVersion: subscriptionByTenant.get(lab.tenantId)?.packageReleaseVersion || "",
+        subscriptionStatus: subscriptionByTenant.get(lab.tenantId)?.status || "",
         contactEmail: lab.contactEmail,
         contactPhone: lab.contactPhone,
         adminEmail: lab.adminAccess?.email || "",
@@ -300,7 +315,7 @@ export async function POST(req) {
     const adminEmail = cleanString(body.adminEmail).toLowerCase();
     const adminPassword = String(body.adminPassword || "");
     const adminPasswordConfirm = String(body.adminPasswordConfirm || body.adminConfirmPassword || "");
-    const enabledModules = normalizeEnabledModules(body.enabledModules);
+    let enabledModules = normalizeEnabledModules(body.enabledModules);
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
     const logoAltText = cleanString(body.logoAltText).slice(0, 120) || `${name} logo`;
     const logo = normalizeCloudinaryLogo(body.logo, logoAltText);
@@ -371,6 +386,14 @@ export async function POST(req) {
     stage = "connecting master database";
     const masterConnection = await connectMasterDB();
     const Lab = getLabModel(masterConnection);
+    let selectedPackage;
+    try {
+      selectedPackage = await getSubscriptionPackageDefinition(body.packageKey);
+      enabledModules = normalizeEnabledModules(selectedPackage.modules);
+    } catch (packageError) {
+      return NextResponse.json({ error: packageError.message }, { status: 400 });
+    }
+    const subscriptionPlan = legacyPlanForPackage(selectedPackage);
     stage = "checking existing tenant";
     const existingLab = await Lab.findOne({ tenantId }).select("tenantId status name").lean();
 
@@ -415,7 +438,7 @@ export async function POST(req) {
       dbName,
       dbConnectionString,
       status: "active",
-      subscriptionPlan: body.subscriptionPlan || "trial",
+      subscriptionPlan,
       enabledModules,
       contactName: cleanString(body.contactName),
       contactEmail,
@@ -484,6 +507,15 @@ export async function POST(req) {
       updatedAt: new Date(),
     };
     await lab.save();
+
+    stage = "assigning shadow subscription";
+    await assignLabSubscription({
+      tenantId: lab.tenantId,
+      packageKey: selectedPackage.key,
+      legacyPlan: lab.subscriptionPlan,
+      modulesOverride: enabledModules,
+      assignedBy: auth.session.userId,
+    });
 
     stage = "warming tenant cache";
     warmTenantConfigCache({
