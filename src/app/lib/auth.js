@@ -6,6 +6,8 @@ import { getTenantConfig } from "@/app/lib/tenant-cache";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { getViewPermissionForModule } from "@/app/lib/rbac";
 
+const tenantAdministrationPermissions = new Set(["settings.manage", "users.manage"]);
+
 export function getSessionFromRequest(req) {
   const token = req.cookies.get(getSessionCookieName())?.value;
   return verifySessionToken(token);
@@ -83,7 +85,12 @@ export function requireTenantSession(req, permission) {
 
 export async function requireEnabledTenantModule(tenantId, permission) {
   const moduleConfig = availableLabModules.find((module) => module.permission === permission);
-  if (!moduleConfig) return {};
+  if (tenantAdministrationPermissions.has(permission)) return {};
+  if (!moduleConfig) {
+    return {
+      error: NextResponse.json({ error: `Unknown module permission: ${permission}` }, { status: 500 }),
+    };
+  }
 
   const lab = await getTenantConfig(tenantId);
 

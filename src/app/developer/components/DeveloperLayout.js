@@ -17,7 +17,13 @@ const sections = [
     label: "Lab Management",
     items: [
       { label: "Create Lab", href: "/developer/labs/create", icon: Icons.plus },
-      { label: "Lab List", href: "/developer/labs", icon: Icons.list },
+      { label: "Labs", href: "/developer/labs", icon: Icons.list },
+    ],
+  },
+  {
+    label: "Subscriptions",
+    items: [
+      { label: "Packages & Usage", href: "/developer/subscriptions", icon: Icons.settings },
     ],
   },
   {
@@ -109,7 +115,9 @@ export default function DeveloperLayout({ children }) {
             <div className="developer-sidebar-section" key={section.label}>
               <p>{section.label}</p>
               {section.items.map((item) => {
-                const active = pathname === item.href;
+                const active =
+                  pathname === item.href ||
+                  (item.href === "/developer/subscriptions" && pathname.startsWith("/developer/subscriptions/"));
                 return (
                   <Link
                     className={`developer-sidebar-link ${active ? "active" : ""}`}

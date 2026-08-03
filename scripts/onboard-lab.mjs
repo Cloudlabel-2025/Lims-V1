@@ -14,6 +14,8 @@ import { getTestCategoryModel } from "../src/app/models/tenant/TestCategory.js";
 import { getTestDefinitionModel } from "../src/app/models/tenant/TestDefinition.js";
 import { getTestReportModel } from "../src/app/models/tenant/TestReport.js";
 import { getUserModel } from "../src/app/models/tenant/User.js";
+import { getQuotaPeriodModel } from "../src/app/models/tenant/QuotaPeriod.js";
+import { getQuotaUsageEventModel } from "../src/app/models/tenant/QuotaUsageEvent.js";
 import { defaultLabModules, normalizeEnabledModules } from "../src/app/lib/modules.js";
 
 const rootDir = process.cwd();
@@ -97,6 +99,8 @@ async function initializeTenantCollections(tenantConnection) {
     getUserModel(tenantConnection).init(),
     getPatientModel(tenantConnection).init(),
     getBillingRecordModel(tenantConnection).init(),
+    getQuotaPeriodModel(tenantConnection).init(),
+    getQuotaUsageEventModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
     getSampleModel(tenantConnection).init(),
   ]);

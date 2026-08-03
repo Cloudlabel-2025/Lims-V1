@@ -9,7 +9,7 @@ export async function GET(req) {
     const auth = requireTenantSession(req, "billing.view");
     if (auth.error) return auth.error;
 
-    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "billing");
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "billing.view");
     if (moduleAuth.error) return moduleAuth.error;
 
     const { searchParams } = new URL(req.url);

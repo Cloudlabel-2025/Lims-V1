@@ -43,3 +43,6 @@ next-env.d.ts
 # Audit files
 PROJECT_AUDIT.md
 
+# Superdesign temporary component templates
+.superdesign/tmp/
+

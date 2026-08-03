@@ -42,6 +42,7 @@ const emptyForm = {
   primaryColor: "#0d9488",
   secondaryColor: "#0f766e",
   accentColor: "#f59e0b",
+  packageKey: "",
   enabledModules: ["dashboard"],
   loginHighlights: [],
 };
@@ -102,7 +103,18 @@ function validateForm(form) {
     errors.enabledModules = "Dashboard module is required.";
   }
 
+  if (!form.packageKey) errors.packageKey = "Select a subscription package.";
+
   return errors;
+}
+
+function formatPackageMoney(minor, currency = "INR") {
+  if (minor === null || minor === undefined) return "Not set";
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(minor / 100);
+}
+
+function formatPackageLimit(value) {
+  return value === null || value === undefined ? "Unlimited" : new Intl.NumberFormat("en-IN").format(value);
 }
 
 export default function DeveloperEditLabPage({ params }) {
@@ -122,9 +134,11 @@ export default function DeveloperEditLabPage({ params }) {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoRemoved, setLogoRemoved] = useState(false);
   const [logoAltText, setLogoAltText] = useState("");
+  const [packages, setPackages] = useState([]);
 
   const formErrors = useMemo(() => validateForm(form), [form]);
   const canSubmit = Object.keys(formErrors).length === 0;
+  const selectedPackage = useMemo(() => packages.find((pkg) => pkg.key === form.packageKey) || null, [packages, form.packageKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,14 +148,20 @@ export default function DeveloperEditLabPage({ params }) {
       setError("");
 
       try {
-        const response = await fetch(`/api/developer/labs/${encodeURIComponent(id)}`, {
-          credentials: "include",
-        });
-        const data = await response.json();
+        const [response, packagesResponse, subscriptionResponse] = await Promise.all([
+          fetch(`/api/developer/labs/${encodeURIComponent(id)}`, { credentials: "include", cache: "no-store" }),
+          fetch("/api/developer/subscription-packages", { credentials: "include", cache: "no-store" }),
+          fetch(`/api/developer/labs/${encodeURIComponent(id)}/subscription`, { credentials: "include", cache: "no-store" }),
+        ]);
+        const [data, packagesData, subscriptionData] = await Promise.all([
+          response.json(), packagesResponse.json(), subscriptionResponse.json(),
+        ]);
 
         if (!response.ok) {
           throw new Error(data.error || data.details || "Unable to load lab");
         }
+        if (!packagesResponse.ok) throw new Error(packagesData.error || "Unable to load subscription packages");
+        if (!subscriptionResponse.ok) throw new Error(subscriptionData.error || "Unable to load current subscription");
 
         if (!cancelled) {
           setForm({
@@ -159,6 +179,7 @@ export default function DeveloperEditLabPage({ params }) {
             primaryColor: data.lab.primaryColor || emptyForm.primaryColor,
             secondaryColor: data.lab.secondaryColor || emptyForm.secondaryColor,
             accentColor: data.lab.accentColor || emptyForm.accentColor,
+            packageKey: subscriptionData.subscription?.packageKey || "",
             enabledModules: data.lab.enabledModules?.length
               ? data.lab.enabledModules
               : emptyForm.enabledModules,
@@ -166,6 +187,7 @@ export default function DeveloperEditLabPage({ params }) {
           });
           setExistingLogo(data.lab.logo || null);
           setLogoAltText(data.lab.logoAltText || `${data.lab.name || "Lab"} logo`);
+          setPackages(packagesData.packages || []);
         }
       } catch (err) {
         if (!cancelled) setError(err.message);
@@ -186,6 +208,11 @@ export default function DeveloperEditLabPage({ params }) {
       ...current,
       [name]: value,
     }));
+    setSuccess("");
+  }
+
+  function selectPackage(pkg) {
+    setForm((current) => ({ ...current, packageKey: pkg.key, enabledModules: pkg.modules }));
     setSuccess("");
   }
 
@@ -331,7 +358,7 @@ export default function DeveloperEditLabPage({ params }) {
       const payload = {
         name: form.name.trim(),
         status: form.status,
-        subscriptionPlan: form.subscriptionPlan,
+        packageKey: form.packageKey,
         contactName: form.contactName.trim(),
         contactEmail: form.contactEmail.trim(),
         contactPhone: form.contactPhone.replace(/\D/g, ""),
@@ -457,16 +484,8 @@ export default function DeveloperEditLabPage({ params }) {
               </select>
             </label>
             <label>
-              Plan
-              <select
-                value={form.subscriptionPlan}
-                onChange={(event) => updateField("subscriptionPlan", event.target.value)}
-              >
-                <option value="trial">Trial</option>
-                <option value="basic">Basic</option>
-                <option value="professional">Professional</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
+              Assigned Package
+              <input value={selectedPackage ? `${selectedPackage.name} · ${selectedPackage.releaseVersion}` : "Select below"} readOnly />
             </label>
             <label>
               Contact Name
@@ -628,24 +647,29 @@ export default function DeveloperEditLabPage({ params }) {
             )}
           </div>
 
-          <div className="developer-module-picker">
+          <div className="developer-module-picker developer-package-assignment">
             <div className="developer-panel-header">
-              <h2>Lab Modules</h2>
-              <p>Only selected modules appear in this lab after login.</p>
+              <h2>Subscription Package</h2>
+              <p>Changing the package updates this lab&apos;s modules, prices, and monthly allowances. The lab administrator will be notified.</p>
             </div>
-            {formErrors.enabledModules && <div className="developer-alert">{formErrors.enabledModules}</div>}
-            <div className="developer-module-grid">
-              {availableLabModules.map((module) => (
-                <label key={module.id} className="developer-module-option">
-                  <input
-                    type="checkbox"
-                    checked={form.enabledModules.includes(module.id)}
-                    disabled={module.id === "dashboard"}
-                    onChange={() => toggleModule(module.id)}
-                  />
-                  <span>{module.label}</span>
-                </label>
-              ))}
+            {formErrors.packageKey && <div className="developer-alert">{formErrors.packageKey}</div>}
+            <div className="developer-assignment-package-grid">
+              {packages.map((pkg) => {
+                const selected = form.packageKey === pkg.key;
+                return (
+                  <button key={pkg.key} type="button" className={`developer-assignment-package ${selected ? "selected" : ""}`} onClick={() => selectPackage(pkg)} aria-pressed={selected}>
+                    <span className="developer-assignment-package-top"><strong>{pkg.name}</strong><small>Release {pkg.releaseVersion}</small></span>
+                    <span className="developer-assignment-price">{formatPackageMoney(pkg.pricing?.monthlyAmountMinor, pkg.pricing?.currency)} <small>/ month</small></span>
+                    <span className="developer-assignment-description">{pkg.description || "Subscription package"}</span>
+                    <span className="developer-assignment-limits">
+                      <small>Patients <strong>{formatPackageLimit(pkg.quotas?.patientRegistrations)}</strong></small>
+                      <small>Bills <strong>{formatPackageLimit(pkg.quotas?.billingRecords)}</strong></small>
+                      <small>Staff <strong>{formatPackageLimit(pkg.quotas?.staffUsers)}</strong></small>
+                    </span>
+                    <span className="developer-assignment-modules">{pkg.modules.map((moduleId) => availableLabModules.find((item) => item.id === moduleId)?.label || moduleId).join(" · ")}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

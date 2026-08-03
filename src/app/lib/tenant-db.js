@@ -28,6 +28,8 @@ import { getInventoryStorageConditionModel } from "@/app/models/tenant/Inventory
 import { getInventorySupplierModel } from "@/app/models/tenant/InventorySupplier";
 import { getInventoryPurchaseOrderModel } from "@/app/models/tenant/InventoryPurchaseOrder";
 import { getInventoryLocationModel } from "@/app/models/tenant/InventoryLocation";
+import { getQuotaPeriodModel } from "@/app/models/tenant/QuotaPeriod";
+import { getQuotaUsageEventModel } from "@/app/models/tenant/QuotaUsageEvent";
 
 
 const tenantDbCache = globalThis.tenantDbCache || new Map();
@@ -112,6 +114,8 @@ export async function getTenantModels(tenantId) {
     InventorySupplier: getInventorySupplierModel(connection),
     InventoryPurchaseOrder: getInventoryPurchaseOrderModel(connection),
     InventoryLocation: getInventoryLocationModel(connection),
+    QuotaPeriod: getQuotaPeriodModel(connection),
+    QuotaUsageEvent: getQuotaUsageEventModel(connection),
   };
 }
 

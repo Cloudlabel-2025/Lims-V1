@@ -9,6 +9,7 @@ import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-
 import { getLabModel } from "@/app/models/master/Lab";
 import { getUserModel } from "@/app/models/tenant/User";
 import { buildTenantUrl } from "@/app/lib/subdomain";
+import { assignLabSubscription, getSubscriptionPackageDefinition } from "@/app/lib/subscription-service";
 
 const connectionOptions = {
   bufferCommands: false,
@@ -18,6 +19,11 @@ const connectionOptions = {
 
 function cleanString(value) {
   return String(value || "").trim();
+}
+
+function legacyPlanForPackage(pkg) {
+  const normalized = String(pkg?.name || "").trim().toLowerCase();
+  return ["basic", "standard", "premium"].includes(normalized) ? normalized : "custom";
 }
 
 function isContactEmail(value) {
@@ -192,19 +198,21 @@ export async function PATCH(req, context) {
     const existingAdminEmail = cleanString(lab.adminAccess?.email).toLowerCase();
     const adminPassword = cleanString(body.adminPassword);
     const adminPasswordConfirm = cleanString(body.adminPasswordConfirm || body.adminConfirmPassword);
-    const enabledModules = normalizeEnabledModules(body.enabledModules);
+    let enabledModules = normalizeEnabledModules(body.enabledModules);
     const loginHighlights = normalizeLoginHighlights(body.loginHighlights);
     const status = normalizeEnum(body.status, lab.status, [
       "pending",
       "active",
       "archived",
     ]);
-    const subscriptionPlan = normalizeEnum(body.subscriptionPlan, lab.subscriptionPlan, [
-      "trial",
-      "basic",
-      "professional",
-      "enterprise",
-    ]);
+    let selectedPackage;
+    try {
+      selectedPackage = await getSubscriptionPackageDefinition(body.packageKey);
+      enabledModules = normalizeEnabledModules(selectedPackage.modules);
+    } catch (packageError) {
+      return NextResponse.json({ error: packageError.message }, { status: 400 });
+    }
+    const subscriptionPlan = legacyPlanForPackage(selectedPackage);
     const adminEmailChanged = Boolean(rawAdminEmail && rawAdminEmail !== existingAdminEmail);
     const adminPasswordChanged = Boolean(adminPassword);
     if (!rawContactEmail) {
@@ -323,6 +331,13 @@ export async function PATCH(req, context) {
     }
 
     await lab.save();
+    await assignLabSubscription({
+      tenantId: lab.tenantId,
+      packageKey: selectedPackage.key,
+      legacyPlan: lab.subscriptionPlan,
+      modulesOverride: enabledModules,
+      assignedBy: auth.session.userId,
+    });
     clearTenantConfigCache(lab.tenantId);
     warmTenantConfigCache({
       id: String(lab._id),

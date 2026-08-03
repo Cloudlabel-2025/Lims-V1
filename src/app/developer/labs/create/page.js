@@ -25,13 +25,14 @@ const defaultForm = {
   primaryColor: "#0d9488",
   secondaryColor: "#0f766e",
   accentColor: "#f59e0b",
+  packageKey: "",
   enabledModules: defaultLabModules,
   loginHighlights: [],
 };
 
 const wizardSteps = [
   { id: "details", title: "Lab Details" },
-  { id: "modules", title: "Lab Modules" },
+  { id: "subscription", title: "Subscription" },
   { id: "highlights", title: "Login Page Highlights" },
   { id: "branding", title: "Login Branding" },
 ];
@@ -169,6 +170,15 @@ function getActiveLabLoginUrl(lab, loginUrl) {
   return getLocalLabLoginUrl(lab.tenantId) || loginUrl;
 }
 
+function formatPackageMoney(minor, currency = "INR") {
+  if (minor === null || minor === undefined) return "Not set";
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(minor / 100);
+}
+
+function formatPackageLimit(value) {
+  return value === null || value === undefined ? "Unlimited" : new Intl.NumberFormat("en-IN").format(value);
+}
+
 export default function DeveloperCreateLabPage() {
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
@@ -185,10 +195,13 @@ export default function DeveloperCreateLabPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [touchedFields, setTouchedFields] = useState({});
   const [attemptedSteps, setAttemptedSteps] = useState({});
+  const [packages, setPackages] = useState([]);
+  const [packagesLoading, setPackagesLoading] = useState(true);
 
   const formErrors = useMemo(() => validateDeveloperForm(form), [form]);
   const logoFileError = useMemo(() => validateLogoFile(logoFile), [logoFile]);
-  const canSubmit = Object.keys(formErrors).length === 0 && !logoFileError;
+  const selectedPackage = useMemo(() => packages.find((pkg) => pkg.key === form.packageKey) || null, [packages, form.packageKey]);
+  const canSubmit = Object.keys(formErrors).length === 0 && !logoFileError && Boolean(selectedPackage);
   const stepId = wizardSteps[activeStep].id;
   const activeStepWarning = shouldShowStepWarning(stepId) ? getStepWarning(activeStep) : "";
 
@@ -203,6 +216,24 @@ export default function DeveloperCreateLabPage() {
 
     return () => URL.revokeObjectURL(objectUrl);
   }, [logoFile, logoFileError]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPackages() {
+      try {
+        const response = await fetch("/api/developer/subscription-packages", { credentials: "include", cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Unable to load subscription packages");
+        if (!cancelled) setPackages(payload.packages || []);
+      } catch (loadError) {
+        if (!cancelled) setError(loadError.message);
+      } finally {
+        if (!cancelled) setPackagesLoading(false);
+      }
+    }
+    loadPackages();
+    return () => { cancelled = true; };
+  }, []);
 
   function updateField(name, value) {
     setForm((current) => ({
@@ -248,6 +279,15 @@ export default function DeveloperCreateLabPage() {
           .filter((id) => selected.has(id)),
       };
     });
+  }
+
+  function selectPackage(pkg) {
+    setForm((current) => ({
+      ...current,
+      packageKey: pkg.key,
+      enabledModules: pkg.modules,
+    }));
+    setError("");
   }
 
   function toggleLoginHighlight(highlight) {
@@ -306,6 +346,8 @@ export default function DeveloperCreateLabPage() {
       return detailsStepFields.filter((field) => formErrors[field]);
     }
 
+    if (id === "subscription") return selectedPackage ? [] : ["packageKey"];
+
     if (id === "branding") {
       return logoFileError ? ["logoFile"] : [];
     }
@@ -322,6 +364,10 @@ export default function DeveloperCreateLabPage() {
 
     if (id === "branding" && logoFileError) {
       return "Fix the logo upload issue before continuing.";
+    }
+
+    if (id === "subscription" && !selectedPackage) {
+      return "Select a subscription package before continuing.";
     }
 
     return "";
@@ -656,25 +702,35 @@ export default function DeveloperCreateLabPage() {
           </>
         )}
 
-        {stepId === "modules" && (
-          <div className="developer-module-picker flush">
+        {stepId === "subscription" && (
+          <div className="developer-module-picker flush developer-package-assignment">
             <div className="developer-panel-header">
-              <h2>Lab Modules</h2>
-              <p>Only selected modules appear in this lab after login.</p>
+              <h2>Choose Subscription Package</h2>
+              <p>The package controls the lab modules, monthly allowances, and published price.</p>
             </div>
-            <div className="developer-module-grid">
-            {availableLabModules.map((module) => (
-              <label key={module.id} className="developer-module-option">
-                <input
-                  type="checkbox"
-                  checked={form.enabledModules.includes(module.id)}
-                  disabled={module.id === "dashboard"}
-                  onChange={() => toggleModule(module.id)}
-                />
-                <span>{module.label}</span>
-              </label>
-            ))}
-            </div>
+            {activeStepWarning && <div className="developer-step-warning">{activeStepWarning}</div>}
+            {packagesLoading ? <p className="developer-empty">Loading packages...</p> : packages.length === 0 ? (
+              <div className="developer-alert">No active packages are available. Create a package before creating the lab.</div>
+            ) : (
+              <div className="developer-assignment-package-grid">
+                {packages.map((pkg) => {
+                  const selected = form.packageKey === pkg.key;
+                  return (
+                    <button key={pkg.key} type="button" className={`developer-assignment-package ${selected ? "selected" : ""}`} onClick={() => selectPackage(pkg)} aria-pressed={selected}>
+                      <span className="developer-assignment-package-top"><strong>{pkg.name}</strong><small>Release {pkg.releaseVersion}</small></span>
+                      <span className="developer-assignment-price">{formatPackageMoney(pkg.pricing?.monthlyAmountMinor, pkg.pricing?.currency)} <small>/ month</small></span>
+                      <span className="developer-assignment-description">{pkg.description || "Subscription package"}</span>
+                      <span className="developer-assignment-limits">
+                        <small>Patients <strong>{formatPackageLimit(pkg.quotas?.patientRegistrations)}</strong></small>
+                        <small>Bills <strong>{formatPackageLimit(pkg.quotas?.billingRecords)}</strong></small>
+                        <small>Staff <strong>{formatPackageLimit(pkg.quotas?.staffUsers)}</strong></small>
+                      </span>
+                      <span className="developer-assignment-modules">{pkg.modules.map((id) => availableLabModules.find((item) => item.id === id)?.label || id).join(" · ")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

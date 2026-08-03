@@ -3,6 +3,8 @@ import { getAccountByCode, postJournalEntry } from "@/app/lib/accounting";
 import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { ensureQuotaPeriod, recordShadowUsage } from "@/app/lib/quota-meter";
+import { getShadowSubscriptionEntitlements } from "@/app/lib/subscription-service";
 
 function clean(value) {
   return String(value || "").trim();
@@ -212,6 +214,9 @@ export async function POST(req) {
     const commissionRate = doctor?.commission || 0;
     const commissionAmount = (invoiceAmount * commissionRate) / 100;
 
+    const subscription = await getShadowSubscriptionEntitlements(auth.tenantId);
+    await ensureQuotaPeriod(connection, auth.tenantId, subscription);
+    let quotaUsage;
     const [billingRecord, samples] = await connection.transaction(async (session) => {
       const [createdBillingRecord] = await BillingRecord.create(
         [
@@ -280,6 +285,20 @@ export async function POST(req) {
       createdBillingRecord.invoiceJournalEntryId = invoiceJournalEntry._id;
       await createdBillingRecord.save({ session });
 
+      quotaUsage = await recordShadowUsage({
+        connection,
+        tenantId: auth.tenantId,
+        subscription,
+        quotaKey: "billingRecords",
+        idempotencyKey: `billing-confirmed:${createdBillingRecord._id}`,
+        relatedResourceType: "BillingRecord",
+        relatedResourceId: createdBillingRecord._id,
+        actorId: auth.session.userId,
+        actorEmail: auth.session.email,
+        metadata: { billId: createdBillingRecord.billId, source: "billing-api", shadowMode: true },
+        session,
+      });
+
       return [createdBillingRecord, createdSamples];
     });
 
@@ -292,7 +311,7 @@ export async function POST(req) {
       metadata: { billId: billingRecord.billId, totalAmount: billingRecord.totalAmount },
     });
 
-    return Response.json({ billingRecord, samples }, { status: 201 });
+    return Response.json({ billingRecord, samples, quotaUsage: quotaUsage?.quota || null }, { status: 201 });
   } catch (error) {
     return jsonError("Unable to create billing record", error, 500);
   }

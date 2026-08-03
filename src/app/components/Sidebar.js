@@ -40,6 +40,7 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
   const canOpenSettings = hasAnyPermission(user, ["settings.manage", "users.manage"]);
   const canViewAudit = hasAnyPermission(user, ["settings.manage"]);
   const adminItems = user?.doctorId ? [] : [
+    ...(hasAnyPermission(user, ["settings.manage"]) ? [{ id: "subscription", label: "Subscription & Usage", href: "/subscription", icon: Icons.wallet }] : []),
     ...(canOpenSettings ? [{ id: "settings", label: "Settings", href: "/settings", icon: Icons.settings }] : []),
     ...(hasAnyPermission(user, ["users.manage"]) ? [{ id: "users", label: "User Assignment", href: "/users", icon: Icons.person }] : []),
     ...(canViewAudit ? [{ id: "audit", label: "Audit Log", href: "/audit", icon: Icons.list }] : []),

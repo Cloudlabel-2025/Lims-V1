@@ -186,7 +186,7 @@ export default function DeveloperLabsListPage() {
                     <div>
                       <h3>{lab.name}</h3>
                       <span>
-                        {lab.tenantId} - {lab.subscriptionPlan} - {lab.status}
+                        {lab.tenantId} · {lab.subscriptionPackageName}{lab.subscriptionReleaseVersion ? ` ${lab.subscriptionReleaseVersion}` : ""} · {lab.subscriptionStatus || lab.status}
                       </span>
                       <small>Created {formatDate(lab.createdAt)}</small>
                       <small>{(lab.enabledModules || defaultLabModules).join(", ")}</small>
@@ -235,6 +235,9 @@ export default function DeveloperLabsListPage() {
                       <Link href={`/developer/labs/${encodeURIComponent(lab.id)}/edit`}>
                         {Icons.edit}
                         Edit
+                      </Link>
+                      <Link href={`/developer/labs/${encodeURIComponent(lab.tenantId)}/subscription`}>
+                        Usage
                       </Link>
                       <button
                         type="button"

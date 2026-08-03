@@ -3,6 +3,8 @@ import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { createPatientAccessCredential } from "@/app/lib/patient-portal";
 import { writeAuditLog } from "@/app/lib/audit";
+import { ensureQuotaPeriod, recordShadowUsage } from "@/app/lib/quota-meter";
+import { getShadowSubscriptionEntitlements } from "@/app/lib/subscription-service";
 
 function clean(value) {
   return String(value || "").trim();
@@ -88,8 +90,13 @@ export async function POST(req) {
       }
     }
 
-    const access = await createPatientAccessCredential(tenantId, req.url);
+    const [access, subscription] = await Promise.all([
+      createPatientAccessCredential(tenantId, req.url),
+      getShadowSubscriptionEntitlements(tenantId),
+    ]);
+    await ensureQuotaPeriod(connection, tenantId, subscription);
     let patient;
+    let quotaUsage;
     await connection.transaction(async (session) => {
       [patient] = await Patient.create([{
         ...body,
@@ -105,6 +112,19 @@ export async function POST(req) {
         activationExpiresAt: access.expiresAt,
         lastAccessSlipIssuedAt: new Date(),
       }], { session });
+      quotaUsage = await recordShadowUsage({
+        connection,
+        tenantId,
+        subscription,
+        quotaKey: "patientRegistrations",
+        idempotencyKey: `patient-registration:${patient._id}`,
+        relatedResourceType: "Patient",
+        relatedResourceId: patient._id,
+        actorId: auth.session.userId,
+        actorEmail: auth.session.email,
+        metadata: { source: "patient-api", shadowMode: true },
+        session,
+      });
     });
 
     await writeAuditLog(req, auth, {
@@ -116,6 +136,7 @@ export async function POST(req) {
     return Response.json({
       ...patient.toObject(),
       portalAccess: { activationUrl: access.activationUrl, accessPin: access.accessPin, expiresAt: access.expiresAt },
+      quotaUsage: quotaUsage?.quota || null,
     }, { status: 201 });
   } catch (err) {
     console.error("POST /api/patient error:", err);

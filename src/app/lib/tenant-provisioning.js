@@ -21,11 +21,14 @@ import { getJournalEntryModel } from "@/app/models/tenant/JournalEntry";
 import { getPaymentReceiptModel } from "@/app/models/tenant/PaymentReceipt";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
+import { getQuotaPeriodModel } from "@/app/models/tenant/QuotaPeriod";
+import { getQuotaUsageEventModel } from "@/app/models/tenant/QuotaUsageEvent";
 import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
 import { getTestDefinitionModel } from "@/app/models/tenant/TestDefinition";
 import { getTestReportModel } from "@/app/models/tenant/TestReport";
 import { getUserModel } from "@/app/models/tenant/User";
 import { slugifySubdomain, validateSubdomain } from "@/app/lib/subdomain";
+import { assignLabSubscription } from "@/app/lib/subscription-service";
 
 const connectionOptions = {
   bufferCommands: false,
@@ -101,6 +104,8 @@ async function initializeTenantCollections(tenantConnection) {
     getBillingRecordModel(tenantConnection).init(),
     getDoctorModel(tenantConnection).init(),
     getSampleModel(tenantConnection).init(),
+    getQuotaPeriodModel(tenantConnection).init(),
+    getQuotaUsageEventModel(tenantConnection).init(),
   ]);
 }
 
@@ -205,6 +210,12 @@ export async function createTenant({ name, subdomain, createdBy }) {
     await initializeTenantCollections(tenantConnection);
     await createTenantRoles(masterConnection, tenantConnection);
     await seedSystemChartOfAccounts(tenantConnection, createdLab.tenantId);
+    await assignLabSubscription({
+      tenantId: createdLab.tenantId,
+      legacyPlan: createdLab.subscriptionPlan,
+      modulesOverride: createdLab.enabledModules,
+      assignedBy: createdBy,
+    });
     warmTenantConfigCache({
       id: String(createdLab._id),
       labId: createdLab.labId,
