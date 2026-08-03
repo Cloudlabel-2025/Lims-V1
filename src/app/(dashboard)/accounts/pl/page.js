@@ -4,6 +4,7 @@ import { Icons } from "@/app/components/Icons";
 import { money, inputStyle } from "../_components/helpers";
 import Field from "../_components/Field";
 import DownloadDropdown from "../_components/DownloadDropdown";
+import BackToDashboard from "../_components/BackToDashboard";
 
 function PlStatement({ pl }) {
   const { revenue, expenses, totalRevenue, totalExpenses, netProfit } = pl;
@@ -115,6 +116,18 @@ export default function PlPage() {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div className="page-header-icon" style={{ background: "var(--brand-surface, #e6f0fa)", color: "var(--brand-action, var(--primary))", padding: 12, borderRadius: 8 }}>
+            {Icons.barChart}
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: 20, color: "var(--text-main)" }}>P&amp;L Statement</h4>
+            <small style={{ color: "var(--text-muted)" }}>Profit &amp; loss with date range</small>
+          </div>
+        </div>
+        <BackToDashboard />
+      </div>
       <div className="form-card" style={{ padding: 14, borderRadius: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, alignItems: "end" }}>
         <Field label="From">
           <input type="date" className="lims-input" value={plFilter.from} onChange={(e) => { setPlFilter({ ...plFilter, from: e.target.value }); setError(""); }} style={inputStyle()} />

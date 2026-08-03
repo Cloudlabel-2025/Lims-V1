@@ -74,6 +74,8 @@ export default function ListsTab({
   onDeleteCategory = null,
   onDeleteTest = null,
   onDeletePackage = null,
+  editCategory = null,
+  editingCategoryId = "",
 }) {
   const [activeListTab, setActiveListTab] = useState("categories");
   const [page, setPage] = useState({ categories: 1, tests: 1, packages: 1 });
@@ -155,14 +157,6 @@ export default function ListsTab({
 
   return (
     <div className="module-page">
-      <div className="module-header">
-        <div>
-          <p className="module-kicker">View Lists</p>
-          <h1>Test Master Records</h1>
-          <span>Browse all created categories, tests, and packages.</span>
-        </div>
-      </div>
-
       <div style={{ display: "flex", gap: "24px", marginBottom: "28px", borderBottom: "1px solid var(--border-light)", padding: "0 4px" }}>
         <button onClick={() => { setActiveListTab("categories"); setPage({ categories: 1, tests: 1, packages: 1 }); }} style={tabStyle(activeListTab === "categories")}>
           Categories List
@@ -176,137 +170,146 @@ export default function ListsTab({
       </div>
 
       {activeListTab === "categories" && (
-        <aside className="module-panel">
-          <div className="module-panel-header">
-            <h2>Department Categories</h2>
-            <p>{categories.length} categories available</p>
-          </div>
-          <div style={{ marginBottom: 12 }}>
+        <>
+          <div className="list-toolbar">
             <input
               className="lims-input"
               placeholder="Search categories..."
               maxLength={35}
               value={search.categories}
               onChange={(e) => handleSearch("categories", e.target.value)}
-              style={{ height: 34, fontSize: 13, paddingLeft: 10 }}
             />
+            <span className="list-count">{categories.length} categories</span>
           </div>
-          <div className="test-card-list">
-            {paginatedCategories.map((cat) => (
-              <article key={cat._id} className="test-card">
-                <div>
-                  <h3>{cat.name}</h3>
-                  <span>Used in {categoryUsageCounts.get(cat._id) || 0} tests</span>
+          <aside className="module-panel">
+            <div className="list-table">
+              {paginatedCategories.map((cat) => (
+                <div
+                  key={cat._id}
+                  className={`list-row ${editingCategoryId === cat._id ? "active" : ""}`}
+                  onClick={() => { if (editCategory) editCategory(cat); }}
+                >
+                  <div className="list-row-top">
+                    <h3>{cat.name}</h3>
+                    <div className="list-row-side">
+                      <em className={cat.status}>{cat.status}</em>
+                      {editCategory && (
+                        <button type="button" className="btn-icon-edit" title="Edit category"
+                          onClick={(e) => { e.stopPropagation(); editCategory(cat); }}>{Icons.edit}</button>
+                      )}
+                      {onDeleteCategory && (
+                        <button type="button" className="btn-icon-delete" title="Delete category"
+                          onClick={(e) => { e.stopPropagation(); handleDelete("category", cat._id, cat.name); }}>{Icons.trash}</button>
+                      )}
+                    </div>
+                  </div>
+                  {cat.description && <p className="list-desc">{cat.description}</p>}
+                  <div className="list-meta">
+                    <span className="list-meta-item"><strong>Used In:</strong> {categoryUsageCounts.get(cat._id) || 0} tests</span>
+                  </div>
                 </div>
-                {onDeleteCategory && (
-                  <button
-                    type="button"
-                    className="btn-icon-delete"
-                    onClick={() => handleDelete("category", cat._id, cat.name)}
-                    title="Delete category"
-                  >
-                    {Icons.trash}
-                  </button>
-                )}
-              </article>
-            ))}
-          </div>
+              ))}
+            </div>
+            {!paginatedCategories.length && <p className="list-empty">No categories found.</p>}
           <PaginationControls page={page.categories} totalPages={totalPages.categories} onPageChange={(p) => setPage((prev) => ({ ...prev, categories: p }))} />
         </aside>
+        </>
       )}
 
       {activeListTab === "tests" && (
-        <aside className="module-panel">
-          <div className="module-panel-header">
-            <h2>Defined Tests</h2>
-            <p>{tests.length} tests configured</p>
-          </div>
-          <div style={{ marginBottom: 12 }}>
+        <>
+          <div className="list-toolbar">
             <input
               className="lims-input"
               placeholder="Search tests..."
               maxLength={35}
               value={search.tests}
               onChange={(e) => handleSearch("tests", e.target.value)}
-              style={{ height: 34, fontSize: 13, paddingLeft: 10 }}
             />
+            <span className="list-count">{tests.length} tests</span>
           </div>
-          <div className="test-card-list">
-            {paginatedTests.map((test) => (
-              <article
-                key={test._id}
-                className={`test-card ${editingId === test._id ? 'active' : ''}`}
-                onClick={() => { if (canEditTests) editTest(test); }}
-              >
-                <div>
-                  <h3>{test.name}</h3>
-                  <span>{test.category?.name || "Uncategorized"} · {test.parameters?.length || 0} parameters</span>
+          <aside className="module-panel">
+            <div className="list-table">
+              {paginatedTests.map((test) => (
+                <div
+                  key={test._id}
+                  className={`list-row ${editingId === test._id ? "active" : ""}`}
+                  onClick={() => { if (canEditTests) editTest(test); }}
+                >
+                  <div className="list-row-top">
+                    <h3>{test.name}</h3>
+                    <div className="list-row-side">
+                      <em className={test.status}>{test.status}</em>
+                      {canEditTests && (
+                        <button type="button" className="btn-icon-edit" title="Edit test"
+                          onClick={(e) => { e.stopPropagation(); editTest(test); }}>{Icons.edit}</button>
+                      )}
+                      {onDeleteTest && (
+                        <button type="button" className="btn-icon-delete" title="Delete test"
+                          onClick={(e) => { e.stopPropagation(); handleDelete("test", test._id, test.name); }}>{Icons.trash}</button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="list-meta">
+                    <span className="list-meta-item"><strong>Category:</strong> {test.category?.name || "Uncategorized"}</span>
+                    <span className="list-meta-item"><strong>Sample:</strong> {test.sampleType || "—"}</span>
+                    <span className="list-meta-item"><strong>Price:</strong> ₹{test.price ?? "—"}</span>
+                    <span className="list-meta-item"><strong>Parameters:</strong> {test.parameters?.length || 0}</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <strong>{test.status}</strong>
-                  {onDeleteTest && (
-                    <button
-                      type="button"
-                      className="btn-icon-delete"
-                      onClick={(e) => { e.stopPropagation(); handleDelete("test", test._id, test.name); }}
-                      title="Delete test"
-                    >
-                      {Icons.trash}
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
+              ))}
+            </div>
+            {!paginatedTests.length && <p className="list-empty">No tests found.</p>}
           <PaginationControls page={page.tests} totalPages={totalPages.tests} onPageChange={(p) => setPage((prev) => ({ ...prev, tests: p }))} />
         </aside>
+        </>
       )}
 
       {activeListTab === "packages" && (
-        <aside className="module-panel">
-          <div className="module-panel-header">
-            <h2>Defined Packages</h2>
-            <p>{packages.length} packages configured</p>
-          </div>
-          <div style={{ marginBottom: 12 }}>
+        <>
+          <div className="list-toolbar">
             <input
               className="lims-input"
               placeholder="Search packages..."
               maxLength={35}
               value={search.packages}
               onChange={(e) => handleSearch("packages", e.target.value)}
-              style={{ height: 34, fontSize: 13, paddingLeft: 10 }}
             />
+            <span className="list-count">{packages.length} packages</span>
           </div>
-          <div className="test-card-list">
-            {paginatedPackages.map((pkg) => (
-              <article
-                key={pkg._id}
-                className={`test-card ${editingPackageId === pkg._id ? 'active' : ''}`}
-                onClick={() => { if (canEditTests) editPackage(pkg); }}
-              >
-                <div>
-                  <h3>{pkg.name}</h3>
-                  <span>{pkg.tests?.length || 0} tests included · ₹{pkg.price}</span>
+          <aside className="module-panel">
+            <div className="list-table">
+              {paginatedPackages.map((pkg) => (
+                <div
+                  key={pkg._id}
+                  className={`list-row ${editingPackageId === pkg._id ? "active" : ""}`}
+                  onClick={() => { if (canEditTests) editPackage(pkg); }}
+                >
+                  <div className="list-row-top">
+                    <h3>{pkg.name}{pkg.code ? <small>{pkg.code}</small> : null}</h3>
+                    <div className="list-row-side">
+                      <em className={pkg.status}>{pkg.status}</em>
+                      {canEditTests && (
+                        <button type="button" className="btn-icon-edit" title="Edit package"
+                          onClick={(e) => { e.stopPropagation(); editPackage(pkg); }}>{Icons.edit}</button>
+                      )}
+                      {onDeletePackage && (
+                        <button type="button" className="btn-icon-delete" title="Delete package"
+                          onClick={(e) => { e.stopPropagation(); handleDelete("package", pkg._id, pkg.name); }}>{Icons.trash}</button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="list-meta">
+                    <span className="list-meta-item"><strong>Tests:</strong> {pkg.tests?.length || 0} included</span>
+                    <span className="list-meta-item"><strong>Price:</strong> ₹{pkg.price}</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <strong>{pkg.status}</strong>
-                  {onDeletePackage && (
-                    <button
-                      type="button"
-                      className="btn-icon-delete"
-                      onClick={(e) => { e.stopPropagation(); handleDelete("package", pkg._id, pkg.name); }}
-                      title="Delete package"
-                    >
-                      {Icons.trash}
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
+              ))}
+            </div>
+            {!paginatedPackages.length && <p className="list-empty">No packages found.</p>}
           <PaginationControls page={page.packages} totalPages={totalPages.packages} onPageChange={(p) => setPage((prev) => ({ ...prev, packages: p }))} />
         </aside>
+        </>
       )}
 
       <DeleteConfirmModal

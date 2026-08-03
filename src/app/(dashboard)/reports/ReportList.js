@@ -68,7 +68,7 @@ export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange
           }}
           style={{ height: 34, fontSize: 12 }}
         >
-          <option value="all">All time</option>
+          <option value="all">Max</option>
           <option value="7">7 days</option>
           <option value="30">30 days</option>
           <option value="90">90 days</option>

@@ -23,7 +23,6 @@ test("getEmptyForm returns the expected patient registration defaults", () => {
     receivedTime: "",
     refDoctorName: "",
     reportType: "Hand",
-    barcode: "",
     selectedTests: [],
   });
 });

@@ -2,16 +2,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import { money, formatDate } from "./_components/helpers";
+import { money } from "./_components/helpers";
 import StatCard from "./_components/StatCard";
-import Badge from "./_components/Badge";
-import Table from "./_components/Table";
 import DownloadDropdown from "./_components/DownloadDropdown";
+import BackToDashboard from "./_components/BackToDashboard";
 
 export default function AccountsDashboard() {
   const router = useRouter();
   const [accounts, setAccounts] = useState([]);
-  const [recentBills, setRecentBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -26,12 +24,8 @@ export default function AccountsDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [accountData, billData] = await Promise.all([
-        fetchJson("/api/accounting/accounts?page=1&limit=200"),
-        fetchJson("/api/billing?page=1&limit=10"),
-      ]);
+      const accountData = await fetchJson("/api/accounting/accounts?page=1&limit=200");
       setAccounts(accountData.accounts || []);
-      setRecentBills(billData.billingRecords || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -49,13 +43,6 @@ export default function AccountsDashboard() {
     { asset: 0, liability: 0, equity: 0, revenue: 0, expense: 0 }
   );
 
-  const statusColors = {
-    paid: ["#ecfdf5", "#047857"],
-    partial: ["#fffbeb", "#b45309"],
-    unpaid: ["#fef2f2", "#b91c1c"],
-    cancelled: ["var(--surface)", "var(--text-muted)"],
-  };
-
   const navLinks = [
     { href: "/accounts/chart", label: "Chart of Accounts", icon: Icons.grid, desc: "Full chart with balances & delete" },
     { href: "/accounts/ledger", label: "Ledger", icon: Icons.list, desc: "Journal entries with filters" },
@@ -65,6 +52,7 @@ export default function AccountsDashboard() {
     { href: "/accounts/commissions", label: "Commissions", icon: Icons.users, desc: "Doctor commission payouts" },
     { href: "/accounts/corporate", label: "Corporate Accounts", icon: Icons.users, desc: "Corporate client management" },
     { href: "/accounts/reports", label: "Reports", icon: Icons.report, desc: "Daily, weekly, monthly & P&L reports" },
+    { href: "/accounts/stats", label: "Statistics", icon: Icons.barChart, desc: "Patients, income & commission stats" },
   ];
 
   return (
@@ -80,6 +68,7 @@ export default function AccountsDashboard() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <BackToDashboard href="/dashboard" />
           <button type="button" className="dash-btn-secondary" onClick={loadDashboard} style={{ height: 38, padding: "0 14px", borderRadius: 8 }}>
             {Icons.refresh} Refresh
           </button>
@@ -129,31 +118,6 @@ export default function AccountsDashboard() {
                 </div>
               </button>
             ))}
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <h5 style={{ margin: "0 0 12px 0", fontSize: 15, color: "var(--text-main)" }}>Recent Bills</h5>
-            <Table
-              minWidth={700}
-              headings={["Bill ID", "Patient", "Amount", "Paid", "Status", "Date"]}
-              empty="No recent bills."
-              rows={recentBills.map((bill) => {
-                const [bg, color] = statusColors[bill.billingStatus] || ["var(--surface)", "var(--text-secondary)"];
-                return [
-                  bill.billId || "-",
-                  bill.patient?.name || "-",
-                  `Rs ${money(bill.totalAmount)}`,
-                  `Rs ${money(bill.totalPaid || 0)}`,
-                  <span key="status" style={{ background: bg, color, padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 800, textTransform: "capitalize" }}>{bill.billingStatus}</span>,
-                  formatDate(bill.createdAt),
-                ];
-              })}
-            />
-          </div>
-
-          <div className="form-card" style={{ padding: 18, borderRadius: 8, display: "flex", justifyContent: "center", gap: 18, flexWrap: "wrap" }}>
-            <a href="/billing" style={{ color: "var(--brand-action, var(--primary))", fontWeight: 700, fontSize: 13, textDecoration: "none" }}>{Icons.arrowRight} Go to Billing Center</a>
-            <a href="/accounts/chart" style={{ color: "var(--brand-action, var(--primary))", fontWeight: 700, fontSize: 13, textDecoration: "none" }}>{Icons.arrowRight} View Full Chart of Accounts</a>
           </div>
         </>
       )}

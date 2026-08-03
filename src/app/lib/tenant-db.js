@@ -12,6 +12,7 @@ import { getExpenseCategoryModel } from "@/app/models/tenant/ExpenseCategory";
 import { getRoleModel } from "@/app/models/tenant/Role";
 import { getSampleModel } from "@/app/models/tenant/Sample";
 import { getJournalEntryModel } from "@/app/models/tenant/JournalEntry";
+import { getNotificationReadModel } from "@/app/models/tenant/NotificationRead";
 import { getPaymentReceiptModel } from "@/app/models/tenant/PaymentReceipt";
 import { getTestCategoryModel } from "@/app/models/tenant/TestCategory";
 import { getTestDefinitionModel } from "@/app/models/tenant/TestDefinition";
@@ -91,6 +92,7 @@ export async function getTenantModels(tenantId) {
     ExpenseEntry: getExpenseEntryModel(connection),
     ExpenseCategory: getExpenseCategoryModel(connection),
     JournalEntry: getJournalEntryModel(connection),
+    NotificationRead: getNotificationReadModel(connection),
     Patient: getPatientModel(connection, { patientPrefix: lab?.name ? `${lab.name.toUpperCase().replace(/\s+/g, "")}` : lab?.numbering?.patientPrefix }),
     PatientPortalAccount: getPatientPortalAccountModel(connection),
     PaymentReceipt: getPaymentReceiptModel(connection),

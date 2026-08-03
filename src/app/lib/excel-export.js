@@ -398,3 +398,24 @@ export async function exportConsolidated({ daily, weekly, monthly }) {
   const buffer = await workbook.xlsx.writeBuffer();
   return buffer;
 }
+
+export async function exportStatsReport(stats) {
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet("Statistics");
+
+  addHeaderRow(ws, "Statistics Report", ["Metric", "Value"]);
+  addColumnHeaders(ws, ["Metric", "Value"]);
+
+  ws.addRow(["Total Patients", stats.totalPatients]);
+  ws.addRow(["Total Lab Income", stats.totalLabIncome]);
+  ws.addRow(["Total Pending Commission", stats.totalPendingCommission]);
+  ws.addRow(["Total Paid Commission", stats.totalPaidCommission]);
+  ws.addRow(["Total Commission", stats.totalCommission]);
+  ws.addRow([]);
+  ws.addRow(["Generated At", stats.generatedAt ? new Date(stats.generatedAt).toLocaleDateString("en-IN") : "-"]);
+
+  ws.columns.forEach((col) => { if (col) col.width = 24; });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer;
+}

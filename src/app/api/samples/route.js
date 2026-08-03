@@ -52,6 +52,8 @@ export async function POST(req) {
     const testDefinitionId = body.testDefinition;
     const sampleType = String(body.sampleType || "").trim();
     const batchId = String(body.batchId || "").trim();
+    const receivedTime = body.receivedTime;
+    const collectionTime = body.collectionTime;
 
     if (!patientId) {
       return Response.json({ error: "Patient is required" }, { status: 400 });
@@ -73,11 +75,39 @@ export async function POST(req) {
       return Response.json({ error: "Active test definition not found" }, { status: 404 });
     }
 
+    if (collectionTime) {
+      if (Number.isNaN(new Date(collectionTime).getTime())) {
+        return Response.json({ error: "Invalid collection time" }, { status: 400 });
+      }
+      if (new Date(collectionTime) > new Date()) {
+        return Response.json({ error: "Collection Time cannot be in the future" }, { status: 400 });
+      }
+      if (patient.dob && new Date(collectionTime) < new Date(patient.dob)) {
+        return Response.json({ error: "Collection time cannot be before date of birth" }, { status: 400 });
+      }
+    }
+
+    if (receivedTime) {
+      if (Number.isNaN(new Date(receivedTime).getTime())) {
+        return Response.json({ error: "Invalid received time" }, { status: 400 });
+      }
+      if (new Date(receivedTime) > new Date()) {
+        return Response.json({ error: "Received Time cannot be in the future" }, { status: 400 });
+      }
+      if (patient.dob && new Date(receivedTime) < new Date(patient.dob)) {
+        return Response.json({ error: "Received time cannot be before date of birth" }, { status: 400 });
+      }
+      if (collectionTime && new Date(receivedTime) < new Date(collectionTime)) {
+        return Response.json({ error: "Received Time cannot be earlier than Collection Time" }, { status: 400 });
+      }
+    }
+
     const sample = await Sample.create({
       patient: patient._id,
       sampleType: sampleType || test.sampleType || undefined,
       batchId: batchId || undefined,
-      receivedAt: new Date(),
+      receivedAt: receivedTime ? new Date(receivedTime) : new Date(),
+      collectionTime: collectionTime ? new Date(collectionTime) : undefined,
       receivedBy: auth.session.email,
       testDefinition: test._id,
       testSnapshot: {

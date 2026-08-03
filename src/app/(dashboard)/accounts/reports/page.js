@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { money, formatDate, inputStyle } from "../_components/helpers";
 import StatCard from "../_components/StatCard";
@@ -9,6 +8,7 @@ import Table from "../_components/Table";
 import Field from "../_components/Field";
 import PaginationControls from "../_components/PaginationControls";
 import DownloadDropdown from "../_components/DownloadDropdown";
+import BackToDashboard from "../_components/BackToDashboard";
 
 function downloadBlob(res, filename) {
   return res.blob().then((blob) => {
@@ -358,8 +358,89 @@ function OutstandingReport() {
   );
 }
 
+function DoctorCommissionReport() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/accounting/reports/commissions", { cache: "no-store" });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || "Failed");
+        setData(d);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <div className="form-card" style={{ padding: 28, borderRadius: 8, textAlign: "center" }}>Loading...</div>;
+  if (!data) return null;
+
+  const pendingDoctors = data.pendingDoctors || [];
+  const payoutHistory = data.payoutHistory || [];
+  const totalPending = pendingDoctors.reduce((s, d) => s + Number(d.pendingPayout || 0), 0);
+  const totalPaid = payoutHistory.reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <DownloadDropdown
+          onDownload={async (format) => {
+            const res = await fetch(`/api/accounting/reports/commissions?section=both&export=${format}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Download failed");
+            await downloadBlob(res, `doctor-commissions.${format}`);
+          }}
+        />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
+        <StatCard label="Doctors with Pending" value={String(pendingDoctors.length)} icon={Icons.users} />
+        <StatCard label="Total Pending Payout" value={`Rs ${money(totalPending)}`} icon={Icons.wallet} />
+        <StatCard label="Total Paid Out" value={`Rs ${money(totalPaid)}`} icon={Icons.barChart} />
+        <StatCard label="Total Commission" value={`Rs ${money(totalPending + totalPaid)}`} icon={Icons.report} />
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h5 style={{ margin: 0, fontSize: 15, color: "var(--text-main)" }}>Pending Payouts</h5>
+        </div>
+        <Table
+          minWidth={700}
+          headings={["Doctor", "ID", "Commission", "Pending Amount"]}
+          empty="No pending payouts."
+          rows={pendingDoctors.map((doc) => [
+            doc.name,
+            doc.doctorId || "-",
+            `${doc.commission || 0}%`,
+            `Rs ${money(doc.pendingPayout)}`,
+          ])}
+        />
+      </div>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h5 style={{ margin: 0, fontSize: 15, color: "var(--text-main)" }}>Payout History</h5>
+        </div>
+        <Table
+          minWidth={750}
+          headings={["Entry", "Date", "Doctor", "Amount", "Description"]}
+          empty="No payouts yet."
+          rows={payoutHistory.map((p) => [
+            p.entryNumber || "-",
+            formatDate(p.date),
+            p.doctor?.name || "-",
+            `Rs ${money(p.amount)}`,
+            p.description || "-",
+          ])}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState("daily");
   const [from, setFrom] = useState(() => {
     const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0];
@@ -373,9 +454,10 @@ export default function ReportsPage() {
     ["monthly", "Monthly Revenue", Icons.barChart],
     ["pl", "P&L Statement", Icons.activity],
     ["outstanding", "Outstanding Dues", Icons.list],
+    ["commission", "Doctor Commission", Icons.users],
   ];
 
-  const showDateRange = activeTab !== "outstanding";
+  const showDateRange = activeTab !== "outstanding" && activeTab !== "commission";
 
   return (
     <div className="patients-page" style={{ paddingBottom: 40 }}>
@@ -389,9 +471,7 @@ export default function ReportsPage() {
             <small style={{ color: "var(--text-muted)" }}>Daily/weekly collection, monthly revenue, P&L, outstanding dues</small>
           </div>
         </div>
-        <button type="button" className="btn-lims-secondary" onClick={() => router.push("/accounts")} style={{ height: 38, padding: "0 14px" }}>
-          {Icons.arrowLeft} Dashboard
-        </button>
+        <BackToDashboard />
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
@@ -428,6 +508,7 @@ export default function ReportsPage() {
       {activeTab === "monthly" && <MonthlyRevenueReport key={`monthly-${loadTrigger}`} from={from} to={to} loadTrigger={loadTrigger} />}
       {activeTab === "pl" && <IncomeExpenseReport key={`pl-${loadTrigger}`} from={from} to={to} loadTrigger={loadTrigger} />}
       {activeTab === "outstanding" && <OutstandingReport key={`outstanding-${loadTrigger}`} />}
+      {activeTab === "commission" && <DoctorCommissionReport key={`commission-${loadTrigger}`} />}
     </div>
   );
 }

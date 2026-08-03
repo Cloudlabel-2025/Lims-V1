@@ -8,6 +8,7 @@ import Field from "../_components/Field";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 import DownloadDropdown from "../_components/DownloadDropdown";
+import BackToDashboard from "../_components/BackToDashboard";
 
 const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxPercentage: "", paidFrom: "vendor-payable", attachmentUrl: "" };
 
@@ -320,6 +321,18 @@ export default function ExpensesPage() {
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div className="page-header-icon" style={{ background: "var(--brand-surface, #e6f0fa)", color: "var(--brand-action, var(--primary))", padding: 12, borderRadius: 8 }}>
+            {Icons.activity}
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: 20, color: "var(--text-main)" }}>Expenses</h4>
+            <small style={{ color: "var(--text-muted)" }}>Record &amp; manage expenses</small>
+          </div>
+        </div>
+        <BackToDashboard />
+      </div>
       {error && <div style={{ padding: "10px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>{error}</div>}
       <SuccessDialog message={success} onClose={() => setSuccess("")} />
 

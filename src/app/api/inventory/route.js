@@ -104,6 +104,7 @@ async function loadInventory(auth, req) {
   const search = clean(searchParams.get("search"));
   const status = clean(searchParams.get("status"));
   const category = clean(searchParams.get("category"));
+  const filter = clean(searchParams.get("filter"));
   const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10)));
 
@@ -116,8 +117,17 @@ async function loadInventory(auth, req) {
     const regex = new RegExp(escapeRegex(search), "i");
     itemQuery.$or = [{ name: regex }, { itemCode: regex }, { genericName: regex }, { manufacturer: regex }];
   }
+  if (filter === "low") {
+    itemQuery.$expr = { $lte: [{ $ifNull: ["$stockOnHandBase", 0] }, { $ifNull: ["$minimumStockBase", 0] }] };
+  } else if (filter === "reorder") {
+    itemQuery.$expr = { $and: [{ $ne: ["$reorderLevelBase", null] }, { $lte: [{ $ifNull: ["$stockOnHandBase", 0] }, "$reorderLevelBase"] }] };
+  }
 
-  const [categories, itemTypes, storageConditions, items, total, movements] = await Promise.all([
+  const now = new Date();
+  const warning = new Date(now);
+  warning.setDate(warning.getDate() + 30);
+
+  const [categories, itemTypes, storageConditions, items, total, movements, statsResult] = await Promise.all([
     InventoryCategory.find({}).populate("parentCategory", "name code").sort({ parentCategory: 1, name: 1 }).lean(),
     InventoryItemType.find({}).sort({ name: 1 }).lean(),
     InventoryStorageCondition.find({}).sort({ name: 1 }).lean(),
@@ -137,6 +147,28 @@ async function loadInventory(auth, req) {
       .sort({ movementDate: -1, createdAt: -1 })
       .limit(80)
       .lean(),
+    InventoryItem.aggregate([
+      { $match: itemQuery },
+      { $facet: {
+          itemTotals: [
+            { $unwind: { path: "$batches", preserveNullAndEmptyArrays: true } },
+            { $group: { _id: null,
+                totalStock: { $sum: "$stockOnHandBase" },
+                inventoryValue: { $sum: { $multiply: [{ $ifNull: ["$batches.quantityBase", 0] }, { $ifNull: ["$batches.costPerBaseUnit", 0] }] } },
+                expiredBatches: { $sum: { $cond: [{ $and: [{ $gt: [{ $ifNull: ["$batches.quantityBase", 0] }, 0] }, { $ne: ["$batches.expiryDate", null] }, { $lt: ["$batches.expiryDate", now] }] }, 1, 0] } },
+                nearExpiryBatches: { $sum: { $cond: [{ $and: [{ $gt: [{ $ifNull: ["$batches.quantityBase", 0] }, 0] }, { $ne: ["$batches.expiryDate", null] }, { $gte: ["$batches.expiryDate", now] }, { $lte: ["$batches.expiryDate", warning] }] }, 1, 0] } },
+                quarantineBatches: { $sum: { $cond: [{ $and: [{ $eq: ["$batches.status", "quarantine"] }, { $gt: [{ $ifNull: ["$batches.quantityBase", 0] }, 0] }] }, 1, 0] } } } },
+          ],
+          lowItems: [
+            { $match: { $expr: { $lte: [{ $ifNull: ["$stockOnHandBase", 0] }, { $ifNull: ["$minimumStockBase", 0] }] } } },
+            { $count: "n" },
+          ],
+          reorderItems: [
+            { $match: { $expr: { $and: [{ $ne: ["$reorderLevelBase", null] }, { $lte: [{ $ifNull: ["$stockOnHandBase", 0] }, "$reorderLevelBase"] }] } } },
+            { $count: "n" },
+          ],
+      } },
+    ]),
   ]);
 
   let uoms = await InventoryUom.find({}).sort({ type: 1, name: 1 }).lean();
@@ -162,18 +194,16 @@ async function loadInventory(auth, req) {
   }
 
   const decoratedItems = items.map((item) => ({ ...item, ...expiryState(item) }));
+  const totals = statsResult[0]?.itemTotals?.[0] || {};
   const stats = {
     totalItems: total,
-    totalStock: decoratedItems.reduce((acc, item) => acc + (item.stockOnHandBase || 0), 0),
-    lowStock: decoratedItems.filter((item) => item.stockOnHandBase <= item.minimumStockBase).length,
-    reorderDue: decoratedItems.filter((item) => item.reorderLevelBase && item.stockOnHandBase <= item.reorderLevelBase).length,
-    expiredBatches: decoratedItems.reduce((acc, item) => acc + item.expiredBatches, 0),
-    nearExpiryBatches: decoratedItems.reduce((acc, item) => acc + item.nearExpiryBatches, 0),
-    quarantineBatches: decoratedItems.reduce((acc, item) => acc + (item.batches || []).filter((b) => b.status === "quarantine" && (b.quantityBase || 0) > 0).length, 0),
-    inventoryValue: decoratedItems.reduce(
-      (acc, item) => acc + (item.batches || []).reduce((sum, batch) => sum + (batch.quantityBase || 0) * (batch.costPerBaseUnit || 0), 0),
-      0
-    ),
+    totalStock: totals.totalStock || 0,
+    lowStock: statsResult[0]?.lowItems?.[0]?.n || 0,
+    reorderDue: statsResult[0]?.reorderItems?.[0]?.n || 0,
+    expiredBatches: totals.expiredBatches || 0,
+    nearExpiryBatches: totals.nearExpiryBatches || 0,
+    quarantineBatches: totals.quarantineBatches || 0,
+    inventoryValue: totals.inventoryValue || 0,
   };
 
   const defaultTypes = ["reagent", "consumable", "chemical", "control", "calibrator", "equipment", "stationery", "other"];
@@ -210,7 +240,7 @@ export async function GET(req) {
     const auth = await requireInventory(req);
     if (auth.error) return auth.error;
 
-    await processExpiredBatches(auth.tenantId);
+    await processExpiredBatches(auth.tenantId).catch((e) => console.error("inventory expiry processing failed:", e));
 
     const inventory = await loadInventory(auth, req);
     return Response.json(inventory);

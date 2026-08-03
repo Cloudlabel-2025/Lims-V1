@@ -69,15 +69,15 @@ function ScrollableDropdown({ name, options, value, onChange, ...props }) {
   );
 }
 
-export default function DatePicker({ value, onChange, max, className, error }) {
+export default function DatePicker({ value, onChange, max, className, error, onDraftChange }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const containerRef = useRef(null);
   const inputRef = useRef(null);
-  const pickingRef = useRef(false);
+  const prevValue = useRef(value);
 
   const selectedDate = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
-  const displayValue = typed || (selectedDate && isValid(selectedDate) ? format(selectedDate, "dd-MM-yyyy") : "");
+  const displayValue = typed || (selectedDate && isValid(selectedDate) ? format(selectedDate, "dd/MM/yyyy") : "");
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -89,19 +89,32 @@ export default function DatePicker({ value, onChange, max, className, error }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (value === "" && prevValue.current !== "") setTyped("");
+    prevValue.current = value;
+  }, [value]);
+
   const maxDate = max ? (typeof max === "string" ? parse(max, "yyyy-MM-dd", new Date()) : max) : undefined;
+  const minDate = new Date();
+  minDate.setFullYear(minDate.getFullYear() - 150);
 
   function commit(date) {
     if (date && isValid(date)) {
       onChange({ target: { name: "dob", value: format(date, "yyyy-MM-dd") } });
+      setTyped(format(date, "dd/MM/yyyy"));
+      onDraftChange?.(format(date, "dd/MM/yyyy"));
     }
-    setTyped("");
     setOpen(false);
   }
 
   function handleInputChange(e) {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
-    if (raw.length === 0) { setTyped(""); return; }
+    if (raw.length === 0) {
+      setTyped("");
+      onDraftChange?.("");
+      onChange({ target: { name: "dob", value: "" } });
+      return;
+    }
 
     let rem = raw;
     let day = "", month = "", year = "";
@@ -141,32 +154,23 @@ export default function DatePicker({ value, onChange, max, className, error }) {
       year = rem.slice(0, 4);
     }
 
-    // Validate year range only when all 4 year digits are in
-    if (year.length === 4) {
-      const y = parseInt(year, 10);
-      const cur = new Date().getFullYear();
-      if (y < 1941 || y > cur) return;
-      const full = day + "-" + month + "-" + year;
-      if (!parse(full, "dd-MM-yyyy", new Date())) return;
-    }
-
-    // Validate full date when complete
-    if (day.length === 2 && month.length === 2 && year.length === 4) {
-      const full = day + "-" + month + "-" + year;
-      if (!isValid(parse(full, "dd-MM-yyyy", new Date()))) return;
-    }
-
     // Build display
     let out = day;
-    if (month) out += "-" + month;
-    if (year) out += "-" + year;
+    if (month) out += "/" + month;
+    if (year) out += "/" + year;
     setTyped(out);
+    onDraftChange?.(out);
+    const parsed = parseTyped(out);
+    onChange({ target: { name: "dob", value: parsed && isValid(parsed) ? format(parsed, "yyyy-MM-dd") : "" } });
   }
 
   function parseTyped(v) {
-    const d = parse(v, "dd-MM-yyyy", new Date());
-    if (isValid(d)) return d;
-    return null;
+    const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    const [, dd, mm, yyyy] = m;
+    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0, 0);
+    if (d.getFullYear() !== Number(yyyy) || d.getMonth() !== Number(mm) - 1 || d.getDate() !== Number(dd)) return null;
+    return d;
   }
 
   function handleInputKeyDown(e) {
@@ -179,25 +183,6 @@ export default function DatePicker({ value, onChange, max, className, error }) {
     }
   }
 
-  function handleInputBlur() {
-    if (pickingRef.current) {
-      pickingRef.current = false;
-      return;
-    }
-    if (!open) {
-      const v = typed.trim();
-      if (!v) {
-        if (selectedDate && isValid(selectedDate)) {
-          setTyped("");
-        }
-        return;
-      }
-      const d = parseTyped(v);
-      if (d) commit(d);
-      else setTyped("");
-    }
-  }
-
   return (
     <div className="date-picker-container" ref={containerRef}>
       <div className="date-picker-input-wrap">
@@ -205,10 +190,9 @@ export default function DatePicker({ value, onChange, max, className, error }) {
           ref={inputRef}
           type="text"
           className={`lims-input date-picker-trigger${error ? " invalid" : ""}${className ? ` ${className}` : ""}`}
-          placeholder="DD-MM-YYYY"
+          placeholder="DD/MM/YYYY"
           value={displayValue}
           onChange={handleInputChange}
-          onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
         />
         <svg
@@ -226,15 +210,11 @@ export default function DatePicker({ value, onChange, max, className, error }) {
         </svg>
       </div>
       {open && (
-        <div
-          className="date-picker-popover"
-          onMouseDown={() => { pickingRef.current = true; }}
-          onMouseUp={() => { pickingRef.current = false; }}
-        >
+        <div className="date-picker-popover">
           <DayPicker
             mode="single"
             captionLayout="dropdown"
-            startMonth={new Date(1940, 0, 1)}
+            startMonth={new Date(minDate.getFullYear(), 0, 1)}
             endMonth={new Date(new Date().getFullYear(), 11, 31)}
             selected={selectedDate && isValid(selectedDate) ? selectedDate : undefined}
             onSelect={(date) => {
@@ -243,7 +223,7 @@ export default function DatePicker({ value, onChange, max, className, error }) {
               }
             }}
             disabled={[
-              { before: new Date(1941, 0, 1) },
+              { before: minDate },
               ...(maxDate ? [{ after: maxDate }] : []),
             ]}
             defaultMonth={selectedDate && isValid(selectedDate) ? selectedDate : undefined}

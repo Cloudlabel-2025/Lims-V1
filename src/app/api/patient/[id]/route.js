@@ -67,11 +67,13 @@ export async function PUT(req, { params }) {
     }
     if (body.dob) {
       const dobDate = new Date(body.dob);
+      const minDob = new Date();
+      minDob.setFullYear(minDob.getFullYear() - 150);
       if (isNaN(dobDate.getTime())) {
         return Response.json({ error: "Invalid date of birth" }, { status: 400 });
       }
-      if (dobDate.getFullYear() < 1941) {
-        return Response.json({ error: "Invalid date of birth" }, { status: 400 });
+      if (dobDate < minDob) {
+        return Response.json({ error: "Age must be between 0 and 150 years" }, { status: 400 });
       }
       if (dobDate > new Date()) {
         return Response.json({ error: "Date of birth cannot be in the future" }, { status: 400 });
@@ -80,8 +82,8 @@ export async function PUT(req, { params }) {
     if (body.gender === "Other" && !body.genderIdentity) {
       return Response.json({ error: "Gender Identity is required when Gender is 'Other'" }, { status: 400 });
     }
-    if (body.age !== undefined && body.age !== null && (Number(body.age) < 0 || isNaN(Number(body.age)))) {
-      return Response.json({ error: "Age must be a valid number" }, { status: 400 });
+    if (body.age !== undefined && body.age !== null && (Number(body.age) < 0 || Number(body.age) > 150 || isNaN(Number(body.age)))) {
+      return Response.json({ error: "Age must be between 0 and 150" }, { status: 400 });
     }
     if (body.address) {
       const addr = clean(body.address);
@@ -91,29 +93,6 @@ export async function PUT(req, { params }) {
       if (/https?:\/\/|www\./i.test(addr)) {
         return Response.json({ error: "URLs not allowed in address" }, { status: 400 });
       }
-    }
-    if (body.barcode) {
-      if (!/^[A-Za-z0-9_-]+$/.test(body.barcode)) {
-        return Response.json({ error: "Barcode: only letters, numbers, hyphens, and underscores allowed" }, { status: 400 });
-      }
-      if (/https?:\/\/|www\./i.test(body.barcode)) {
-        return Response.json({ error: "URLs not allowed in barcode" }, { status: 400 });
-      }
-    }
-    if (body.collectionTime && new Date(body.collectionTime) > new Date()) {
-      return Response.json({ error: "Collection Time cannot be in the future" }, { status: 400 });
-    }
-    if (body.receivedTime && new Date(body.receivedTime) > new Date()) {
-      return Response.json({ error: "Received Time cannot be in the future" }, { status: 400 });
-    }
-    if (body.collectionTime && body.receivedTime && new Date(body.receivedTime) < new Date(body.collectionTime)) {
-      return Response.json({ error: "Received Time cannot be earlier than Collection Time" }, { status: 400 });
-    }
-    if (body.dob && body.collectionTime && new Date(body.collectionTime) < new Date(body.dob)) {
-      return Response.json({ error: "Collection time cannot be before date of birth" }, { status: 400 });
-    }
-    if (body.dob && body.receivedTime && new Date(body.receivedTime) < new Date(body.dob)) {
-      return Response.json({ error: "Received time cannot be before date of birth" }, { status: 400 });
     }
 
     const patient = await Patient.findByIdAndUpdate(

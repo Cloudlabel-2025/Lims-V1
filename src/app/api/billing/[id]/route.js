@@ -94,6 +94,10 @@ export async function PATCH(req, { params }) {
       return Response.json({ error: "Bill is already cancelled" }, { status: 400 });
     }
 
+    if (billingRecord.billingStatus === "partial") {
+      return Response.json({ error: "Cannot cancel a partially paid bill — revert it instead" }, { status: 400 });
+    }
+
     if (billingRecord.billingStatus === "paid") {
       return Response.json({ error: "Cannot cancel a paid bill. Issue a refund instead." }, { status: 400 });
     }

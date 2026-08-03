@@ -4,17 +4,20 @@ import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
+import { getISTNow } from "@/app/utils/patient-helpers";
 
 export default function SampleRegistration() {
   const router = useRouter();
   const [patients, setPatients] = useState([]);
   const [tests, setTests] = useState([]);
-  const [form, setForm] = useState({ patient: "", testDefinition: "", sampleType: "", batchId: "" });
+  const [form, setForm] = useState({ patient: "", testDefinition: "", sampleType: "", batchId: "", collectionTime: "", receivedTime: "" });
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
+    setForm((prev) => ({ ...prev, receivedTime: getISTNow() }));
     async function fetchData() {
       try {
         const [patRes, testRes] = await Promise.all([
@@ -48,6 +51,27 @@ export default function SampleRegistration() {
     if (!form.patient) { setError("Please select a patient"); return; }
     if (!form.testDefinition) { setError("Please select a test"); return; }
 
+    const newErrors = {};
+    if (!form.receivedTime) newErrors.receivedTime = "Received time is required";
+    else if (isNaN(new Date(form.receivedTime).getTime())) newErrors.receivedTime = "Invalid received time";
+    else if (new Date(form.receivedTime) > new Date()) newErrors.receivedTime = "Received time cannot be in the future";
+    if (form.collectionTime) {
+      if (isNaN(new Date(form.collectionTime).getTime())) newErrors.collectionTime = "Invalid collection time";
+      else if (new Date(form.collectionTime) > new Date()) newErrors.collectionTime = "Collection time cannot be in the future";
+      else if (new Date(form.receivedTime) < new Date(form.collectionTime)) newErrors.collectionTime = "Collection time must be before received time";
+    }
+    const patient = patients.find((p) => p._id === form.patient);
+    if (patient?.dob) {
+      const dobDate = new Date(patient.dob);
+      if (form.collectionTime && new Date(form.collectionTime) < dobDate) newErrors.collectionTime = "Collection time cannot be before date of birth";
+      if (form.receivedTime && new Date(form.receivedTime) < dobDate) newErrors.receivedTime = "Received time cannot be before date of birth";
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setError("Please correct the highlighted errors.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/samples", {
@@ -63,7 +87,7 @@ export default function SampleRegistration() {
       clearCachedApi("/api/dashboard/stats");
 
       setSuccess(`Sample ${data.sample.sampleId} registered successfully.`);
-      setForm({ patient: "", testDefinition: "", sampleType: "", batchId: "" });
+      setForm({ patient: "", testDefinition: "", sampleType: "", batchId: "", collectionTime: "", receivedTime: getISTNow() });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -128,8 +152,26 @@ export default function SampleRegistration() {
           </div>
         </div>
 
+        <div className="form-card">
+          <div className="form-card-header"><h6>Sample Timing</h6></div>
+          <div className="form-card-body">
+            <div className="row g-3">
+              <div className="col-md-6">
+                <label className="lims-label">Collection Time <span className="optional">(optional)</span></label>
+                <input type="datetime-local" name="collectionTime" className={`lims-input ${errors.collectionTime ? 'invalid' : ''}`} value={form.collectionTime} onChange={handleChange} />
+                {errors.collectionTime && <div className="lims-error-text">{errors.collectionTime}</div>}
+              </div>
+              <div className="col-md-6">
+                <label className="lims-label">Received Time <span className="required">*</span></label>
+                <input type="datetime-local" name="receivedTime" className={`lims-input ${errors.receivedTime ? 'invalid' : ''}`} value={form.receivedTime} onChange={handleChange} />
+                {errors.receivedTime && <div className="lims-error-text">{errors.receivedTime}</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="form-actions">
-          <button type="button" className="btn-lims-secondary" onClick={() => setForm({ patient: "", testDefinition: "", sampleType: "", batchId: "" })}>Reset</button>
+          <button type="button" className="btn-lims-secondary" onClick={() => setForm({ patient: "", testDefinition: "", sampleType: "", batchId: "", collectionTime: "", receivedTime: getISTNow() })}>Reset</button>
           <button type="submit" className="btn-lims-primary" disabled={loading}>{loading ? "Registering..." : "Register Sample"}</button>
         </div>
       </form>

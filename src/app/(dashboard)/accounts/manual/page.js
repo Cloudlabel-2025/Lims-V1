@@ -5,6 +5,7 @@ import SuccessDialog from "@/app/components/SuccessDialog";
 import { money, hasUrl, inputStyle, sanitizeAmountInput } from "../_components/helpers";
 import Badge from "../_components/Badge";
 import Field from "../_components/Field";
+import BackToDashboard from "../_components/BackToDashboard";
 
 const emptyJournal = {
   date: new Date().toISOString().slice(0, 10),
@@ -97,8 +98,20 @@ export default function ManualPage() {
   }
 
   return (
-    <form className="form-card" onSubmit={handleSubmit} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 14 }}>
-      <h5 style={{ margin: 0, fontSize: 16 }}>Manual Journal</h5>
+    <div className="patients-page" style={{ paddingBottom: 40 }}>
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div className="page-header-icon" style={{ background: "var(--brand-surface, #e6f0fa)", color: "var(--brand-action, var(--primary))", padding: 12, borderRadius: 8 }}>
+            {Icons.edit}
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: 20, color: "var(--text-main)" }}>Manual Journal</h4>
+            <small style={{ color: "var(--text-muted)" }}>Post double-entry journal</small>
+          </div>
+        </div>
+        <BackToDashboard />
+      </div>
+      <form className="form-card" onSubmit={handleSubmit} style={{ padding: 20, borderRadius: 8, display: "grid", gap: 14 }}>
 
       {error && <div style={{ padding: "10px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>{error}</div>}
       <SuccessDialog message={success} onClose={() => setSuccess("")} />
@@ -144,5 +157,6 @@ export default function ManualPage() {
         </>
       )}
     </form>
+    </div>
   );
 }

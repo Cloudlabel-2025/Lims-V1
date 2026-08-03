@@ -52,7 +52,6 @@ const doctorSchema = new mongoose.Schema({
     },
     mciNumber: {
         type: String,
-        required: true,
         unique: true,
         uppercase: true,
         trim: true,

@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { money, formatDate, inputStyle } from "../_components/helpers";
 import Badge from "../_components/Badge";
@@ -8,6 +7,7 @@ import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 import Field from "../_components/Field";
 import DownloadDropdown from "../_components/DownloadDropdown";
+import BackToDashboard from "../_components/BackToDashboard";
 
 const methodColors = {
   cash: ["#ecfdf5", "#047857"],
@@ -18,7 +18,6 @@ const methodColors = {
 };
 
 export default function ReceiptsPage() {
-  const router = useRouter();
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -79,9 +78,7 @@ export default function ReceiptsPage() {
             <small style={{ color: "var(--text-muted)" }}>View all payment receipts</small>
           </div>
         </div>
-        <button type="button" className="btn-lims-secondary" onClick={() => router.push("/accounts")} style={{ height: 38, padding: "0 14px" }}>
-          {Icons.arrowLeft} Dashboard
-        </button>
+        <BackToDashboard />
       </div>
 
       <div className="form-card" style={{ padding: 14, borderRadius: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>

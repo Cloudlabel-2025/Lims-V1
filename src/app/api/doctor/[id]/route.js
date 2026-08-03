@@ -57,13 +57,20 @@ export async function PUT(req, { params }) {
 
     payload.email = String(payload.email).toLowerCase();
     payload.phone = String(payload.phone);
-    payload.mciNumber = String(payload.mciNumber).toUpperCase();
+    const mciValue = String(payload.mciNumber ?? "").trim();
+    const hasMci = Boolean(mciValue);
+    if (hasMci) payload.mciNumber = mciValue.toUpperCase();
+    else delete payload.mciNumber;
     payload.experience = Number(payload.experience);
     payload.commission = payload.commission !== undefined ? Number(payload.commission) : 0;
 
+    const updateOp = hasMci
+      ? { $set: payload }
+      : { $set: payload, $unset: { mciNumber: "" } };
+
     const doctor = await Doctor.findByIdAndUpdate(
       id,
-      { $set: payload },
+      updateOp,
       { returnDocument: "after", runValidators: true }
     );
 

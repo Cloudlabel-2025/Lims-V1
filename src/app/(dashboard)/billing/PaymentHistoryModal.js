@@ -11,7 +11,7 @@ function formatMethod(method) {
   return METHOD_LABEL[method] || method;
 }
 
-function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh }) {
+function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh, onRevert, canRefundBilling, reverting }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -49,6 +49,12 @@ function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh }) {
   const receipts = data?.receipts || [];
   const totalPaid = receipts.length > 0 ? receipts[0].runningTotal : 0;
   const remaining = bill?.totalAmount ? Math.max(0, bill.totalAmount - totalPaid) : 0;
+  const canRevert =
+    canRefundBilling &&
+    ["paid", "partial"].includes(bill?.billingStatus) &&
+    receipts.length > 0 &&
+    receipts.every((r) => r.method === "cash" && !r.isRefunded) &&
+    (data?.samples || []).every((s) => s.status === "registered");
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -146,7 +152,28 @@ function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh }) {
           )}
         </div>
 
-        <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+        <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+            {receipts.length > 0 && receipts.some((r) => r.method !== "cash") && (
+              <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" }}>
+                Revert is only available for hand (cash) payments.
+              </span>
+            )}
+          </div>
+          {canRevert && (
+            <button
+              className="btn-modal-cancel"
+              onClick={() => onRevert?.(billId)}
+              disabled={reverting}
+              style={{
+                color: "#dc2626",
+                borderColor: "#fecaca",
+                background: "#fef2f2",
+              }}
+            >
+              {reverting ? "Reverting..." : "Revert Bill"}
+            </button>
+          )}
           <button className="btn-modal-cancel" onClick={onClose}>Close</button>
         </div>
       </div>

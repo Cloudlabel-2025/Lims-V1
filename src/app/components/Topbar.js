@@ -26,13 +26,12 @@ export default function Topbar({ onToggleSidebar, user, theme }) {
   const [apiResults, setApiResults] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [hasUnread, setHasUnread] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState(loadRecentSearches);
   const searchTimer = useRef(null);
   const topbarRef = useRef(null);
-  const notifVersion = useRef("");
   const displayName = user?.name || user?.email?.split("@")[0] || "Admin";
   const avatarInitial = displayName.trim()[0]?.toUpperCase() || "A";
 
@@ -85,21 +84,31 @@ export default function Topbar({ onToggleSidebar, user, theme }) {
       const resp = await fetch("/api/notifications", { credentials: "include" });
       const data = await resp.json();
       if (resp.ok) {
-        const next = data.notifications || [];
-        const nextVersion = next.map((n) => n.id).join(",");
-        if (nextVersion !== notifVersion.current && notifVersion.current !== "") {
-          setHasUnread(true);
-        }
-        notifVersion.current = nextVersion;
-        setNotifications(next);
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
       }
     } catch { /* noop */ }
+  }, []);
+
+  const markNotificationsRead = useCallback(async () => {
+    try {
+      await fetch("/api/notifications/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ all: true }),
+      });
+    } catch { /* noop */ }
+    setUnreadCount(0);
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(fetchNotifications, 0);
     const interval = setInterval(fetchNotifications, 60000);
-    return () => { clearTimeout(timer); clearInterval(interval); };
+    const onFocus = () => fetchNotifications();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { clearTimeout(timer); clearInterval(interval); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
   }, [fetchNotifications]);
 
   useEffect(() => {
@@ -187,18 +196,19 @@ export default function Topbar({ onToggleSidebar, user, theme }) {
         <div className="dash-action-wrap">
           <button className="dash-topbar-btn" id="notification-btn" type="button" aria-label="Notifications"
             aria-expanded={notificationsOpen}
-            onClick={() => { setNotificationsOpen((o) => !o); setAccountOpen(false); setHasUnread(false); }}
+            onClick={() => { const opening = !notificationsOpen; setNotificationsOpen((o) => !o); setAccountOpen(false); if (opening && unreadCount > 0) markNotificationsRead(); }}
           >
             {Icons.bell}
-            {hasUnread && notifications.length > 0 && <span className="dash-notif-dot" />}
+            {unreadCount > 0 && notifications.length > 0 && <span className="dash-notif-dot" />}
           </button>
           {notificationsOpen && (
             <div className="dash-menu-dropdown notifications">
-              <div className="dash-dropdown-header">Notifications</div>
+              <div className="dash-dropdown-header">Notifications{unreadCount > 0 ? ` · ${unreadCount} unread` : ""}</div>
               {notifications.length > 0 ? (
                 notifications.map((item) => (
                   <button type="button" className="dash-notification-item" key={item.id}
-                    onClick={() => { setNotificationsOpen(false); router.push(item.href); }}
+                    style={item.unread ? undefined : { opacity: 0.7 }}
+                    onClick={() => { if (item.unread) { setUnreadCount((c) => Math.max(0, (c || 0) - 1)); fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ types: [item.id] }) }).catch(() => {}); } setNotificationsOpen(false); router.push(item.href); }}
                   >
                     <span className={`dash-priority-dot ${item.priority}`} />
                     <span>
@@ -208,7 +218,7 @@ export default function Topbar({ onToggleSidebar, user, theme }) {
                   </button>
                 ))
               ) : (
-                <div className="dash-dropdown-empty" style={{ padding: "22px 14px" }}>No new notifications</div>
+                <div className="dash-dropdown-empty" style={{ padding: "22px 14px" }}>No notifications</div>
               )}
             </div>
           )}

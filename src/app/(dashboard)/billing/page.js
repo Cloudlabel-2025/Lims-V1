@@ -67,6 +67,9 @@ export default function BillingPage() {
   const [partialConfirmData, setPartialConfirmData] = useState(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+  const [revertConfirmId, setRevertConfirmId] = useState(null);
+  const [revertReason, setRevertReason] = useState("");
 
   const pendingBills = useMemo(
     () => billingRecords.filter((billingRecord) => billingRecord.billingStatus !== "paid" && billingRecord.billingStatus !== "cancelled"),
@@ -104,6 +107,7 @@ export default function BillingPage() {
   const canDiscountBilling = hasPermission(user, "billing.discount");
   const canCancelBilling = hasPermission(user, "billing.cancel");
   const canUpdateBilling = hasPermission(user, "billing.update");
+  const canRefundBilling = hasPermission(user, "billing.refund");
 
   const loadData = useCallback(async ({ force = false } = {}) => {
     setLoading(true);
@@ -469,6 +473,42 @@ export default function BillingPage() {
     }
   }
 
+  const openRevert = (billId) => {
+    setRevertConfirmId(billId);
+    setShowRevertConfirm(true);
+  };
+
+  async function confirmRevertBill() {
+    if (!revertConfirmId) return;
+    setShowRevertConfirm(false);
+    setClosing(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/billing/${revertConfirmId}/revert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ reason: (revertReason || "").trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to revert bill");
+      clearCachedApi("/api/billing");
+      clearCachedApi("/api/billing/payments-history");
+      clearCachedApi(`/api/billing/${revertConfirmId}/receipts`);
+      await loadData({ force: true });
+      if (activeTab === "history") await loadPaymentHistory({ force: true });
+      setShowPaymentHistory(false);
+      setSuccess("Bill reverted successfully.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setClosing(false);
+      setRevertConfirmId(null);
+      setRevertReason("");
+    }
+  }
+
   if (loading) return <div className="module-page">Loading...</div>;
 
   return (
@@ -623,7 +663,7 @@ export default function BillingPage() {
                               Edit
                             </button>
                           )}
-                          {canCancelBilling && billingRecord.billingStatus !== "paid" && (
+                          {canCancelBilling && billingRecord.billingStatus === "unpaid" && (
                             <button
                               className="dash-btn-secondary"
                               onClick={() => cancelBill(billingRecord._id)}
@@ -726,6 +766,9 @@ export default function BillingPage() {
           loading={loading}
           onPageChange={setPaymentPage}
           onViewHistory={handleViewHistory}
+          onRevert={openRevert}
+          canRefundBilling={canRefundBilling}
+          reverting={closing}
         />
       )}
       {showCloseModal && selectedBillingRecord && (
@@ -805,6 +848,50 @@ export default function BillingPage() {
         </div>
       )}
 
+      {showRevertConfirm && (
+        <div className="modal-overlay" onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "460px", width: "95%", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
+            <div style={{ padding: "20px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h4 style={{ margin: 0, fontSize: "18px" }}>Revert Bill</h4>
+              <button onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); }} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{Icons.close}</button>
+            </div>
+            <div style={{ padding: "20px" }}>
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-md)", padding: "14px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "600", color: "#991b1b", marginBottom: "8px" }}>
+                  {Icons.alertTriangle}
+                  <span>Revert Bill?</span>
+                </div>
+                <div style={{ fontSize: "13px", color: "#7f1d1d", lineHeight: "1.5" }}>
+                  This permanently reverts the bill and cannot be undone. It reverses all cash payments (they will be refunded), reverses the invoice/commission journal entries, and rejects all registered samples.
+                </div>
+              </div>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Reason (optional)</span>
+                <textarea
+                  className="lims-input"
+                  value={revertReason}
+                  onChange={(e) => setRevertReason(e.target.value)}
+                  rows={3}
+                  maxLength={150}
+                  placeholder="Why is this bill being reverted?"
+                />
+              </label>
+            </div>
+            <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button className="btn-modal-cancel" onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); }}>Go Back</button>
+              <button
+                className="btn-modal-confirm"
+                onClick={confirmRevertBill}
+                disabled={closing}
+                style={closing ? { opacity: 0.6, cursor: "not-allowed", background: "var(--danger, #dc2626)" } : { background: "var(--danger, #dc2626)" }}
+              >
+                {closing ? "Processing..." : "Yes, Revert Bill"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingBill && (
         <div className="modal-overlay" onClick={closeEditBill}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
@@ -874,6 +961,9 @@ export default function BillingPage() {
           billId={historyBillId}
           isOpen={showPaymentHistory}
           onClose={() => setShowPaymentHistory(false)}
+          onRevert={openRevert}
+          canRefundBilling={canRefundBilling}
+          reverting={closing}
         />
       )}
     </div>

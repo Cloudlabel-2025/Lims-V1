@@ -55,10 +55,11 @@ export async function GET(req) {
     // For each invoice, fetch ALL its receipts (oldest first) and compute running remaining at each payment
     const runningRemainingByReceiptId = new Map();
     const runningCumulativeByReceiptId = new Map();
+    const canRevertByInvoiceId = new Map();
 
     if (invoiceIds.length > 0) {
       const allReceiptsForInvoices = await PaymentReceipt.find({ tenantId: auth.tenantId, invoiceId: { $in: invoiceIds } })
-        .select("invoiceId amount receivedAt")
+        .select("invoiceId amount receivedAt method isRefunded")
         .sort({ receivedAt: 1 }) // ASC = oldest first
         .lean();
 
@@ -73,10 +74,12 @@ export async function GET(req) {
 
       // Get bill totals for these invoices (from the populated receipts on current page)
       const billTotals = new Map();
+      const billStatuses = new Map();
       for (const r of receipts) {
         const id = r.invoiceId?._id?.toString() || r.invoiceId?.toString();
         if (id && !billTotals.has(id)) {
           billTotals.set(id, money(r.invoiceId?.totalAmount || 0));
+          billStatuses.set(id, r.invoiceId?.billingStatus || "unpaid");
         }
       }
 
@@ -90,6 +93,10 @@ export async function GET(req) {
           runningCumulativeByReceiptId.set(r._id.toString(), runningPaid);
           runningRemainingByReceiptId.set(r._id.toString(), remaining);
         }
+        const allCash = invReceipts.every((r) => r.method === "cash");
+        const noneRefunded = invReceipts.every((r) => !r.isRefunded);
+        const billStatus = billStatuses.get(invoiceId) || "unpaid";
+        canRevertByInvoiceId.set(invoiceId, allCash && noneRefunded && (billStatus === "paid" || billStatus === "partial"));
       }
     }
 
@@ -121,6 +128,7 @@ export async function GET(req) {
         invoiceTotalAmount: invoiceTotalAmount,
         billingStatus: receipt.invoiceId?.billingStatus || "unpaid",
         investigationCount: receipt.invoiceId?.items?.length || 0,
+        canRevert: canRevertByInvoiceId.get(invoiceId) || false,
       });
     }
 

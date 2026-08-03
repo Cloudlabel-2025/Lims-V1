@@ -8,7 +8,7 @@ export async function GET(req, { params }) {
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const { PaymentReceipt, BillingRecord } = await getTenantModels(auth.tenantId);
+    const { PaymentReceipt, BillingRecord, Sample } = await getTenantModels(auth.tenantId);
 
     const billingRecord = await BillingRecord.findById(id)
       .select("billId patient totalAmount billingStatus items")
@@ -19,10 +19,13 @@ export async function GET(req, { params }) {
       return Response.json({ error: "Billing record not found" }, { status: 404 });
     }
 
-    const receipts = await PaymentReceipt.find({ invoiceId: id, tenantId: auth.tenantId })
-      .populate("receivedBy", "name")
-      .sort({ receivedAt: -1 })
-      .lean();
+    const [receipts, samples] = await Promise.all([
+      PaymentReceipt.find({ invoiceId: id, tenantId: auth.tenantId })
+        .populate("receivedBy", "name")
+        .sort({ receivedAt: -1 })
+        .lean(),
+      Sample.find({ billingRecord: id }).select("sampleId status").lean(),
+    ]);
 
     let runningTotal = 0;
     const receiptsWithTotals = receipts.map((receipt) => {
@@ -48,6 +51,7 @@ export async function GET(req, { params }) {
         billingStatus: billingRecord.billingStatus,
         investigationCount: billingRecord.items?.length || 0,
       },
+      samples: samples.map((sample) => ({ sampleId: sample.sampleId, status: sample.status })),
     });
   } catch (error) {
     return jsonError("Unable to load receipts", error, 500);

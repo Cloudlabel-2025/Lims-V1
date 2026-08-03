@@ -11,6 +11,9 @@ export default function EditPatient({ params }) {
   const resolvedParams = use(params);
   const { id } = resolvedParams;
   const router = useRouter();
+  const minDob = new Date();
+  minDob.setFullYear(minDob.getFullYear() - 150);
+  const minDobStr = minDob.toISOString().split("T")[0];
   
   const [errors, setErrors] = useState({});
   const [showErrors, setShowErrors] = useState(false);
@@ -26,19 +29,14 @@ export default function EditPatient({ params }) {
       try {
         const { response: res, data } = await cachedJsonFetch(`/api/patient/${id}`, { ttl: 10_000 });
         if (res.ok) {
-          // Format dates for input[type="date"] and datetime-local
+          // Format dates for input[type="date"]
           const formattedData = {
             ...data,
             dob: data.dob ? new Date(data.dob).toISOString().split("T")[0] : "",
-            receivedTime: data.receivedTime ? new Date(data.receivedTime).toISOString().slice(0, 16) : "",
-            collectionTime: data.collectionTime ? new Date(data.collectionTime).toISOString().slice(0, 16) : "",
           };
           setForm(formattedData);
           if (data.refDoctorName) setHasRefDoctor(true);
-    } else if (name === "phone") {
-      const sanitized = value.replace(/\D/g, "").slice(0, 10);
-      setForm((prev) => ({ ...prev, phone: sanitized }));
-    } else {
+        } else {
           setStatus({ type: "danger", message: data.error || "Failed to load patient data." });
         }
       } catch (err) {
@@ -65,14 +63,6 @@ export default function EditPatient({ params }) {
     if (name === "dob") {
       const calculatedAge = calculateAge(value);
       setForm((prev) => ({ ...prev, dob: value, age: calculatedAge }));
-    } else if (name === "barcode") {
-      const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
-      let formatted = "";
-      for (let i = 0; i < cleaned.length; i++) {
-        if (i === 4 || i === 12) formatted += "-";
-        formatted += cleaned[i];
-      }
-      setForm((prev) => ({ ...prev, barcode: formatted }));
     } else if (name === "uhId") {
       const sanitized = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 14);
       setForm((prev) => ({ ...prev, uhId: sanitized }));
@@ -99,31 +89,16 @@ export default function EditPatient({ params }) {
     if (!form.dob) newErrors.dob = "Date of Birth is required";
     else {
       const dobDate = new Date(form.dob);
-      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1941) newErrors.dob = "Invalid date of birth";
+      if (isNaN(dobDate.getTime()) || dobDate < minDob) newErrors.dob = "Age must be between 0 and 150 years";
       else if (dobDate > new Date()) newErrors.dob = "Date of birth cannot be in the future";
     }
     if (!form.age && form.age !== 0) newErrors.age = "Age is required";
-    else if (parseInt(form.age) < 0) newErrors.age = "Invalid age";
+    else if (parseInt(form.age) < 0 || parseInt(form.age) > 150) newErrors.age = "Age must be between 0 and 150";
     if (!form.phone?.trim()) newErrors.phone = "Mobile number is required";
     else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
     if (form.address?.trim() && !/^[A-Za-z0-9 .,/-]+$/.test(form.address)) newErrors.address = "Only letters, numbers, spaces, and . , / - allowed";
     else if (/https?:\/\/|www\./i.test(form.address)) newErrors.address = "URLs not allowed in address";
-    if (!form.barcode?.trim()) newErrors.barcode = "Barcode is required";
-    else if (!/^[A-Z]{4}-\d{8}-\d{4}$/.test(form.barcode)) newErrors.barcode = "Format: XXXX-NNNNNNNN-NNNN (e.g., ABCD-12345678-1234)";
-    if (!form.uhId?.trim()) newErrors.uhId = "UH ID is required";
-    else if (!/^[A-Za-z0-9]{14}$/.test(String(form.uhId))) newErrors.uhId = "UH ID must be exactly 14 alphanumeric characters";
-    if (!form.receivedTime) newErrors.receivedTime = "Received time is required";
-    else if (new Date(form.receivedTime) > new Date()) newErrors.receivedTime = "Received time cannot be in the future";
-    if (form.collectionTime && new Date(form.collectionTime) > new Date()) newErrors.collectionTime = "Collection time cannot be in the future";
-    if (form.collectionTime && form.receivedTime && new Date(form.receivedTime) < new Date(form.collectionTime)) {
-      newErrors.receivedTime = "Received time cannot be earlier than collection time";
-    }
-    if (form.dob && form.collectionTime && new Date(form.collectionTime) < new Date(form.dob)) {
-      newErrors.collectionTime = "Collection time cannot be before date of birth";
-    }
-    if (form.dob && form.receivedTime && new Date(form.receivedTime) < new Date(form.dob)) {
-      newErrors.receivedTime = "Received time cannot be before date of birth";
-    }
+    if (form.uhId && !/^[A-Za-z0-9]{14}$/.test(String(form.uhId))) newErrors.uhId = "UH ID must be exactly 14 alphanumeric characters";
     if (hasRefDoctor && !form.refDoctorName?.trim()) newErrors.refDoctorName = "Referring doctor is required";
 
     return newErrors;
@@ -212,7 +187,7 @@ export default function EditPatient({ params }) {
               </div>
               <div className="col-md-3">
                 <label className="lims-label">Date of Birth <span className="required">*</span></label>
-                <input type="date" name="dob" className={`lims-input ${errors.dob ? 'invalid' : ''}`} value={form.dob} max={new Date().toISOString().split("T")[0]} onChange={handleChange} />
+                <input type="date" name="dob" className={`lims-input ${errors.dob ? 'invalid' : ''}`} value={form.dob} min={minDobStr} max={new Date().toISOString().split("T")[0]} onChange={handleChange} />
               </div>
               <div className="col-md-1">
                 <label className="lims-label">Age</label>
@@ -245,13 +220,7 @@ export default function EditPatient({ params }) {
               </div>
 
               <div className="col-md-4">
-                <label className="lims-label">Barcode</label>
-                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="XXXX-NNNNNNNN-NNNN" maxLength={18} value={form.barcode || ""} onChange={handleChange} />
-                {errors.barcode && <div className="lims-error-text">{errors.barcode}</div>}
-              </div>
-
-              <div className="col-md-4">
-                <label className="lims-label">UH ID</label>
+                <label className="lims-label">UH ID <span className="optional">(optional)</span></label>
                 <input type="text" name="uhId" className={`lims-input ${errors.uhId ? 'invalid' : ''}`} placeholder="Enter UH ID (14 characters)" maxLength={14} value={form.uhId || ""} onChange={handleChange} />
                 {errors.uhId && <div className="lims-error-text">{errors.uhId}</div>}
               </div>
@@ -278,23 +247,11 @@ export default function EditPatient({ params }) {
           </div>
         </div>
 
-        {/* Step 3: Timing & Referral */}
+        {/* Step 3: Referral */}
         <div className="form-card">
-          <div className="form-card-header"><h6><span className="step-badge">3</span>Sample Timing & Referral</h6></div>
+          <div className="form-card-header"><h6><span className="step-badge">3</span>Referral</h6></div>
           <div className="form-card-body">
             <div className="row g-3">
-              <div className="col-md-6">
-                <label className="lims-label">Collection Time</label>
-                <input type="datetime-local" name="collectionTime" className={`lims-input ${errors.collectionTime ? 'invalid' : ''}`} value={form.collectionTime} onChange={handleChange} />
-                {errors.collectionTime && <div className="lims-error-text">{errors.collectionTime}</div>}
-              </div>
-              <div className="col-md-6">
-                <label className="lims-label">Received Time <span className="required">*</span></label>
-                <input type="datetime-local" name="receivedTime" className={`lims-input ${errors.receivedTime ? 'invalid' : ''}`} value={form.receivedTime} onChange={handleChange} />
-                {errors.receivedTime && <div className="lims-error-text">{errors.receivedTime}</div>}
-              </div>
-            </div>
-            <div className="row g-3 mt-1">
               <div className="col-12">
                 <label className="lims-label">Doctor Referral</label>
                 <div className="radio-group">

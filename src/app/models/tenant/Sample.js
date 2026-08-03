@@ -98,6 +98,7 @@ export const SampleSchema = new mongoose.Schema(
       maxlength: 80,
     },
     receivedAt: { type: Date },
+    collectionTime: { type: Date },
     receivedBy: { type: String, trim: true },
     batchId: { type: String, trim: true, index: true },
     results: {

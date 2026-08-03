@@ -176,7 +176,7 @@ export default function EditDoctor({ params }) {
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
               </div>
               <div className="col-md-4">
-                 <label className="lims-label">MCI Registration Number <span className="required">*</span></label>
+                 <label className="lims-label">MCI Registration Number</label>
                 <input 
                   name="mciNumber" 
                   className={`lims-input ${errors.mciNumber ? 'invalid' : ''}`} 

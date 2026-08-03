@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { money, formatDate, inputStyle } from "../_components/helpers";
 import Badge from "../_components/Badge";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
+import BackToDashboard from "../_components/BackToDashboard";
 
 const statusColors = {
   paid: ["#ecfdf5", "#047857"],
@@ -17,7 +17,6 @@ const statusColors = {
 };
 
 export default function InvoicesPage() {
-  const router = useRouter();
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -88,9 +87,7 @@ export default function InvoicesPage() {
             <small style={{ color: "var(--text-muted)" }}>View and download invoices</small>
           </div>
         </div>
-        <button type="button" className="btn-lims-secondary" onClick={() => router.push("/accounts")} style={{ height: 38, padding: "0 14px" }}>
-          {Icons.arrowLeft} Dashboard
-        </button>
+        <BackToDashboard />
       </div>
 
       {loading ? (

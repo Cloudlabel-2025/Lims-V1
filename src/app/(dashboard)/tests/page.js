@@ -85,7 +85,6 @@ export default function TestsPage() {
   const [inventoryUoms, setInventoryUoms] = useState([]);
   const [form, setForm] = useState(blankForm);
   const [packageForm, setPackageForm] = useState(blankPackageForm);
-  const [categoryName, setCategoryName] = useState("");
   const [categoryForm, setCategoryForm] = useState({ name: "", description: "", status: "active" });
   const [editingId, setEditingId] = useState("");
   const [editingPackageId, setEditingPackageId] = useState("");
@@ -237,7 +236,8 @@ export default function TestsPage() {
 
   async function saveCategory(event) {
     event.preventDefault();
-    const name = categoryName.trim();
+    const name = categoryForm.name.trim();
+    const description = categoryForm.description.trim();
     if (!name) { setError("Category name is required"); return; }
     if (name.length > 25) { setError("Category name must be 25 characters or less"); return; }
     if (!isValidField(name, NAME_PATTERN)) {
@@ -257,7 +257,7 @@ export default function TestsPage() {
         method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name: categoryName }),
+        body: JSON.stringify({ name, description, status: categoryForm.status }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || (editingCategoryId ? "Unable to update category" : "Unable to create category"));
@@ -270,7 +270,7 @@ export default function TestsPage() {
         setCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
         setForm((current) => ({ ...current, category: data.category._id }));
       }
-      setCategoryName("");
+      setCategoryForm({ name: "", description: "", status: "active" });
       setSuccess(`Category "${data.category.name}" ${editingCategoryId ? "updated" : "created"} successfully.`);
     } catch (err) {
       setError(err.message);
@@ -552,6 +552,16 @@ export default function TestsPage() {
     });
   }
 
+  function editCategory(cat) {
+    setEditingCategoryId(cat._id);
+    setCategoryForm({
+      name: cat.name || "",
+      description: cat.description || "",
+      status: cat.status || "active",
+    });
+    setActiveTab("categories");
+  }
+
   async function deleteCategory(categoryId) {
     setSaving(true);
     setError("");
@@ -706,10 +716,10 @@ export default function TestsPage() {
           canEditTests={canEditTests}
           editingCategoryId={editingCategoryId}
           saveCategory={saveCategory}
-          categoryName={categoryName}
-          setCategoryName={setCategoryName}
+          categoryForm={categoryForm}
+          setCategoryForm={setCategoryForm}
           saving={saving}
-          onCancelEdit={() => { setEditingCategoryId(""); setCategoryName(""); }}
+          onCancelEdit={() => { setEditingCategoryId(""); setCategoryForm({ name: "", description: "", status: "active" }); }}
         />
       )}
 
@@ -999,6 +1009,8 @@ export default function TestsPage() {
           editTest={editTest}
           editPackage={editPackage}
           canDeleteTests={canDeleteTests}
+          editCategory={editCategory}
+          editingCategoryId={editingCategoryId}
           onDeleteCategory={canDeleteTests ? deleteCategory : null}
           onDeleteTest={canDeleteTests ? deleteTest : null}
           onDeletePackage={canDeleteTests ? (id) => deletePackage(id, { skipConfirm: true }) : null}

@@ -25,7 +25,7 @@ export default function PackagesTab({
   onDeletePackage = null,
 }) {
   return (
-    <div className="module-grid">
+    <div className={showList ? "module-grid" : "module-grid single-col"}>
       {canEditTests && (
         <section className="module-panel">
           <div className="module-panel-header">
@@ -34,7 +34,7 @@ export default function PackagesTab({
           </div>
 
           <form onSubmit={savePackage} className="module-form">
-            <div className="module-form-grid">
+            <div className="module-form-grid compact">
                 <label>
                   Package Name
                   <input
@@ -60,16 +60,6 @@ export default function PackagesTab({
                     title="Only uppercase letters and numbers allowed (max 20 characters)"
                   />
                 </label>
-              <label className="full-width">
-                Description
-                <textarea
-                  value={packageForm.description}
-                  onChange={(e) => setPackageForm((p) => ({ ...p, description: e.target.value }))}
-                  placeholder="Enter description"
-                  maxLength={150}
-                  style={{ width: "100%", height: "80px", padding: "10px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border)", fontSize: "13.5px" }}
-                />
-              </label>
               <label>
                 Package Price (₹)
                 <div style={{ position: "relative" }}>
@@ -108,7 +98,17 @@ export default function PackagesTab({
                   <option value="inactive">Inactive</option>
                 </select>
               </label>
-              <label className="full-width">
+              <label className="span-full">
+                Description
+                <textarea
+                  value={packageForm.description}
+                  onChange={(e) => setPackageForm((p) => ({ ...p, description: e.target.value }))}
+                  placeholder="Enter description"
+                  maxLength={150}
+                  style={{ width: "100%", height: "80px", padding: "10px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border)", fontSize: "13.5px" }}
+                />
+              </label>
+              <label className="span-full">
                 Select Tests
                 <MultiSelect
                   options={packageTestOptions}

@@ -320,6 +320,22 @@ export async function exportDashboardPdf(accounts, recentBills) {
   return toBuffer(doc);
 }
 
+export async function exportStatsPdf(stats) {
+  const doc = createDoc("Statistics Report");
+  const headers = ["Metric", "Value"];
+  const colWidths = [220, 200];
+  const rows = [
+    ["Total Patients", String(stats.totalPatients)],
+    ["Total Lab Income", money(stats.totalLabIncome)],
+    ["Total Pending Commission", money(stats.totalPendingCommission)],
+    ["Total Paid Commission", money(stats.totalPaidCommission)],
+    ["Total Commission", money(stats.totalCommission)],
+    ["Generated At", stats.generatedAt ? new Date(stats.generatedAt).toLocaleDateString("en-IN") : "-"],
+  ];
+  drawTable(doc, headers, rows, colWidths);
+  return toBuffer(doc);
+}
+
 export function generateCsv(headers, rows) {
   function escape(val) {
     const s = String(val != null ? val : "");

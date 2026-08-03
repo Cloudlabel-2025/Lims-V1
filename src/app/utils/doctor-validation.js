@@ -89,7 +89,6 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
     else if (!isValidDoctorName(name)) errors.name = "Only letters, spaces, and periods allowed";
   }
 
-  requireField("mciNumber", "MCI registration number is required");
   if (cleanDoctorValue(form.mciNumber) && !isValidMciNumber(form.mciNumber)) {
     errors.mciNumber = "Enter a valid MCI registration number";
   }

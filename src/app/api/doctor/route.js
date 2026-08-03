@@ -44,11 +44,12 @@ export async function POST(req) {
     if (!payload.genderIdentity) delete payload.genderIdentity;
 
     const { mciNumber, phone } = payload;
+    const mciValue = String(mciNumber ?? "").trim();
     const email = String(payload.email).toLowerCase();
 
     // --- Duplicate Checks ---
     const [existingMCI, existingPhone, existingDoctorEmail, existingUser] = await Promise.all([
-      Doctor.findOne({ mciNumber: String(mciNumber) }),
+      mciValue ? Doctor.findOne({ mciNumber: mciValue.toUpperCase() }) : Promise.resolve(null),
       Doctor.findOne({ phone: String(phone) }),
       Doctor.findOne({ email }),
       User.findOne({ email }).select("_id doctorId status"),
@@ -89,7 +90,7 @@ export async function POST(req) {
         ...payload,
         email,
         phone: String(phone),
-        mciNumber: String(mciNumber).toUpperCase(),
+        mciNumber: mciValue ? mciValue.toUpperCase() : undefined,
         experience: Number(payload.experience),
         commission: payload.commission !== undefined ? Number(payload.commission) : 0,
       }], { session });

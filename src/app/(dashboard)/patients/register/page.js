@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 import DatePicker from "@/app/components/DatePicker";
-import { getISTNow, getEmptyForm, calculateAge } from "@/app/utils/patient-helpers";
+import { getEmptyForm, calculateAge } from "@/app/utils/patient-helpers";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
 const SearchableSelect = dynamic(() => import("@/app/components/SearchableSelect"), {
@@ -20,12 +20,16 @@ const MultiSelect = dynamic(() => import("@/app/components/MultiSelect"), {
 
 export default function PatientRegistration() {
   const router = useRouter();
+  const minDob = new Date();
+  minDob.setFullYear(minDob.getFullYear() - 150);
+
   const [duplicateWarning, setDuplicateWarning] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
   const [duplicatePatient, setDuplicatePatient] = useState(null);
   const [errors, setErrors] = useState({});
   const [showErrors, setShowErrors] = useState(false);
   const [form, setForm] = useState(getEmptyForm);
+  const [dobDraft, setDobDraft] = useState("");
   const [mounted, setMounted] = useState(false);
   const [hasRefDoctor, setHasRefDoctor] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
@@ -50,7 +54,6 @@ export default function PatientRegistration() {
 
   useEffect(() => {
     setMounted(true);
-    setForm(prev => ({ ...prev, receivedTime: getISTNow() }));
 
     async function fetchData() {
       try {
@@ -83,14 +86,6 @@ export default function PatientRegistration() {
       const sanitized = value.replace(/[^A-Za-z ]/g, "").slice(0, 30);
       const capitalized = sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
       setForm((prev) => ({ ...prev, name: capitalized }));
-    } else if (name === "barcode") {
-      const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
-      let formatted = "";
-      for (let i = 0; i < cleaned.length; i++) {
-        if (i === 4 || i === 12) formatted += "-";
-        formatted += cleaned[i];
-      }
-      setForm((prev) => ({ ...prev, barcode: formatted }));
     } else if (name === "uhId") {
       const sanitized = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 14);
       setForm((prev) => ({ ...prev, uhId: sanitized }));
@@ -125,42 +120,22 @@ export default function PatientRegistration() {
     else if (!/^[A-Za-z ]+$/.test(form.name.trim())) newErrors.name = "Only letters and spaces allowed";
     if (!form.gender) newErrors.gender = "Gender is required";
     if (form.gender === "Other" && !form.genderIdentity) newErrors.genderIdentity = "Gender identity is required";
-    if (!form.dob) newErrors.dob = "Date of Birth is required";
+    if (!dobDraft?.trim()) newErrors.dob = "Date of Birth is required";
+    else if (!form.dob) newErrors.dob = "Invalid date of birth (DD/MM/YYYY)";
     else {
       const dobDate = new Date(form.dob);
-      if (isNaN(dobDate.getTime()) || dobDate.getFullYear() < 1941) newErrors.dob = "Invalid date of birth";
+      if (isNaN(dobDate.getTime()) || dobDate < minDob) newErrors.dob = "Age must be between 0 and 150 years";
       else if (dobDate > new Date()) newErrors.dob = "Date of Birth cannot be in the future";
     }
-    if (!form.age && form.age !== 0) newErrors.age = "Age is required";
-    else if (parseInt(form.age) < 0) newErrors.age = "Invalid age";
+    if (form.dob && !form.age && form.age !== 0) newErrors.age = "Age is required";
+    else if (form.dob && (parseInt(form.age) < 0 || parseInt(form.age) > 150)) newErrors.age = "Age must be between 0 and 150";
     if (!form.phone?.trim()) newErrors.phone = "Mobile number is required";
     else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Mobile number must be 10 digits";
     if (!form.address?.trim()) newErrors.address = "Address is required";
     else if (!/^[A-Za-z0-9 .,/-]+$/.test(form.address)) newErrors.address = "Only letters, numbers, spaces, and . , / - allowed";
     else if (/https?:\/\/|www\./i.test(form.address)) newErrors.address = "URLs not allowed in address";
-    if (!form.receivedTime) newErrors.receivedTime = "Received time is required";
-    else if (isNaN(new Date(form.receivedTime).getTime())) newErrors.receivedTime = "Invalid received time";
-    else if (new Date(form.receivedTime) > new Date()) newErrors.receivedTime = "Received time cannot be in the future";
-    if (form.collectionTime && isNaN(new Date(form.collectionTime).getTime())) newErrors.collectionTime = "Invalid collection time";
-    if (form.collectionTime && new Date(form.collectionTime) > new Date()) newErrors.collectionTime = "Collection time cannot be in the future";
-    if (form.collectionTime && form.receivedTime) {
-      if (new Date(form.receivedTime) < new Date(form.collectionTime)) {
-        newErrors.receivedTime = "Received time cannot be earlier than collection time";
-        newErrors.collectionTime = "Collection time must be before received time";
-      }
-    }
-    if (form.dob && form.collectionTime && new Date(form.collectionTime) < new Date(form.dob)) {
-      newErrors.collectionTime = "Collection time cannot be before date of birth";
-    }
-    if (form.dob && form.receivedTime && new Date(form.receivedTime) < new Date(form.dob)) {
-      newErrors.receivedTime = "Received time cannot be before date of birth";
-    }
-    if (!form.barcode?.trim()) newErrors.barcode = "Barcode is required";
-    else if (!/^[A-Z]{4}-\d{8}-\d{4}$/.test(form.barcode)) newErrors.barcode = "Format: XXXX-NNNNNNNN-NNNN (e.g., ABCD-12345678-1234)";
     if (hasRefDoctor && !form.refDoctorName?.trim()) newErrors.refDoctorName = "Referring doctor name is required";
-    if (!form.uhId?.trim()) newErrors.uhId = "UH ID is required";
-    else if (!/^[A-Za-z0-9]{14}$/.test(String(form.uhId))) newErrors.uhId = "UH ID must be exactly 14 alphanumeric characters";
-    if (!form.selectedTests || form.selectedTests.length === 0) newErrors.selectedTests = "At least one test or package must be selected";
+    if (form.uhId && !/^[A-Za-z0-9]{14}$/.test(String(form.uhId))) newErrors.uhId = "UH ID must be exactly 14 alphanumeric characters";
     return newErrors;
   };
 
@@ -184,26 +159,10 @@ export default function PatientRegistration() {
     setErrors({});
     setStatus({ type: "", message: "" });
     const payload = { ...form };
-    if (!payload.collectionTime) delete payload.collectionTime;
     if (!payload.genderIdentity) delete payload.genderIdentity;
     if (!hasRefDoctor) delete payload.refDoctorName;
     if (!payload.reportType) delete payload.reportType;
-
-    if (payload.barcode) {
-      try {
-        const barRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.barcode)}`, { credentials: "include" });
-        const barData = await barRes.json();
-        const barcodeMatches = Array.isArray(barData) ? barData : barData.patients || [];
-        if (barcodeMatches.some(p => p.barcode === payload.barcode)) {
-          setErrors(prev => ({ ...prev, barcode: "This barcode is already assigned to another patient" }));
-          setStatus({ type: "danger", message: "Duplicate barcode detected." });
-          setLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.error("Barcode duplication check failed:", err);
-      }
-    }
+    if (!payload.uhId) delete payload.uhId;
 
     try {
       const dupRes = await fetch(`/api/patient?search=${encodeURIComponent(payload.phone)}`, { credentials: "include" });
@@ -231,28 +190,30 @@ export default function PatientRegistration() {
       const data = await res.json();
       if (res.ok) {
         let billId = null;
-        try {
-          const billingRes = await fetch("/api/billing", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              patient: data._id,
-              tests: payload.selectedTests,
-              priority: "routine",
-              notes: "",
-              discountAmount: 0,
-              taxAmount: 0,
-            }),
-          });
-          const billingData = await billingRes.json();
-          if (billingRes.ok) {
-            billId = billingData.billingRecord?.billId;
-          } else {
-            console.warn("Auto-bill creation failed:", billingData.error);
+        if ((payload.selectedTests || []).length > 0) {
+          try {
+            const billingRes = await fetch("/api/billing", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                patient: data._id,
+                tests: payload.selectedTests,
+                priority: "routine",
+                notes: "",
+                discountAmount: 0,
+                taxAmount: 0,
+              }),
+            });
+            const billingData = await billingRes.json();
+            if (billingRes.ok) {
+              billId = billingData.billingRecord?.billId;
+            } else {
+              console.warn("Auto-bill creation failed:", billingData.error);
+            }
+          } catch (billErr) {
+            console.warn("Auto-bill creation error:", billErr);
           }
-        } catch (billErr) {
-          console.warn("Auto-bill creation error:", billErr);
         }
 
         clearCachedApi("/api/patient");
@@ -260,18 +221,20 @@ export default function PatientRegistration() {
         clearCachedApi("/api/samples?status=all");
         clearCachedApi("/api/dashboard/stats");
 
-        const billMsg = billId
+        const billCreated = billId !== null;
+        const billMsg = billCreated
           ? `Bill ${billId} has been generated.`
-          : "Note: Bill could not be auto-generated. Please create it manually in Billing Center.";
+          : "Add tests later from the patient's records (New Visit) or the Billing Center.";
 
         setStatus({
           type: "success",
           message: `Patient registered successfully. Patient ID: ${data.patientId}. ${billMsg}`,
         });
         setForm(getEmptyForm());
+        setDobDraft("");
         setHasRefDoctor(false);
         setShowErrors(false);
-        setTimeout(() => router.push("/billing"), 5000);
+        setTimeout(() => router.push(billCreated ? "/billing" : "/patients"), 5000);
       } else {
         setStatus({ type: "danger", message: data.error || "Something went wrong." });
       }
@@ -322,12 +285,12 @@ export default function PatientRegistration() {
               </div>
               <div className="col-md-3">
                 <label className="lims-label">Date of Birth <span className="required">*</span></label>
-                <DatePicker value={form.dob} onChange={handleChange} max={new Date().toISOString().split("T")[0]} error={errors.dob} />
+                <DatePicker value={form.dob} onChange={handleChange} max={new Date().toISOString().split("T")[0]} error={errors.dob} onDraftChange={setDobDraft} />
                 {errors.dob && <div className="lims-error-text">{errors.dob}</div>}
               </div>
               <div className="col-md-1">
                 <label className="lims-label">Age <span className="required">*</span></label>
-                <input type="text" name="age" className="lims-input" value={form.age ? `${form.age} Yrs` : ""} readOnly disabled style={{ backgroundColor: 'var(--surface)', textAlign: 'center', fontWeight: '600' }} />
+                <input type="text" name="age" className="lims-input" value={form.age !== "" ? `${form.age} Yrs` : ""} readOnly disabled style={{ backgroundColor: 'var(--surface)', textAlign: 'center', fontWeight: '600' }} />
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Report Type</label>
@@ -335,11 +298,6 @@ export default function PatientRegistration() {
                   <option value="Hand">Hand</option>
                   <option value="Digital">Digital</option>
                 </select>
-              </div>
-              <div className="col-md-4">
-                <label className="lims-label">Barcode <span className="required">*</span></label>
-                <input name="barcode" className={`lims-input ${errors.barcode ? 'invalid' : ''}`} placeholder="XXXX-NNNNNNNN-NNNN" maxLength={18} value={form.barcode} onChange={handleChange} />
-                {errors.barcode && <div className="lims-error-text">{errors.barcode}</div>}
               </div>
               <div className="col-md-4">
                 <label className="lims-label">Gender <span className="required">*</span></label>
@@ -358,7 +316,7 @@ export default function PatientRegistration() {
                 </div>
               )}
               <div className="col-md-4">
-                <label className="lims-label">UH ID <span className="required">*</span></label>
+                <label className="lims-label">UH ID <span className="optional">(optional)</span></label>
                 <input type="text" name="uhId" className={`lims-input ${errors.uhId ? 'invalid' : ''}`} placeholder="Enter UH ID" value={form.uhId} maxLength={14} onChange={handleChange} />
                 {errors.uhId && <div className="lims-error-text">{errors.uhId}</div>}
               </div>
@@ -385,13 +343,9 @@ export default function PatientRegistration() {
         </div>
 
         <div className="form-card">
-          <div className="form-card-header"><h6><span className="step-badge">3</span>Sample Timing</h6></div>
+          <div className="form-card-header"><h6><span className="step-badge">3</span>Doctor Referral</h6></div>
           <div className="form-card-body">
             <div className="row g-3">
-              <div className="col-md-6"><label className="lims-label">Collection Time <span className="optional">(optional)</span></label><input type="datetime-local" name="collectionTime" className="lims-input" value={form.collectionTime} onChange={handleChange} /></div>
-              <div className="col-md-6"><label className="lims-label">Received Time <span className="required">*</span></label><input type="datetime-local" name="receivedTime" className={`lims-input ${errors.receivedTime ? 'invalid' : ''}`} value={form.receivedTime} min={form.collectionTime || undefined} onChange={handleChange} />{errors.receivedTime && <div className="lims-error-text">{errors.receivedTime}</div>}</div>
-            </div>
-            <div className="row g-3 mt-1">
               <div className="col-12"><label className="lims-label">Doctor Referral</label><div className="radio-group"><label className="radio-item"><input type="radio" name="refDoctorToggle" checked={!hasRefDoctor} onChange={() => { setHasRefDoctor(false); setForm(p => ({ ...p, refDoctorName: "" })); }} /> No</label><label className="radio-item"><input type="radio" name="refDoctorToggle" checked={hasRefDoctor} onChange={() => setHasRefDoctor(true)} /> Yes</label></div></div>
               {hasRefDoctor && (
                 <div className="col-md-6">
@@ -416,7 +370,7 @@ export default function PatientRegistration() {
           <div className="form-card-body">
             <div className="row g-3">
               <div className="col-12">
-                <label className="lims-label">Select Tests / Packages <span className="required">*</span></label>
+                <label className="lims-label">Select Tests / Packages <span className="optional">(optional)</span></label>
                 <MultiSelect 
                   name="selectedTests"
                   options={[
@@ -462,7 +416,7 @@ export default function PatientRegistration() {
         </div>
 
         <div className="form-actions">
-          <button type="button" className="btn-lims-secondary" onClick={() => { setForm(getEmptyForm()); setStatus({ type: "", message: "" }); }}>Reset</button>
+          <button type="button" className="btn-lims-secondary" onClick={() => { setForm(getEmptyForm()); setDobDraft(""); setStatus({ type: "", message: "" }); }}>Reset</button>
           <button type="submit" className="btn-lims-primary" disabled={loading}>{loading ? "Saving..." : "Save Patient"}</button>
         </div>
       </form>
@@ -481,32 +435,34 @@ export default function PatientRegistration() {
                   const data = await res.json();
                   if (res.ok) {
                     let billId = null;
-                    try {
-                      const billingRes = await fetch("/api/billing", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                        body: JSON.stringify({
-                          patient: data._id,
-                          tests: pendingPayload.selectedTests,
-                          priority: "routine",
-                          notes: "",
-                          discountAmount: 0,
-                          taxAmount: 0,
-                        }),
-                      });
-                      const billingData = await billingRes.json();
-                      if (billingRes.ok) {
-                        billId = billingData.billingRecord?.billId;
-                      } else {
-                        console.warn("Auto-bill creation failed:", billingData.error);
+                    if ((pendingPayload.selectedTests || []).length > 0) {
+                      try {
+                        const billingRes = await fetch("/api/billing", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({
+                            patient: data._id,
+                            tests: pendingPayload.selectedTests,
+                            priority: "routine",
+                            notes: "",
+                            discountAmount: 0,
+                            taxAmount: 0,
+                          }),
+                        });
+                        const billingData = await billingRes.json();
+                        if (billingRes.ok) {
+                          billId = billingData.billingRecord?.billId;
+                        } else {
+                          console.warn("Auto-bill creation failed:", billingData.error);
+                        }
+                      } catch (billErr) {
+                        console.warn("Auto-bill creation error:", billErr);
                       }
-                    } catch (billErr) {
-                      console.warn("Auto-bill creation error:", billErr);
                     }
                     clearCachedApi("/api/patient"); clearCachedApi("/api/billing"); clearCachedApi("/api/samples?status=all"); clearCachedApi("/api/dashboard/stats");
                     const billMsg = billId ? ` Bill ${billId} has been generated.` : "";
-                    setStatus({ type: "success", message: `Patient registered successfully. Patient ID: ${data.patientId}.${billMsg}` }); setForm(getEmptyForm()); setHasRefDoctor(false);
+                    setStatus({ type: "success", message: `Patient registered successfully. Patient ID: ${data.patientId}.${billMsg}` }); setForm(getEmptyForm()); setDobDraft(""); setHasRefDoctor(false);
                   }
                   else setStatus({ type: "danger", message: data.error || "Failed" });
                 } catch { setStatus({ type: "danger", message: "Network error" }); }

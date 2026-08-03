@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { money } from "../_components/helpers";
 import StatCard from "../_components/StatCard";
@@ -8,9 +7,9 @@ import Badge from "../_components/Badge";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 import DownloadDropdown from "../_components/DownloadDropdown";
+import BackToDashboard from "../_components/BackToDashboard";
 
 export default function ChartOfAccountsPage() {
-  const router = useRouter();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -66,9 +65,7 @@ export default function ChartOfAccountsPage() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="btn-lims-secondary" onClick={() => router.push("/accounts")} style={{ height: 38, padding: "0 14px" }}>
-            {Icons.arrowLeft} Dashboard
-          </button>
+          <BackToDashboard />
           <button type="button" className="dash-btn-secondary" onClick={() => fetchAccounts(page)} disabled={loading} style={{ height: 38, padding: "0 14px" }}>
             {Icons.refresh} Refresh
           </button>

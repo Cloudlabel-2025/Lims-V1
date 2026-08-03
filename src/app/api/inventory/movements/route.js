@@ -25,7 +25,7 @@ export async function GET(req) {
     const auth = await requireInventory(req);
     if (auth.error) return auth.error;
 
-    await processExpiredBatches(auth.tenantId);
+    await processExpiredBatches(auth.tenantId).catch((e) => console.error("inventory expiry processing failed:", e));
 
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));

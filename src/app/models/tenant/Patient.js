@@ -32,6 +32,7 @@ const patientSchema = new mongoose.Schema({
         type: Number,
         required: true,
         min: [0, "Age must be at least 0"],
+        max: [150, "Age must be at most 150"],
         validate: {
             validator: Number.isInteger,
             message: "Age must be an integer"
@@ -72,26 +73,10 @@ const patientSchema = new mongoose.Schema({
     },
     uhId: {
         type: String,
-        required: true,
-        unique: true,
+        trim: true,
         validate: {
-            validator: (v) => /^[A-Za-z0-9]{14}$/.test(v),
+            validator: (v) => !v || /^[A-Za-z0-9]{14}$/.test(v),
             message: "UH ID must be exactly 14 alphanumeric characters"
-        }
-    },
-
-    collectionTime: {
-        type: Date
-    },
-    receivedTime: {
-        type: Date,
-        required: true,
-        validate: {
-            validator: function (value) {
-                if (!this.collectionTime) return true;
-                return value >= this.collectionTime;
-            },
-            message: "Received time must be greater than or equal to collection time"
         }
     },
 
@@ -103,16 +88,6 @@ const patientSchema = new mongoose.Schema({
         enum: ["Hand", "Digital"],
         default: "Hand"
     },
-    barcode: {
-        type: String,
-        required: true,
-        unique: true,
-        sparse: true,
-        validate: {
-            validator: (v) => /^[A-Za-z0-9-_]+$/.test(v) && !/https?:\/\/|www\./i.test(v),
-            message: "Invalid barcode format"
-        }
-    }
 }, { timestamps: true });
 
 patientSchema.index({ name: "text", patientId: 1, phone: 1 });

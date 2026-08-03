@@ -14,11 +14,8 @@ export const getEmptyForm = () => ({
   phone: "",
   address: "",
   uhId: "",
-  collectionTime: "",
-  receivedTime: "", // Consistently empty for SSR
   refDoctorName: "",
   reportType: "Hand",
-  barcode: "",
   selectedTests: [],
 });
 

@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
 import { money, formatDate, inputStyle } from "../_components/helpers";
@@ -10,9 +9,9 @@ import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 import Field from "../_components/Field";
 import DownloadDropdown from "../_components/DownloadDropdown";
+import BackToDashboard from "../_components/BackToDashboard";
 
 export default function CommissionsPage() {
-  const router = useRouter();
   const [doctors, setDoctors] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,9 +123,7 @@ export default function CommissionsPage() {
             <small style={{ color: "var(--text-muted)" }}>Commission tracking and payout management</small>
           </div>
         </div>
-        <button type="button" className="btn-lims-secondary" onClick={() => router.push("/accounts")} style={{ height: 38, padding: "0 14px" }}>
-          {Icons.arrowLeft} Dashboard
-        </button>
+        <BackToDashboard />
       </div>
 
       {error && <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 800 }}>{error}</div>}

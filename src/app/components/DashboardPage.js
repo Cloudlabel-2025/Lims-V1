@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { cachedJsonFetch, useTenantShell } from "@/app/lib/use-current-user";
@@ -88,6 +89,7 @@ export default function DashboardPage() {
       icon: Icons.flask,
       color: "#0d9488",
       bg: "linear-gradient(135deg, #f0fdfa, #ccfbf1)",
+      href: "/samples",
     },
     {
       label: "Pending Samples",
@@ -98,6 +100,7 @@ export default function DashboardPage() {
       icon: Icons.clock,
       color: "#7c3aed",
       bg: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
+      href: "/samples",
     },
     {
       label: "Reports Pending",
@@ -108,6 +111,7 @@ export default function DashboardPage() {
       icon: Icons.report,
       color: "#ea580c",
       bg: "linear-gradient(135deg, #fff7ed, #ffedd5)",
+      href: "/reports",
     },
     {
       label: "Patients Today",
@@ -118,12 +122,12 @@ export default function DashboardPage() {
       icon: Icons.users,
       color: "#f43f5e",
       bg: "linear-gradient(135deg, #fff1f2, #ffe4e6)",
+      href: "/patients",
     },
   ];
   const visibleStatCards = statCards.filter((stat) => hasPermission(user, stat.permission));
   const canRegisterPatients = hasPermission(user, "patients.register");
   const canViewPatients = hasPermission(user, "patients.view");
-  const canEditTests = hasPermission(user, "tests.edit");
 
   const recentPatients = stats?.recentPatients || [];
   const activityFeed = recentPatients.map((patient) => ({
@@ -163,17 +167,12 @@ export default function DashboardPage() {
               {Icons.plus} Register Patient
             </button>
           )}
-          {canEditTests && (
-            <button className="dash-btn-secondary" onClick={() => router.push("/tests")}>
-              {Icons.flask} New Test
-            </button>
-          )}
         </div>
       </div>
 
       <div className="dash-stats-grid">
         {visibleStatCards.map((stat) => (
-          <div key={stat.label} className="dash-stat-card">
+          <Link key={stat.label} href={stat.href} className="dash-stat-card">
             <div className="dash-stat-header">
               <div className="dash-stat-icon" style={{ background: stat.bg, color: stat.color }}>
                 {stat.icon}
@@ -185,13 +184,13 @@ export default function DashboardPage() {
             </div>
             <div className="dash-stat-value">{stat.value}</div>
             <div className="dash-stat-label">{stat.label}</div>
-          </div>
+          </Link>
         ))}
       </div>
 
       <div className="dash-content-grid">
         {canViewPatients && (
-        <div className="dash-card dash-recent-patients">
+        <div className="dash-card dash-recent-patients" onClick={() => router.push("/patients")}>
           <div className="dash-card-header">
             <h3>{Icons.activity} Recent Patients</h3>
             {canViewPatients && (
@@ -225,7 +224,15 @@ export default function DashboardPage() {
               </div>
             ) : (
               recentPatients.map((patient) => (
-                <div key={patient._id || patient.patientId} className="dash-table-row">
+                <div
+                  key={patient._id || patient.patientId}
+                  className="dash-table-row"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const id = patient._id || patient.patientId;
+                    if (id) router.push(`/patients/${id}/visits`);
+                  }}
+                >
                   <div className="dash-td" style={{ flex: 2 }}>
                     <div className="dash-patient-cell">
                       <div className="dash-mini-avatar">{getInitials(patient.name)}</div>
@@ -256,7 +263,7 @@ export default function DashboardPage() {
         </div>
         )}
 
-        <div className="dash-card dash-activity-feed">
+        <div className="dash-card dash-activity-feed" onClick={() => router.push("/patients")}>
           <div className="dash-card-header">
             <h3>{Icons.clock} Activity Feed</h3>
           </div>

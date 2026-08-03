@@ -60,6 +60,9 @@ export default function BillingHistoryTab({
   loading,
   onPageChange,
   onViewHistory,
+  onRevert,
+  canRefundBilling,
+  reverting,
 }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("recent");
@@ -214,17 +217,38 @@ export default function BillingHistoryTab({
                     </span>
                   </td>
                   <td style={{ padding: "14px 20px", textAlign: "center" }}>
-                    <button
-                      type="button"
-                      className="view-history-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewHistory?.(txn.invoiceId);
-                      }}
-                      title="View payment history for this bill"
-                    >
-                      View History
-                    </button>
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
+                      <button
+                        type="button"
+                        className="view-history-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewHistory?.(txn.invoiceId);
+                        }}
+                        title="View payment history for this bill"
+                      >
+                        View History
+                      </button>
+                      {canRefundBilling && txn.canRevert && typeof onRevert === "function" && (
+                        <button
+                          type="button"
+                          className="view-history-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRevert?.(txn.invoiceId);
+                          }}
+                          disabled={reverting}
+                          title="Revert this bill (hand/cash payments only)"
+                          style={{
+                            color: "#dc2626",
+                            background: "#fef2f2",
+                            borderColor: "#fecaca",
+                          }}
+                        >
+                          {reverting ? "Reverting..." : "Revert"}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

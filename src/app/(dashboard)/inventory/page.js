@@ -239,6 +239,7 @@ export default function InventoryPage() {
   const [movementPage, setMovementPage] = useState(1);
   const [movementFilters, setMovementFilters] = useState({ type: "", search: "", dateFrom: "", dateTo: "" });
   const movementFiltersRef = useRef(movementFilters);
+  const requestIdRef = useRef(0);
   function applyMovementFilters(patch) {
     const next = typeof patch === "function" ? patch(movementFiltersRef.current) : patch;
     movementFiltersRef.current = next;
@@ -286,15 +287,11 @@ export default function InventoryPage() {
           .some((value) => String(value).toLowerCase().includes(needle))
       );
     }
-    if (dashboardFilter === "low") {
-      items = items.filter((item) => (item.stockOnHandBase || 0) <= item.minimumStockBase);
-    } else if (dashboardFilter === "reorder") {
-      items = items.filter((item) => item.reorderLevelBase && (item.stockOnHandBase || 0) <= item.reorderLevelBase);
-    }
     return items;
-  }, [inventory.items, searchQuery, dashboardFilter]);
+  }, [inventory.items, searchQuery]);
 
   const loadInventory = useCallback(async (page) => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError("");
     try {
@@ -302,9 +299,11 @@ export default function InventoryPage() {
       if (page) params.set("page", page);
       params.set("limit", "20");
       if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (dashboardFilter && dashboardFilter !== "all") params.set("filter", dashboardFilter);
       const response = await fetch(`/api/inventory?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load inventory");
+      if (requestIdRef.current !== requestId) return;
       setInventory(data);
       setItemTypes(data.itemTypes || []);
       setStorageConditions(data.storageConditions || []);
@@ -314,19 +313,15 @@ export default function InventoryPage() {
       );
       setShowExpiredBanner(hasUnprocessedExpired);
     } catch (err) {
-      setError(err.message);
+      if (requestIdRef.current === requestId) setError(err.message);
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) setLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, dashboardFilter]);
 
-  useEffect(() => {
-    loadInventory(1);
-  }, [loadInventory]);
+  useEffect(() => { loadInventory(itemPage); }, [itemPage, loadInventory]);
 
-  useEffect(() => {
-    loadInventory(itemPage);
-  }, [itemPage, loadInventory]);
+  useEffect(() => { setItemPage(1); }, [searchQuery]);
 
   useEffect(() => {
     if (!error) return;
@@ -677,11 +672,12 @@ export default function InventoryPage() {
                   }}>{chip.label}</button>
                 ))}
               </div>
-              <InventoryTable items={filteredItems} onEdit={editItem} onOrder={(item) => {
+              <InventoryTable items={inventory.items} onEdit={editItem} onOrder={(item) => {
                 setMovementForm({ ...emptyMovement, movementType: "purchase", purchaseItems: [{ item: item._id, quantity: "", unitCost: "", notes: "" }] });
                 setMovementFormErrors({});
                 setActiveTab("stock");
               }} />
+              <PaginationControls pagination={itemPagination} loading={loading} onPageChange={setItemPage} />
             </div>
           )}
 
