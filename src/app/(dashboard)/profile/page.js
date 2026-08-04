@@ -105,10 +105,6 @@ export default function ProfilePage() {
           </div>
           <dl className="profile-detail-list">
             <div>
-              <dt>User ID</dt>
-              <dd>{user?.userCode || user?.id || "-"}</dd>
-            </div>
-            <div>
               <dt>Email</dt>
               <dd>{user?.email || "-"}</dd>
             </div>

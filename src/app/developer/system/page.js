@@ -304,21 +304,7 @@ export default function DeveloperSystemPage() {
       {error && <div className="developer-alert">{error}</div>}
       <CmsSuccessDialog message={success} onClose={() => setSuccess("")} />
 
-      <div className="developer-summary-grid developer-system-summary-grid">
-        <article className="developer-summary-card">
-          <span>Active Labs</span>
-          <strong>{loadingLabs ? "—" : labs.length}</strong>
-        </article>
-        <article className="developer-summary-card">
-          <span>Lab Permissions</span>
-          <strong>{labPermissions.length}</strong>
-        </article>
-        <article className="developer-summary-card">
-          <span>Current Selection</span>
-          <strong>{draftAccess?.enabledModules?.length || 0}</strong>
-          <small>enabled modules</small>
-        </article>
-      </div>
+
 
       <div className="developer-system-workspace">
         <aside className="developer-system-context">

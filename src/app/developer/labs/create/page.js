@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
@@ -193,6 +193,16 @@ export default function DeveloperCreateLabPage() {
   const [logoInputTouched, setLogoInputTouched] = useState(false);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef(null);
+
+  function handleRemoveLogo() {
+    setLogoFile(null);
+    setLogoPreviewUrl("");
+    setLogoInputTouched(false);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+  }
   const [touchedFields, setTouchedFields] = useState({});
   const [attemptedSteps, setAttemptedSteps] = useState({});
   const [packages, setPackages] = useState([]);
@@ -793,6 +803,7 @@ export default function DeveloperCreateLabPage() {
                 <label>
                   Logo Image
                   <input
+                    ref={logoInputRef}
                     className={logoFileError && logoInputTouched ? "invalid" : ""}
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/avif"
@@ -815,12 +826,35 @@ export default function DeveloperCreateLabPage() {
                 </label>
               </div>
               {logoPreviewUrl && (
-                <div
-                  className="developer-logo-preview"
-                  role="img"
-                  aria-label={form.logoAltText || `${form.name || "Lab"} logo`}
-                  style={{ backgroundImage: `url("${logoPreviewUrl}")` }}
-                />
+                <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 14 }}>
+                  <div
+                    className="developer-logo-preview"
+                    role="img"
+                    aria-label={form.logoAltText || `${form.name || "Lab"} logo`}
+                    style={{ backgroundImage: `url("${logoPreviewUrl}")` }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    title="Remove logo"
+                    aria-label="Remove logo"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 36,
+                      height: 36,
+                      borderRadius: 8,
+                      border: "1px solid rgba(220, 38, 38, 0.3)",
+                      background: "rgba(220, 38, 38, 0.08)",
+                      color: "#dc2626",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {Icons.trash}
+                  </button>
+                </div>
               )}
             </div>
 

@@ -109,36 +109,58 @@ async function initializeTenantCollections(tenantConnection) {
   ]);
 }
 
-async function createTenantRoles(masterConnection, tenantConnection) {
+export async function importStandardRoleTemplates(masterConnection, tenantConnection) {
   const RoleTemplate = getRoleTemplateModel(masterConnection);
   const Role = getRoleModel(tenantConnection);
-  const templates = await RoleTemplate.find({ isActive: true }).sort({ sortOrder: 1, name: 1 });
-
-  if (templates.length === 0) {
-    throw new Error("No active role templates found. Run seed-rbac first.");
-  }
+  const templates = await RoleTemplate.find({ isActive: true, isDefaultAdmin: { $ne: true } }).sort({ sortOrder: 1, name: 1 });
 
   const allTenantPermissions = rbacConfig.permissions
     .filter((permission) => permission.scope !== "developer")
     .map((permission) => permission.key);
 
+  const importedRoles = [];
   for (const template of templates) {
-    const isAdminTemplate = template.isDefaultAdmin || template.name === "Admin";
-    const permissions = isAdminTemplate ? allTenantPermissions : template.permissions;
-
-    await Role.findOneAndUpdate(
+    const permissions = template.permissions || [];
+    const role = await Role.findOneAndUpdate(
       { name: template.name },
       {
         name: template.name,
-        description: template.description,
+        description: template.description || `${template.name} role.`,
         permissions,
-        isDefaultAdmin: template.isDefaultAdmin,
-        isSystemRole: template.isSystemTemplate,
+        isDefaultAdmin: false,
+        isSystemRole: false,
         status: "active",
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+    importedRoles.push(role);
   }
+  return importedRoles;
+}
+
+async function createTenantRoles(masterConnection, tenantConnection) {
+  const RoleTemplate = getRoleTemplateModel(masterConnection);
+  const Role = getRoleModel(tenantConnection);
+  const adminTemplate = await RoleTemplate.findOne({
+    $or: [{ isDefaultAdmin: true }, { name: "Admin" }],
+  });
+
+  const allTenantPermissions = rbacConfig.permissions
+    .filter((permission) => permission.scope !== "developer")
+    .map((permission) => permission.key);
+
+  await Role.findOneAndUpdate(
+    { isDefaultAdmin: true },
+    {
+      name: adminTemplate?.name || "Admin",
+      description: adminTemplate?.description || "Default Administrator with full lab access.",
+      permissions: allTenantPermissions,
+      isDefaultAdmin: true,
+      isSystemRole: false,
+      status: "active",
+    },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+  );
 }
 
 export async function createTenant({ name, subdomain, createdBy }) {

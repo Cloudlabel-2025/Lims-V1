@@ -113,10 +113,6 @@ export default function DeveloperProfilePage() {
               <dd style={{ margin: "4px 0 0" }}>{user?.email || "-"}</dd>
             </div>
             <div>
-              <dt style={{ fontWeight: 600, color: "var(--text-muted)", fontSize: 12, textTransform: "uppercase" }}>User ID</dt>
-              <dd style={{ margin: "4px 0 0" }}>{user?.userCode || user?.id || "-"}</dd>
-            </div>
-            <div>
               <dt style={{ fontWeight: 600, color: "var(--text-muted)", fontSize: 12, textTransform: "uppercase" }}>Access Type</dt>
               <dd style={{ margin: "4px 0 0" }}>Developer Access</dd>
             </div>

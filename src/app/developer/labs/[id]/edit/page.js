@@ -629,7 +629,7 @@ export default function DeveloperEditLabPage({ params }) {
               </label>
             </div>
             {(logoPreviewUrl || (existingLogo?.url && !logoRemoved)) && (
-              <div style={{ marginTop: 12, display: "flex", alignItems: "flex-start", gap: 16 }}>
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 14 }}>
                 <div
                   className="developer-logo-preview"
                   role="img"
@@ -639,9 +639,23 @@ export default function DeveloperEditLabPage({ params }) {
                 <button
                   type="button"
                   onClick={handleRemoveLogo}
-                  style={{ marginTop: 8, fontSize: 12, color: "var(--error)", background: "none", border: "1px solid var(--error)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}
+                  title="Remove logo"
+                  aria-label="Remove logo"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    border: "1px solid rgba(220, 38, 38, 0.3)",
+                    background: "rgba(220, 38, 38, 0.08)",
+                    color: "#dc2626",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
                 >
-                  Remove Logo
+                  {Icons.trash}
                 </button>
               </div>
             )}

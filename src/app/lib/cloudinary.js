@@ -126,7 +126,6 @@ async function uploadImageWithSdk(
           overwrite: false,
           resource_type: "image",
           timeout: timeoutMs,
-          format: mimeType.replace("image/", ""),
         },
         (error, result) => {
           if (error) {

@@ -60,7 +60,7 @@ function dedupeRolesByName(roles) {
 function duplicateRoleMessage(error) {
   const field = Object.keys(error?.keyPattern || {})[0];
   if (field === "roleId") return "Role ID sequence conflict. Please try saving again.";
-  if (field === "name") return "Role name already exists";
+  if (field === "name") return "Role name already exists. (protected system role names are managed per tenant.)";
   return "Role record already exists";
 }
 
@@ -85,7 +85,7 @@ export async function GET(req) {
 
     const { allowedPermissionKeys, enabledModules } = await getAllowedPermissionsForTenant(auth);
     const { Role } = await getTenantModels(auth.tenantId);
-    const roles = await Role.find({ status: "active", isSystemRole: { $ne: true } }).sort({
+    const roles = await Role.find({ status: "active" }).sort({
       name: 1,
     });
     const uniqueRoles = dedupeRolesByName(roles);
@@ -100,6 +100,41 @@ export async function GET(req) {
     });
   } catch (error) {
     return jsonError("Unable to load roles", error, 500);
+  }
+}
+
+export async function POST(req) {
+  try {
+    const auth = requireTenantSession(req, "settings.manage");
+    if (auth.error) return auth.error;
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "settings.manage");
+    if (moduleAuth.error) return moduleAuth.error;
+
+    const [{ default: connectMasterDB }, { importStandardRoleTemplates }, { getTenantConnection }] = await Promise.all([
+      import("@/app/lib/master-db"),
+      import("@/app/lib/tenant-provisioning"),
+      import("@/app/lib/tenant-db"),
+    ]);
+
+    const masterConnection = await connectMasterDB();
+    const tenantConnection = await getTenantConnection(auth.tenantId);
+    await importStandardRoleTemplates(masterConnection, tenantConnection);
+
+    const { allowedPermissionKeys, enabledModules } = await getAllowedPermissionsForTenant(auth);
+    const { Role } = await getTenantModels(auth.tenantId);
+    const roles = await Role.find({ status: "active" }).sort({ name: 1 });
+
+    return Response.json({
+      message: "Standard role templates imported successfully",
+      roles: dedupeRolesByName(roles).map((role) => ({
+        ...serializeRole(role),
+        permissions: role.permissions?.includes("*")
+          ? [...allowedPermissionKeys]
+          : normalizePermissions(role.permissions, allowedPermissionKeys, enabledModules),
+      })),
+    });
+  } catch (error) {
+    return jsonError("Unable to import role templates", error, 500);
   }
 }
 
@@ -123,37 +158,23 @@ export async function PATCH(req) {
       if (!SAFE_NAME.test(name)) return Response.json({ error: "Role name contains invalid characters" }, { status: 400 });
 
       const permissions = normalizePermissions(item.permissions, allowedPermissionKeys, enabledModules);
-      const description = clean(item.description || "Custom lab role.").slice(0, 500);
+      const description = clean(item.description || "Lab role.").slice(0, 500);
       const existingRole =
-        (item.id ? await Role.findOne({ _id: item.id, isSystemRole: { $ne: true } }) : null) ||
+        (item.id ? await Role.findOne({ _id: item.id }) : null) ||
         (await Role.findOne({
           name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
-          isSystemRole: { $ne: true },
         }));
 
       if (existingRole) {
-        existingRole.name = name;
+        if (!existingRole.isDefaultAdmin) {
+          existingRole.name = name;
+        }
         existingRole.description = description;
         existingRole.permissions = permissions;
         existingRole.status = "active";
         await existingRole.save();
         savedRoles.push(existingRole);
       } else {
-        const protectedRole = await Role.findOne({
-          name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
-        }).lean();
-
-        if (protectedRole) {
-          return Response.json(
-            {
-              error: protectedRole.isSystemRole
-                ? `Role "${name}" already exists as a protected system role. Use a different custom role name.`
-                : `Role "${name}" already exists.`,
-            },
-            { status: 409 }
-          );
-        }
-
         const role = await Role.create({
           name,
           description,
@@ -166,7 +187,7 @@ export async function PATCH(req) {
       }
     }
 
-    const roles = await Role.find({ status: "active", isSystemRole: { $ne: true } }).sort({
+    const roles = await Role.find({ status: "active" }).sort({
       name: 1,
     });
     return Response.json({ roles: dedupeRolesByName(roles).map(serializeRole) });
@@ -193,7 +214,7 @@ export async function DELETE(req) {
     }
 
     const { Role } = await getTenantModels(auth.tenantId);
-    const role = await Role.findOne({ _id: roleId, isSystemRole: { $ne: true } });
+    const role = await Role.findOne({ _id: roleId });
 
     if (!role) {
       return Response.json({ error: "Role not found" }, { status: 404 });
@@ -205,7 +226,7 @@ export async function DELETE(req) {
 
     await role.deleteOne();
 
-    const roles = await Role.find({ status: "active", isSystemRole: { $ne: true } }).sort({
+    const roles = await Role.find({ status: "active" }).sort({
       name: 1,
     });
 

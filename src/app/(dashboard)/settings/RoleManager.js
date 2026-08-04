@@ -25,6 +25,7 @@ export default function RoleManager({
   rolesDirty,
   cancelRoleChanges,
   saveRoleConfiguration,
+  importStandardRoles,
 }) {
   const [newRoleError, setNewRoleError] = useState("");
 
@@ -43,9 +44,22 @@ export default function RoleManager({
 
   return (
     <section className="settings-panel">
-      <div className="settings-panel-header">
-        <h2>Lab Roles</h2>
-        <p>Create roles inside this lab and assign only allowed permissions.</p>
+      <div className="settings-panel-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <h2>Lab Roles</h2>
+          <p>Create roles inside this lab and assign only allowed permissions.</p>
+        </div>
+        {typeof importStandardRoles === "function" && (
+          <button
+            type="button"
+            className="developer-secondary-link"
+            onClick={importStandardRoles}
+            disabled={roleSaving}
+            style={{ fontSize: 13, padding: "6px 12px" }}
+          >
+            Import Standard Templates
+          </button>
+        )}
       </div>
 
       <div className="settings-role-list">
@@ -59,7 +73,7 @@ export default function RoleManager({
               <strong>{role.name}</strong>
               <span>{role.permissions.includes("*") ? "All permissions" : `${role.permissions.length} permissions`}</span>
             </button>
-            {!role.isDefaultAdmin && !role.isSystemRole && (
+            {!role.isDefaultAdmin && (
               <button
                 type="button"
                 className="settings-role-delete"

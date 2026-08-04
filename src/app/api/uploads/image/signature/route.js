@@ -30,7 +30,7 @@ export async function POST(req) {
     });
 
     if (target.error) {
-      return NextResponse.json({ error: target.error }, { status: target.status });
+      return NextResponse.json({ error: target.error }, { status: target.status || 400 });
     }
 
     const { cloudName, apiKey, apiSecret } = getCloudinarySigningConfig();

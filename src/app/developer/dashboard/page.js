@@ -89,10 +89,6 @@ export default function DeveloperDashboardPage() {
           <span>Deleted Labs</span>
           <strong>{loading ? "-" : deletedLabs}</strong>
         </article>
-        <article className="developer-summary-card">
-          <span>Assigned Modules</span>
-          <strong>{loading ? "-" : moduleCount}</strong>
-        </article>
       </div>
 
       <div className="developer-two-column">

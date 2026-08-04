@@ -47,21 +47,25 @@ export function assertUploadAccess(session, context) {
 }
 
 export function buildUploadTarget(session, { context, tenantId }) {
-  const normalizedContext = String(context || "attachment");
-  const normalizedTenantId = getUploadTenantId(session, tenantId);
-  const folderSuffix = uploadContextFolders[normalizedContext];
+  try {
+    const normalizedContext = String(context || "attachment");
+    const normalizedTenantId = getUploadTenantId(session, tenantId);
+    const folderSuffix = uploadContextFolders[normalizedContext];
 
-  if (!folderSuffix) {
-    return { error: "Unsupported upload context", status: 400 };
+    if (!folderSuffix) {
+      return { error: "Unsupported upload context", status: 400 };
+    }
+
+    const accessError = assertUploadAccess(session, normalizedContext);
+    if (accessError) return accessError;
+
+    return {
+      context: normalizedContext,
+      tenantId: normalizedTenantId,
+      folder: `lims/labs/${normalizedTenantId}/${folderSuffix}`,
+      publicIdPrefix: `${cleanUploadFolderPart(normalizedContext)}-${Date.now()}`,
+    };
+  } catch (err) {
+    return { error: err.message || "Upload context preparation failed", status: 400 };
   }
-
-  const accessError = assertUploadAccess(session, normalizedContext);
-  if (accessError) return accessError;
-
-  return {
-    context: normalizedContext,
-    tenantId: normalizedTenantId,
-    folder: `lims/labs/${normalizedTenantId}/${folderSuffix}`,
-    publicIdPrefix: `${cleanUploadFolderPart(normalizedContext)}-${Date.now()}`,
-  };
 }

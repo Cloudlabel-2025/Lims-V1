@@ -457,6 +457,33 @@ export default function LabAdminSettingsPage() {
     }
   }
 
+  async function importStandardRoles() {
+    setRoleSaving(true);
+    setRoleMessage("");
+    setSettingsError("");
+
+    try {
+      const response = await fetch("/api/settings/roles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.details || "Unable to import standard role templates");
+
+      const nextRoles = data.roles || [];
+      clearCachedApi("/api/settings/roles");
+      setRoles(nextRoles);
+      setSavedRoles(nextRoles);
+      setActiveRoleIndex(0);
+      setRoleMessage(data.message || "Standard role templates imported successfully.");
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setRoleSaving(false);
+    }
+  }
+
   async function saveRoleConfiguration() {
     setRoleSaving(true);
     setRoleMessage("");
@@ -598,10 +625,6 @@ export default function LabAdminSettingsPage() {
         <>
           <div className="settings-summary-grid mb-4">
             <article>
-              <span>Enabled Modules</span>
-              <strong>{enabledModules.length}</strong>
-            </article>
-            <article>
               <span>Active Role Permissions</span>
               <strong>{activePermissionSet.size}</strong>
             </article>
@@ -623,6 +646,7 @@ export default function LabAdminSettingsPage() {
             rolesDirty={rolesDirty}
             cancelRoleChanges={cancelRoleChanges}
             saveRoleConfiguration={saveRoleConfiguration}
+            importStandardRoles={importStandardRoles}
           />
 
           <PermissionMatrix

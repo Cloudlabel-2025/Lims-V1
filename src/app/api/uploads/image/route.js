@@ -20,7 +20,7 @@ export async function POST(req) {
     });
 
     if (target.error) {
-      return NextResponse.json({ error: target.error }, { status: target.status });
+      return NextResponse.json({ error: target.error }, { status: target.status || 400 });
     }
 
     const image = await uploadImageToCloudinary(file, {
@@ -32,6 +32,7 @@ export async function POST(req) {
   } catch (error) {
     console.error("POST /api/uploads/image error:", error.message);
 
-    return nextJsonError("Image upload failed", error, error.status || 400);
+    const status = error.status || (error.name === "ImageUploadError" ? 400 : 500);
+    return nextJsonError(error.message || "Image upload failed", error, status);
   }
 }
