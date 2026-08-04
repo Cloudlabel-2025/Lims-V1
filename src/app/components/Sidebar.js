@@ -102,12 +102,12 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
               <Link
                 key={item.id}
                 href={item.href}
-                className={`dash-nav-item ${pathname === item.href ? "active" : ""}`}
+                className={`dash-nav-item ${isActive(item.href) ? "active" : ""}`}
                 onClick={() => setMobileOpen && setMobileOpen(false)}
               >
                 <span className="dash-nav-icon">{item.icon}</span>
                 {!collapsed && <span className="dash-nav-label">{item.label}</span>}
-                {pathname === item.href && <div className="dash-nav-indicator" />}
+                {isActive(item.href) && <div className="dash-nav-indicator" />}
               </Link>
             ))}
           </div>

@@ -2,6 +2,7 @@ import { jsonError } from "@/app/lib/api-response";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
+import { ensureUserDoctorIdIndex } from "@/app/models/tenant/User";
 
 const URL_RE = /https?:\/\//;
 const SAFE_NAME = /^[A-Za-z0-9 .&'\/,()@_-]+$/;
@@ -21,6 +22,17 @@ function splitName(name) {
 }
 
 function serializeUser(user) {
+  const doctor = user.doctorId && typeof user.doctorId === "object"
+    ? {
+        id: String(user.doctorId._id || user.doctorId),
+        doctorId: user.doctorId.doctorId,
+        name: user.doctorId.name,
+        status: user.doctorId.status,
+        speciality: user.doctorId.speciality,
+        clinicName: user.doctorId.clinicName,
+      }
+    : null;
+
   return {
     id: String(user._id),
     userId: user.userId,
@@ -34,7 +46,23 @@ function serializeUser(user) {
           name: user.role.name,
         }
       : null,
+    doctor,
   };
+}
+
+function duplicateUserMessage(error) {
+  const field = Object.keys(error?.keyPattern || {})[0];
+  if (field === "email") return "A user with this login email already exists";
+  if (field === "userId") return "User ID sequence conflict. Please try creating the user again.";
+  if (field === "doctorId") return "A portal account is already linked to this doctor";
+  return "User account already exists";
+}
+
+function describeExistingUser(user) {
+  if (!user) return "A user with this login email already exists";
+  const status = user.status ? ` ${user.status}` : "";
+  const portal = user.doctorId ? " doctor portal" : "";
+  return `A${status}${portal} user with this login email already exists`;
 }
 
 export async function GET(req) {
@@ -45,9 +73,31 @@ export async function GET(req) {
     if (moduleAuth.error) return moduleAuth.error;
 
     const { User } = await getTenantModels(auth.tenantId);
-    const users = await User.find({}).populate("role", "name").sort({ createdAt: -1 }).limit(50);
+    await ensureUserDoctorIdIndex(User);
 
-    return Response.json({ users: users.map(serializeUser) });
+    const staffUserQuery = {
+      $or: [{ doctorId: { $exists: false } }, { doctorId: null }],
+    };
+    const doctorPortalQuery = {
+      doctorId: { $exists: true, $ne: null },
+    };
+
+    const [users, doctorPortalUsers] = await Promise.all([
+      User.find(staffUserQuery)
+        .populate("role", "name")
+        .sort({ createdAt: -1 })
+        .limit(50),
+      User.find(doctorPortalQuery)
+        .populate("role", "name")
+        .populate("doctorId", "name doctorId status speciality clinicName")
+        .sort({ createdAt: -1 })
+        .limit(100),
+    ]);
+
+    return Response.json({
+      users: users.map(serializeUser),
+      doctorPortalUsers: doctorPortalUsers.map(serializeUser),
+    });
   } catch (error) {
     return jsonError("Unable to load users", error, 500);
   }
@@ -103,10 +153,19 @@ export async function POST(req) {
     }
 
     const { Role, User } = await getTenantModels(auth.tenantId);
-    const role = await Role.findOne({ _id: roleId, status: "active" });
+    await ensureUserDoctorIdIndex(User);
+
+    const [role, existingEmailUser] = await Promise.all([
+      Role.findOne({ _id: roleId, status: "active" }),
+      User.findOne({ email }).select("_id status doctorId").lean(),
+    ]);
 
     if (!role) {
       return Response.json({ error: "Selected role not found" }, { status: 404 });
+    }
+
+    if (existingEmailUser) {
+      return Response.json({ error: describeExistingUser(existingEmailUser) }, { status: 409 });
     }
 
     const user = await User.create({
@@ -126,7 +185,7 @@ export async function POST(req) {
     return Response.json({ user: serializeUser(user) }, { status: 201 });
   } catch (error) {
     if (error.code === 11000) {
-      return Response.json({ error: "A user with this login email already exists" }, { status: 409 });
+      return Response.json({ error: duplicateUserMessage(error) }, { status: 409 });
     }
 
     return jsonError("Unable to create user", error, 500);
@@ -189,9 +248,12 @@ export async function PATCH(req) {
     }
 
     const { Role, User } = await getTenantModels(auth.tenantId);
-    const [role, user] = await Promise.all([
+    await ensureUserDoctorIdIndex(User);
+
+    const [role, user, existingEmailUser] = await Promise.all([
       Role.findOne({ _id: roleId, status: "active" }),
       User.findById(userId).select("+passwordHash"),
+      User.findOne({ email, _id: { $ne: userId } }).select("_id status doctorId").lean(),
     ]);
 
     if (!role) {
@@ -200,6 +262,10 @@ export async function PATCH(req) {
 
     if (!user) {
       return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (existingEmailUser) {
+      return Response.json({ error: describeExistingUser(existingEmailUser) }, { status: 409 });
     }
 
     user.set({
@@ -236,7 +302,7 @@ export async function PATCH(req) {
     return Response.json({ user: serializeUser(user) });
   } catch (error) {
     if (error.code === 11000) {
-      return Response.json({ error: "A user with this login email already exists" }, { status: 409 });
+      return Response.json({ error: duplicateUserMessage(error) }, { status: 409 });
     }
 
     return jsonError("Unable to update user", error, 500);

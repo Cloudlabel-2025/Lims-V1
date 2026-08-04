@@ -23,8 +23,8 @@ function isValidItemCode(value) {
   return /^[A-Z0-9-]*$/.test(value);
 }
 
-function isLettersOnly(value) {
-  return /^[A-Za-z\s]*$/.test(value);
+function isValidUomName(value) {
+  return /^[A-Za-z0-9\s]*$/.test(value);
 }
 
 function hasUrl(value) {
@@ -87,6 +87,23 @@ function expiryState(item) {
       .map((batch) => new Date(batch.expiryDate))
       .sort((a, b) => a - b)[0],
   };
+}
+
+async function seedDefaults(Model, docs, sort) {
+  if (docs.length === 0) return [];
+
+  await Model.bulkWrite(
+    docs.map((doc) => ({
+      updateOne: {
+        filter: { name: doc.name },
+        update: { $setOnInsert: doc },
+        upsert: true,
+      },
+    })),
+    { ordered: false }
+  );
+
+  return Model.find({}).sort(sort).lean();
 }
 
 async function requireInventory(req, permission = "inventory.view") {
@@ -189,8 +206,7 @@ async function loadInventory(auth, req) {
     { name: "Pair", symbol: "pair", type: "count", conversionToBase: 2, baseSymbol: "each" },
   ];
   if (uoms.length === 0) {
-    await InventoryUom.insertMany(defaultUoms);
-    uoms = await InventoryUom.find({}).sort({ type: 1, name: 1 }).lean();
+    uoms = await seedDefaults(InventoryUom, defaultUoms, { type: 1, name: 1 });
   }
 
   const decoratedItems = items.map((item) => ({ ...item, ...expiryState(item) }));
@@ -208,8 +224,7 @@ async function loadInventory(auth, req) {
 
   const defaultTypes = ["reagent", "consumable", "chemical", "control", "calibrator", "equipment", "stationery", "other"];
   if (itemTypes.length === 0) {
-    await InventoryItemType.insertMany(defaultTypes.map((name) => ({ name })));
-    itemTypes.push(...defaultTypes.map((name) => ({ name })));
+    itemTypes.push(...await seedDefaults(InventoryItemType, defaultTypes.map((name) => ({ name })), { name: 1 }));
   }
 
   const defaultConditions = [
@@ -219,8 +234,7 @@ async function loadInventory(auth, req) {
     "Flammable Cabinet", "Corrosive Cabinet", "Toxic Storage", "Cryogenic", "Ambient",
   ];
   if (storageConditions.length === 0) {
-    await InventoryStorageCondition.insertMany(defaultConditions.map((name) => ({ name })));
-    storageConditions.push(...defaultConditions.map((name) => ({ name })));
+    storageConditions.push(...await seedDefaults(InventoryStorageCondition, defaultConditions.map((name) => ({ name })), { name: 1 }));
   }
 
   return {
@@ -299,7 +313,7 @@ export async function POST(req) {
       const name = clean(body.name);
       const symbol = clean(body.symbol);
       if (!name || !symbol) return Response.json({ error: "UOM name and symbol are required" }, { status: 400 });
-      if (!isLettersOnly(name)) return Response.json({ error: "UOM name must contain only letters" }, { status: 400 });
+      if (!isValidUomName(name)) return Response.json({ error: "UOM name must contain only letters, numbers, and spaces" }, { status: 400 });
       if (hasUrl(name)) return Response.json({ error: "URLs are not allowed in UOM name" }, { status: 400 });
       if (!isValidName(symbol)) return Response.json({ error: "UOM symbol contains invalid characters" }, { status: 400 });
       if (hasUrl(symbol)) return Response.json({ error: "URLs are not allowed in UOM symbol" }, { status: 400 });

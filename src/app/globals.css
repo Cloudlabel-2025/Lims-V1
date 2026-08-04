@@ -5446,6 +5446,112 @@ input[type="number"] {
   margin-top: 20px;
 }
 
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tabs button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.settings-tabs button.active {
+  border-color: var(--brand-action, var(--primary));
+  background: color-mix(in srgb, var(--brand-action, var(--primary)) 10%, #fff);
+  color: var(--brand-action, var(--primary));
+}
+
+.settings-tabs button span {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2f7;
+  color: inherit;
+  font-size: 12px;
+}
+
+.settings-subpage-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.user-assignment-link-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  padding: 22px;
+}
+
+.user-assignment-link-card {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 96px;
+  padding: 18px;
+  text-decoration: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.user-assignment-link-card:hover {
+  border-color: var(--brand-action, var(--primary));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.user-assignment-link-card > span {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand-action, var(--primary)) 12%, #fff);
+  border-radius: 8px;
+  color: var(--brand-action, var(--primary));
+  display: inline-flex;
+  grid-row: span 2;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.user-assignment-link-card > span svg {
+  height: 20px;
+  width: 20px;
+}
+
+.user-assignment-link-card strong {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.user-assignment-link-card small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .settings-user-list {
   gap: 12px;
 }

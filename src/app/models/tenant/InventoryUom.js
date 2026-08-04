@@ -17,7 +17,7 @@ export const InventoryUomSchema = new mongoose.Schema(
       trim: true,
       maxlength: 60,
       unique: true,
-      match: [/^[A-Za-z\s]+$/, "Name must contain only letters and spaces"],
+      match: [/^[A-Za-z0-9\s]+$/, "Name must contain only letters, numbers, and spaces"],
       validate: { validator: noUrl, message: "URLs are not allowed in UOM name" },
     },
     symbol: {

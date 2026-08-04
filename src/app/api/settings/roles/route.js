@@ -57,6 +57,13 @@ function dedupeRolesByName(roles) {
   return uniqueRoles;
 }
 
+function duplicateRoleMessage(error) {
+  const field = Object.keys(error?.keyPattern || {})[0];
+  if (field === "roleId") return "Role ID sequence conflict. Please try saving again.";
+  if (field === "name") return "Role name already exists";
+  return "Role record already exists";
+}
+
 async function getAllowedPermissionsForTenant(auth) {
   const lab = await getTenantConfig(auth.tenantId);
   const enabledModules = getEnabledModules(lab);
@@ -132,6 +139,21 @@ export async function PATCH(req) {
         await existingRole.save();
         savedRoles.push(existingRole);
       } else {
+        const protectedRole = await Role.findOne({
+          name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+        }).lean();
+
+        if (protectedRole) {
+          return Response.json(
+            {
+              error: protectedRole.isSystemRole
+                ? `Role "${name}" already exists as a protected system role. Use a different custom role name.`
+                : `Role "${name}" already exists.`,
+            },
+            { status: 409 }
+          );
+        }
+
         const role = await Role.create({
           name,
           description,
@@ -150,7 +172,7 @@ export async function PATCH(req) {
     return Response.json({ roles: dedupeRolesByName(roles).map(serializeRole) });
   } catch (error) {
     if (error.code === 11000) {
-      return Response.json({ error: "Role name already exists" }, { status: 409 });
+      return Response.json({ error: duplicateRoleMessage(error) }, { status: 409 });
     }
 
     return jsonError("Unable to save roles", error, 500);

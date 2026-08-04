@@ -24,6 +24,17 @@ async function getNextSequence(connection, name) {
   return counter.seq;
 }
 
+async function getNextAvailableRoleId(Role) {
+  for (let attempts = 0; attempts < 1000; attempts += 1) {
+    const seq = await getNextSequence(Role.db, "roleId");
+    const roleId = `ROLE-${String(seq).padStart(6, "0")}`;
+    const exists = await Role.exists({ roleId });
+    if (!exists) return roleId;
+  }
+
+  throw new Error("Unable to generate a unique role ID");
+}
+
 const permissionKeySchema = {
   type: String,
   trim: true,
@@ -87,8 +98,7 @@ RoleSchema.index({ name: 1 }, { unique: true });
 RoleSchema.pre("save", async function generateRoleId() {
   if (this.roleId) return;
 
-  const seq = await getNextSequence(this.constructor.db, "roleId");
-  this.roleId = `ROLE-${String(seq).padStart(6, "0")}`;
+  this.roleId = await getNextAvailableRoleId(this.constructor);
 });
 
 // Tenant DB only: permissions are assigned as keys from the Master DB catalog.

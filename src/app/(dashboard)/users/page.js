@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import SuccessDialog from "@/app/components/SuccessDialog";
+import { Icons } from "@/app/components/Icons";
 import { cachedJsonFetch, clearCachedApi, useTenantShell } from "@/app/lib/use-current-user";
 import { hasPermission } from "@/app/lib/client-rbac";
 
@@ -27,6 +29,7 @@ export default function UserAssignmentPage() {
   });
   const [editingUser, setEditingUser] = useState(null);
   const [users, setUsers] = useState([]);
+  const [doctorPortalUsers, setDoctorPortalUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [userSaving, setUserSaving] = useState(false);
   const [pageError, setPageError] = useState("");
@@ -58,6 +61,7 @@ export default function UserAssignmentPage() {
           const loadedRoles = roleResponse.data.roles || [];
           setRoles(loadedRoles);
           setUsers(userResponse.data.users || []);
+          setDoctorPortalUsers(userResponse.data.doctorPortalUsers || []);
           setNewUser((current) => ({
             ...current,
             roleId: current.roleId || loadedRoles[0]?.id || "",
@@ -202,6 +206,41 @@ export default function UserAssignmentPage() {
     }
   }
 
+  async function resendDoctorInvitation(portalUser) {
+    const doctorId = portalUser?.doctor?.id;
+    if (!doctorId) {
+      setPageError("Linked doctor profile was not found for this portal user.");
+      return;
+    }
+
+    setUserSaving(true);
+    setUserMessage("");
+    setPageError("");
+
+    try {
+      const response = await fetch(`/api/doctor/${doctorId}/resend-invitation`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.details || "Unable to resend invitation");
+
+      clearCachedApi("/api/settings/users");
+      setUserMessage(data.message || `Invitation sent to ${portalUser.email}.`);
+      setDoctorPortalUsers((current) =>
+        current.map((item) => (
+          item.id === portalUser.id
+            ? { ...item, status: "invited" }
+            : item
+        ))
+      );
+    } catch (err) {
+      setPageError(err.message);
+    } finally {
+      setUserSaving(false);
+    }
+  }
+
   return (
     <section className="settings-page">
       <div className="settings-header">
@@ -218,23 +257,47 @@ export default function UserAssignmentPage() {
       {loadingUsers ? (
         <p className="developer-empty">Loading users...</p>
       ) : canManageUsers ? (
-        <UserManager
-          newUser={newUser}
-          setNewUser={setNewUser}
-          newUserErrors={newUserErrors}
-          roles={roles}
-          createUser={createUser}
-          userSaving={userSaving}
-          rolesDirty={false}
-          canCreateUser={canCreateUser}
-          users={users}
-          editingUser={editingUser}
-          setEditingUser={setEditingUser}
-          startEditUser={startEditUser}
-          cancelEditUser={cancelEditUser}
-          saveUserEdit={saveUserEdit}
-          deleteUser={deleteUser}
-        />
+        <>
+          <UserManager
+            newUser={newUser}
+            setNewUser={setNewUser}
+            newUserErrors={newUserErrors}
+            roles={roles}
+            createUser={createUser}
+            userSaving={userSaving}
+            rolesDirty={false}
+            canCreateUser={canCreateUser}
+            users={users}
+            doctorPortalUsers={doctorPortalUsers}
+            editingUser={editingUser}
+            setEditingUser={setEditingUser}
+            startEditUser={startEditUser}
+            cancelEditUser={cancelEditUser}
+            saveUserEdit={saveUserEdit}
+            deleteUser={deleteUser}
+            resendDoctorInvitation={resendDoctorInvitation}
+            showLists={false}
+          />
+
+          <section className="settings-panel">
+            <div className="settings-panel-header">
+              <h2>User Assignment Lists</h2>
+              <p>Open staff users or doctor portal accounts in their own workspace.</p>
+            </div>
+            <div className="user-assignment-link-grid">
+              <Link href="/users/list" className="user-assignment-link-card">
+                <span>{Icons.users || Icons.person}</span>
+                <strong>User List</strong>
+                <small>{users.length} staff accounts</small>
+              </Link>
+              <Link href="/users/doctor-portal" className="user-assignment-link-card">
+                <span>{Icons.stethoscope}</span>
+                <strong>Doctor Portal Users</strong>
+                <small>{doctorPortalUsers.length} linked accounts</small>
+              </Link>
+            </div>
+          </section>
+        </>
       ) : (
         <section className="settings-panel">
           <p className="developer-empty">Your role does not have permission to manage users.</p>

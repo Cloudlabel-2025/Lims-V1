@@ -14,6 +14,8 @@ export const getEmptyForm = () => ({
   phone: "",
   address: "",
   uhId: "",
+  collectionTime: "",
+  receivedTime: "",
   refDoctorName: "",
   reportType: "Hand",
   selectedTests: [],

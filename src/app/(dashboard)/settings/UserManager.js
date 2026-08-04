@@ -31,14 +31,21 @@ export default function UserManager({
   rolesDirty,
   canCreateUser,
   users,
+  doctorPortalUsers = [],
   editingUser,
   setEditingUser,
   startEditUser,
   cancelEditUser,
   saveUserEdit,
   deleteUser,
+  resendDoctorInvitation,
+  showCreate = true,
+  showLists = true,
+  listMode = "tabs",
 }) {
   const [localErrors, setLocalErrors] = useState({});
+  const [activeListTab, setActiveListTab] = useState("staff");
+  const visibleListTab = listMode === "tabs" ? activeListTab : listMode;
 
   function handleNewUserNameChange(value) {
     setNewUser((current) => ({ ...current, name: value }));
@@ -90,6 +97,7 @@ export default function UserManager({
 
   return (
     <>
+      {showCreate && (
       <section className="settings-panel">
         <div className="settings-panel-header">
           <h2>Create User</h2>
@@ -171,6 +179,7 @@ export default function UserManager({
         </div>
         {rolesDirty && <p className="developer-empty">Save role configuration before creating users.</p>}
       </section>
+      )}
 
       {editingUser && (
         <section className="settings-panel settings-user-edit">
@@ -258,12 +267,41 @@ export default function UserManager({
         </section>
       )}
 
+      {showLists && (
       <section className="settings-panel settings-user-list-panel">
         <div className="settings-panel-header">
-          <h2>User List</h2>
-          <p>Review users, open edit mode, or remove accounts that no longer need access.</p>
+          <h2>{visibleListTab === "staff" ? "User List" : "Doctor Portal Users"}</h2>
+          <p>
+            {visibleListTab === "staff"
+              ? "Review staff users, open edit mode, or remove accounts that no longer need access."
+              : "Review linked doctor portal accounts and invitation status."}
+          </p>
         </div>
-        {users.length > 0 ? (
+
+        {listMode === "tabs" && (
+        <div className="settings-tabs" role="tablist" aria-label="User assignment lists">
+          <button
+            type="button"
+            className={activeListTab === "staff" ? "active" : ""}
+            onClick={() => setActiveListTab("staff")}
+            role="tab"
+            aria-selected={activeListTab === "staff"}
+          >
+            User List <span>{users.length}</span>
+          </button>
+          <button
+            type="button"
+            className={activeListTab === "doctorPortal" ? "active" : ""}
+            onClick={() => setActiveListTab("doctorPortal")}
+            role="tab"
+            aria-selected={activeListTab === "doctorPortal"}
+          >
+            Doctor Portal Users <span>{doctorPortalUsers.length}</span>
+          </button>
+        </div>
+        )}
+
+        {visibleListTab === "staff" && (users.length > 0 ? (
           <div className="settings-role-list settings-user-list">
             {users.map((user) => (
               <div className="settings-user-row" key={user.id}>
@@ -284,8 +322,118 @@ export default function UserManager({
           </div>
         ) : (
           <p className="developer-empty">No lab users created yet.</p>
-        )}
+        ))}
+
+        {visibleListTab === "doctorPortal" && (doctorPortalUsers.length > 0 ? (
+          <div className="settings-role-list settings-user-list">
+            {doctorPortalUsers.map((portalUser) => (
+              <div className="settings-user-row" key={portalUser.id}>
+                <button type="button" disabled>
+                  <strong>{portalUser.userId}</strong>
+                  <span>
+                    {(portalUser.doctor?.name || [portalUser.firstName, portalUser.lastName].filter(Boolean).join(" "))} - {portalUser.email} - {portalUser.status}
+                  </span>
+                  <span>
+                    {portalUser.doctor?.doctorId || "No doctor ID"} - {portalUser.role?.name || "Doctor portal"}
+                    {portalUser.doctor?.speciality ? ` - ${portalUser.doctor.speciality}` : ""}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => resendDoctorInvitation?.(portalUser)}
+                  disabled={userSaving || portalUser.status === "active"}
+                >
+                  {portalUser.status === "active" ? "Active" : "Resend Invite"}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="developer-empty">No doctor portal users created yet.</p>
+        ))}
       </section>
+      )}
     </>
+  );
+}
+
+export function StaffUserListPanel({
+  users,
+  userSaving,
+  rolesDirty = false,
+  startEditUser,
+  deleteUser,
+}) {
+  return (
+    <section className="settings-panel settings-user-list-panel">
+      <div className="settings-panel-header">
+        <h2>User List</h2>
+        <p>Review staff users, open edit mode, or remove accounts that no longer need access.</p>
+      </div>
+      {users.length > 0 ? (
+        <div className="settings-role-list settings-user-list">
+          {users.map((user) => (
+            <div className="settings-user-row" key={user.id}>
+              <button type="button" onClick={() => startEditUser(user)}>
+                <strong>{user.userId}</strong>
+                <span>
+                  {user.email} - {user.role?.name || "No role"} - {user.status}
+                </span>
+              </button>
+              <button type="button" onClick={() => startEditUser(user)} disabled={userSaving || rolesDirty}>
+                Edit
+              </button>
+              <button type="button" className="danger" onClick={() => deleteUser(user)} disabled={userSaving || rolesDirty}>
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="developer-empty">No lab users created yet.</p>
+      )}
+    </section>
+  );
+}
+
+export function DoctorPortalUserListPanel({
+  doctorPortalUsers,
+  userSaving,
+  resendDoctorInvitation,
+}) {
+  return (
+    <section className="settings-panel settings-user-list-panel">
+      <div className="settings-panel-header">
+        <h2>Doctor Portal Users</h2>
+        <p>Review linked doctor portal accounts and invitation status.</p>
+      </div>
+      {doctorPortalUsers.length > 0 ? (
+        <div className="settings-role-list settings-user-list">
+          {doctorPortalUsers.map((portalUser) => (
+            <div className="settings-user-row" key={portalUser.id}>
+              <button type="button" disabled>
+                <strong>{portalUser.userId}</strong>
+                <span>
+                  {(portalUser.doctor?.name || [portalUser.firstName, portalUser.lastName].filter(Boolean).join(" "))} - {portalUser.email} - {portalUser.status}
+                </span>
+                <span>
+                  {portalUser.doctor?.doctorId || "No doctor ID"} - {portalUser.role?.name || "Doctor portal"}
+                  {portalUser.doctor?.speciality ? ` - ${portalUser.doctor.speciality}` : ""}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => resendDoctorInvitation?.(portalUser)}
+                disabled={userSaving || portalUser.status === "active"}
+              >
+                {portalUser.status === "active" ? "Active" : "Resend Invite"}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="developer-empty">No doctor portal users created yet.</p>
+      )}
+    </section>
   );
 }

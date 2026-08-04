@@ -24,6 +24,17 @@ async function getNextSequence(connection, name) {
   return counter.seq;
 }
 
+async function getNextAvailableUserId(User) {
+  for (let attempts = 0; attempts < 1000; attempts += 1) {
+    const seq = await getNextSequence(User.db, "userId");
+    const userId = `USR-${String(seq).padStart(6, "0")}`;
+    const exists = await User.exists({ userId });
+    if (!exists) return userId;
+  }
+
+  throw new Error("Unable to generate a unique user ID");
+}
+
 export const UserSchema = new mongoose.Schema(
   {
     userId: {
@@ -118,7 +129,6 @@ export const UserSchema = new mongoose.Schema(
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Doctor",
-      default: null,
     },
   },
   { timestamps: true }
@@ -126,17 +136,47 @@ export const UserSchema = new mongoose.Schema(
 
 UserSchema.index({ status: 1, role: 1 });
 UserSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
-UserSchema.index({ doctorId: 1 }, { unique: true, sparse: true });
+UserSchema.index(
+  { doctorId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { doctorId: { $type: "objectId" } },
+  }
+);
 
 UserSchema.pre("save", async function generateUserId() {
   if (this.userId) return;
 
-  const seq = await getNextSequence(this.constructor.db, "userId");
-  this.userId = `USR-${String(seq).padStart(6, "0")}`;
+  this.userId = await getNextAvailableUserId(this.constructor);
 });
 
 export function getUserModel(connection = mongoose) {
   return connection.models.User || connection.model("User", UserSchema);
+}
+
+export async function ensureUserDoctorIdIndex(User) {
+  const connection = User.db;
+  if (connection.__userDoctorIdIndexPromise) return connection.__userDoctorIdIndexPromise;
+
+  connection.__userDoctorIdIndexPromise = (async () => {
+    await User.updateMany({ doctorId: null }, { $unset: { doctorId: "" } });
+    await User.collection.dropIndex("doctorId_1").catch((error) => {
+      if (error?.codeName !== "IndexNotFound") throw error;
+    });
+    await User.collection.createIndex(
+      { doctorId: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { doctorId: { $type: "objectId" } },
+        name: "doctorId_1",
+      }
+    );
+  })().catch((error) => {
+    connection.__userDoctorIdIndexPromise = null;
+    throw error;
+  });
+
+  return connection.__userDoctorIdIndexPromise;
 }
 
 const User = getUserModel();
