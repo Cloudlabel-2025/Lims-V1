@@ -105,7 +105,7 @@ export default function DeveloperLayout({ children }) {
         <div className="developer-sidebar-brand">
           <div className="developer-sidebar-logo">{Icons.logo}</div>
           <div>
-            <strong>UTHIRAM</strong>
+            <strong>CHC</strong>
             <span>Developer Console</span>
           </div>
         </div>

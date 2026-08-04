@@ -25,6 +25,20 @@ function formatMoney(minor, currency = "INR") {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(minor / 100);
 }
 
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function SubscriptionPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +48,7 @@ export default function SubscriptionPage() {
   const [requesting, setRequesting] = useState(false);
   const [notice, setNotice] = useState("");
   const [upgradeError, setUpgradeError] = useState("");
+  const [guiltTripOpen, setGuiltTripOpen] = useState(false);
   const moduleNameById = useMemo(() => new Map(availableLabModules.map((item) => [item.id, item.label])), []);
 
   useEffect(() => {
@@ -67,12 +82,84 @@ export default function SubscriptionPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to request upgrade");
-      setData((current) => ({ ...current, pendingUpgrade: payload.request }));
-      setNotice(payload.message);
-      setUpgradeOpen(false);
-      setSelectedPlanKey("");
+      
+      const { request } = payload;
+      const { id: upgradeRequestId, rzpOrderId, amount, keyId } = request;
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        throw new Error("Failed to load Razorpay SDK. Please check your internet connection.");
+      }
+
+      const options = {
+        key: keyId,
+        amount: amount,
+        currency: "INR",
+        name: "LIMS Plan Upgrade",
+        description: `Upgrade to ${selectedUpgradePlan?.name || "Premium Plan"}`,
+        order_id: rzpOrderId,
+        handler: async function (paymentResponse) {
+          setRequesting(true);
+          try {
+            const confirmRes = await fetch("/api/subscription/confirm", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                upgradeRequestId,
+                razorpayOrderId: paymentResponse.razorpay_order_id,
+                razorpayPaymentId: paymentResponse.razorpay_payment_id,
+                razorpaySignature: paymentResponse.razorpay_signature,
+              }),
+            });
+            const confirmPayload = await confirmRes.json();
+            if (!confirmRes.ok) throw new Error(confirmPayload.error || "Payment verification failed");
+
+            setNotice(confirmPayload.message);
+            setUpgradeOpen(false);
+            setSelectedPlanKey("");
+            window.location.reload();
+          } catch (err) {
+            setUpgradeError(err.message);
+          } finally {
+            setRequesting(false);
+          }
+        },
+        theme: {
+          color: "#0d9488",
+        },
+        modal: {
+          ondismiss: function () {
+            setRequesting(false);
+          }
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
     } catch (requestError) {
       setUpgradeError(requestError.message);
+      setUpgradeOpen(true);
+      setRequesting(false);
+    }
+  }
+
+  async function cancelUpgradeRequest() {
+    setRequesting(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/subscription", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to cancel request");
+      
+      setNotice(payload.message);
+      setData((current) => ({ ...current, pendingUpgrade: null }));
+    } catch (err) {
+      setNotice("");
+      alert(err.message);
     } finally {
       setRequesting(false);
     }
@@ -124,9 +211,20 @@ export default function SubscriptionPage() {
 
       {notice && <div className="lims-alert success">{notice}</div>}
       {pendingUpgrade && (
-        <div className="tenant-upgrade-pending">
-          <strong>{pendingUpgrade.packageName} Version 1 requested</strong>
-          <span>Submitted {formatDate(pendingUpgrade.requestedAt)}. Your current package remains active until the request is approved.</span>
+        <div className="tenant-upgrade-pending" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <strong>{pendingUpgrade.packageName} Version 1 requested</strong>
+            <span>Submitted {formatDate(pendingUpgrade.requestedAt)}. Your current package remains active until the request is approved.</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-danger"
+            style={{ color: "#ef4444", borderColor: "#ef4444", backgroundColor: "transparent", padding: "4px 10px", fontSize: "12px", borderRadius: "4px", fontWeight: "600" }}
+            onClick={cancelUpgradeRequest}
+            disabled={requesting}
+          >
+            {requesting ? "Cancelling..." : "Cancel Request"}
+          </button>
         </div>
       )}
 
@@ -214,20 +312,19 @@ export default function SubscriptionPage() {
               {upgradePlans.map((plan) => {
                 const current = plan.key === subscription.packageKey;
                 const selected = plan.key === selectedPlanKey;
-                const unavailable = !current && !plan.canUpgrade;
                 return (
                   <button
                     type="button"
                     className={`tenant-upgrade-plan ${selected ? "selected" : ""} ${current ? "current" : ""}`}
                     key={plan.key}
-                    disabled={current || unavailable}
+                    disabled={current}
                     aria-pressed={selected}
                     onClick={() => setSelectedPlanKey(plan.key)}
                   >
                     <span className="tenant-upgrade-plan-heading">
                       <span><strong>{plan.name}</strong><small>Version 1</small></span>
                       {current && <em>Current</em>}
-                      {unavailable && <em className="unavailable">Lower plan</em>}
+                      {plan.isDowngrade && <em className="downgrade" style={{ backgroundColor: "#ef4444", color: "#fff", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", textTransform: "none", fontStyle: "normal" }}>Downgrade</em>}
                       {selected && <em className="selected">Selected</em>}
                     </span>
                     <span className="tenant-upgrade-plan-prices">
@@ -265,8 +362,104 @@ export default function SubscriptionPage() {
                 {selectedUpgradePlan && <strong>{selectedUpgradePlan.name} · Version 1</strong>}
               </div>
               <button type="button" className="tenant-upgrade-cancel" onClick={() => setUpgradeOpen(false)}>Dismiss</button>
-              <button type="button" className="tenant-upgrade-submit" disabled={!selectedPlanKey || requesting} onClick={requestUpgrade}>
+              <button
+                type="button"
+                className="tenant-upgrade-submit"
+                disabled={!selectedPlanKey || requesting}
+                onClick={() => {
+                  if (selectedUpgradePlan?.isDowngrade) {
+                    setUpgradeOpen(false);
+                    setGuiltTripOpen(true);
+                  } else {
+                    requestUpgrade();
+                  }
+                }}
+              >
                 {requesting ? "Submitting..." : "Confirm selection"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {guiltTripOpen && selectedUpgradePlan && (
+        <div className="tenant-upgrade-modal" role="dialog" aria-modal="true" style={{ zIndex: 1100 }}>
+          <button type="button" className="tenant-upgrade-backdrop" onClick={() => setGuiltTripOpen(false)} />
+          <section className="tenant-upgrade-dialog" style={{ maxWidth: "500px", border: "2px solid #ef4444" }}>
+            <header className="tenant-upgrade-dialog-header" style={{ borderBottom: "1px solid var(--border-light)" }}>
+              <div style={{ textAlign: "center", width: "100%" }}>
+                <span style={{ fontSize: "40px" }}>😢</span>
+                <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#ef4444", marginTop: "10px" }}>Are you sure you want to break their hearts?</h2>
+                <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
+                  Your patients and staff will miss the premium superpowers of <strong>{subscription.packageName}</strong>.
+                </p>
+              </div>
+            </header>
+
+            <div style={{ padding: "20px" }}>
+              <h4 style={{ fontSize: "14px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: "12px", textAlign: "center" }}>
+                What you will lose by degrading to {selectedUpgradePlan.name}:
+              </h4>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px", background: "var(--surface)", borderRadius: "6px" }}>
+                  <span style={{ fontSize: "20px" }}>📉</span>
+                  <div style={{ textAlign: "left" }}>
+                    <strong style={{ fontSize: "13px", display: "block" }}>Drastic Quota Reductions</strong>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>
+                      Your monthly patient registrations allowance drops to <strong>{selectedUpgradePlan.quotas?.patientRegistrations || "Unlimited"}</strong> (down from {subscription.pricing?.patientRegistrations || "5,000"}).
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px", background: "var(--surface)", borderRadius: "6px" }}>
+                  <span style={{ fontSize: "20px" }}>🔒</span>
+                  <div style={{ textAlign: "left" }}>
+                    <strong style={{ fontSize: "13px", display: "block" }}>Disabled Doctor & Patient Portals</strong>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>
+                      Portals, custom branding, and online report downloading will be locked for your referring doctors and patients.
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px", background: "var(--surface)", borderRadius: "6px" }}>
+                  <span style={{ fontSize: "20px" }}>💔</span>
+                  <div style={{ textAlign: "left" }}>
+                    <strong style={{ fontSize: "13px", display: "block" }}>Staff Member lockouts</strong>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>
+                      Active accounts limit reduces to <strong>{selectedUpgradePlan.quotas?.staffUsers || "Unlimited"}</strong>. Some staff members might lose dashboard access.
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <p style={{ fontStyle: "italic", fontSize: "12px", color: "#ef4444", marginTop: "20px", textAlign: "center", lineHeight: "1.4" }}>
+                "Portals keep referring labs and doctors connected. Downgrading might slow down your business growth..."
+              </p>
+            </div>
+
+            <footer className="tenant-upgrade-dialog-footer" style={{ borderTop: "1px solid var(--border-light)", display: "flex", flexDirection: "column", gap: "10px", padding: "20px" }}>
+              <button 
+                type="button" 
+                className="tenant-upgrade-submit w-100" 
+                style={{ height: "45px", fontWeight: "700", backgroundColor: "var(--primary)", color: "#fff", border: "none" }}
+                onClick={() => {
+                  setGuiltTripOpen(false);
+                  setUpgradeOpen(true);
+                }}
+              >
+                Nevermind, keep my Premium plan!
+              </button>
+              <button 
+                type="button" 
+                className="tenant-upgrade-cancel w-100" 
+                style={{ color: "#ef4444", borderColor: "#ef4444", fontSize: "12px", fontWeight: "600", border: "1px solid #ef4444", background: "transparent" }}
+                onClick={() => {
+                  setGuiltTripOpen(false);
+                  requestUpgrade();
+                }}
+              >
+                Yes, degrade my plan anyway 💔
               </button>
             </footer>
           </section>

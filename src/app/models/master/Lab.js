@@ -189,6 +189,10 @@ export const LabSchema = new mongoose.Schema(
         ],
         default: [],
       },
+      upiId: {
+        type: String,
+        trim: true,
+      },
     },
     archivedAt: {
       type: Date,

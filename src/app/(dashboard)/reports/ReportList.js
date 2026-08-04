@@ -2,13 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const statusColors = {
-  draft: ["#f1f5f9", "#475569"],
-  reviewed: ["#eff6ff", "#1d4ed8"],
-  approved: ["#f0fdf4", "#15803d"],
-  released: ["#ecfdf5", "#047857"],
-};
+import { Icons } from "@/app/components/Icons";
 
 const STATUS_OPTIONS = ["all", "draft", "reviewed", "approved", "released"];
 const RANGE_OPTIONS = ["7", "30", "90"];
@@ -17,125 +11,129 @@ function dateDaysAgo(baseDate, days) {
   return new Date(baseDate.getTime() - Number(days) * 86400000).toISOString().split("T")[0];
 }
 
-export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange, onDateToChange }) {
+function formatDate(value) {
+  if (!value) return "Not recorded";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Not recorded" : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatStatus(value) {
+  return String(value || "Unknown").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getResultSignals(report) {
+  const results = report.results || [];
+  const high = results.filter((result) => result.flag === "high").length;
+  const low = results.filter((result) => result.flag === "low").length;
+  return { high, low, total: results.length };
+}
+
+export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange, onDateToChange, loading }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [today] = useState(() => new Date());
 
+  const statusCounts = useMemo(() => reports.reduce((counts, report) => {
+    counts[report.status] = (counts[report.status] || 0) + 1;
+    return counts;
+  }, {}), [reports]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const from = dateFrom ? new Date(dateFrom) : null;
-    const to = dateTo ? new Date(dateTo) : null;
-    if (to) to.setHours(23, 59, 59, 999);
-    return reports.filter((r) => {
-      const matchStatus = statusFilter === "all" || r.status === statusFilter;
-      const matchSearch = !q ||
-        r.patient?.name?.toLowerCase().includes(q) ||
-        r.testSnapshot?.name?.toLowerCase().includes(q) ||
-        r.reportId?.toLowerCase().includes(q) ||
-        r.sampleId?.toLowerCase().includes(q);
-      let matchDate = true;
-      if (from || to) {
-        const rDate = new Date(r.createdAt);
-        if (from && rDate < from) matchDate = false;
-        if (to && rDate > to) matchDate = false;
-      }
-      return matchStatus && matchSearch && matchDate;
+    const query = search.trim().toLowerCase();
+    return reports.filter((report) => {
+      const matchesStatus = statusFilter === "all" || report.status === statusFilter;
+      const matchesSearch = !query || [
+        report.patient?.name,
+        report.patient?.patientId,
+        report.testSnapshot?.name,
+        report.testSnapshot?.code,
+        report.reportId,
+        report.sampleId,
+      ].some((value) => String(value || "").toLowerCase().includes(query));
+      return matchesStatus && matchesSearch;
     });
-  }, [reports, search, statusFilter, dateFrom, dateTo]);
+  }, [reports, search, statusFilter]);
+
+  const activeRange = dateFrom && !dateTo
+    ? RANGE_OPTIONS.find((days) => dateFrom === dateDaysAgo(today, days)) || "custom"
+    : dateFrom || dateTo ? "custom" : "all";
+
+  function changeRange(value) {
+    if (value === "all") {
+      onDateFromChange?.("");
+      onDateToChange?.("");
+      return;
+    }
+    if (value === "custom") return;
+    onDateFromChange?.(dateDaysAgo(today, value));
+    onDateToChange?.("");
+  }
 
   return (
-    <aside className="module-panel">
-      <div className="module-panel-header">
-        <h2>Generated Reports</h2>
-        <p>{filtered.length} of {reports.length} reports</p>
+    <section className="reports-directory">
+      <header className="reports-directory-header">
+        <div><span>Report directory</span><h2>Clinical report queue</h2><p>Find reports quickly and move each result through verification and release.</p></div>
+        <em>{filtered.length} of {reports.length} report{reports.length === 1 ? "" : "s"}</em>
+      </header>
+
+      <nav className="reports-status-tabs" aria-label="Filter reports by status">
+        {STATUS_OPTIONS.map((option) => (
+          <button key={option} type="button" className={`${statusFilter === option ? "active" : ""} ${option}`} onClick={() => setStatusFilter(option)}>
+            <strong>{option === "all" ? "All reports" : formatStatus(option)}</strong>
+            <em>{option === "all" ? reports.length : statusCounts[option] || 0}</em>
+          </button>
+        ))}
+      </nav>
+
+      <div className="reports-toolbar">
+        <label className="reports-search">
+          <span>{Icons.search}</span>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search patient, report, sample, or test…" />
+          {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search">{Icons.close}</button>}
+        </label>
+        <label className="reports-filter-control">
+          <span>Period</span>
+          <select value={activeRange} onChange={(event) => changeRange(event.target.value)}>
+            <option value="all">All time</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="custom">Custom dates</option>
+          </select>
+        </label>
+        <label className="reports-filter-control date"><span>From</span><input type="date" value={dateFrom || ""} onChange={(event) => onDateFromChange?.(event.target.value)} /></label>
+        <label className="reports-filter-control date"><span>To</span><input type="date" value={dateTo || ""} onChange={(event) => onDateToChange?.(event.target.value)} /></label>
+        {(dateFrom || dateTo || search || statusFilter !== "all") && <button className="reports-clear-filters" type="button" onClick={() => { setSearch(""); setStatusFilter("all"); onDateFromChange?.(""); onDateToChange?.(""); }}>Clear filters</button>}
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <select
-          className="lims-input"
-          value={dateFrom && !dateTo ? RANGE_OPTIONS.find((d) => dateFrom === dateDaysAgo(today, d)) || "all" : "all"}
-          onChange={(e) => {
-            const days = Number(e.target.value);
-            if (!days) {
-              onDateFromChange?.("");
-              onDateToChange?.("");
-            } else {
-              onDateFromChange?.(dateDaysAgo(today, days));
-              onDateToChange?.("");
-            }
-          }}
-          style={{ height: 34, fontSize: 12 }}
-        >
-          <option value="all">Max</option>
-          <option value="7">7 days</option>
-          <option value="30">30 days</option>
-          <option value="90">90 days</option>
-        </select>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <input
-          className="lims-input"
-          style={{ flex: 1, minWidth: 120, height: 34, fontSize: 12 }}
-          placeholder="Search patient, test, ID..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <input
-          type="date"
-          className="lims-input"
-          style={{ height: 34, fontSize: 12, width: 130 }}
-          value={dateFrom || ""}
-          onChange={(e) => onDateFromChange?.(e.target.value)}
-          title="From date"
-        />
-        <input
-          type="date"
-          className="lims-input"
-          style={{ height: 34, fontSize: 12, width: 130 }}
-          value={dateTo || ""}
-          onChange={(e) => onDateToChange?.(e.target.value)}
-          title="To date"
-        />
-        <select
-          className="lims-input"
-          style={{ height: 34, fontSize: 12, width: 110 }}
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s === "all" ? "All Status" : s.charAt(0).toUpperCase() + s.slice(1)}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="test-card-list">
-        {filtered.map((report) => {
-          const [bg, color] = statusColors[report.status] || ["var(--surface)", "var(--text-secondary)"];
-          return (
-            <article
-              key={report._id}
-              className="test-card"
-              onClick={() => router.push(`/reports/${report._id}`)}
-            >
-              <div>
-                <h3>{report.testSnapshot?.name}</h3>
-                <span>{report.patient?.name} &middot; {report.reportId} {report.version > 1 ? `v${report.version}` : ""}</span>
-              </div>
-              <span style={{ background: bg, color, borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 800 }}>
-                {report.status}
-              </span>
-            </article>
-          );
-        })}
-        {filtered.length === 0 && (
-          <p style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 20 }}>
-            {reports.length === 0 ? "No reports yet." : "No reports match your filter."}
-          </p>
-        )}
-      </div>
-    </aside>
+      {filtered.length ? (
+        <div className={`reports-table ${loading ? "is-refreshing" : ""}`} role="table" aria-label="Clinical reports">
+          <div className="reports-table-head" role="row"><span>Report & investigation</span><span>Patient</span><span>Specimen</span><span>Result signals</span><span>Created</span><span>Status</span><span aria-label="Actions" /></div>
+          {filtered.map((report) => {
+            const signals = getResultSignals(report);
+            return (
+              <article className="reports-table-row" role="row" key={report._id}>
+                <div className="reports-report-cell" role="cell" data-label="Report">
+                  <span className="reports-file-icon">{Icons.report}</span>
+                  <div><strong>{report.testSnapshot?.name || "Unnamed investigation"}</strong><span>{report.reportId || "Report ID pending"}{report.version > 1 ? ` · Version ${report.version}` : ""}</span><small>{report.testSnapshot?.code || report.testSnapshot?.categoryName || "Diagnostic report"}</small></div>
+                </div>
+                <div className="reports-patient-cell" role="cell" data-label="Patient"><strong>{report.patient?.name || "Patient unavailable"}</strong><span>{report.patient?.patientId || "No patient ID"}</span><small>{report.patient?.age || "—"} yrs · {report.patient?.gender || "Not specified"}</small></div>
+                <div className="reports-specimen-cell" role="cell" data-label="Specimen"><strong>{report.sampleId || "Not linked"}</strong><span>{report.testSnapshot?.sampleType || "Sample type unavailable"}</span></div>
+                <div className="reports-signals-cell" role="cell" data-label="Result signals">
+                  {signals.high || signals.low ? <><strong className="flagged">{signals.high + signals.low} flagged</strong><span>{signals.high ? `${signals.high} high` : ""}{signals.high && signals.low ? " · " : ""}{signals.low ? `${signals.low} low` : ""}</span></> : <><strong className="normal">Within range</strong><span>{signals.total} parameter{signals.total === 1 ? "" : "s"}</span></>}
+                </div>
+                <div className="reports-date-cell" role="cell" data-label="Created"><strong>{formatDate(report.createdAt)}</strong><span>{report.enteredBy ? `Entered by ${report.enteredBy}` : "Origin not recorded"}</span></div>
+                <div className="reports-status-cell" role="cell" data-label="Status"><span className={`reports-status-badge ${report.status}`}>{formatStatus(report.status)}</span></div>
+                <div className="reports-action-cell" role="cell"><button type="button" onClick={() => router.push(`/reports/${report._id}`)} aria-label={`Open report ${report.reportId || ""}`}>Open report {Icons.chevronRight}</button></div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="reports-empty-state">
+          <span>{reports.length ? Icons.noResults : Icons.report}</span>
+          <h3>{reports.length ? "No reports match these filters" : "No reports have been generated"}</h3>
+          <p>{reports.length ? "Clear or adjust the search, status, and date filters." : "Reports will appear here after sample results are completed."}</p>
+          {reports.length > 0 && <button type="button" onClick={() => { setSearch(""); setStatusFilter("all"); onDateFromChange?.(""); onDateToChange?.(""); }}>Clear all filters</button>}
+        </div>
+      )}
+    </section>
   );
 }

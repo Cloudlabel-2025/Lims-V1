@@ -48,7 +48,7 @@ function DoctorSidebar({
         <div className="teal-brand-card" style={{ marginBottom: "24px", width: "100%" }}>
           <div className="brand-header-mini">
             <div className="brand-logo-mini">{Icons.logo}</div>
-            <div className="brand-name-mini">UTHIRAM LIMS</div>
+            <div className="brand-name-mini">CHC LIMS</div>
           </div>
 
           <div className="brand-patient-info">

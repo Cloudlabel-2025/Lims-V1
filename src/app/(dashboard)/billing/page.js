@@ -779,6 +779,34 @@ export default function BillingPage() {
           onClose={closeSettlementModal}
           onPaymentChange={updateSettlementPayment}
           onSubmit={handleCloseBill}
+          onExternalSettle={(data) => {
+            clearCachedApi("/api/billing");
+            clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
+            clearCachedApi("/api/billing/payments-history");
+            clearCachedApi(`/api/billing/payments-history?page=${paymentPage}&limit=20`);
+            clearCachedApi("/api/dashboard/stats");
+            clearCachedApi("/api/samples?status=all");
+            clearCachedApi("/api/reports");
+            setBillingRecords((current) =>
+              current.map((br) =>
+                br._id === selectedBillingRecord._id
+                  ? {
+                      ...br,
+                      billingStatus: data.billingStatus || br.billingStatus,
+                      paymentBreakdown: data.paymentBreakdown || br.paymentBreakdown,
+                      firstPaymentDate: data.firstPaymentDate || br.firstPaymentDate,
+                      lastPaymentDate: data.lastPaymentDate || br.lastPaymentDate,
+                      lastPaymentAmount: data.lastPaymentAmount ?? br.lastPaymentAmount,
+                      lastPaymentMethod: data.lastPaymentMethod ?? br.lastPaymentMethod,
+                      lastPaymentModes: data.lastPaymentModes ?? br.lastPaymentModes,
+                    }
+                  : br
+              )
+            );
+            setShowCloseModal(false);
+            setPayment({ amount: 0, method: "cash" });
+            setSuccess("Razorpay payment captured and settled successfully.");
+          }}
         />
       )}
 

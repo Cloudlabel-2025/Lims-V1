@@ -74,7 +74,7 @@ export default function LoginPage({
   const formId = isTenantLogin ? "tenant-login-form" : "cms-developer-login-form";
   const usernameInputId = isTenantLogin ? "tenant-login-username" : "cms-developer-login-email";
   const passwordInputId = isTenantLogin ? "tenant-login-password" : "cms-developer-login-password";
-  const labName = theme?.labName || (isTenantLogin ? "Lab LIMS" : "CHC Lab CMS");
+  const labName = theme?.labName || (isTenantLogin ? "Lab LIMS" : "CHC LIMS");
   const brandLogoUrl = isTenantLogin ? theme?.logo : null;
   const brandLogoLabel = theme?.logoAltText || `${labName} logo`;
   const showBrandLogoAltText = isTenantLogin && (!brandLogoUrl || logoLoadFailed);

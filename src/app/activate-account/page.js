@@ -39,7 +39,7 @@ function ActivationForm() {
       <section className="activation-shell">
         <header className="activation-brand">
           <span className="activation-brand-icon">{Icons.logo}</span>
-          <div><strong>UTHIRAM LIMS</strong><small>Secure account activation</small></div>
+          <div><strong>CHC LIMS</strong><small>Secure account activation</small></div>
         </header>
         <div className="activation-card">
           <div className="activation-heading">

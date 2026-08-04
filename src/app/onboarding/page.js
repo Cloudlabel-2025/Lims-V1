@@ -178,7 +178,7 @@ export default function TenantOnboardingPage() {
       <aside className="tenant-onboarding-aside">
         <div className="tenant-onboarding-brand">
           <span>{Icons.logo}</span>
-          <div><strong>UTHIRAM</strong><small>Provisioning console</small></div>
+          <div><strong>CHC</strong><small>Provisioning console</small></div>
         </div>
         <div className="tenant-onboarding-progress">
           <p>Onboarding progress</p>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import { cachedJsonFetch } from "@/app/lib/use-current-user";
+import styles from "./Analytics.module.css";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -26,7 +27,8 @@ const statusColors = {
   confirmed: "#16a34a", unknown: "#9ca3af",
 };
 
-const PIE_COLORS = ["#059669", "#2563eb", "#7c3aed", "#d97706", "#dc2626", "#0d9488", "#ca8a04", "#16a34a", "#e11d48", "#0891b2", "#9333ea", "#ea580c", "#4f46e5", "#15803d", "#b91c1c", "#0369a1", "#6d28d9", "#c2410c", "#1d4ed8", "#a16207"];
+const BRAND_COLOR = "var(--brand-action, var(--primary))";
+const PIE_COLORS = [BRAND_COLOR, "#2563eb", "#7c3aed", "#d97706", "#dc2626", "#0891b2", "#16a34a", "#e11d48", "#4f46e5", "#ca8a04"];
 
 function ChartTooltip({ active, payload, label, formatter }) {
   if (!active || !payload?.length) return null;
@@ -121,6 +123,30 @@ function ExpandButton({ onClick }) {
     <button type="button" onClick={onClick} className="analytics-expand-button" title="Expand chart" aria-label="Expand chart">
       {Icons.grid}
     </button>
+  );
+}
+
+function ChartHeading({ icon, title, description }) {
+  return (
+    <div className={styles.chartHeading}>
+      <span className={styles.chartIcon} aria-hidden="true">{icon}</span>
+      <div>
+        <div className={styles.chartTitle}>{title}</div>
+        <p>{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeading({ eyebrow, title, description }) {
+  return (
+    <div className={styles.sectionHeading}>
+      <div>
+        <span>{eyebrow}</span>
+        <h2>{title}</h2>
+      </div>
+      <p>{description}</p>
+    </div>
   );
 }
 
@@ -229,6 +255,7 @@ export default function AnalyticsPage() {
   const [range, setRange] = useState("30");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const [revenueView, setRevenueView] = useState("area");
   const [reportView, setReportView] = useState("pie");
@@ -247,6 +274,7 @@ export default function AnalyticsPage() {
       const { response, data: d } = await cachedJsonFetch(`/api/analytics?range=${r}`, { ttl: 30_000 });
       if (!response.ok) throw new Error(d.error || "Unable to load analytics");
       setData(d);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -286,7 +314,7 @@ export default function AnalyticsPage() {
                 <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                <Area type="monotone" dataKey="revenue" fill="var(--primary)" stroke="var(--primary)" fillOpacity={0.15} strokeWidth={2} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
+                <Area type="monotone" dataKey="revenue" fill={BRAND_COLOR} stroke={BRAND_COLOR} fillOpacity={0.16} strokeWidth={2.5} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
               </AreaChart>
             ) : revenueView === "bar" ? (
               <BarChart data={data.revenueSeries}>
@@ -306,7 +334,7 @@ export default function AnalyticsPage() {
                 <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                 <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                <Line type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
+                <Line type="monotone" dataKey="revenue" stroke={BRAND_COLOR} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
               </LineChart>
             )}
           </ResponsiveContainer>
@@ -456,73 +484,99 @@ export default function AnalyticsPage() {
   const hasInventory = data?.inventoryValuation?.length > 0;
 
   return (
-    <div className="analytics-page">
-      <div className="analytics-page-header">
-        <div>
-          <p className="module-kicker">Business Intelligence</p>
-          <h1>Analytics</h1>
-          <span>Revenue, patient activity, test demand, referrals, and workflow performance.</span>
+    <div className={`${styles.page} analytics-page`}>
+      <header className={`${styles.pageHeader} analytics-page-header`}>
+        <div className={styles.headingCopy}>
+          <div className={styles.eyebrow}><span aria-hidden="true" /> Business intelligence</div>
+          <h1>Analytics overview</h1>
+          <p>Track financial health, laboratory throughput, referrals, and inventory performance in one workspace.</p>
         </div>
-        <div className="analytics-page-controls">
-          <select
-            value={range}
-            onChange={(e) => setRange(e.target.value)}
-            className="lims-input"
-            aria-label="Analytics reporting period"
-          >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="180">Last 180 days</option>
-            <option value="365">Last 365 days</option>
-          </select>
-          <button className="dash-btn-secondary" onClick={() => load(range)} disabled={loading}>
-            {Icons.refresh} Refresh
+        <div className={styles.headerActions}>
+          <div className={styles.periodControl}>
+            <label htmlFor="analytics-range">Reporting period</label>
+            <select
+              id="analytics-range"
+              value={range}
+              onChange={(e) => setRange(e.target.value)}
+              className="lims-input"
+              aria-label="Analytics reporting period"
+            >
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="180">Last 180 days</option>
+              <option value="365">Last 365 days</option>
+            </select>
+          </div>
+          <button className={styles.refreshButton} onClick={() => load(range)} disabled={loading}>
+            {Icons.refresh} <span>{loading ? "Refreshing…" : "Refresh data"}</span>
           </button>
+          {lastUpdated && (
+            <span className={styles.updatedAt}>Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+          )}
         </div>
-      </div>
+      </header>
 
       {error && <div className="module-alert">{error}</div>}
 
       {loading ? <SkeletonGrid /> : data && (
         <>
-          <div className="analytics-kpi-grid">
-            <div className="stat-card-upgraded analytics-kpi-card revenue">
-              <div className="accent-bar" style={{ background: "var(--primary)" }} />
-              <div className="label">Revenue Collected</div>
-              <div className="value" style={{ color: "var(--primary)" }}>₹{money(data.summary.totalRevenue)}</div>
+          <section className={`${styles.kpiGrid} analytics-kpi-grid`} aria-label="Key performance indicators">
+            <article className={`${styles.kpiCard} ${styles.kpiBrand} stat-card-upgraded analytics-kpi-card revenue`}>
+              <div className={styles.kpiTopline}>
+                <span className={styles.kpiIcon}>{Icons.wallet}</span>
+                <span className={styles.kpiContext}>Revenue</span>
+              </div>
+              <div className="label">Revenue collected</div>
+              <div className="value">₹{money(data.summary.totalRevenue)}</div>
               <div className="sub">
                 {trend !== 0 && (
                   <span className={trend > 0 ? "trend-up" : "trend-down"}>
                     {trend > 0 ? "▲" : "▼"} {Math.abs(Math.round(trend))}%
                   </span>
                 )}
+                {trend === 0 && <span>Stable for this period</span>}
               </div>
-            </div>
-            <div className="stat-card-upgraded analytics-kpi-card bills">
-              <div className="accent-bar" style={{ background: "#2563eb" }} />
-              <div className="label">Total Bills</div>
+            </article>
+            <article className={`${styles.kpiCard} ${styles.kpiBlue} stat-card-upgraded analytics-kpi-card bills`}>
+              <div className={styles.kpiTopline}>
+                <span className={styles.kpiIcon}>{Icons.report}</span>
+                <span className={styles.kpiContext}>Billing</span>
+              </div>
+              <div className="label">Total bills</div>
               <div className="value">{data.summary.totalBills || 0}</div>
               <div className="sub">{data.summary.paidBills || 0} paid</div>
-            </div>
-            <div className="stat-card-upgraded analytics-kpi-card patients">
-              <div className="accent-bar" style={{ background: "#7c3aed" }} />
-              <div className="label">New Patients</div>
+            </article>
+            <article className={`${styles.kpiCard} ${styles.kpiViolet} stat-card-upgraded analytics-kpi-card patients`}>
+              <div className={styles.kpiTopline}>
+                <span className={styles.kpiIcon}>{Icons.users}</span>
+                <span className={styles.kpiContext}>Patients</span>
+              </div>
+              <div className="label">New patients</div>
               <div className="value">{data.summary.newPatients || 0}</div>
               <div className="sub">{data.summary.totalPatients || 0} total</div>
-            </div>
-            <div className="stat-card-upgraded analytics-kpi-card collection">
-              <div className="accent-bar" style={{ background: "#d97706" }} />
-              <div className="label">Collection Rate</div>
-              <div className="value" style={{ color: "#d97706" }}>{collectionPct}%</div>
+            </article>
+            <article className={`${styles.kpiCard} ${styles.kpiAmber} stat-card-upgraded analytics-kpi-card collection`}>
+              <div className={styles.kpiTopline}>
+                <span className={styles.kpiIcon}>{Icons.activity}</span>
+                <span className={styles.kpiContext}>Efficiency</span>
+              </div>
+              <div className="label">Collection rate</div>
+              <div className="value">{collectionPct}%</div>
               <div className="sub">{data.summary.paidBills || 0} of {data.summary.totalBills || 0} paid</div>
-            </div>
-          </div>
+            </article>
+          </section>
+
+          <SectionHeading
+            eyebrow="Financial performance"
+            title="Revenue and report delivery"
+            description="Review collection movement and the current report pipeline for the selected period."
+          />
 
           <div className="analytics-chart-grid analytics-chart-grid-primary">
             <div className="chart-card">
               <div className="chart-card-header">
-                <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.barChart}</span> Revenue Trend</div>
+                <ChartHeading icon={Icons.barChart} title="Revenue trend" description="Collections recorded across the selected period" />
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <ChartToggle views={["line", "bar", "area", "composed"]} active={revenueView} onChange={setRevenueView} />
                   <ExpandButton onClick={() => setExpanded("revenue")} />
@@ -536,7 +590,7 @@ export default function AnalyticsPage() {
                       <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                      <Area type="monotone" dataKey="revenue" fill="var(--primary)" stroke="var(--primary)" fillOpacity={0.15} strokeWidth={2} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
+                      <Area type="monotone" dataKey="revenue" fill={BRAND_COLOR} stroke={BRAND_COLOR} fillOpacity={0.16} strokeWidth={2.5} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
                     </AreaChart>
                   ) : revenueView === "bar" ? (
                     <BarChart data={data.revenueSeries}>
@@ -570,7 +624,7 @@ export default function AnalyticsPage() {
                       <XAxis dataKey="_id" tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
                       <Tooltip content={<ChartTooltip formatter={(v) => `₹${money(v)}`} />} />
-                      <Line type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
+                      <Line type="monotone" dataKey="revenue" stroke={BRAND_COLOR} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive animationDuration={1200} animationEasing="ease-in-out" />
                     </LineChart>
                   )}
                 </ResponsiveContainer>
@@ -581,7 +635,7 @@ export default function AnalyticsPage() {
 
             <div className="chart-card">
               <div className="chart-card-header">
-                <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.report}</span> Report Status</div>
+                <ChartHeading icon={Icons.report} title="Report status" description="Distribution by stage in the reporting workflow" />
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <ChartToggle views={["pills", "pie", "donut"]} active={reportView} onChange={setReportView} />
                   <ExpandButton onClick={() => setExpanded("report-pie")} />
@@ -621,10 +675,16 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
+          <SectionHeading
+            eyebrow="Laboratory operations"
+            title="Samples and test demand"
+            description="Understand current sample workload and the tests driving laboratory volume."
+          />
+
           <div className="analytics-chart-grid">
             <div className="chart-card">
               <div className="chart-card-header">
-                <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.clock}</span> Sample Status</div>
+                <ChartHeading icon={Icons.clock} title="Sample status" description="Workload grouped by the latest processing stage" />
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <ChartToggle views={["pills", "pie", "donut"]} active={sampleView} onChange={setSampleView} />
                   <ExpandButton onClick={() => setExpanded("sample-pie")} />
@@ -665,7 +725,7 @@ export default function AnalyticsPage() {
 
             <div className="chart-card">
               <div className="chart-card-header">
-                <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.flask}</span> Top Tests by Volume</div>
+                <ChartHeading icon={Icons.flask} title="Top tests by volume" description="Most frequently ordered tests in this period" />
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <ChartToggle views={["bar", "pie", "donut"]} active={testsView} onChange={setTestsView} />
                   <ExpandButton onClick={() => setExpanded("tests")} />
@@ -705,10 +765,16 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
+          <SectionHeading
+            eyebrow="Business performance"
+            title="Referrals, costs, and assets"
+            description="Compare referral contribution with operating expenses and inventory value."
+          />
+
           <div className="analytics-chart-grid analytics-chart-grid-business">
             <div className="chart-card">
               <div className="chart-card-header">
-                <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.stethoscope}</span> Doctor Referrals</div>
+                <ChartHeading icon={Icons.stethoscope} title="Doctor referrals" description="Revenue and bill contribution by referring doctor" />
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <ChartToggle views={["bar", "pie", "donut"]} active={doctorView} onChange={setDoctorView} />
                   <ExpandButton onClick={() => setExpanded("doctors")} />
@@ -776,7 +842,7 @@ export default function AnalyticsPage() {
                 {hasExpenses ? (
                   <div className="chart-card">
                     <div className="chart-card-header">
-                      <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.wallet}</span> Expense Breakdown</div>
+                      <ChartHeading icon={Icons.wallet} title="Expense breakdown" description="Operating spend grouped by expense category" />
                       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <ChartToggle views={["pie", "bar", "donut"]} active={expenseView} onChange={setExpenseView} />
                         <ExpandButton onClick={() => setExpanded("expenses")} />
@@ -797,7 +863,7 @@ export default function AnalyticsPage() {
                 {hasInventory ? (
                   <div className="chart-card">
                     <div className="chart-card-header">
-                      <div className="chart-card-title"><span style={{ color: "var(--primary)" }}>{Icons.grid}</span> Inventory Valuation</div>
+                      <ChartHeading icon={Icons.grid} title="Inventory valuation" description="Current stock value grouped by category" />
                       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <ChartToggle views={["bar", "pie", "donut"]} active={inventoryView} onChange={setInventoryView} />
                         <ExpandButton onClick={() => setExpanded("inventory")} />

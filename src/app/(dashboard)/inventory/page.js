@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
+import styles from "./Inventory.module.css";
 
 const emptyItem = {
   itemCode: "",
@@ -54,7 +55,7 @@ const emptyMovement = {
 
 function Field({ label, children }) {
   return (
-    <label style={{ display: "grid", gap: "8px", fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
+    <label className={styles.field}>
       {label}
       {children}
     </label>
@@ -63,43 +64,24 @@ function Field({ label, children }) {
 
 function StatCard({ icon, label, value, tone }) {
   return (
-    <div className="form-card" style={{ padding: 18, borderRadius: 8, minHeight: 104, overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-          <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
-        </div>
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 8,
-            display: "grid",
-            placeItems: "center",
-            flexShrink: 0,
-            color: tone || "var(--brand-action, var(--primary))",
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          {icon}
-        </div>
-      </div>
-    </div>
+    <article className={styles.statCard}>
+      <div className={styles.statIcon} style={{ color: tone || "var(--brand-action, var(--primary))" }}>{icon}</div>
+      <div className={styles.statLabel}>{label}</div>
+      <div className={styles.statValue}>{value}</div>
+    </article>
   );
 }
 
 function Badge({ children, tone = "neutral" }) {
-  const colors = {
-    neutral: ["var(--surface)", "var(--text-secondary)"],
-    good: ["#ecfdf5", "#047857"],
-    warn: ["#fffbeb", "#b45309"],
-    danger: ["#fef2f2", "#b91c1c"],
-    info: ["#eff6ff", "#1d4ed8"],
-  };
-  const [bg, color] = colors[tone] || colors.neutral;
+  const toneClass = {
+    neutral: styles.badgeNeutral,
+    good: styles.badgeGood,
+    warn: styles.badgeWarn,
+    danger: styles.badgeDanger,
+    info: styles.badgeInfo,
+  }[tone] || styles.badgeNeutral;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 8px", borderRadius: 6, background: bg, color, fontSize: 12, fontWeight: 700 }}>
+    <span className={`${styles.badge} ${toneClass}`}>
       {children}
     </span>
   );
@@ -169,7 +151,7 @@ function validateExpiryDate(value) {
 }
 
 function ErrorMsg({ message }) {
-  return message ? <small style={{ color: "#dc2626", fontSize: 10, display: "block", marginTop: 2 }}>{message}</small> : null;
+  return message ? <small className={styles.fieldError}>{message}</small> : null;
 }
 
 function inputStyle() {
@@ -568,82 +550,81 @@ export default function InventoryPage() {
   ];
 
   return (
-    <div className="patients-page" style={{ paddingBottom: 40 }}>
-      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div className="page-header-icon" style={{ background: "var(--brand-surface, #e6f0fa)", color: "var(--brand-action, var(--primary))", padding: 12, borderRadius: 8 }}>
+    <div className={`${styles.page} patients-page`}>
+      <header className={styles.header}>
+        <div className={styles.identity}>
+          <div className={styles.identityIcon}>
             {Icons.flask}
           </div>
           <div>
-            <h4 style={{ margin: 0, fontSize: 20, color: "var(--text-main)" }}>Inventory Management</h4>
-            <small style={{ color: "var(--text-muted)" }}>Item master, stock ledger, UOM, expiry and wastage control</small>
+            <h1>Inventory Management</h1>
+            <p>Item master, stock ledger, UOM, expiry and wastage control</p>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {activeTab === "dashboard" && <div style={{ position: "relative", minWidth: 280, flex: "0 1 360px" }}>
-            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>{Icons.search}</span>
-            <input className="lims-input" maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setItemPage(1); loadInventory(1); } }} placeholder="Search item, code, category..." style={{ ...inputStyle(), paddingLeft: 38 }} />
+        <div className={styles.headerActions}>
+          {activeTab === "dashboard" && <div className={styles.search}>
+            <span className={styles.searchIcon}>{Icons.search}</span>
+            <input className={styles.searchInput} maxLength={35} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setItemPage(1); loadInventory(1); } }} placeholder="Search item, code, category..." />
           </div>}
-          <button className="dash-btn-secondary" onClick={() => { loadInventory(itemPage); if (activeTab === "movements") loadMovements(movementPage); }} disabled={loading} style={{ height: 34, padding: "0 14px", fontSize: 12 }}><span className={loading ? "icon-spin" : ""}>{Icons.refresh}</span> Refresh</button>
+          <button className={styles.refreshButton} onClick={() => { loadInventory(itemPage); if (activeTab === "movements") loadMovements(movementPage); }} disabled={loading}><span className={loading ? "icon-spin" : ""}>{Icons.refresh}</span> Refresh</button>
         </div>
-      </div>
+      </header>
 
       {activeTab !== "dashboard" && activeTab !== "expiry" && (
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>View:</span>
-        <div style={{ display: "flex", background: "var(--border-light)", padding: 3, borderRadius: 8 }}>
-          <button onClick={() => setViewMode("form")} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: viewMode === "form" ? "#fff" : "transparent", color: viewMode === "form" ? "var(--brand-action)" : "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, transition: "all 0.2s", boxShadow: viewMode === "form" ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+      <div className={styles.viewToggle}>
+          <button type="button" className={`${styles.viewButton} ${viewMode === "form" ? styles.viewButtonActive : ""}`} onClick={() => setViewMode("form")}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M3 9h18" />
             </svg>
             Form
           </button>
-          <button onClick={() => setViewMode("list")} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: viewMode === "list" ? "#fff" : "transparent", color: viewMode === "list" ? "var(--brand-action)" : "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, transition: "all 0.2s", boxShadow: viewMode === "list" ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
+          <button type="button" className={`${styles.viewButton} ${viewMode === "list" ? styles.viewButtonActive : ""}`} onClick={() => setViewMode("list")}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
             </svg>
             List
           </button>
-        </div>
       </div>
       )}
 
       {error && (
-        <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>
+        <div className={styles.alert}>
           {error}
         </div>
       )}
       <SuccessDialog message={successMessage} onClose={() => setSuccessMessage("")} />
 
       {showExpiredBanner && (
-        <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+        <div className={styles.warning}>
           <span style={{ fontSize: 16 }}>⚠️</span>
           Some batches have expired and will be processed automatically.
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+      <nav className={styles.workspaceBar} aria-label="Inventory sections">
+        <div className={styles.tabs}>
         {tabs.map(([key, label, icon]) => (
           <button
             key={key}
             type="button"
             onClick={() => setActiveTab(key)}
-            className={activeTab === key ? "btn-lims-primary" : "btn-lims-secondary"}
-            style={{ height: 38, padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 8, fontSize: 13 }}
+            aria-current={activeTab === key ? "page" : undefined}
+            className={`${styles.tab} ${activeTab === key ? styles.tabActive : ""}`}
           >
             {icon} {label}
           </button>
         ))}
-      </div>
+        </div>
+      </nav>
 
       {loading ? (
-        <div className="form-card" style={{ padding: 28, borderRadius: 8 }}>Loading inventory...</div>
+        <div className={styles.loading}>Loading inventory…</div>
       ) : (
         <>
           {activeTab === "dashboard" && (
-            <div style={{ display: "grid", gap: 18 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
+            <div className={styles.dashboard}>
+              <div className={styles.statsGrid}>
                 <StatCard icon={Icons.flask} label="Items" value={inventory.stats.totalItems || 0} />
                 <StatCard icon={Icons.activity} label="Stock Units" value={formatNumber(inventory.stats.totalStock)} tone="#047857" />
                 <StatCard icon={Icons.alertCircle} label="Low Stock" value={inventory.stats.lowStock || 0} tone="#b45309" />
@@ -652,24 +633,14 @@ export default function InventoryPage() {
                 <StatCard icon={Icons.trash} label="Expired Batches" value={inventory.stats.expiredBatches || 0} tone="#b91c1c" />
                 <StatCard icon={Icons.list} label="Stock Value" value={`Rs ${formatNumber(inventory.stats.inventoryValue)}`} />
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>Filter:</span>
+              <div className={styles.filters}>
+                <span className={styles.filterLabel}>Filter:</span>
                 {[
                   { key: "all", label: "All", tone: "info" },
                   { key: "low", label: "Low Stock", tone: "warn" },
                   { key: "reorder", label: "Reorder Due", tone: "danger" },
                 ].map((chip) => (
-                  <button key={chip.key} type="button" onClick={() => setDashboardFilter(chip.key)} style={{
-                    padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer",
-                    fontSize: 13, fontWeight: 700, transition: "all 0.15s",
-                    background: dashboardFilter === chip.key
-                      ? ({ info: "#eff6ff", warn: "#fffbeb", danger: "#fef2f2" })[chip.tone]
-                      : "var(--surface)",
-                    color: dashboardFilter === chip.key
-                      ? ({ info: "#1d4ed8", warn: "#b45309", danger: "#b91c1c" })[chip.tone]
-                      : "var(--text-muted)",
-                    boxShadow: dashboardFilter === chip.key ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                  }}>{chip.label}</button>
+                  <button key={chip.key} type="button" onClick={() => setDashboardFilter(chip.key)} className={`${styles.filterChip} ${dashboardFilter === chip.key ? styles.filterChipActive : ""} ${chip.tone === "warn" ? styles.filterChipWarn : chip.tone === "danger" ? styles.filterChipDanger : ""}`}>{chip.label}</button>
                 ))}
               </div>
               <InventoryTable items={inventory.items} onEdit={editItem} onOrder={(item) => {
@@ -1598,12 +1569,12 @@ export default function InventoryPage() {
 
 function InventoryTable({ items, onEdit, onOrder }) {
   return (
-    <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 1200 }}>
+    <div className={styles.tableCard}>
+      <table className={styles.table}>
         <thead>
-          <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
+          <tr>
             {["Item", "Generic Name", "Category", "Stock", "Min/Reorder/Max", "Batch No", "Location", "Expiry", "Status", "Action"].map((heading) => (
-              <th key={heading} style={{ padding: "12px 14px", textAlign: "left", color: "var(--text-secondary)", fontWeight: 700, whiteSpace: "nowrap" }}>{heading}</th>
+              <th key={heading}>{heading}</th>
             ))}
           </tr>
         </thead>
@@ -1615,42 +1586,42 @@ function InventoryTable({ items, onEdit, onOrder }) {
             const expiryTone = item.expiredBatches ? "danger" : item.nearExpiryBatches ? "warn" : "good";
             const latestBatch = item.batches?.length ? item.batches[item.batches.length - 1] : null;
             return (
-              <tr key={item._id} style={{ borderBottom: "1px solid var(--border-light)" }}>
-                <td style={{ padding: "12px 14px" }}>
-                  <div style={{ fontWeight: 800, color: "var(--text-primary)" }}>{item.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{item.itemCode} <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, background: "var(--surface)", border: "1px solid var(--border)", fontSize: 10, marginLeft: 4 }}>{item.itemType}</span></div>
+              <tr key={item._id}>
+                <td>
+                  <div className={styles.itemName}>{item.name}</div>
+                  <div className={styles.itemMeta}>{item.itemCode} <span className={styles.typeTag}>{item.itemType}</span></div>
                 </td>
-                <td style={{ padding: "12px 14px" }}>{item.genericName || "-"}</td>
-                <td style={{ padding: "12px 14px" }}>
+                <td>{item.genericName || "-"}</td>
+                <td>
                   <div>{item.category?.name || "-"}</div>
                   <small style={{ color: "var(--text-muted)" }}>{item.subCategory?.name || ""}</small>
                 </td>
-                <td style={{ padding: "12px 14px", fontWeight: 800, color: low ? "#b91c1c" : "var(--text-primary)" }}>
+                <td className={`${styles.stockValue} ${low ? styles.stockLow : ""}`}>
                   {formatNumber(availableStock)} {item.baseUom?.symbol}
                   {(item.reservedBase || 0) > 0 && (
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
+                    <div className={styles.stockSub}>
                       ({formatNumber(item.stockOnHandBase)} total, {formatNumber(item.reservedBase)} reserved)
                     </div>
                   )}
                 </td>
-                <td style={{ padding: "12px 14px" }}>{formatNumber(item.minimumStockBase)} / {formatNumber(item.reorderLevelBase)} / {formatNumber(item.maximumStockBase)}</td>
-                <td style={{ padding: "12px 14px" }}>{latestBatch?.batchNo || "-"}</td>
-                <td style={{ padding: "12px 14px" }}>{item.defaultLocation || "-"}</td>
-                <td style={{ padding: "12px 14px" }}><Badge tone={expiryTone}>{item.expiredBatches ? "Expired" : item.nearExpiryBatches ? "Near expiry" : formatDate(item.nextExpiryDate)}</Badge></td>
-                <td style={{ padding: "12px 14px" }}>
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <td className={styles.thresholds}>{formatNumber(item.minimumStockBase)} / {formatNumber(item.reorderLevelBase)} / {formatNumber(item.maximumStockBase)}</td>
+                <td>{latestBatch?.batchNo || "-"}</td>
+                <td>{item.defaultLocation || "-"}</td>
+                <td><Badge tone={expiryTone}>{item.expiredBatches ? "Expired" : item.nearExpiryBatches ? "Near expiry" : formatDate(item.nextExpiryDate)}</Badge></td>
+                <td>
+                  <div className={styles.tableActions}>
                     <Badge tone={reorder ? "warn" : low ? "danger" : "good"}>{reorder ? "Reorder" : low ? "Low" : "OK"}</Badge>
                     {onOrder && reorder && (
-                      <button type="button" title="Order" onClick={() => onOrder(item)} style={{ width: 30, height: 30, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534" }}>+</button>
+                      <button type="button" className={styles.orderButton} title="Create purchase order" onClick={() => onOrder(item)}>Order</button>
                     )}
                   </div>
                 </td>
-                <td style={{ padding: "12px 14px" }}><button className="btn-lims-secondary" onClick={() => onEdit(item)} style={{ height: 32, padding: "0 10px" }}>{Icons.edit}</button></td>
+                <td><button type="button" className={styles.iconButton} aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}>{Icons.edit}</button></td>
               </tr>
             );
           })}
           {items.length === 0 && (
-            <tr><td colSpan="12" style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No inventory items found.</td></tr>
+            <tr><td colSpan="12" style={{ padding: 44, textAlign: "center", color: "var(--text-muted)" }}>No inventory items found.</td></tr>
           )}
         </tbody>
       </table>
@@ -1691,11 +1662,11 @@ function MastersPanel({ title, fields, onSubmit, saving, viewMode, onOpenForm, o
 
 function MasterTable({ headings, rows }) {
   return (
-    <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead><tr style={{ background: "var(--surface)" }}>{headings.map((heading) => <th key={heading} style={{ padding: 12, textAlign: "left" }}>{heading}</th>)}</tr></thead>
+    <div className={styles.tableCard}>
+      <table className={styles.table}>
+        <thead><tr>{headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead>
         <tbody>
-          {rows.map((row, index) => <tr key={index} style={{ borderTop: "1px solid var(--border-light)" }}>{row.map((cell, cellIndex) => <td key={cellIndex} style={{ padding: 12 }}>{cell}</td>)}</tr>)}
+          {rows.map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}
           {rows.length === 0 && <tr><td colSpan={headings.length} style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No records yet.</td></tr>}
         </tbody>
       </table>
@@ -2214,9 +2185,9 @@ function ExpiryPanel({ items, onWaste }) {
   warning.setDate(warning.getDate() + 30);
 
   return (
-    <div className="form-card" style={{ padding: 0, overflowX: "auto", borderRadius: 8 }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
-        <thead><tr style={{ background: "var(--surface)" }}>{["Item", "Batch", "Qty", "Expiry", "Risk", "Action"].map((heading) => <th key={heading} style={{ padding: 12, textAlign: "left" }}>{heading}</th>)}</tr></thead>
+    <div className={styles.tableCard}>
+      <table className={styles.table} style={{ minWidth: 760 }}>
+        <thead><tr>{["Item", "Batch", "Qty", "Expiry", "Risk", "Action"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead>
         <tbody>
           {batches.map(({ item, batch }) => {
             const expiry = new Date(batch.expiryDate);
@@ -2230,12 +2201,12 @@ function ExpiryPanel({ items, onWaste }) {
             else if (near) { riskLabel = "Near expiry"; riskTone = "warn"; }
             return (
               <tr key={`${item._id}-${batch._id}`} style={{ borderTop: "1px solid var(--border-light)", background: expired ? "#fef2f2" : near ? "#fffbeb" : "transparent" }}>
-                <td style={{ padding: 12 }}><strong>{item.name}</strong><br /><small>{item.itemCode}</small></td>
-                <td style={{ padding: 12 }}>{batch.batchNo || "-"}</td>
-                <td style={{ padding: 12 }}>{formatNumber(batch.quantityBase)} {item.baseUom?.symbol}</td>
-                <td style={{ padding: 12 }}>{batch.expiryDate ? formatDate(batch.expiryDate) : "—"}</td>
-                <td style={{ padding: 12 }}><Badge tone={riskTone}>{riskLabel}</Badge></td>
-                <td style={{ padding: 12, whiteSpace: "nowrap" }}>
+                <td><strong>{item.name}</strong><br /><small>{item.itemCode}</small></td>
+                <td>{batch.batchNo || "-"}</td>
+                <td>{formatNumber(batch.quantityBase)} {item.baseUom?.symbol}</td>
+                <td>{batch.expiryDate ? formatDate(batch.expiryDate) : "—"}</td>
+                <td><Badge tone={riskTone}>{riskLabel}</Badge></td>
+                <td style={{ whiteSpace: "nowrap" }}>
                   {(expired || near || isQuarantine) ? (
                     <button className="btn-lims-secondary" onClick={() => onWaste(item, batch)} style={{ height: 32, background: expired ? "#dc2626" : near ? "#f59e0b" : "#6b7280", color: "#fff", borderColor: "transparent" }}>Log Wastage</button>
                   ) : (

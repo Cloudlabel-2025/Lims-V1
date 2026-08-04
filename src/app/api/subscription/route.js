@@ -62,7 +62,8 @@ export async function GET(req) {
     const currentRank = versionOnePlans.findIndex((plan) => plan.key === subscription.packageKey);
     const upgradePlans = versionOnePlans.map((plan) => ({
       ...plan,
-      canUpgrade: currentRank === -1 || plan.catalogRank > currentRank,
+      isDowngrade: currentRank !== -1 && plan.catalogRank < currentRank,
+      canUpgrade: currentRank === -1 || plan.catalogRank !== currentRank,
     }));
 
     return Response.json({
@@ -107,8 +108,8 @@ export async function POST(req) {
 
     const currentRank = plans.findIndex((plan) => plan.key === current.packageKey);
     const targetRank = plans.findIndex((plan) => plan.key === target.key);
-    if (targetRank <= currentRank) {
-      return Response.json({ error: "Select a package above the current plan" }, { status: 400 });
+    if (targetRank === currentRank) {
+      return Response.json({ error: "You are already subscribed to this plan" }, { status: 400 });
     }
 
     const existing = await UpgradeRequest.findOne({ tenantId: auth.tenantId, status: "pending" }).lean();
@@ -116,6 +117,14 @@ export async function POST(req) {
 
     const lab = await Lab.findOne({ tenantId: auth.tenantId }).select("_id").lean();
     if (!lab) return Response.json({ error: "Lab not found" }, { status: 404 });
+
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
+      return Response.json({ error: "Razorpay integration is not configured" }, { status: 500 });
+    }
+
     const created = await UpgradeRequest.create({
       lab: lab._id,
       tenantId: auth.tenantId,
@@ -129,12 +138,62 @@ export async function POST(req) {
       requestedByEmail: auth.session.email,
     });
 
+    const amount = target.pricing?.monthlyAmountMinor || 149900;
+
+    const authHeader = "Basic " + Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+    const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": authHeader,
+      },
+      body: JSON.stringify({
+        amount: amount,
+        currency: "INR",
+        receipt: String(created._id),
+      }),
+    });
+
+    if (!rzpRes.ok) {
+      const rzpErr = await rzpRes.json();
+      await UpgradeRequest.deleteOne({ _id: created._id });
+      return Response.json({ error: rzpErr.error?.description || "Failed to create Razorpay order" }, { status: 500 });
+    }
+
+    const rzpOrder = await rzpRes.json();
+    created.rzpOrderId = rzpOrder.id;
+    await created.save();
+
     return Response.json({
-      request: { id: String(created._id), packageName: created.toPackageName, releaseVersion: "1", requestedAt: created.createdAt },
-      message: `${created.toPackageName} Version 1 upgrade request submitted`,
+      request: {
+        id: String(created._id),
+        packageName: created.toPackageName,
+        releaseVersion: "1",
+        requestedAt: created.createdAt,
+        rzpOrderId: rzpOrder.id,
+        amount: amount,
+        keyId,
+      },
+      message: `${created.toPackageName} Version 1 upgrade order created`,
     }, { status: 201 });
   } catch (error) {
     if (error?.code === 11000) return Response.json({ error: "An upgrade request is already pending" }, { status: 409 });
     return jsonError("Unable to request subscription upgrade", error, 500);
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    const auth = requireTenantSession(req, "settings.manage");
+    if (auth.error) return auth.error;
+
+    const masterConnection = await connectMasterDB();
+    const UpgradeRequest = getSubscriptionUpgradeRequestModel(masterConnection);
+
+    await UpgradeRequest.deleteOne({ tenantId: auth.tenantId, status: "pending" });
+
+    return Response.json({ message: "Pending upgrade request cancelled successfully" });
+  } catch (error) {
+    return jsonError("Unable to cancel upgrade request", error, 500);
   }
 }

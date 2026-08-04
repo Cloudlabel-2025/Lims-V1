@@ -65,12 +65,12 @@ function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh, onRevert, can
       >
         <div style={{ padding: "20px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           <div>
-            <h4 style={{ margin: 0, fontSize: "18px" }}>Payment History</h4>
+            <h4 style={{ margin: 0, fontSize: "18px" }}>Invoice payment history</h4>
             <p style={{ margin: "4px 0 0", fontSize: "13px", color: "var(--text-muted)" }}>
               {bill?.billId} · {bill?.patient?.name} · {bill?.investigationCount || 0} investigations
             </p>
           </div>
-          <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", transition: "all var(--duration-fast)" }}>{Icons.close}</button>
+          <button type="button" aria-label="Close payment history" onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", transition: "all var(--duration-fast)" }}>{Icons.close}</button>
         </div>
 
         <div style={{ padding: "20px 20px", maxHeight: "70vh", overflowY: "auto" }}>
@@ -83,19 +83,19 @@ function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh, onRevert, can
 
           <div style={{ background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: "var(--radius-md)", padding: "16px", marginBottom: "18px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "14px" }}>
-              <span style={{ fontWeight: "700", color: "var(--text-primary)" }}>Total Amount</span>
+              <span style={{ fontWeight: "700", color: "var(--text-primary)" }}>Invoice total</span>
               <span style={{ fontWeight: "800", fontSize: "20px", color: "var(--brand-action, var(--primary))" }}>₹{Number(bill?.totalAmount || 0).toLocaleString("en-IN")}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", color: "var(--text-secondary)" }}>
-              <span>Total Paid</span>
+              <span>Total paid</span>
               <strong style={{ color: "var(--success)", fontSize: "18px" }}>₹{Number(totalPaid).toLocaleString("en-IN")}</strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: "13px", color: "var(--text-primary)" }}>
-              <span>Remaining</span>
+              <span>Balance due</span>
               <strong style={{ color: remaining > 0 ? "#d97706" : "var(--success)", fontSize: "18px" }}>₹{Number(remaining).toLocaleString("en-IN")}</strong>
             </div>
             <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--primary-200)", fontSize: "11px", color: "var(--brand-action, var(--primary))" }}>
-              Bill Status: <strong>{bill?.billingStatus?.toUpperCase() || "UNPAID"}</strong>
+              Invoice status: <strong>{bill?.billingStatus?.toUpperCase() || "UNPAID"}</strong>
             </div>
           </div>
 
@@ -156,7 +156,7 @@ function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh, onRevert, can
           <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "4px" }}>
             {receipts.length > 0 && receipts.some((r) => r.method !== "cash") && (
               <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" }}>
-                Revert is only available for hand (cash) payments.
+                Reversal is available only when all recorded payments were collected in cash.
               </span>
             )}
           </div>

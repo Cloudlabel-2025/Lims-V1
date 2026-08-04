@@ -1,66 +1,22 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import styles from "./Billing.module.css";
 
 const MultiSelect = dynamic(() => import("@/app/components/MultiSelect"), {
   ssr: false,
-  loading: () => <div className="lims-input">Loading options...</div>,
+  loading: () => <div className={styles.control}>Loading investigations…</div>,
 });
 
-const s = {
-  label: {
-    display: "block",
-    fontSize: "13px",
-    fontWeight: 600,
-    color: "var(--text-secondary)",
-    marginBottom: "6px",
-  },
-  input: {
-    width: "100%",
-    height: "48px",
-    padding: "0 14px",
-    fontSize: "14px",
-    border: "1.5px solid var(--border)",
-    borderRadius: "8px",
-    background: "#fff",
-    color: "var(--text-primary)",
-    outline: "none",
-    fontFamily: "var(--font-main)",
-    boxSizing: "border-box",
-    MozAppearance: "textfield",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "48px",
-    padding: "12px 14px",
-    fontSize: "14px",
-    border: "1.5px solid var(--border)",
-    borderRadius: "8px",
-    background: "#fff",
-    color: "var(--text-primary)",
-    outline: "none",
-    fontFamily: "var(--font-main)",
-    boxSizing: "border-box",
-    resize: "vertical",
-  },
-  row: {
-    display: "flex",
-    flexWrap: "wrap",
-    margin: "0 -9px",
-  },
-  col6: {
-    flex: "1 1 0%",
-    minWidth: "250px",
-    padding: "0 9px",
-  },
-  col12: {
-    flex: "0 0 100%",
-    padding: "0 9px",
-  },
-  field: {
-    marginBottom: "18px",
-  },
-};
+const currency = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
+
+function formatCurrency(value) {
+  return currency.format(Number(value) || 0);
+}
 
 export default function CreateBillTab({
   patients,
@@ -87,148 +43,147 @@ export default function CreateBillTab({
   const discountValue = Math.min(selectedTotal, Math.round((selectedTotal * discountPct) / 100 * 100) / 100);
   const taxValue = Math.round((selectedTotal * taxPct) / 100 * 100) / 100;
   const netPayable = Math.max(0, selectedTotal - discountValue + taxValue);
+  const selectedPatient = patients.find((item) => item._id === patient);
+
   return (
-    <div className="module-grid" style={{ gridTemplateColumns: "1fr" }}>
-      <section className="module-panel" style={{ padding: "24px" }}>
-        <div style={{ marginBottom: "20px" }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: "17px", fontWeight: 800, color: "var(--text-primary)" }}>New Investigation Bill</h2>
-          <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Register tests for existing patients.</p>
+    <form onSubmit={createBill} className={styles.composerGrid}>
+      <section className={styles.panel} aria-labelledby="bill-details-title">
+        <div className={styles.panelHeader}>
+          <p className={styles.eyebrow}>Invoice setup</p>
+          <h2 id="bill-details-title">New investigation bill</h2>
+          <p>Choose the patient and investigations first, then confirm pricing before generating the invoice.</p>
         </div>
-        <form onSubmit={createBill}>
-          <div style={s.row}>
-            <div style={{ ...s.col6, ...s.field }}>
-              <label style={s.label}>
-                Select Patient <span className="required">*</span>
-              </label>
-              <select style={s.input} value={patient} onChange={(e) => setPatient(e.target.value)} required>
-                <option value="">Choose patient...</option>
+        <div className={styles.panelBody}>
+          <div className={styles.formGrid}>
+            <div className={styles.field}>
+              <label htmlFor="billing-patient">Patient <span className={styles.required}>*</span></label>
+              <select
+                id="billing-patient"
+                className={styles.control}
+                value={patient}
+                onChange={(event) => setPatient(event.target.value)}
+                required
+              >
+                <option value="">Select a registered patient</option>
                 {patients.map((item) => (
                   <option key={item._id} value={item._id}>{item.name} ({item.patientId})</option>
                 ))}
               </select>
+              <div className={styles.fieldHint}>Invoices are linked permanently to the selected patient record.</div>
             </div>
-            <div style={{ ...s.col6, ...s.field }}>
-              <label style={s.label}>Priority</label>
-              <select style={s.input} value={priority} onChange={(e) => setPriority(e.target.value)}>
+
+            <div className={styles.field}>
+              <label htmlFor="billing-priority">Service priority</label>
+              <select
+                id="billing-priority"
+                className={styles.control}
+                value={priority}
+                onChange={(event) => setPriority(event.target.value)}
+              >
                 <option value="routine">Routine</option>
                 <option value="urgent">Urgent (STAT)</option>
               </select>
+              <div className={styles.fieldHint}>Urgent requests are highlighted in the laboratory workflow.</div>
             </div>
-          </div>
 
-          <div style={{ ...s.col12, ...s.field, padding: 0 }}>
-            <label style={s.label}>
-              Select Investigations <span className="required">*</span>
-            </label>
-            <MultiSelect
-              name="selectedTests"
-              placeholder="Search tests or packages"
-              options={investigationOptions}
-              value={selectedTests}
-              onChange={(e) => setSelectedTests(e.target.value)}
-            />
-          </div>
+            <div className={`${styles.field} ${styles.fieldFull}`}>
+              <label>Investigations <span className={styles.required}>*</span></label>
+              <MultiSelect
+                name="selectedTests"
+                placeholder="Search tests or packages"
+                options={investigationOptions}
+                value={selectedTests}
+                onChange={(event) => setSelectedTests(event.target.value)}
+              />
+              <div className={styles.fieldHint}>{selectedTests.length} selected · package inclusions retain their configured price.</div>
+            </div>
 
-          {canDiscountBilling && (
-            <div style={s.row}>
-              <div style={{ ...s.col6, ...s.field }}>
-                <label style={s.label}>Discount (%)</label>
+            {canDiscountBilling && (
+              <div className={styles.field}>
+                <label htmlFor="billing-discount">Discount percentage</label>
                 <input
+                  id="billing-discount"
                   type="number"
-                  style={s.input}
-                  className="lims-input"
+                  className={styles.control}
                   min="0"
                   max="95"
                   step="0.01"
                   value={discountAmount}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setDiscountAmount(v);
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value === "" || (Number(value) >= 0 && Number(value) <= 95)) setDiscountAmount(value);
                   }}
-                  placeholder="0"
+                  placeholder="0.00"
                 />
               </div>
-              <div style={{ ...s.col6, ...s.field }}>
-                <label style={s.label}>Tax (%)</label>
-                <input
-                  type="number"
-                  style={s.input}
-                  className="lims-input"
-                  min="0"
-                  max="95"
-                  step="0.01"
-                  value={taxAmount}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setTaxAmount(v);
-                  }}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          )}
+            )}
 
-          {!canDiscountBilling && (
-            <div style={{ ...s.col12, ...s.field, padding: 0 }}>
-              <label style={s.label}>Tax (%)</label>
+            <div className={`${styles.field} ${canDiscountBilling ? "" : styles.fieldFull}`}>
+              <label htmlFor="billing-tax">Tax percentage</label>
               <input
+                id="billing-tax"
                 type="number"
-                style={s.input}
-                className="lims-input"
+                className={styles.control}
                 min="0"
                 max="95"
                 step="0.01"
                 value={taxAmount}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "" || (Number(v) >= 0 && Number(v) <= 95)) setTaxAmount(v);
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "" || (Number(value) >= 0 && Number(value) <= 95)) setTaxAmount(value);
                 }}
-                placeholder="0"
+                placeholder="0.00"
               />
             </div>
-          )}
 
-          <div style={{ ...s.col12, ...s.field, padding: 0 }}>
-            <label style={s.label}>Notes</label>
-            <textarea
-              style={s.textarea}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Enter notes (optional)"
-            />
-          </div>
-
-          <div style={{
-            background: "var(--surface)",
-            padding: "16px",
-            borderRadius: "8px",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-muted)" }}>
-              <span>Subtotal</span><span>₹{selectedTotal}</span>
-            </div>
-            {discountPct > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--success)" }}>
-                <span>Discount ({discountPct}%)</span><span>− ₹{discountValue}</span>
-              </div>
-            )}
-            {taxPct > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--text-secondary)" }}>
-                <span>Tax ({taxPct}%)</span><span>+ ₹{taxValue}</span>
-              </div>
-            )}
-            <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "10px", marginTop: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-              <div>
-                <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "block" }}>Net Payable</span>
-                <strong style={{ fontSize: "24px", color: "var(--brand-action, var(--primary))" }}>₹{netPayable}</strong>
-              </div>
-              <button type="submit" className="dash-btn-primary" disabled={!patient || selectedTests.length === 0 || saving} style={{ height: "48px", padding: "0 28px", fontSize: "14px", fontWeight: 700, borderRadius: "8px", border: "none", cursor: "pointer", background: saving ? "var(--primary-60)" : "var(--brand-action, var(--primary))", color: "#fff" }}>
-                {saving ? "Processing..." : "Generate Bill"}
-              </button>
+            <div className={`${styles.field} ${styles.fieldFull}`}>
+              <label htmlFor="billing-notes">Internal notes</label>
+              <textarea
+                id="billing-notes"
+                className={styles.control}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={3}
+                placeholder="Optional billing or collection note"
+              />
             </div>
           </div>
-        </form>
+        </div>
       </section>
-    </div>
+
+      <aside className={`${styles.panel} ${styles.summaryPanel}`} aria-labelledby="bill-summary-title">
+        <div className={styles.panelHeader}>
+          <p className={styles.eyebrow}>Review</p>
+          <h2 id="bill-summary-title">Invoice summary</h2>
+          <p>{selectedPatient ? `${selectedPatient.name} · ${selectedPatient.patientId}` : "Select a patient to continue"}</p>
+        </div>
+        <div className={styles.summaryBody}>
+          <div className={styles.summaryLine}><span>Investigations</span><strong>{selectedTests.length}</strong></div>
+          <div className={styles.summaryLine}><span>Subtotal</span><strong>{formatCurrency(selectedTotal)}</strong></div>
+          {discountPct > 0 && (
+            <div className={`${styles.summaryLine} ${styles.summaryDiscount}`}>
+              <span>Discount ({discountPct}%)</span><strong>− {formatCurrency(discountValue)}</strong>
+            </div>
+          )}
+          {taxPct > 0 && (
+            <div className={styles.summaryLine}><span>Tax ({taxPct}%)</span><strong>+ {formatCurrency(taxValue)}</strong></div>
+          )}
+          <div className={styles.summaryTotal}>
+            <span>Net payable</span>
+            <strong>{formatCurrency(netPayable)}</strong>
+          </div>
+          <div className={styles.summaryHelp}>
+            Confirm the patient, investigations, discount, and tax. Generating the bill creates the corresponding laboratory work items.
+          </div>
+          <button
+            type="submit"
+            className={styles.primaryButton}
+            disabled={!patient || selectedTests.length === 0 || saving}
+          >
+            {saving ? "Generating invoice…" : "Generate bill"}
+          </button>
+        </div>
+      </aside>
+    </form>
   );
 }

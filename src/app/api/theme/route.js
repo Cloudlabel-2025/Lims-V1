@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionFromRequest, requireTenantSession } from "@/app/lib/auth";
 import { getHostnameFromHeaders, getTenantIdFromRequest } from "@/app/lib/tenant-resolver";
 import { defaultLabModules } from "@/app/lib/modules";
-import { clearTenantConfigCache, getTenantConfig } from "@/app/lib/tenant-cache";
+import { clearTenantConfigCache, getTenantConfig, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
@@ -15,15 +15,16 @@ function debugRequestLog(message, details = {}) {
 }
 
 const defaultTheme = {
-  labName: "Uthiram LIMS",
+  labName: "CHC LIMS",
   tenantId: null,
   logo: null,
-  logoAltText: "Uthiram LIMS logo",
+  logoAltText: "CHC LIMS logo",
   primaryColor: "#0d9488",
   secondaryColor: "#0f766e",
   accentColor: "#f59e0b",
   enabledModules: defaultLabModules,
   loginHighlights: [],
+  upiId: "",
 };
 
 function getRequestHostname(req) {
@@ -88,6 +89,11 @@ export async function GET(req) {
         reportHeader: lab.branding?.reportHeader?.url || null,
         enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultTheme.enabledModules,
         loginHighlights: lab.branding?.loginHighlights || [],
+        upiId: lab.branding?.upiId || "",
+        numbering: {
+          patientPrefix: lab.numbering?.patientPrefix || "",
+          doctorPrefix: lab.numbering?.doctorPrefix || "",
+        },
       },
     });
   } catch (error) {
@@ -118,6 +124,24 @@ function normalizeLogo(value, fallbackAltText) {
   };
 }
 
+function normalizeColor(value, fallback) {
+  const color = cleanString(value);
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : fallback;
+}
+
+function normalizeLoginHighlights(value) {
+  if (!Array.isArray(value)) return [];
+
+  return [
+    ...new Set(
+      value
+        .map((item) => cleanString(item))
+        .filter(Boolean)
+        .map((item) => item.slice(0, 80))
+    ),
+  ].slice(0, 6);
+}
+
 export async function PATCH(req) {
   try {
     const auth = requireTenantSession(req, "settings.branding");
@@ -130,36 +154,62 @@ export async function PATCH(req) {
     ]);
     const masterConnection = await connectMasterDB();
     const Lab = getLabModel(masterConnection);
-    const lab = await Lab.findOne({ tenantId: auth.tenantId });
+    const lab = await Lab.findOne({ tenantId: auth.tenantId }).select("+dbConnectionString");
 
     if (!lab) {
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
+    // 1. Lab Name Update
+    if (body.labName !== undefined) {
+      const name = cleanString(body.labName);
+      if (name.length < 2) {
+        return NextResponse.json({ error: "Lab Name must be at least 2 characters" }, { status: 400 });
+      }
+      lab.name = name;
+    }
+
+    // 2. Colors Update
+    if (body.primaryColor !== undefined) {
+      lab.set("branding.primaryColor", normalizeColor(body.primaryColor, lab.branding?.primaryColor || "#0f766e"));
+    }
+    if (body.secondaryColor !== undefined) {
+      lab.set("branding.secondaryColor", normalizeColor(body.secondaryColor, lab.branding?.secondaryColor || "#164e63"));
+    }
+    if (body.accentColor !== undefined) {
+      lab.set("branding.accentColor", normalizeColor(body.accentColor, lab.branding?.accentColor || "#f59e0b"));
+    }
+
+    // 3. Login Highlights Update
+    if (body.loginHighlights !== undefined) {
+      lab.set("branding.loginHighlights", normalizeLoginHighlights(body.loginHighlights));
+    }
+    if (body.upiId !== undefined) {
+      lab.set("branding.upiId", cleanString(body.upiId).trim());
+    }
+
+    // 4. Logo Update
     const logoAltText = cleanString(body.logoAltText).slice(0, 120) || `${lab.name} logo`;
-    const logo = normalizeLogo(body.logo, logoAltText);
-    const existingLogo = lab.branding?.logo;
+    if (body.removeLogo) {
+      lab.set("branding.logo", undefined);
+    } else if (body.logo) {
+      const logo = normalizeLogo(body.logo, logoAltText);
+      if (logo) lab.set("branding.logo", logo);
+    } else if (body.logoAltText !== undefined) {
+      const existingLogo = lab.branding?.logo;
+      if (existingLogo) {
+        const logoObj = existingLogo.toObject?.() || existingLogo;
+        lab.set("branding.logo", { ...logoObj, altText: logoAltText });
+      }
+    }
 
-    lab.branding = {
-      ...(lab.branding || {}),
-      ...(logo
-        ? { logo }
-        : existingLogo
-          ? {
-              logo: {
-                ...(existingLogo.toObject?.() || existingLogo),
-                altText: logoAltText,
-              },
-            }
-          : {}),
-    };
-
+    // 5. Report Header Update
     if (body.reportHeader !== undefined) {
       const rh = body.reportHeader;
       if (rh === null) {
-        delete lab.branding.reportHeader;
+        lab.set("branding.reportHeader", undefined);
       } else if (rh && rh.url && rh.publicId) {
-        lab.branding.reportHeader = {
+        lab.set("branding.reportHeader", {
           url: String(rh.url).trim(),
           storageKey: String(rh.publicId).trim(),
           publicId: String(rh.publicId).trim(),
@@ -168,12 +218,44 @@ export async function PATCH(req) {
           mimeType: String(rh.mimeType || "").trim().slice(0, 80),
           altText: String(rh.altText || "").trim().slice(0, 120) || "Report header",
           uploadedAt: rh.uploadedAt ? new Date(rh.uploadedAt) : new Date(),
-        };
+        });
       }
+    }
+
+    // 6. Numbering prefixes Update
+    if (body.numbering !== undefined) {
+      const pPrefix = cleanString(body.numbering?.patientPrefix).toUpperCase();
+      const dPrefix = cleanString(body.numbering?.doctorPrefix).toUpperCase();
+
+      if (pPrefix && !/^[A-Z0-9-]{1,10}$/.test(pPrefix)) {
+        return NextResponse.json({ error: "Patient Prefix must be 1-10 alphanumeric characters or dash" }, { status: 400 });
+      }
+      if (dPrefix && !/^[A-Z0-9-]{1,10}$/.test(dPrefix)) {
+        return NextResponse.json({ error: "Doctor Prefix must be 1-10 alphanumeric characters or dash" }, { status: 400 });
+      }
+
+      lab.numbering = {
+        patientPrefix: pPrefix || undefined,
+        doctorPrefix: dPrefix || undefined,
+      };
     }
 
     await lab.save();
     clearTenantConfigCache(auth.tenantId);
+
+    // Warm tenant config cache so current session and styles immediately pick it up
+    warmTenantConfigCache({
+      id: String(lab._id),
+      labId: lab.labId,
+      tenantId: lab.tenantId,
+      name: lab.name,
+      status: lab.status,
+      dbName: lab.dbName,
+      dbConnectionString: lab.dbConnectionString,
+      subscriptionPlan: lab.subscriptionPlan,
+      enabledModules: lab.enabledModules || [],
+      branding: lab.branding || {},
+    });
 
     return NextResponse.json({
       theme: {
@@ -188,6 +270,11 @@ export async function PATCH(req) {
         reportHeader: lab.branding?.reportHeader?.url || null,
         enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultTheme.enabledModules,
         loginHighlights: lab.branding?.loginHighlights || [],
+        upiId: lab.branding?.upiId || "",
+        numbering: {
+          patientPrefix: lab.numbering?.patientPrefix || "",
+          doctorPrefix: lab.numbering?.doctorPrefix || "",
+        },
       },
     });
   } catch (error) {

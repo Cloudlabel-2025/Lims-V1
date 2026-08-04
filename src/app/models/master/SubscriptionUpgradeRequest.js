@@ -15,6 +15,8 @@ export const SubscriptionUpgradeRequestSchema = new mongoose.Schema(
     requestedByEmail: { type: String, trim: true, lowercase: true },
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "DeveloperUser" },
     reviewedAt: { type: Date },
+    rzpOrderId: { type: String, trim: true },
+    rzpPaymentId: { type: String, trim: true },
   },
   { timestamps: true }
 );

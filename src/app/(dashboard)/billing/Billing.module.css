@@ -1,0 +1,488 @@
+.page {
+  display: grid;
+  gap: 22px;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 2px;
+}
+
+.kicker,
+.eyebrow {
+  margin: 0 0 7px;
+  color: #087f78;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  color: #0f1c36;
+  font-size: clamp(27px, 3vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -.035em;
+}
+
+.heroDescription {
+  max-width: 680px;
+  margin: 8px 0 0;
+  color: #60708a;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.refreshButton,
+.secondaryButton,
+.primaryButton,
+.dangerButton {
+  min-height: 40px;
+  border-radius: 9px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+}
+
+.refreshButton,
+.secondaryButton {
+  border: 1px solid #d7e0eb;
+  background: #fff;
+  color: #40516b;
+}
+
+.refreshButton:hover,
+.secondaryButton:hover { border-color: #8fb8b5; color: #087f78; }
+.refreshButton:active,
+.secondaryButton:active,
+.primaryButton:active,
+.dangerButton:active { transform: translateY(1px); }
+.refreshButton:disabled,
+.secondaryButton:disabled,
+.primaryButton:disabled,
+.dangerButton:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+.primaryButton {
+  border: 1px solid #0c8f87;
+  background: #0c8f87;
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(12, 143, 135, .16);
+}
+
+.primaryButton:hover { background: #087f78; }
+
+.dangerButton {
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #c42828;
+}
+
+.dangerButton:hover { background: #fff5f5; }
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid #dce4ee;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(15, 28, 54, .035);
+}
+
+.metricLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #718099;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.metricIcon {
+  width: 31px;
+  height: 31px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #eaf8f6;
+  color: #087f78;
+}
+
+.metricValue {
+  margin-top: 15px;
+  color: #0f1c36;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricHint {
+  margin-top: 7px;
+  color: #7a879c;
+  font-size: 12px;
+}
+
+.tabShell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px;
+  border: 1px solid #dce4ee;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(15, 28, 54, .03);
+  overflow-x: auto;
+}
+
+.tabs { display: flex; gap: 4px; min-width: max-content; }
+
+.tab {
+  min-height: 39px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #60708a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab:hover { background: #f5f8fb; color: #0f1c36; }
+.tabActive { background: #eaf8f6; color: #087f78; }
+
+.tabCount {
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  border-radius: 99px;
+  display: inline-grid;
+  place-items: center;
+  background: #fff;
+  color: #087f78;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.sectionHeader h2,
+.panelHeader h2 {
+  margin: 0;
+  color: #0f1c36;
+  font-size: 18px;
+  letter-spacing: -.015em;
+}
+
+.sectionHeader p,
+.panelHeader p {
+  margin: 5px 0 0;
+  color: #718099;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.queueSummary {
+  color: #4f6078;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.queueGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.billCard {
+  border: 1px solid #dce4ee;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(15, 28, 54, .04);
+  overflow: hidden;
+}
+
+.billCardTop {
+  padding: 17px 18px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.patientBlock { min-width: 0; display: flex; align-items: center; gap: 11px; }
+
+.patientAvatar {
+  width: 39px;
+  height: 39px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: #edf8f7;
+  color: #087f78;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.patientName {
+  overflow: hidden;
+  color: #0f1c36;
+  font-size: 15px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patientMeta { margin-top: 3px; color: #718099; font-size: 11.5px; }
+
+.status {
+  flex: 0 0 auto;
+  border-radius: 99px;
+  padding: 5px 9px;
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+
+.statusUnpaid { background: #fff1f2; color: #c42828; }
+.statusPartial { background: #fff7e8; color: #aa6105; }
+.statusPaid { background: #eaf8f1; color: #137752; }
+
+.billBody { padding: 15px 18px 17px; }
+
+.investigationHeader,
+.amountRow,
+.billFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.investigationHeader {
+  margin-bottom: 9px;
+  color: #718099;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.readyText { color: #087f78; }
+
+.investigationList {
+  display: grid;
+  gap: 7px;
+  min-height: 48px;
+}
+
+.investigationItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #40516b;
+  font-size: 12.5px;
+}
+
+.investigationName { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.investigationName span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 6px; height: 6px; border-radius: 99px; flex: 0 0 auto; background: #cad3df; }
+.dotReady { background: #1aa17f; }
+.itemPrice { color: #718099; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.moreItems { color: #087f78; font-size: 11.5px; font-weight: 750; }
+
+.commission {
+  margin-top: 13px;
+  padding: 9px 11px;
+  border: 1px solid #d6ece9;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f3fbfa;
+  color: #42615f;
+  font-size: 11.5px;
+}
+
+.billFooter {
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid #edf1f5;
+  align-items: flex-end;
+}
+
+.amountLabel { color: #718099; font-size: 10.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+.amountValue { margin-top: 3px; color: #0f1c36; font-size: 20px; font-weight: 850; font-variant-numeric: tabular-nums; }
+.amountSub { margin-top: 2px; color: #aa6105; font-size: 11.5px; font-weight: 700; }
+.cardActions { display: flex; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+.cardActions button { min-height: 35px; padding: 0 12px; }
+
+.emptyState {
+  grid-column: 1 / -1;
+  min-height: 260px;
+  border: 1px dashed #cfd9e5;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #fff;
+  color: #718099;
+  text-align: center;
+}
+
+.emptyIcon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #eaf8f6;
+  color: #087f78;
+}
+
+.emptyState h3 { margin: 0; color: #0f1c36; font-size: 17px; }
+.emptyState p { max-width: 380px; margin: 7px auto 0; font-size: 12.5px; line-height: 1.5; }
+
+.pagination { margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.paginationText { color: #718099; font-size: 12.5px; font-weight: 650; }
+
+.composerGrid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .65fr); gap: 16px; align-items: start; }
+.panel { border: 1px solid #dce4ee; border-radius: 12px; background: #fff; box-shadow: 0 2px 6px rgba(15, 28, 54, .04); overflow: hidden; }
+.panelHeader { padding: 18px 20px; border-bottom: 1px solid #e7edf3; }
+.panelBody { padding: 20px; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.fieldFull { grid-column: 1 / -1; }
+.field label { display: block; margin-bottom: 7px; color: #40516b; font-size: 12px; font-weight: 750; }
+.required { color: #c42828; }
+.control { width: 100%; min-height: 44px; border: 1px solid #cfd9e5; border-radius: 8px; padding: 0 12px; background: #fff; color: #0f1c36; font: inherit; font-size: 13px; outline: none; box-sizing: border-box; }
+textarea.control { min-height: 86px; padding: 11px 12px; resize: vertical; }
+.control:focus { border-color: #0c8f87; box-shadow: 0 0 0 3px rgba(12, 143, 135, .1); }
+.fieldHint { margin-top: 5px; color: #8290a4; font-size: 11.5px; }
+
+.summaryPanel { position: sticky; top: 20px; }
+.summaryBody { padding: 20px; }
+.summaryLine { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; color: #60708a; font-size: 12.5px; }
+.summaryLine strong { color: #283952; font-variant-numeric: tabular-nums; }
+.summaryDiscount strong { color: #137752; }
+.summaryTotal { margin-top: 8px; padding-top: 16px; border-top: 1px solid #dce4ee; }
+.summaryTotal span { color: #40516b; font-size: 12px; font-weight: 750; }
+.summaryTotal strong { display: block; margin-top: 5px; color: #087f78; font-size: 27px; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.summaryHelp { margin: 14px 0 18px; padding: 10px 11px; border-radius: 8px; background: #f5f8fb; color: #718099; font-size: 11.5px; line-height: 1.5; }
+.summaryPanel .primaryButton { width: 100%; min-height: 44px; }
+
+.historyPanel { border: 1px solid #dce4ee; border-radius: 12px; background: #fff; box-shadow: 0 2px 6px rgba(15, 28, 54, .04); overflow: hidden; }
+.historyHeader { padding: 18px 20px 14px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.historyHeader h2 { margin: 0; color: #0f1c36; font-size: 18px; }
+.historyHeader p { margin: 5px 0 0; color: #718099; font-size: 12.5px; }
+.historyCount { color: #60708a; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.historyToolbar { padding: 12px 20px; display: flex; gap: 10px; border-top: 1px solid #edf1f5; border-bottom: 1px solid #e2e8f0; background: #fbfcfe; }
+.searchWrap { position: relative; flex: 1 1 260px; }
+.searchIcon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: grid; color: #8b99ad; pointer-events: none; }
+.historyInput,
+.historySelect { min-height: 39px; border: 1px solid #d4dde8; border-radius: 8px; background: #fff; color: #283952; font: inherit; font-size: 12.5px; outline: none; }
+.historyInput { width: 100%; padding: 0 12px 0 39px; box-sizing: border-box; }
+.historySelect { min-width: 210px; padding: 0 32px 0 11px; }
+.historyInput:focus,
+.historySelect:focus { border-color: #0c8f87; box-shadow: 0 0 0 3px rgba(12, 143, 135, .09); }
+.tableWrap { overflow-x: auto; }
+.historyTable { width: 100%; min-width: 1010px; border-collapse: collapse; }
+.historyTable th { padding: 11px 14px; background: #f5f8fb; color: #718099; font-size: 10.5px; font-weight: 800; letter-spacing: .045em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.historyTable th.money,
+.historyTable td.money { text-align: right; }
+.historyTable td { padding: 13px 14px; border-top: 1px solid #edf1f5; color: #40516b; font-size: 12.5px; vertical-align: middle; }
+.historyTable tbody tr:hover { background: #fbfdfd; }
+.billLink { color: #087f78; font-weight: 800; }
+.patientCell strong { display: block; color: #17243b; font-size: 13px; }
+.patientCell span { display: block; margin-top: 2px; color: #8290a4; font-size: 11px; }
+.dateCell { min-width: 112px; color: #60708a; }
+.moneyValue { color: #17243b; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.moneyPaid { color: #137752; }
+.moneyDue { color: #aa6105; }
+.methodBadge { display: inline-flex; padding: 4px 8px; border-radius: 6px; background: #f1f5f9; color: #52627a; font-size: 11px; font-weight: 750; }
+.rowActions { display: flex; justify-content: flex-end; gap: 6px; }
+.rowAction { min-height: 32px; border: 1px solid #d7e0eb; border-radius: 7px; padding: 0 10px; background: #fff; color: #40516b; font: inherit; font-size: 11.5px; font-weight: 750; cursor: pointer; }
+.rowAction:hover { border-color: #8fb8b5; color: #087f78; }
+.rowActionDanger { border-color: #fecaca; color: #c42828; }
+.historyEmpty { padding: 46px 20px !important; text-align: center; color: #718099 !important; }
+.historyPagination { padding: 12px 20px; border-top: 1px solid #e7edf3; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+@media (max-width: 1100px) {
+  .overviewGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .queueGrid { grid-template-columns: 1fr; }
+  .composerGrid { grid-template-columns: 1fr; }
+  .summaryPanel { position: static; }
+}
+
+@media (max-width: 700px) {
+  .page { gap: 17px; }
+  .hero { align-items: stretch; flex-direction: column; gap: 13px; }
+  .heroActions { display: grid; grid-template-columns: 1fr; }
+  .refreshButton { width: 100%; }
+  .overviewGrid { grid-template-columns: 1fr 1fr; gap: 9px; }
+  .metricCard { min-height: 100px; padding: 14px; }
+  .metricValue { font-size: 20px; }
+  .metricHint { display: none; }
+  .tabShell { align-items: stretch; }
+  .sectionHeader,
+  .historyHeader { align-items: flex-start; flex-direction: column; }
+  .billCardTop,
+  .billFooter { align-items: stretch; flex-direction: column; }
+  .cardActions { justify-content: stretch; }
+  .cardActions button { flex: 1 1 auto; }
+  .formGrid { grid-template-columns: 1fr; }
+  .fieldFull { grid-column: auto; }
+  .panelBody,
+  .summaryBody { padding: 16px; }
+  .historyToolbar { flex-direction: column; padding: 12px 14px; }
+  .historySelect { width: 100%; }
+  .historyPagination { align-items: stretch; flex-direction: column; }
+  .pagination { flex-wrap: wrap; }
+}
+
+@media (max-width: 430px) {
+  .overviewGrid { grid-template-columns: 1fr; }
+  .metricHint { display: block; }
+  .tabs { width: max-content; }
+  .billBody,
+  .billCardTop { padding-left: 14px; padding-right: 14px; }
+}

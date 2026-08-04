@@ -7,7 +7,7 @@ import { getAllowedNavItems, hasAnyPermission, hasPermission } from "@/app/lib/c
 
 export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout, theme, user }) {
   const pathname = usePathname();
-  const labName = theme?.labName || "Uthiram LIMS";
+  const labName = theme?.labName || "CHC LIMS";
   const [title, subtitle = "LIMS"] = labName.split(/\s+/, 2);
 
   const iconByModule = {

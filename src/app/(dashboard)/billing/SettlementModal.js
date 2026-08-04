@@ -1,7 +1,9 @@
 "use client";
 
-import { memo, useCallback } from "react";
+import { memo, useCallback, useState, useEffect, useRef } from "react";
 import { Icons } from "@/app/components/Icons";
+import { useTenantShell } from "@/app/lib/use-current-user";
+import QRCode from "qrcode";
 
 const paymentMethods = [
   { key: "cash", label: "Cash" },
@@ -17,7 +19,87 @@ function SettlementModal({
   onClose,
   onPaymentChange,
   onSubmit,
+  onExternalSettle,
 }) {
+  const { theme } = useTenantShell();
+  const [upiSubMode, setUpiSubMode] = useState("razorpay"); // 'razorpay' or 'direct'
+  const [directQrUrl, setDirectQrUrl] = useState("");
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState("");
+  const [qrCode, setQrCode] = useState(null);
+  const [isPolling, setIsPolling] = useState(false);
+
+  useEffect(() => {
+    if (upiSubMode === "direct" && theme?.upiId && payment.amount > 0) {
+      const upiUri = `upi://pay?pa=${theme.upiId}&pn=${encodeURIComponent(theme.labName || "LIMS")}&am=${payment.amount}&cu=INR&tn=${encodeURIComponent(billingRecord.billId)}`;
+      QRCode.toDataURL(upiUri, { margin: 1, width: 300 })
+        .then((url) => setDirectQrUrl(url))
+        .catch((err) => console.error("QR generation error:", err));
+    }
+  }, [upiSubMode, theme, payment.amount, billingRecord.billId]);
+
+  const pollingRef = useRef(null);
+
+  useEffect(() => {
+    if (!isPolling || !qrCode?.id) return;
+
+    const pollStatus = async () => {
+      try {
+        const res = await fetch(
+          `/api/billing/razorpay/status?qrCodeId=${qrCode.id}&billingRecordId=${billingRecord._id}`
+        );
+        const data = await res.json();
+        if (res.ok && data.paid) {
+          setIsPolling(false);
+          if (onExternalSettle) {
+            onExternalSettle(data.result);
+          }
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    };
+
+    pollingRef.current = setInterval(pollStatus, 3000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, [isPolling, qrCode, billingRecord, onExternalSettle]);
+
+  const handleGenerateQR = async () => {
+    setQrLoading(true);
+    setQrError("");
+    setQrCode(null);
+    try {
+      const res = await fetch("/api/billing/razorpay/qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          billingRecordId: billingRecord._id,
+          amount: payment.amount,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate QR");
+      setQrCode({ id: data.qrCodeId, imageUrl: data.imageUrl });
+      setIsPolling(true);
+    } catch (err) {
+      setQrError(err.message);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleCancelQR = () => {
+    setIsPolling(false);
+    setQrCode(null);
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+  };
   const netPayable = billingRecord?.totalAmount || 0;
   const alreadyPaid =
     Number(billingRecord?.paymentBreakdown?.cash || 0) +
@@ -177,7 +259,7 @@ function SettlementModal({
                   step="0.01"
                   value={payment.amount || ""}
                   onChange={handleAmountChange}
-                  disabled={closing}
+                  disabled={closing || qrCode}
                   className="lims-input"
                   style={{ height: "42px", fontSize: "16px" }}
                   placeholder="Enter amount"
@@ -205,7 +287,7 @@ function SettlementModal({
                 <select
                   value={payment.method || "cash"}
                   onChange={handleMethodChange}
-                  disabled={closing}
+                  disabled={closing || qrCode}
                   className="lims-select"
                   style={{ height: "42px", fontSize: "14px", width: "100%" }}
                 >
@@ -216,6 +298,97 @@ function SettlementModal({
                   ))}
                 </select>
               </div>
+
+              {payment.method === "upi" && (
+                <div style={{ marginTop: "6px", padding: "14px", border: "1.5px dashed var(--border)", borderRadius: "var(--radius-md)", background: "var(--surface)" }}>
+                  {theme?.upiId && (
+                    <div className="btn-group w-100 mb-3" role="group">
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${upiSubMode === "razorpay" ? "btn-primary" : "btn-outline-primary"}`}
+                        onClick={() => { setUpiSubMode("razorpay"); handleCancelQR(); }}
+                        disabled={qrCode}
+                        style={{ flex: 1 }}
+                      >
+                        Razorpay Auto-Track
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${upiSubMode === "direct" ? "btn-primary" : "btn-outline-primary"}`}
+                        onClick={() => { setUpiSubMode("direct"); handleCancelQR(); }}
+                        disabled={qrCode}
+                        style={{ flex: 1 }}
+                      >
+                        Direct UPI (GPay)
+                      </button>
+                    </div>
+                  )}
+
+                  {upiSubMode === "razorpay" ? (
+                    <>
+                      {qrError && <div style={{ color: "var(--error)", fontSize: "13px", marginBottom: "8px" }}>{qrError}</div>}
+                      
+                      {!qrCode ? (
+                        <button
+                          type="button"
+                          onClick={handleGenerateQR}
+                          disabled={qrLoading || totalPaid <= 0 || totalPaid > remainingDue}
+                          className="btn-lims-primary"
+                          style={{ width: "100%", height: "40px" }}
+                        >
+                          {qrLoading ? "Generating payment QR..." : "Generate Razorpay payment QR"}
+                        </button>
+                      ) : (
+                        <div style={{ textAlign: "center", padding: "5px 0" }}>
+                          <div style={{ fontWeight: "700", fontSize: "14px", color: "var(--brand-action, var(--primary))", marginBottom: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                            <span className="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" style={{ width: "14px", height: "14px" }}></span>
+                            <span>Waiting for payment...</span>
+                          </div>
+                          
+                          {qrCode.imageUrl && (
+                            <div style={{ background: "#fff", padding: "12px", display: "inline-block", borderRadius: "8px", border: "1.5px solid var(--border)", marginBottom: "10px" }}>
+                              <img src={qrCode.imageUrl} alt="Razorpay UPI Payment QR" style={{ width: "160px", height: "160px", display: "block", margin: "0 auto" }} />
+                            </div>
+                          )}
+                          
+                          <p style={{ margin: "4px 0 12px", fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+                            Scan using GPay, PhonePe, Paytm, or any UPI app to pay <strong>₹{Number(totalPaid).toLocaleString("en-IN")}</strong>.
+                          </p>
+                          
+                          <button
+                            type="button"
+                            onClick={handleCancelQR}
+                            className="btn-lims-secondary"
+                            style={{ height: "32px", padding: "0 12px", fontSize: "12px" }}
+                          >
+                            Cancel QR Code
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "5px 0" }}>
+                      <div style={{ fontWeight: "700", fontSize: "14px", color: "var(--success)", marginBottom: "10px" }}>
+                        Direct Scanner Payment (Opens GPay)
+                      </div>
+                      
+                      {directQrUrl && (
+                        <div style={{ background: "#fff", padding: "12px", display: "inline-block", borderRadius: "8px", border: "1.5px solid var(--border)", marginBottom: "10px" }}>
+                          <img src={directQrUrl} alt="Direct UPI Payment QR" style={{ width: "160px", height: "160px", display: "block", margin: "0 auto" }} />
+                        </div>
+                      )}
+                      
+                      <p style={{ margin: "4px 0 8px", fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+                        UPI VPA: <code>{theme?.upiId}</code>
+                      </p>
+                      
+                      <p style={{ margin: "4px 0 12px", fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+                        Scanning this QR code will open Google Pay directly on the patient's phone. Once payment is confirmed on your device, click <strong>Collect balance</strong> below to settle manually.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div
@@ -273,15 +446,37 @@ function SettlementModal({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={closing || totalPaid <= 0 || totalPaid > remainingDue}
-            className="btn-lims-primary"
-            style={{ height: "40px", padding: "0 24px" }}
-          >
-            {closing ? "Processing..." : remaining > 0 ? "Record Partial Payment" : "Close Bill"}
-          </button>
+          {payment.method === "upi" && upiSubMode === "razorpay" ? (
+            qrCode ? (
+              <button
+                type="button"
+                disabled
+                className="btn-lims-primary"
+                style={{ height: "40px", padding: "0 24px", opacity: 0.7 }}
+              >
+                Waiting for scan...
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="btn-lims-primary"
+                style={{ height: "40px", padding: "0 24px", opacity: 0.5 }}
+              >
+                Use Razorpay button above
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={closing || totalPaid <= 0 || totalPaid > remainingDue}
+              className="btn-lims-primary"
+              style={{ height: "40px", padding: "0 24px" }}
+            >
+              {closing ? "Recording payment…" : remaining > 0 ? "Record partial payment" : "Collect full balance"}
+            </button>
+          )}
         </div>
       </div>
     </div>
