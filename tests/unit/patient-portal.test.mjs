@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { hashSecret, verifyPassword } from "../../src/app/lib/password.js";
-import { hashPatientActivationToken, isValidPortalPin, normalizeDob } from "../../src/app/lib/patient-portal.js";
+import { hashPatientActivationToken, isValidPortalPin, normalizeDob, generateMobileOtp, hashOtpToken, buildWhatsAppShareUrl } from "../../src/app/lib/patient-portal.js";
 
 const root = new URL("../../", import.meta.url);
 
@@ -39,3 +39,25 @@ test("patient access slip issuance requires staff patient-registration permissio
   const source = await readFile(new URL("src/app/api/patient/[id]/portal-access/route.js", root), "utf8");
   assert.match(source, /requireTenantSession\(req, "patients\.register"\)/);
 });
+
+test("mobile OTP generator produces 6-digit codes and hashes", () => {
+  const { otp, otpHash, expiresAt } = generateMobileOtp();
+  assert.equal(/^\d{6}$/.test(otp), true);
+  assert.equal(hashOtpToken(otp), otpHash);
+  assert.equal(expiresAt instanceof Date, true);
+
+  const waUrl = buildWhatsAppShareUrl("mega", "http://localhost", "John Doe", "9876543210", "http://localhost/link");
+  assert.match(waUrl, /https:\/\/api\.whatsapp\.com\/send\?phone=919876543210/);
+  assert.match(waUrl, /John%20Doe/);
+});
+
+test("OTP and token authentication endpoints check patient portal package entitlement", async () => {
+  const sendOtpSrc = await readFile(new URL("src/app/api/patient-portal/send-otp/route.js", root), "utf8");
+  const verifyOtpSrc = await readFile(new URL("src/app/api/patient-portal/verify-otp/route.js", root), "utf8");
+  const tokenLoginSrc = await readFile(new URL("src/app/api/patient-portal/token-login/route.js", root), "utf8");
+
+  assert.match(sendOtpSrc, /hasPatientPortalEntitlement\(subscription\)/);
+  assert.match(verifyOtpSrc, /hasPatientPortalEntitlement\(subscription\)/);
+  assert.match(tokenLoginSrc, /hasPatientPortalEntitlement\(subscription\)/);
+});
+

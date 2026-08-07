@@ -4,7 +4,7 @@ import { ensureQuotaPeriod, serializeQuotaPeriod } from "@/app/lib/quota-meter";
 import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
 
 export async function buildNotifications(tenantId, session) {
-  const { connection, Doctor, InventoryItem, QuotaPeriod, Sample, User } = await getTenantModels(tenantId);
+  const { connection, Doctor, InventoryItem, QuotaPeriod, Sample, TestRequest, User } = await getTenantModels(tenantId);
   const canViewDoctors = hasPermission(session, "doctors.view");
   const canViewInventory = hasPermission(session, "inventory.view");
   const canViewSamples = hasPermission(session, "samples.view");
@@ -130,6 +130,21 @@ export async function buildNotifications(tenantId, session) {
         detail: `${staleSamples} sample(s) in testing for over 24 hours.`,
         href: "/samples",
         priority: "normal",
+      });
+    }
+  }
+
+  const canViewBilling = hasPermission(session, "billing.view") || hasPermission(session, "billing.create");
+  if (canViewBilling && TestRequest) {
+    const pendingDoctorRequests = await TestRequest.countDocuments({ status: "pending" });
+    if (pendingDoctorRequests > 0) {
+      activeTypes.push("doctor-test-requests");
+      notifications.push({
+        id: "doctor-test-requests",
+        title: "New Doctor Test Requests",
+        detail: `${pendingDoctorRequests} test request(s) received from Doctor Portal pending lab billing.`,
+        href: "/billing",
+        priority: "high",
       });
     }
   }

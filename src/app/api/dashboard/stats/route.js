@@ -1,5 +1,6 @@
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { buildNotifications, resolveUnread } from "@/app/lib/notifications";
 
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
@@ -23,18 +24,23 @@ export async function GET(req) {
     const moduleAuth = await requireEnabledTenantModule(tenantId, "dashboard.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Patient, Sample, TestReport } = await getTenantModels(tenantId);
+    const { Patient, Sample, TestReport, TestRequest } = await getTenantModels(tenantId);
     const canViewPatients = hasPermission(auth.session, "patients.view");
     const canViewSamples = hasPermission(auth.session, "samples.view");
     const canViewReports = hasPermission(auth.session, "reports.view");
+    const canViewBilling = hasPermission(auth.session, "billing.view") || hasPermission(auth.session, "billing.create");
+
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
+
     const [
       samplesToday,
       pendingSamples,
       todayPatients,
       pendingReports,
       recentPatients,
+      pendingDoctorRequests,
+      notificationsData,
     ] = await Promise.all([
       canViewSamples
         ? Sample.countDocuments({ createdAt: { $gte: startOfToday } })
@@ -50,6 +56,17 @@ export async function GET(req) {
         ? Patient.find({}).sort({ createdAt: -1 }).limit(5).select("name patientId age gender createdAt")
             .lean()
         : Promise.resolve([]),
+      canViewBilling && TestRequest
+        ? TestRequest.find({ status: "pending" })
+            .populate("doctor", "name doctorId speciality phone")
+            .populate("patient", "name patientId phone age gender")
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean()
+        : Promise.resolve([]),
+      buildNotifications(tenantId, auth.session).then(({ notifications, activeTypes }) =>
+        resolveUnread(tenantId, auth.session.userId, notifications, activeTypes)
+      ).catch(() => ({ notifications: [], unreadCount: 0 })),
     ]);
 
     debugRequestLog("ok", {
@@ -64,6 +81,9 @@ export async function GET(req) {
       todayPatients,
       pendingReports,
       recentPatients,
+      pendingDoctorRequests: pendingDoctorRequests || [],
+      notifications: notificationsData?.notifications || [],
+      unreadNotificationsCount: notificationsData?.unreadCount || 0,
       permissions: {
         patients: canViewPatients,
         samples: canViewSamples,

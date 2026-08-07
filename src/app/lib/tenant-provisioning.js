@@ -109,34 +109,7 @@ async function initializeTenantCollections(tenantConnection) {
   ]);
 }
 
-export async function importStandardRoleTemplates(masterConnection, tenantConnection) {
-  const RoleTemplate = getRoleTemplateModel(masterConnection);
-  const Role = getRoleModel(tenantConnection);
-  const templates = await RoleTemplate.find({ isActive: true, isDefaultAdmin: { $ne: true } }).sort({ sortOrder: 1, name: 1 });
 
-  const allTenantPermissions = rbacConfig.permissions
-    .filter((permission) => permission.scope !== "developer")
-    .map((permission) => permission.key);
-
-  const importedRoles = [];
-  for (const template of templates) {
-    const permissions = template.permissions || [];
-    const role = await Role.findOneAndUpdate(
-      { name: template.name },
-      {
-        name: template.name,
-        description: template.description || `${template.name} role.`,
-        permissions,
-        isDefaultAdmin: false,
-        isSystemRole: false,
-        status: "active",
-      },
-      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
-    );
-    importedRoles.push(role);
-  }
-  return importedRoles;
-}
 
 async function createTenantRoles(masterConnection, tenantConnection) {
   const RoleTemplate = getRoleTemplateModel(masterConnection);

@@ -1,5 +1,6 @@
 import { requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
+import { getNextAvailableUserId } from "@/app/models/tenant/User";
 import { createDoctorInvitation } from "@/app/lib/doctor-invitation";
 import { sendDoctorInvitationEmail } from "@/app/lib/reset-email";
 import { buildTenantUrl } from "@/app/lib/subdomain";
@@ -26,24 +27,57 @@ export async function POST(req, { params }) {
     }
     console.log("[resend-invitation] Step 5: Doctor found:", doctor.name, "status:", doctor.status);
 
-    console.log("[resend-invitation] Step 6: Finding linked portal user...");
-    const user = await User.findOne({ doctorId: doctor._id })
-      .select("email status +passwordResetTokenHash +passwordResetExpiresAt");
-    if (!user) {
-      console.log("[resend-invitation] No linked user for doctorId:", doctor._id);
-      return Response.json({ error: "No linked portal account found" }, { status: 404 });
-    }
-    console.log("[resend-invitation] Step 7: User found:", user.email, "status:", user.status);
+    let user = await User.findOne({ doctorId: doctor._id })
+      .select("userId email status +passwordResetTokenHash +passwordResetExpiresAt");
 
-    if (user.status === "active") {
-      return Response.json({ error: "This portal account is already active" }, { status: 409 });
+    const invitation = createDoctorInvitation();
+
+    if (!user) {
+      if (!doctor.email) {
+        return Response.json({ error: "Doctor email is required to create a portal account" }, { status: 400 });
+      }
+
+      const { Role } = await getTenantModels(auth.tenantId);
+      let doctorRole = await Role.findOne({ name: "Doctor" });
+      if (!doctorRole) {
+        doctorRole = await Role.create({
+          name: "Doctor",
+          description: "Referring doctor with access to portal and test orders.",
+          permissions: ["doctor-portal.access"],
+          isSystemRole: true,
+        });
+      }
+
+      const nameParts = String(doctor.name || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "Doctor";
+      const lastName = nameParts.slice(1).join(" ") || "Partner";
+      const nextUserId = await getNextAvailableUserId(User);
+
+      user = new User({
+        userId: nextUserId,
+        firstName,
+        lastName,
+        email: doctor.email,
+        role: doctorRole._id,
+        status: "invited",
+        doctorId: doctor._id,
+        createdBy: auth.session.userId,
+      });
+    } else {
+      if (doctor.email && user.email !== doctor.email) {
+        user.email = doctor.email;
+      }
+
+      if (user.status === "active") {
+        return Response.json({ error: "This portal account is already active" }, { status: 409 });
+      }
     }
+
     if (doctor.status !== "Active") {
       return Response.json({ error: "Activate the doctor profile before sending an invitation" }, { status: 409 });
     }
 
     console.log("[resend-invitation] Step 8: Creating invitation OTP...");
-    const invitation = createDoctorInvitation();
     user.passwordResetTokenHash = invitation.otpHash;
     user.passwordResetExpiresAt = invitation.expiresAt;
     user.status = "invited";

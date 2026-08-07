@@ -383,7 +383,7 @@ function SettlementModal({
                       </p>
                       
                       <p style={{ margin: "4px 0 12px", fontSize: "12px", color: "var(--text-muted)", lineHeight: "1.4" }}>
-                        Scanning this QR code will open Google Pay directly on the patient's phone. Once payment is confirmed on your device, click <strong>Collect balance</strong> below to settle manually.
+                        Scanning this QR code will open Google Pay directly on the patient&apos;s phone. Once payment is confirmed on your device, click <strong>Collect balance</strong> below to settle manually.
                       </p>
                     </div>
                   )}

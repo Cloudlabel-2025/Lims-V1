@@ -8,6 +8,7 @@ import { getRoleModel } from "@/app/models/tenant/Role";
 import { clearTenantConfigCache } from "@/app/lib/tenant-cache";
 import { normalizeEnabledModules } from "@/app/lib/modules";
 import rbacConfig from "@/app/lib/rbac-config.json";
+import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
 
 const labPermissions = rbacConfig.permissions.filter((permission) => permission.scope !== "developer");
 
@@ -37,8 +38,9 @@ async function getLab(tenantId) {
   const labId = cleanString(tenantId);
   const masterConnection = await connectMasterDB();
   const Lab = getLabModel(masterConnection);
-  const query = mongoose.Types.ObjectId.isValid(labId)
-    ? { $or: [{ _id: labId }, { tenantId: labId.toLowerCase() }, { labId }] }
+  const isObjectId = mongoose.Types.ObjectId.isValid(labId);
+  const query = isObjectId
+    ? { $or: [{ _id: new mongoose.Types.ObjectId(labId) }, { tenantId: labId.toLowerCase() }, { labId }] }
     : { $or: [{ tenantId: labId.toLowerCase() }, { labId }] };
 
   return Lab.findOne(query).select(
@@ -93,6 +95,8 @@ export async function GET(req, { params }) {
       await connection.close();
     }
 
+    const subscription = await getLabSubscriptionEntitlements(lab.tenantId).catch(() => null);
+
     return NextResponse.json({
       lab: {
         name: lab.name,
@@ -100,6 +104,7 @@ export async function GET(req, { params }) {
         status: lab.status,
         subscriptionPlan: lab.subscriptionPlan,
         enabledModules: lab.enabledModules,
+        subscriptionFeatures: subscription?.features || [],
       },
       adminRole: adminRole
         ? {
@@ -149,6 +154,11 @@ export async function PATCH(req, { params }) {
         { $set: { enabledModules } },
         { runValidators: true }
       );
+      await assignLabSubscription({
+        tenantId: lab.tenantId,
+        modulesOverride: enabledModules,
+        assignedBy: auth.session?.userId,
+      });
       clearTenantConfigCache(lab.tenantId);
 
       return NextResponse.json({

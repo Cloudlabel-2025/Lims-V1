@@ -18,7 +18,6 @@ function clean(value) {
 function getAllowedPermissionKeys(session, enabledModules) {
   return new Set(
     getPermissionCatalogForEnabledModules(enabledModules)
-      .filter((permission) => permission.key !== "settings.branding")
       .map((permission) => permission.key)
   );
 }
@@ -73,6 +72,15 @@ async function getAllowedPermissionsForTenant(auth) {
   };
 }
 
+const LEGACY_SEEDED_NAMES = [
+  "Doctor Regular",
+  "Lab Technician",
+  "Receptionist",
+  "Accountant",
+  "Phlebotomist",
+  "Quality Manager",
+];
+
 export async function GET(req) {
   try {
     const auth = requireTenantSession(req);
@@ -84,7 +92,25 @@ export async function GET(req) {
     }
 
     const { allowedPermissionKeys, enabledModules } = await getAllowedPermissionsForTenant(auth);
-    const { Role } = await getTenantModels(auth.tenantId);
+    const { Role, User } = await getTenantModels(auth.tenantId);
+
+    // Remove all non-admin seeded/system roles that are not explicitly created by users
+    const extraRoles = await Role.find({
+      isDefaultAdmin: false,
+      $or: [
+        { isSystemRole: true },
+        { createdBy: { $exists: false } },
+        { createdBy: null },
+        { name: { $in: LEGACY_SEEDED_NAMES } },
+      ],
+    });
+    for (const extraRole of extraRoles) {
+      const isAssigned = await User.exists({ role: extraRole._id });
+      if (!isAssigned) {
+        await Role.deleteOne({ _id: extraRole._id });
+      }
+    }
+
     const roles = await Role.find({ status: "active" }).sort({
       name: 1,
     });
@@ -110,22 +136,11 @@ export async function POST(req) {
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "settings.manage");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const [{ default: connectMasterDB }, { importStandardRoleTemplates }, { getTenantConnection }] = await Promise.all([
-      import("@/app/lib/master-db"),
-      import("@/app/lib/tenant-provisioning"),
-      import("@/app/lib/tenant-db"),
-    ]);
-
-    const masterConnection = await connectMasterDB();
-    const tenantConnection = await getTenantConnection(auth.tenantId);
-    await importStandardRoleTemplates(masterConnection, tenantConnection);
-
     const { allowedPermissionKeys, enabledModules } = await getAllowedPermissionsForTenant(auth);
     const { Role } = await getTenantModels(auth.tenantId);
     const roles = await Role.find({ status: "active" }).sort({ name: 1 });
 
     return Response.json({
-      message: "Standard role templates imported successfully",
       roles: dedupeRolesByName(roles).map((role) => ({
         ...serializeRole(role),
         permissions: role.permissions?.includes("*")
@@ -134,7 +149,7 @@ export async function POST(req) {
       })),
     });
   } catch (error) {
-    return jsonError("Unable to import role templates", error, 500);
+    return jsonError("Unable to fetch roles", error, 500);
   }
 }
 

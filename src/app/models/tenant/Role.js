@@ -39,7 +39,7 @@ const permissionKeySchema = {
   type: String,
   trim: true,
   lowercase: true,
-  match: /^(?:\*|[a-z]+(?:\.[a-z]+)+)$/,
+  match: /^(?:\*|[a-z0-9_-]+(?:\.[a-z0-9_-]+)+)$/,
 };
 
 export const RoleSchema = new mongoose.Schema(

@@ -37,7 +37,7 @@ export default function Sidebar({ collapsed, mobileOpen, setMobileOpen, onLogout
     }))
     .filter((group) => group.items.length > 0);
 
-  const canOpenSettings = hasAnyPermission(user, ["settings.manage", "users.manage"]);
+  const canOpenSettings = hasAnyPermission(user, ["settings.manage", "users.manage", "settings.branding"]);
   const canViewAudit = hasAnyPermission(user, ["settings.manage"]);
   const adminItems = user?.doctorId ? [] : [
     ...(hasAnyPermission(user, ["settings.manage"]) ? [{ id: "subscription", label: "Subscription & Usage", href: "/subscription", icon: Icons.wallet }] : []),

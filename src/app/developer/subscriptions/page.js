@@ -104,8 +104,8 @@ function PackageCard({ pkg, onEdit, onNewVersion }) {
 
       <div className="subscription-module-section">
         <div className="subscription-section-label">
-          <span>Included modules</span>
-          <small>{pkg.modules.length} enabled</small>
+          <span>Included modules &amp; features</span>
+          <small>{pkg.modules.length} modules, {(pkg.features || []).length} features</small>
         </div>
         <div className="subscription-module-chips">
           {visibleModules.map((moduleId) => (
@@ -114,6 +114,16 @@ function PackageCard({ pkg, onEdit, onNewVersion }) {
             </span>
           ))}
           {hiddenModuleCount > 0 && <span className="more">+{hiddenModuleCount} more</span>}
+          {((pkg.features || []).includes("record-deletion") || (pkg.features || []).includes("record-deletion:5min")) && (
+            <span style={{ backgroundColor: "#fef3c7", color: "#92400e", fontWeight: 700 }}>
+              ⏱️ 5m Deletion Window
+            </span>
+          )}
+          {(pkg.features || []).includes("record-deletion:all") && (
+            <span style={{ backgroundColor: "#dcfce7", color: "#166534", fontWeight: 700 }}>
+              🔓 Full Delete (All Modules)
+            </span>
+          )}
         </div>
       </div>
 
@@ -302,15 +312,90 @@ function PackageDrawer({ draft, setDraft, saving, mode, onClose, onSave }) {
           {activeStep === 4 && <section className="subscription-form-section">
             <div className="subscription-form-heading">
               <span>4</span>
-              <div><h3>Functional modules</h3><p>Select the capabilities included in this package. Required dependencies are added automatically.</p></div>
+              <div><h3>Modules &amp; Feature Entitlements</h3><p>Select functional modules and premium features included in this package.</p></div>
             </div>
-            <div className="subscription-module-picker">
-              {availableLabModules.map((module) => (
-                <label key={module.id} className={module.id === "dashboard" ? "locked" : ""}>
-                  <input type="checkbox" checked={module.id === "dashboard" || draft.modules.includes(module.id)} disabled={module.id === "dashboard"} onChange={() => toggleModule(module.id)} />
-                  <span>{module.label}</span>
-                </label>
-              ))}
+            <div style={{ marginBottom: "16px" }}>
+              <h4 style={{ fontSize: "13px", fontWeight: 700, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>Included Modules</h4>
+              <div className="subscription-module-picker">
+                {availableLabModules.map((module) => (
+                  <label key={module.id} className={module.id === "dashboard" ? "locked" : ""}>
+                    <input type="checkbox" checked={module.id === "dashboard" || draft.modules.includes(module.id)} disabled={module.id === "dashboard"} onChange={() => toggleModule(module.id)} />
+                    <span>{module.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 style={{ fontSize: "13px", fontWeight: 700, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>Record Deletion Security &amp; Access Controls</h4>
+              <div className="subscription-module-picker" style={{ gridTemplateColumns: "1fr", gap: "8px", marginBottom: "16px" }}>
+                {[
+                  { id: "record-deletion:5min", label: "⏱️ Standard 5-Minute Grace Window Delete Access (Default)" },
+                  { id: "record-deletion:all", label: "🔓 Permanent Delete Access for ALL Modules (Purchased Upgrade)" },
+                  { id: "record-deletion:patients", label: "🔒 Permanent Delete Access: Patients Module Only" },
+                  { id: "record-deletion:accounts", label: "🔒 Permanent Delete Access: Accounts & Financials Only" },
+                  { id: "record-deletion:doctors", label: "🔒 Permanent Delete Access: Doctors Module Only" },
+                  { id: "record-deletion:billing", label: "🔒 Permanent Delete Access: Billing Module Only" },
+                  { id: "record-deletion:reports", label: "🔒 Permanent Delete Access: Reports Module Only" },
+                ].map((feat) => {
+                  const isChecked = (draft.features || []).includes(feat.id);
+                  return (
+                    <label key={feat.id} style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f8fafc", padding: "8px 12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setDraft((current) => {
+                            const currentFeats = current.features || [];
+                            return {
+                              ...current,
+                              features: isChecked
+                                ? currentFeats.filter((f) => f !== feat.id)
+                                : [...currentFeats, feat.id],
+                            };
+                          });
+                        }}
+                      />
+                      <span style={{ fontSize: "13px", fontWeight: isChecked ? 700 : 500 }}>{feat.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <h4 style={{ fontSize: "13px", fontWeight: 700, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>Platform Feature Add-ons</h4>
+              <div className="subscription-module-picker">
+                {[
+                  { id: "patient-portal", label: "Patient Portal Access" },
+                  { id: "doctor-portal", label: "Doctor Portal Access" },
+                  { id: "corporate-accounts", label: "Corporate Accounts" },
+                  { id: "doctor-commissions", label: "Doctor Commissions" },
+                  { id: "custom-branding", label: "Custom Lab Branding" },
+                  { id: "excel-export", label: "Excel Export" },
+                  { id: "pdf-export", label: "PDF Export" },
+                ].map((feat) => {
+                  const isChecked = (draft.features || []).includes(feat.id);
+                  return (
+                    <label key={feat.id}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setDraft((current) => {
+                            const currentFeats = current.features || [];
+                            return {
+                              ...current,
+                              features: isChecked
+                                ? currentFeats.filter((f) => f !== feat.id)
+                                : [...currentFeats, feat.id],
+                            };
+                          });
+                        }}
+                      />
+                      <span>{feat.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </section>}
         </form>

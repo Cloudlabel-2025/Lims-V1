@@ -278,9 +278,36 @@ export default function SubscriptionPage() {
               <strong>{subscription.modules.length} modules</strong>
             </header>
             <div className="tenant-entitlement-list">
-              {subscription.modules.map((moduleId) => (
-                <div key={moduleId}><i>✓</i><span>{moduleNameById.get(moduleId) || moduleId}</span></div>
-              ))}
+              {subscription.modules.map((moduleId) => {
+                const supportsDelete = ["patients", "accounts", "doctors", "billing", "reports", "samples", "tests"].includes(moduleId);
+                const feats = subscription.features || [];
+                const hasFullDelete = feats.includes("record-deletion:all") || feats.includes(`record-deletion:${moduleId}`);
+                const has5MinDelete = feats.includes("record-deletion") || feats.includes("record-deletion:5min");
+
+                return (
+                  <div key={moduleId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <i>✓</i>
+                      <span>{moduleNameById.get(moduleId) || moduleId}</span>
+                    </div>
+                    {supportsDelete && (
+                      hasFullDelete ? (
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#166534", backgroundColor: "#dcfce7", padding: "2px 8px", borderRadius: "12px" }}>
+                          🔓 Full Delete
+                        </span>
+                      ) : has5MinDelete ? (
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#92400e", backgroundColor: "#fef3c7", padding: "2px 8px", borderRadius: "12px" }}>
+                          ⏱️ 5m Delete
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "#64748b", backgroundColor: "#f1f5f9", padding: "2px 8px", borderRadius: "12px" }}>
+                          No Delete
+                        </span>
+                      )
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
           <section className="tenant-account-support">
@@ -434,7 +461,7 @@ export default function SubscriptionPage() {
               </div>
               
               <p style={{ fontStyle: "italic", fontSize: "12px", color: "#ef4444", marginTop: "20px", textAlign: "center", lineHeight: "1.4" }}>
-                "Portals keep referring labs and doctors connected. Downgrading might slow down your business growth..."
+                &quot;Portals keep referring labs and doctors connected. Downgrading might slow down your business growth...&quot;
               </p>
             </div>
 

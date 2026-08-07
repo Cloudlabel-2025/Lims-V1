@@ -59,6 +59,18 @@ export const availableLabModules = [
     permission: "inventory.view",
     href: "/inventory",
   },
+  {
+    id: "doctor-portal",
+    label: "Doctor Portal",
+    permission: "doctors.view",
+    href: "/doctor/dashboard",
+  },
+  {
+    id: "patient-portal",
+    label: "Patient Portal",
+    permission: "patients.view",
+    href: "/patient/login",
+  },
 ];
 
 export const defaultLabModules = [

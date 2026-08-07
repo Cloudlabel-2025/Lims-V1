@@ -3,6 +3,8 @@
 import { memo } from "react";
 import { Icons } from "@/app/components/Icons";
 import { getInitials, formatDate } from "@/app/utils/doctor-helpers";
+import { useTenantShell } from "@/app/lib/use-current-user";
+import { hasDoctorPortalEntitlement } from "@/app/lib/portal-policy";
 
 function DoctorSidebar({
   doctor,
@@ -23,6 +25,8 @@ function DoctorSidebar({
   onEdit,
   onDeleteClick,
 }) {
+  const { theme } = useTenantShell() || {};
+  const allowDoctorPortal = hasDoctorPortalEntitlement(theme);
   return (
     <div className="sidebar-top">
       <div className="sidebar-header">
@@ -127,7 +131,7 @@ function DoctorSidebar({
         <div className="detail-item"><div className="detail-value">{formatDate(doctor.createdAt)}</div><div className="detail-label">Registered On</div></div>
       </div>
 
-      {canManageUsers && (
+      {canManageUsers && allowDoctorPortal && (
         <div style={{ padding: "0 24px 16px" }}>
           <button type="button" className="btn-lims-secondary" onClick={onResendInvitation} style={{ width: "100%" }}>
             {Icons.mail} Resend portal invitation

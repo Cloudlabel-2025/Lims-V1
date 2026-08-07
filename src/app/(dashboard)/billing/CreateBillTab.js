@@ -37,6 +37,7 @@ export default function CreateBillTab({
   saving,
   createBill,
   canDiscountBilling = true,
+  activeDoctorRequest,
 }) {
   const discountPct = Math.min(95, Math.max(0, Number(discountAmount) || 0));
   const taxPct = Math.min(95, Math.max(0, Number(taxAmount) || 0));
@@ -48,6 +49,11 @@ export default function CreateBillTab({
   return (
     <form onSubmit={createBill} className={styles.composerGrid}>
       <section className={styles.panel} aria-labelledby="bill-details-title">
+        {activeDoctorRequest && (
+          <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "12px 16px", borderRadius: "10px", margin: "16px", color: "#166534", fontSize: "13px" }}>
+            <strong>📋 Doctor Test Request Auto-Loaded</strong>: Pre-selected {(activeDoctorRequest.testPackages || []).length} Test Package(s) & {(activeDoctorRequest.tests || []).length} Test(s) requested by <strong>Dr. {activeDoctorRequest.doctor?.name || "Referring Doctor"}</strong>.
+          </div>
+        )}
         <div className={styles.panelHeader}>
           <p className={styles.eyebrow}>Invoice setup</p>
           <h2 id="bill-details-title">New investigation bill</h2>

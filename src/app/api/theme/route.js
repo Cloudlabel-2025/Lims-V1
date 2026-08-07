@@ -5,6 +5,8 @@ import { getHostnameFromHeaders, getTenantIdFromRequest } from "@/app/lib/tenant
 import { defaultLabModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, getTenantConfig, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 
+import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
   const detailText = Object.entries(details)
@@ -72,6 +74,9 @@ export async function GET(req) {
       return NextResponse.json({ error: "Tenant is not active" }, { status: 403 });
     }
 
+    const subscription = await getLabSubscriptionEntitlements(lab.tenantId).catch(() => null);
+    const features = subscription?.features || subscription?.entitlements?.features || [];
+
     debugRequestLog("ok", {
       tenantId: lab.tenantId,
       status: lab.status,
@@ -88,6 +93,8 @@ export async function GET(req) {
         accentColor: lab.branding?.accentColor || defaultTheme.accentColor,
         reportHeader: lab.branding?.reportHeader?.url || null,
         enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultTheme.enabledModules,
+        features,
+        subscriptionFeatures: features,
         loginHighlights: lab.branding?.loginHighlights || [],
         upiId: lab.branding?.upiId || "",
         numbering: {

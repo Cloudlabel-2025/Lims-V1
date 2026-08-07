@@ -92,50 +92,33 @@ export async function ensureLabSubscription(tenantId, { assignedBy } = {}) {
   const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
 
   const normalizedTenantId = String(tenantId || "").trim().toLowerCase();
-  const existing = await LabSubscription.findOne({ tenantId: normalizedTenantId }).lean();
-  if (existing) return existing;
-
   const lab = await Lab.findOne({ tenantId: normalizedTenantId }).select(
     "_id tenantId subscriptionPlan enabledModules status createdAt"
   );
   if (!lab) throw new Error(`Lab not found for tenantId: ${normalizedTenantId}`);
+
+  const existing = await LabSubscription.findOne({ tenantId: normalizedTenantId }).lean();
+  if (
+    existing &&
+    existing.packageKey &&
+    Array.isArray(existing.entitlements?.features) &&
+    existing.entitlements.features.length > 0
+  ) {
+    return existing;
+  }
 
   await ensureDefaultSubscriptionPackages(masterConnection);
   const packageKey = mapLegacyPlanToPackageKey(lab.subscriptionPlan);
   const pkg = await SubscriptionPackage.findOne({ key: packageKey, status: "active" });
   if (!pkg) throw new Error(`Active subscription package not found: ${packageKey}`);
 
-  const definition = packageDefinition(pkg);
-  const entitlements = buildEntitlementSnapshot(definition, { modulesOverride: lab.enabledModules });
-  const period = getCalendarMonthPeriod();
-  const status = lab.subscriptionPlan === "trial" ? "trialing" : "active";
-
-  try {
-    const created = await LabSubscription.create({
-      lab: lab._id,
-      tenantId: normalizedTenantId,
-      package: pkg._id,
-      packageKey: pkg.key,
-      packageName: pkg.name,
-      packageVersion: definition.version,
-      packageReleaseVersion: definition.releaseVersion,
-      entitlements,
-      commercialTerms: definition.pricing,
-      status,
-      enforcementMode: "shadow",
-      currentPeriodStart: period.start,
-      currentPeriodEnd: period.end,
-      legacyPlan: lab.subscriptionPlan,
-      migratedAt: new Date(),
-      assignedBy,
-    });
-    return created.toObject();
-  } catch (error) {
-    if (error?.code === 11000) {
-      return LabSubscription.findOne({ tenantId: normalizedTenantId }).lean();
-    }
-    throw error;
-  }
+  return assignLabSubscription({
+    tenantId: normalizedTenantId,
+    packageKey: pkg.key,
+    legacyPlan: lab.subscriptionPlan,
+    modulesOverride: lab.enabledModules,
+    assignedBy,
+  });
 }
 
 export async function assignLabSubscription({
@@ -220,6 +203,8 @@ export async function getLabSubscriptionEntitlements(tenantId) {
 
   return {
     ...subscription,
+    features: subscription.entitlements?.features || [],
+    enabledModules: subscription.entitlements?.enabledModules || [],
     currentPeriodStart: period.start,
     currentPeriodEnd: period.end,
   };

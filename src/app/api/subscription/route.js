@@ -73,6 +73,7 @@ export async function GET(req) {
         releaseVersion: subscription.packageReleaseVersion,
         status: subscription.status,
         modules: subscription.entitlements?.modules || [],
+        features: subscription.entitlements?.features || [],
         pricing: subscription.commercialTerms || {},
         assignedAt: subscription.assignedAt,
         periodStart: subscription.currentPeriodStart,

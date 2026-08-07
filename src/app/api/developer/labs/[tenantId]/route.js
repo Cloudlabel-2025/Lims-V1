@@ -137,9 +137,10 @@ async function getLabById(req, params) {
   const labId = cleanString(tenantId);
   const masterConnection = await connectMasterDB();
   const Lab = getLabModel(masterConnection);
-  const query = mongoose.Types.ObjectId.isValid(labId)
-    ? { _id: labId }
-    : { tenantId: labId.toLowerCase() };
+  const isObjectId = mongoose.Types.ObjectId.isValid(labId);
+  const query = isObjectId
+    ? { $or: [{ _id: new mongoose.Types.ObjectId(labId) }, { tenantId: labId.toLowerCase() }, { labId }] }
+    : { $or: [{ tenantId: labId.toLowerCase() }, { labId }] };
   const lab = await Lab.findOne(query).select({
     dbConnectionString: 1,
     labId: 1,

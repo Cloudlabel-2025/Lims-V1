@@ -136,6 +136,41 @@ export async function PATCH(req, { params }) {
       } else if (action === "release") {
         report.releasedAt = now;
         report.releasedBy = userName;
+
+        try {
+          const { BillingRecord, Doctor, Patient, Notification } = await getTenantModels(auth.tenantId);
+          let refDoctorId = null;
+
+          if (report.billingRecord) {
+            const bill = await BillingRecord.findById(report.billingRecord).select("referralDoctor").lean();
+            if (bill?.referralDoctor) refDoctorId = bill.referralDoctor;
+          }
+
+          if (!refDoctorId && report.patient) {
+            const pat = await Patient.findById(report.patient).select("refDoctor refDoctorName").lean();
+            if (pat?.refDoctor) {
+              refDoctorId = pat.refDoctor;
+            } else if (pat?.refDoctorName && Doctor) {
+              const doc = await Doctor.findOne({ name: new RegExp(`^${pat.refDoctorName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }).select("_id").lean();
+              if (doc) refDoctorId = doc._id;
+            }
+          }
+
+          if (refDoctorId && Notification) {
+            const patName = report.patient?.name || "Patient";
+            await Notification.create({
+              tenantId: auth.tenantId,
+              recipientType: "doctor",
+              recipientId: refDoctorId,
+              title: "📄 Diagnostic Report Released",
+              message: `Diagnostic test report for patient ${patName} has been verified and released by the laboratory.`,
+              type: "report_released",
+              link: "/doctor/dashboard",
+            }).catch(() => {});
+          }
+        } catch (e) {
+          console.error("Error triggering doctor report notification:", e);
+        }
       }
     }
 

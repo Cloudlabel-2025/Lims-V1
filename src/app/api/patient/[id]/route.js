@@ -12,10 +12,17 @@ export async function GET(req, { params }) {
     if (auth.error) return auth.error;
 
     const { tenantId } = auth;
-    const { Patient, BillingRecord } = await getTenantModels(tenantId);
+    const { Patient, Doctor, BillingRecord } = await getTenantModels(tenantId);
     const { id } = await params;
+    const patient = await Patient.findById(id);
+    if (!patient) {
+      return Response.json({ error: "Patient not found" }, { status: 404 });
+    }
+
     if (auth.session.doctorId) {
-      const ownsReferral = await BillingRecord.exists({
+      const doctor = await Doctor.findById(auth.session.doctorId).select("name").lean();
+      const isDirectDocPatient = String(patient.refDoctor) === String(auth.session.doctorId) || (doctor?.name && patient.refDoctorName === doctor.name);
+      const ownsReferral = isDirectDocPatient || await BillingRecord.exists({
         tenantId,
         referralDoctor: auth.session.doctorId,
         patient: id,
@@ -23,10 +30,7 @@ export async function GET(req, { params }) {
       });
       if (!ownsReferral) return Response.json({ error: "Patient not found" }, { status: 404 });
     }
-    const patient = await Patient.findById(id);
-    if (!patient) {
-      return Response.json({ error: "Patient not found" }, { status: 404 });
-    }
+
     return Response.json(patient);
   } catch (err) {
     return jsonError("Fetch failed", err, 500);
@@ -116,6 +120,9 @@ export async function PUT(req, { params }) {
   }
 }
 
+import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import { getDeleteRestrictionReason } from "@/app/lib/deletion-policy";
+
 // ── DELETE: Delete single patient by ID ──
 export async function DELETE(req, { params }) {
   try {
@@ -126,10 +133,18 @@ export async function DELETE(req, { params }) {
     const { Patient } = await getTenantModels(tenantId);
     const { id } = await params;
 
-    const patient = await Patient.findByIdAndDelete(id);
+    const patient = await Patient.findById(id);
     if (!patient) {
       return Response.json({ error: "Patient not found" }, { status: 404 });
     }
+
+    const subscription = await getLabSubscriptionEntitlements(tenantId);
+    const restrictionReason = getDeleteRestrictionReason(patient, subscription, "patients");
+    if (restrictionReason) {
+      return Response.json({ error: "Deletion window expired", details: restrictionReason }, { status: 403 });
+    }
+
+    await Patient.findByIdAndDelete(id);
 
     return Response.json({ success: true, deletedPatient: patient.patientId });
   } catch (err) {

@@ -21,6 +21,8 @@ const moduleIcons = {
   accounts: Icons.barChart,
   analytics: Icons.activity,
   inventory: Icons.grid,
+  "doctor-portal": Icons.stethoscope,
+  "patient-portal": Icons.person,
   users: Icons.users,
   settings: Icons.settings,
   general: Icons.settings,
@@ -64,6 +66,7 @@ export default function PermissionMatrix({
     const knownOrder = [
       "dashboard", "patients", "doctors", "tests", "billing",
       "samples", "reports", "accounts", "analytics", "inventory",
+      "doctor-portal", "patient-portal",
       "users", "settings", "general",
     ];
     return Object.keys(filteredModules).sort(

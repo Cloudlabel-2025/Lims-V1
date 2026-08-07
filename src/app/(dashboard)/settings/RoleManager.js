@@ -44,22 +44,11 @@ export default function RoleManager({
 
   return (
     <section className="settings-panel">
-      <div className="settings-panel-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="settings-panel-header">
         <div>
           <h2>Lab Roles</h2>
           <p>Create roles inside this lab and assign only allowed permissions.</p>
         </div>
-        {typeof importStandardRoles === "function" && (
-          <button
-            type="button"
-            className="developer-secondary-link"
-            onClick={importStandardRoles}
-            disabled={roleSaving}
-            style={{ fontSize: 13, padding: "6px 12px" }}
-          >
-            Import Standard Templates
-          </button>
-        )}
       </div>
 
       <div className="settings-role-list">

@@ -169,6 +169,7 @@ export async function GET(req) {
     const gender = clean(searchParams.get("gender"));
     const ageMin = clean(searchParams.get("ageMin"));
     const ageMax = clean(searchParams.get("ageMax"));
+    const refDoctorOnly = searchParams.get("refDoctorOnly") === "true";
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
 
@@ -181,9 +182,24 @@ export async function GET(req) {
       });
       query._id = { $in: referredPatientIds };
     }
+    if (refDoctorOnly) {
+      query.$and = [
+        {
+          $or: [
+            { refDoctorName: { $exists: true, $ne: "" } },
+            { refDoctor: { $exists: true, $ne: null } },
+          ],
+        },
+      ];
+    }
     if (search) {
       const regex = new RegExp(escapeRegex(search), "i");
-      query.$or = [{ name: regex }, { phone: regex }, { patientId: regex }];
+      const searchOr = [{ name: regex }, { phone: regex }, { patientId: regex }];
+      if (query.$and) {
+        query.$and.push({ $or: searchOr });
+      } else {
+        query.$or = searchOr;
+      }
     }
     if (gender && ["Male", "Female", "Other"].includes(gender)) {
       query.gender = gender;

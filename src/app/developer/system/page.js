@@ -77,7 +77,7 @@ export default function DeveloperSystemPage() {
   const [expandedPermissionModules, setExpandedPermissionModules] = useState(new Set(["dashboard"]));
   const [activeConfigView, setActiveConfigView] = useState("modules");
 
-  const selectedLab = labs.find((lab) => lab.id === selectedLabId);
+  const selectedLab = labs.find((lab) => lab.id === selectedLabId || lab.tenantId === selectedLabId);
   const activeDraftModules = useMemo(() => draftAccess?.enabledModules || [], [draftAccess]);
   const visibleLabPermissions = useMemo(
     () =>
@@ -122,7 +122,7 @@ export default function DeveloperSystemPage() {
         const loadedLabs = (data.labs || []).filter((lab) => lab.status === "active");
         if (!cancelled) {
           setLabs(loadedLabs);
-          setSelectedLabId(loadedLabs[0]?.id || "");
+          setSelectedLabId(loadedLabs[0]?.tenantId || loadedLabs[0]?.id || "");
         }
       } catch (err) {
         if (!cancelled) setError(err.message);
@@ -315,7 +315,7 @@ export default function DeveloperSystemPage() {
           <label>
             Laboratory
             <select value={selectedLabId} onChange={(event) => setSelectedLabId(event.target.value)} disabled={loadingLabs || labs.length === 0}>
-              {labs.length === 0 ? <option value="">No labs available</option> : labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name} ({lab.tenantId})</option>)}
+              {labs.length === 0 ? <option value="">No labs available</option> : labs.map((lab) => <option key={lab.id} value={lab.tenantId || lab.id}>{lab.name} ({lab.tenantId})</option>)}
             </select>
           </label>
           <div className="developer-system-lab-card">

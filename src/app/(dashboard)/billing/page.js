@@ -24,6 +24,10 @@ const PaymentHistoryModal = dynamic(() => import("./PaymentHistoryModal"), {
   ssr: false,
   loading: () => null,
 });
+const DoctorOrdersTab = dynamic(() => import("./DoctorOrdersTab"), {
+  ssr: false,
+  loading: () => <div className="module-panel">Loading doctor orders...</div>,
+});
 
 export default function BillingPage() {
   const user = useCurrentUser();
@@ -70,6 +74,19 @@ export default function BillingPage() {
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
   const [revertConfirmId, setRevertConfirmId] = useState(null);
   const [revertReason, setRevertReason] = useState("");
+  const [activeDoctorRequestId, setActiveDoctorRequestId] = useState(null);
+  const [activeDoctorRequest, setActiveDoctorRequest] = useState(null);
+
+  const handleAcceptDoctorRequest = (req) => {
+    setActiveDoctorRequestId(req._id);
+    setActiveDoctorRequest(req);
+    if (req.patient?._id) setPatient(req.patient._id);
+    const pkgKeys = (req.testPackages || []).map((p) => `pkg_${p.packageId || p._id}`);
+    const testKeys = (req.tests || []).map((t) => `test_${t.testId || t._id}`);
+    setSelectedTests([...pkgKeys, ...testKeys]);
+    if (req.notes) setNotes(req.notes);
+    setActiveTab("create");
+  };
 
   const pendingBills = useMemo(
     () => billingRecords.filter((billingRecord) => billingRecord.billingStatus !== "paid" && billingRecord.billingStatus !== "cancelled"),
@@ -182,6 +199,36 @@ export default function BillingPage() {
   }, [searchParams, patients]);
 
   useEffect(() => {
+    if (!patient) {
+      setActiveDoctorRequest(null);
+      return;
+    }
+    let isMounted = true;
+    cachedJsonFetch(`/api/doctor/test-requests?patientId=${patient}&status=pending`, { ttl: 5_000 })
+      .then(({ data }) => {
+        if (!isMounted) return;
+        const requests = data?.requests || [];
+        if (requests.length > 0) {
+          const latestReq = requests[0];
+          setActiveDoctorRequestId(latestReq._id);
+          setActiveDoctorRequest(latestReq);
+
+          const pkgKeys = (latestReq.testPackages || []).map((p) => `pkg_${p.packageId || p._id}`);
+          const testKeys = (latestReq.tests || []).map((t) => `test_${t.testId || t._id}`);
+          const allKeys = Array.from(new Set([...pkgKeys, ...testKeys]));
+          if (allKeys.length > 0) {
+            setSelectedTests(allKeys);
+          }
+          if (latestReq.notes) {
+            setNotes(latestReq.notes);
+          }
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [patient]);
+
+  useEffect(() => {
     function refreshTestCache() {
       clearCachedApi("/api/tests/definitions?status=active");
       clearCachedApi("/api/tests/packages");
@@ -257,6 +304,15 @@ export default function BillingPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.details || data.error || "Unable to create bill");
+
+      if (activeDoctorRequestId) {
+        await fetch("/api/doctor/test-requests", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId: activeDoctorRequestId, status: "received", billingRecordId: data.billingRecord._id }),
+        }).catch(() => {});
+        setActiveDoctorRequestId(null);
+      }
 
       clearCachedApi("/api/billing");
       clearCachedApi(`/api/billing?page=${billingPage}&limit=20`);
@@ -540,6 +596,7 @@ export default function BillingPage() {
       }}>
         {[
           { id: "pending", label: "Pending Payments", count: pendingBills.length },
+          { id: "doctor-orders", label: "📋 Doctor Portal Orders" },
           { id: "create", label: "Create New Bill", hide: !canCreateBilling },
           { id: "history", label: "Billing History" }
         ].map(tab => !tab.hide && (
@@ -576,6 +633,10 @@ export default function BillingPage() {
       </div>
 
       {error && <div className="lims-alert danger" style={{ marginBottom: "20px" }}>{error}</div>}
+
+      {activeTab === "doctor-orders" && (
+        <DoctorOrdersTab onAcceptRequest={handleAcceptDoctorRequest} />
+      )}
 
       {activeTab === "pending" && (
         <div className="module-grid" style={{ gridTemplateColumns: "1fr" }}>
@@ -756,6 +817,7 @@ export default function BillingPage() {
           saving={saving}
           createBill={createBill}
           canDiscountBilling={canDiscountBilling}
+          activeDoctorRequest={activeDoctorRequest}
         />
       )}
 

@@ -24,7 +24,7 @@ async function getNextSequence(connection, name) {
   return counter.seq;
 }
 
-async function getNextAvailableUserId(User) {
+export async function getNextAvailableUserId(User) {
   for (let attempts = 0; attempts < 1000; attempts += 1) {
     const seq = await getNextSequence(User.db, "userId");
     const userId = `USR-${String(seq).padStart(6, "0")}`;
@@ -159,6 +159,12 @@ export async function ensureUserDoctorIdIndex(User) {
   if (connection.__userDoctorIdIndexPromise) return connection.__userDoctorIdIndexPromise;
 
   connection.__userDoctorIdIndexPromise = (async () => {
+    const missingUserIdDocs = await User.find({ $or: [{ userId: { $exists: false } }, { userId: null }] }).select("_id");
+    for (const doc of missingUserIdDocs) {
+      const userId = await getNextAvailableUserId(User);
+      await User.updateOne({ _id: doc._id }, { $set: { userId } });
+    }
+
     await User.updateMany({ doctorId: null }, { $unset: { doctorId: "" } });
     await User.collection.dropIndex("doctorId_1").catch((error) => {
       if (error?.codeName !== "IndexNotFound") throw error;

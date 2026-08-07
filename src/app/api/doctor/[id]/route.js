@@ -35,7 +35,7 @@ export async function PUT(req, { params }) {
     if (auth.error) return auth.error;
 
     const { tenantId } = auth;
-    const { Doctor } = await getTenantModels(tenantId);
+    const { Doctor, User } = await getTenantModels(tenantId);
     const body = await req.json();
     const { id } = await params;
 
@@ -78,6 +78,14 @@ export async function PUT(req, { params }) {
       return Response.json({ error: "Doctor not found" }, { status: 404 });
     }
 
+    // Sync updated email to linked User portal account if present
+    if (payload.email) {
+      await User.findOneAndUpdate(
+        { doctorId: doctor._id },
+        { $set: { email: payload.email } }
+      ).catch(() => {});
+    }
+
     return Response.json(doctor);
   } catch (err) {
     console.error("PUT /api/doctor/[id] error:", err);
@@ -89,6 +97,9 @@ export async function PUT(req, { params }) {
   }
 }
 
+import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import { getDeleteRestrictionReason } from "@/app/lib/deletion-policy";
+
 // ── DELETE: Delete single doctor by ID ──
 export async function DELETE(req, { params }) {
   try {
@@ -99,10 +110,18 @@ export async function DELETE(req, { params }) {
     const { Doctor } = await getTenantModels(tenantId);
     const { id } = await params;
 
-    const doctor = await Doctor.findByIdAndDelete(id);
+    const doctor = await Doctor.findById(id);
     if (!doctor) {
       return Response.json({ error: "Doctor not found" }, { status: 404 });
     }
+
+    const subscription = await getLabSubscriptionEntitlements(tenantId);
+    const restrictionReason = getDeleteRestrictionReason(doctor, subscription, "doctors");
+    if (restrictionReason) {
+      return Response.json({ error: "Deletion window expired", details: restrictionReason }, { status: 403 });
+    }
+
+    await Doctor.findByIdAndDelete(id);
 
     return Response.json({ success: true, deletedDoctor: doctor.doctorId });
   } catch (err) {

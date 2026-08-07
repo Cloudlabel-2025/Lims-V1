@@ -287,8 +287,14 @@ export default function LabAdminSettingsPage() {
         setSettingsError("");
         if (!user) return;
 
-        if (!hasPermission(user, "settings.manage")) {
-          if (!cancelled) setRoles([]);
+        if (!hasPermission(user, "settings.manage") && !hasPermission(user, "users.manage")) {
+          if (!cancelled) {
+            setRoles([]);
+            setLoadingSettings(false);
+            if (hasPermission(user, "settings.branding")) {
+              setActiveTab("branding");
+            }
+          }
           return;
         }
 
@@ -317,12 +323,14 @@ export default function LabAdminSettingsPage() {
 
   const enabledModules = theme?.enabledModules?.length ? theme.enabledModules : defaultLabModules;
   const canManageRoles = hasPermission(user, "settings.manage");
+  const canManageBranding = hasPermission(user, "settings.branding");
+  const canManageSettings = canManageRoles || canManageBranding;
+
   const labPermissions = useMemo(
     () =>
       rbacConfig.permissions.filter(
         (permission) =>
           permission.scope !== "developer" &&
-          permission.key !== "settings.branding" &&
           (enabledModules.includes(permission.module) || permission.module === "users" || permission.module === "settings")
       ),
     [enabledModules]
@@ -595,81 +603,97 @@ export default function LabAdminSettingsPage() {
       {settingsError && <div className="developer-alert">{settingsError}</div>}
 
       <div className="settings-tabs">
-        <button
-          className={activeTab === "roles" ? "active" : ""}
-          onClick={() => setActiveTab("roles")}
-        >
-          Roles & Permissions
-        </button>
-        <button
-          className={activeTab === "branding" ? "active" : ""}
-          onClick={() => setActiveTab("branding")}
-        >
-          Lab Profile & Branding
-        </button>
-        <button
-          className={activeTab === "numbering" ? "active" : ""}
-          onClick={() => setActiveTab("numbering")}
-        >
-          Numbering Formats
-        </button>
+        {canManageRoles && (
+          <button
+            className={activeTab === "roles" ? "active" : ""}
+            onClick={() => setActiveTab("roles")}
+          >
+            Roles & Permissions
+          </button>
+        )}
+        {canManageBranding && (
+          <button
+            className={activeTab === "branding" ? "active" : ""}
+            onClick={() => setActiveTab("branding")}
+          >
+            Lab Profile & Branding
+          </button>
+        )}
+        {canManageRoles && (
+          <button
+            className={activeTab === "numbering" ? "active" : ""}
+            onClick={() => setActiveTab("numbering")}
+          >
+            Numbering Formats
+          </button>
+        )}
       </div>
 
       {loadingSettings ? (
         <p className="developer-empty">Loading settings...</p>
-      ) : !canManageRoles ? (
+      ) : !canManageSettings ? (
         <section className="settings-panel">
           <p className="developer-empty">Your role does not have permission to manage settings.</p>
         </section>
       ) : activeTab === "roles" ? (
-        <>
-          <div className="settings-summary-grid mb-4">
-            <article>
-              <span>Active Role Permissions</span>
-              <strong>{activePermissionSet.size}</strong>
-            </article>
-            <article>
-              <span>Lab Roles</span>
-              <strong>{roles.length}</strong>
-            </article>
-          </div>
+        !canManageRoles ? (
+          <section className="settings-panel">
+            <p className="developer-empty">Your role does not have permission to manage roles.</p>
+          </section>
+        ) : (
+          <>
+            <div className="settings-summary-grid mb-4">
+              <article>
+                <span>Active Role Permissions</span>
+                <strong>{activePermissionSet.size}</strong>
+              </article>
+              <article>
+                <span>Lab Roles</span>
+                <strong>{roles.length}</strong>
+              </article>
+            </div>
 
-          <RoleManager
-            roles={roles}
-            activeRoleIndex={activeRoleIndex}
-            setActiveRoleIndex={setActiveRoleIndex}
-            newRoleName={newRoleName}
-            setNewRoleName={setNewRoleName}
-            addRole={addRole}
-            deleteRole={deleteRole}
-            roleSaving={roleSaving}
-            rolesDirty={rolesDirty}
-            cancelRoleChanges={cancelRoleChanges}
-            saveRoleConfiguration={saveRoleConfiguration}
-            importStandardRoles={importStandardRoles}
-          />
+            <RoleManager
+              roles={roles}
+              activeRoleIndex={activeRoleIndex}
+              setActiveRoleIndex={setActiveRoleIndex}
+              newRoleName={newRoleName}
+              setNewRoleName={setNewRoleName}
+              addRole={addRole}
+              deleteRole={deleteRole}
+              roleSaving={roleSaving}
+              rolesDirty={rolesDirty}
+              cancelRoleChanges={cancelRoleChanges}
+              saveRoleConfiguration={saveRoleConfiguration}
+            />
 
-          <PermissionMatrix
-            activeRole={activeRole}
-            roles={roles}
-            permissionsByModule={permissionsByModule}
-            activePermissionSet={activePermissionSet}
-            toggleRolePermission={toggleRolePermission}
-            rolesDirty={rolesDirty}
-            roleSaving={roleSaving}
-            cancelRoleChanges={cancelRoleChanges}
-            saveRoleConfiguration={saveRoleConfiguration}
-            expandedModules={expandedModules}
-            onToggleModuleExpand={toggleModuleExpand}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            handleSelectAll={handleSelectAll}
-            handleClear={handleClear}
-            permissionByKey={permissionByKey}
-          />
-        </>
+            <PermissionMatrix
+              activeRole={activeRole}
+              roles={roles}
+              permissionsByModule={permissionsByModule}
+              activePermissionSet={activePermissionSet}
+              toggleRolePermission={toggleRolePermission}
+              rolesDirty={rolesDirty}
+              roleSaving={roleSaving}
+              cancelRoleChanges={cancelRoleChanges}
+              saveRoleConfiguration={saveRoleConfiguration}
+              expandedModules={expandedModules}
+              onToggleModuleExpand={toggleModuleExpand}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              handleSelectAll={handleSelectAll}
+              handleClear={handleClear}
+              permissionByKey={permissionByKey}
+            />
+          </>
+        )
       ) : activeTab === "branding" ? (
-        <section className="settings-panel">
+        !canManageBranding ? (
+          <section className="settings-panel">
+            <p className="developer-empty">Your role does not have permission to manage lab branding.</p>
+          </section>
+        ) : (
+          <section className="settings-panel">
           <div className="settings-panel-header">
             <h2>Lab Profile & Branding</h2>
             <p>Configure your workspace details, primary colors, login highlights, and logo assets.</p>
@@ -697,7 +721,7 @@ export default function LabAdminSettingsPage() {
                   onChange={(e) => setUpiId(e.target.value)}
                   placeholder="e.g. merchant@okaxis"
                 />
-                <div className="form-text">Optional. Enables direct scan-to-pay opening Google Pay / PhonePe directly on patient's phone.</div>
+                <div className="form-text">Optional. Enables direct scan-to-pay opening Google Pay / PhonePe directly on patient&apos;s phone.</div>
               </div>
             </div>
 
@@ -871,6 +895,7 @@ export default function LabAdminSettingsPage() {
             </div>
           </form>
         </section>
+        )
       ) : (
         <section className="settings-panel">
           <div className="settings-panel-header">

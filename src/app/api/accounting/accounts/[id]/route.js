@@ -1,6 +1,8 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import { getDeleteRestrictionReason } from "@/app/lib/deletion-policy";
 
 export async function DELETE(req, { params }) {
   try {
@@ -20,6 +22,12 @@ export async function DELETE(req, { params }) {
     }
     if (account.balance !== 0) {
       return Response.json({ error: "Only zero-balance accounts can be deleted" }, { status: 400 });
+    }
+
+    const subscription = await getLabSubscriptionEntitlements(auth.tenantId);
+    const restrictionReason = getDeleteRestrictionReason(account, subscription, "accounts");
+    if (restrictionReason) {
+      return Response.json({ error: "Deletion window expired", details: restrictionReason }, { status: 403 });
     }
 
     await account.deleteOne();

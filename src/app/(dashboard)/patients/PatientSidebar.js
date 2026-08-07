@@ -4,10 +4,13 @@ import { memo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { formatDate, getInitials } from "@/app/utils/patient-helpers";
-import { cachedJsonFetch } from "@/app/lib/use-current-user";
+import { cachedJsonFetch, useTenantShell } from "@/app/lib/use-current-user";
+import { hasPatientPortalEntitlement } from "@/app/lib/portal-policy";
 
 function PatientSidebar({ patient, onClose }) {
   const router = useRouter();
+  const { theme } = useTenantShell() || {};
+  const allowPatientPortal = hasPatientPortalEntitlement(theme);
   const [clinicalSummary, setClinicalSummary] = useState(null);
   const [summaryUnavailable, setSummaryUnavailable] = useState(false);
   const patientId = patient?._id;
@@ -189,9 +192,11 @@ function PatientSidebar({ patient, onClose }) {
           <button type="button" className="btn-lims-secondary" onClick={() => router.push(`/patients/${patient._id}/visits`)}>
             {Icons.list} Visit history{Number.isFinite(visitCount) ? ` (${visitCount})` : ""}
           </button>
-          <button type="button" className="btn-lims-secondary" onClick={() => router.push(`/patients/${patient._id}/portal-access`)}>
-            {Icons.shield} Portal access
-          </button>
+          {allowPatientPortal && (
+            <button type="button" className="btn-lims-secondary" onClick={() => router.push(`/patients/${patient._id}/portal-access`)}>
+              {Icons.shield} Portal access
+            </button>
+          )}
         </div>
       </footer>
     </div>

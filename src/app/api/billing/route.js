@@ -90,19 +90,23 @@ export async function POST(req) {
     if (!patient) return Response.json({ error: "Patient not found" }, { status: 404 });
 
     let doctor = null;
-    if (patient.refDoctorName) {
+    const refDoctorId = body.referralDoctor || patient.refDoctor;
+    if (refDoctorId) {
+      doctor = await Doctor.findById(refDoctorId).select("_id commission status name").lean();
+    }
+    if (!doctor && patient.refDoctorName) {
       const refName = patient.refDoctorName.trim();
       doctor = await Doctor.findOne({
         name: { $regex: new RegExp(`^${refName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
       })
-        .select("_id commission status")
+        .select("_id commission status name")
         .lean();
       if (!doctor && refName.includes(" ")) {
         const lastName = refName.split(" ").pop();
         doctor = await Doctor.findOne({
           name: { $regex: new RegExp(lastName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") },
         })
-          .select("_id commission status")
+          .select("_id commission status name")
           .lean();
       }
     }

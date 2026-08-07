@@ -31,3 +31,21 @@ export function normalizeDob(value) {
 export function isValidPortalPin(value) {
   return /^\d{4}$/.test(String(value || ""));
 }
+
+export function generateMobileOtp() {
+  const otp = String(crypto.randomInt(100000, 1000000));
+  const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+  return { otp, otpHash, expiresAt };
+}
+
+export function hashOtpToken(otp) {
+  return crypto.createHash("sha256").update(String(otp || "")).digest("hex");
+}
+
+export function buildWhatsAppShareUrl(tenantId, requestUrl, patientName, phone, activationUrl) {
+  const rawPhone = String(phone || "").replace(/\D/g, "");
+  const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
+  const message = `Hello ${patientName || "Patient"},\n\nView your lab visit records, billing receipts, and official test reports directly on your mobile phone here:\n${activationUrl}\n\nThank you!`;
+  return `https://api.whatsapp.com/send?phone=${encodeURIComponent(targetPhone)}&text=${encodeURIComponent(message)}`;
+}

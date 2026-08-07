@@ -85,9 +85,17 @@ export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
   const config = getSmtpConfig();
 
   if (!config.host || !config.user || !config.pass || !config.from) {
+    if (process.env.NODE_ENV !== "production" || process.env.ALLOW_DEV_EMAIL_FALLBACK === "true") {
+      console.log(`\n================ [DEV EMAIL FALLBACK] ================`);
+      console.log(`[PASSWORD RESET EMAIL] To: ${to}`);
+      console.log(`[PASSWORD RESET EMAIL] OTP: ${otp}`);
+      console.log(`======================================================\n`);
+      return { sent: true, devFallback: true };
+    }
+
     return {
       sent: false,
-      reason: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM.",
+      reason: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM in .env.local.",
     };
   }
 
@@ -150,8 +158,21 @@ export async function sendPasswordResetEmail({ to, otp, expiresAt }) {
 
 export async function sendDoctorInvitationEmail({ to, doctorName, labName, otp, expiresAt, activationUrl }) {
   const config = getSmtpConfig();
+  const safeName = doctorName || "Doctor";
+  const safeLab = labName || "your laboratory";
+
   if (!config.host || !config.user || !config.pass || !config.from) {
-    return { sent: false, reason: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM." };
+    if (process.env.NODE_ENV !== "production" || process.env.ALLOW_DEV_EMAIL_FALLBACK === "true") {
+      console.log(`\n================ [DEV EMAIL FALLBACK] ================`);
+      console.log(`[DOCTOR INVITATION EMAIL] To: ${to}`);
+      console.log(`[DOCTOR INVITATION EMAIL] Doctor: ${safeName} (${safeLab})`);
+      console.log(`[DOCTOR INVITATION EMAIL] OTP: ${otp}`);
+      console.log(`[DOCTOR INVITATION EMAIL] Activation URL: ${activationUrl}`);
+      console.log(`======================================================\n`);
+      return { sent: true, devFallback: true };
+    }
+
+    return { sent: false, reason: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM in .env.local." };
   }
 
   console.log("[reset-email] SMTP config:", {
@@ -167,8 +188,6 @@ export async function sendDoctorInvitationEmail({ to, doctorName, labName, otp, 
     timeStyle: "short",
     timeZone: "Asia/Kolkata",
   });
-  const safeName = doctorName || "Doctor";
-  const safeLab = labName || "your laboratory";
   const textBody = [
     `Hello ${safeName},`,
     "",

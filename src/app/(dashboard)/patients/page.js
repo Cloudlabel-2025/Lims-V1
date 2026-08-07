@@ -3,9 +3,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import { cachedJsonFetch } from "@/app/lib/use-current-user";
+import { cachedJsonFetch, useCurrentUser, useTenantShell } from "@/app/lib/use-current-user";
 import { hasPermission } from "@/app/lib/client-rbac";
-import { useCurrentUser } from "@/app/lib/use-current-user";
 
 const PatientSidebar = dynamic(() => import("./PatientSidebar"), {
   ssr: false,
@@ -23,6 +22,7 @@ const PatientTable = dynamic(() => import("./PatientTable"), {
 export default function PatientList() {
   const router = useRouter();
   const user = useCurrentUser();
+  const { theme } = useTenantShell() || {};
   const canCreatePatient = hasPermission(user, "patients.register");
   const canDeletePatient = hasPermission(user, "patients.delete");
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,6 +36,7 @@ export default function PatientList() {
   const [status, setStatus] = useState("");
   const [mounted, setMounted] = useState(false);
   const [viewState, setViewState] = useState("grid");
+  const [tabFilter, setTabFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
   const debounceRef = useRef(null);
@@ -48,8 +49,9 @@ export default function PatientList() {
     if (genderFilter) params.set("gender", genderFilter);
     if (ageMinFilter) params.set("ageMin", ageMinFilter);
     if (ageMaxFilter) params.set("ageMax", ageMaxFilter);
+    if (tabFilter === "referrals") params.set("refDoctorOnly", "true");
     return params.toString();
-  }, [searchQuery, genderFilter, ageMinFilter, ageMaxFilter]);
+  }, [searchQuery, genderFilter, ageMinFilter, ageMaxFilter, tabFilter]);
 
   const fetchPatients = useCallback(async (page = 1) => {
     setListLoading(true);
@@ -100,6 +102,10 @@ export default function PatientList() {
     [router]
   );
 
+  const handleProcessBill = useCallback((patientId) => {
+    router.push(`/billing?patientId=${patientId}`);
+  }, [router]);
+
   const deletePatient = useCallback(async (patientId) => {
     try {
       const res = await fetch(`/api/patient/${patientId}`, {
@@ -114,7 +120,7 @@ export default function PatientList() {
     }
   }, []);
 
-  const hasActiveFilters = Boolean(searchQuery.trim() || genderFilter || ageMinFilter || ageMaxFilter);
+  const hasActiveFilters = Boolean(searchQuery.trim() || genderFilter || ageMinFilter || ageMaxFilter || tabFilter !== "all");
 
   if (!mounted) return null;
 
@@ -133,6 +139,25 @@ export default function PatientList() {
         </div>
       )}
 
+      <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+        <button
+          type="button"
+          className={tabFilter === "all" ? "btn-lims-primary" : "btn-lims-secondary"}
+          onClick={() => { setTabFilter("all"); setCurrentPage(1); }}
+          style={{ fontSize: "13px", height: "36px", borderRadius: "8px" }}
+        >
+          All Patients
+        </button>
+        <button
+          type="button"
+          className={tabFilter === "referrals" ? "btn-lims-primary" : "btn-lims-secondary"}
+          onClick={() => { setTabFilter("referrals"); setCurrentPage(1); }}
+          style={{ fontSize: "13px", height: "36px", borderRadius: "8px" }}
+        >
+          👨‍⚕️ Doctor Referral Patients
+        </button>
+      </div>
+
       <div
         className="page-header patient-directory-header"
         style={{
@@ -147,7 +172,7 @@ export default function PatientList() {
           <div className="page-header-icon">{Icons.users}</div>
           <div className="page-header-text">
             <span className="module-kicker">Patient management</span>
-            <h4>Patients</h4>
+            <h4>{tabFilter === "referrals" ? "Doctor Referral Patients" : "Patients"}</h4>
             <small>{pagination.total || allPatients.length} registered patient records</small>
           </div>
         </div>
@@ -310,6 +335,7 @@ export default function PatientList() {
                 setGenderFilter("");
                 setAgeMinFilter("");
                 setAgeMaxFilter("");
+                setTabFilter("all");
                 setCurrentPage(1);
               }}
             >
@@ -332,7 +358,7 @@ export default function PatientList() {
       <section className="patient-list-container patient-directory-panel">
         <div className="patient-list-header" style={{ marginBottom: "16px" }}>
           <div>
-            <span className="patient-list-count">Patient directory</span>
+            <span className="patient-list-count">{tabFilter === "referrals" ? "Doctor Referral Patients" : "Patient directory"}</span>
             <small>{listLoading ? "Updating records..." : `Showing ${allPatients.length} of ${pagination.total || allPatients.length} patients`}</small>
           </div>
           <button
@@ -375,6 +401,8 @@ export default function PatientList() {
             onSelectPatient={handleSelectPatient}
             onEditPatient={goToEditPatient}
             onDeletePatient={canDeletePatient ? deletePatient : null}
+            onProcessBill={handleProcessBill}
+            subscription={theme}
           />
         ) : (
           <PatientTable
@@ -383,6 +411,8 @@ export default function PatientList() {
             onSelectPatient={handleSelectPatient}
             onEditPatient={goToEditPatient}
             onDeletePatient={canDeletePatient ? deletePatient : null}
+            onProcessBill={handleProcessBill}
+            subscription={theme}
           />
         )}
         <PaginationControls pagination={pagination} loading={listLoading} onPageChange={setCurrentPage} />

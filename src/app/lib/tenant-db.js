@@ -30,6 +30,7 @@ import { getInventoryPurchaseOrderModel } from "@/app/models/tenant/InventoryPur
 import { getInventoryLocationModel } from "@/app/models/tenant/InventoryLocation";
 import { getQuotaPeriodModel } from "@/app/models/tenant/QuotaPeriod";
 import { getQuotaUsageEventModel } from "@/app/models/tenant/QuotaUsageEvent";
+import { getTestRequestModel } from "@/app/models/tenant/TestRequest";
 
 
 const tenantDbCache = globalThis.tenantDbCache || new Map();
@@ -102,6 +103,7 @@ export async function getTenantModels(tenantId) {
     Sample: getSampleModel(connection),
     TestCategory: getTestCategoryModel(connection),
     TestDefinition: getTestDefinitionModel(connection),
+    TestRequest: getTestRequestModel(connection),
     TestPackage: getTestPackageModel(connection),
     TestReport: getTestReportModel(connection),
     User: getUserModel(connection),

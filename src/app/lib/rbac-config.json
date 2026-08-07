@@ -712,7 +712,25 @@
                                                       "professional",
                                                       "enterprise"
                                                   ],
-                            "sortOrder":  181
+                            "sortOrder": 181
+                        },
+                        {
+                            "name": "Access Doctor Portal",
+                            "key": "doctor-portal.access",
+                            "module": "doctor-portal",
+                            "action": "access",
+                            "category": "portals",
+                            "description": "Access referring doctor portal and test package ordering.",
+                            "sortOrder": 190
+                        },
+                        {
+                            "name": "Access Patient Portal",
+                            "key": "patient-portal.access",
+                            "module": "patient-portal",
+                            "action": "access",
+                            "category": "portals",
+                            "description": "Access patient self-service portal, visit history, and report downloads.",
+                            "sortOrder": 200
                         }
                     ],
     "roleTemplates":  [

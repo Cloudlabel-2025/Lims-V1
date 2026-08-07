@@ -16,6 +16,9 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import { hasDoctorPortalEntitlement } from "@/app/lib/portal-policy";
+
 // ── POST: Create a new Doctor ──
 export async function POST(req) {
   try {
@@ -72,78 +75,99 @@ export async function POST(req) {
       );
     }
 
-    const doctorRole = await Role.findOne({ name: "Doctor Regular", status: "active" });
-    if (!doctorRole) {
-      return Response.json(
-        { error: "Doctor Regular role is not configured. Seed or create the role before registering doctors." },
-        { status: 409 }
-      );
-    }
+    const subscription = await getLabSubscriptionEntitlements(tenantId);
+    const allowDoctorPortal = hasDoctorPortalEntitlement(subscription);
 
-    const invitation = createDoctorInvitation();
-    const { firstName, lastName } = splitDoctorName(payload.name);
     let doctor;
-    let portalUser;
+    let portalUser = null;
+    let invitationSent = false;
+    let invitationError = "";
 
-    await connection.transaction(async (session) => {
-      [doctor] = await Doctor.create([{
+    if (allowDoctorPortal) {
+      const doctorRole = await Role.findOne({ name: "Doctor Regular", status: "active" })
+        || await Role.findOne({ name: "Doctor", status: "active" })
+        || await Role.findOne({ status: "active" });
+      if (doctorRole) {
+        const invitation = createDoctorInvitation();
+        const { firstName, lastName } = splitDoctorName(payload.name);
+
+        await connection.transaction(async (session) => {
+          [doctor] = await Doctor.create([{
+            ...payload,
+            email,
+            phone: String(phone),
+            mciNumber: mciValue ? mciValue.toUpperCase() : undefined,
+            experience: Number(payload.experience),
+            commission: payload.commission !== undefined ? Number(payload.commission) : 0,
+          }], { session });
+
+          [portalUser] = await User.create([{
+            firstName,
+            lastName,
+            email,
+            role: doctorRole._id,
+            status: "invited",
+            doctorId: doctor._id,
+            createdBy: auth.session.userId,
+            passwordResetTokenHash: invitation.otpHash,
+            passwordResetExpiresAt: invitation.expiresAt,
+          }], { session });
+        });
+
+        const lab = await getTenantConfig(tenantId);
+        const activationPath = `/activate-account?tenantId=${encodeURIComponent(tenantId)}&email=${encodeURIComponent(email)}`;
+        const activationUrl = buildTenantUrl(tenantId, req.url, activationPath);
+        try {
+          const result = await sendDoctorInvitationEmail({
+            to: email,
+            doctorName: doctor.name,
+            labName: lab?.name,
+            otp: invitation.otp,
+            expiresAt: invitation.expiresAt,
+            activationUrl,
+          });
+          invitationSent = Boolean(result?.sent);
+          invitationError = result?.reason || "";
+        } catch (emailError) {
+          invitationError = emailError.message || "Unable to send invitation email";
+        }
+      } else {
+        doctor = await Doctor.create({
+          ...payload,
+          email,
+          phone: String(phone),
+          mciNumber: mciValue ? mciValue.toUpperCase() : undefined,
+          experience: Number(payload.experience),
+          commission: payload.commission !== undefined ? Number(payload.commission) : 0,
+        });
+      }
+    } else {
+      doctor = await Doctor.create({
         ...payload,
         email,
         phone: String(phone),
         mciNumber: mciValue ? mciValue.toUpperCase() : undefined,
         experience: Number(payload.experience),
         commission: payload.commission !== undefined ? Number(payload.commission) : 0,
-      }], { session });
-
-      [portalUser] = await User.create([{
-        firstName,
-        lastName,
-        email,
-        role: doctorRole._id,
-        status: "invited",
-        doctorId: doctor._id,
-        createdBy: auth.session.userId,
-        passwordResetTokenHash: invitation.otpHash,
-        passwordResetExpiresAt: invitation.expiresAt,
-      }], { session });
-    });
-
-    const lab = await getTenantConfig(tenantId);
-    const activationPath = `/activate-account?tenantId=${encodeURIComponent(tenantId)}&email=${encodeURIComponent(email)}`;
-    const activationUrl = buildTenantUrl(tenantId, req.url, activationPath);
-    let invitationSent = false;
-    let invitationError = "";
-    try {
-      const result = await sendDoctorInvitationEmail({
-        to: email,
-        doctorName: doctor.name,
-        labName: lab?.name,
-        otp: invitation.otp,
-        expiresAt: invitation.expiresAt,
-        activationUrl,
       });
-      invitationSent = Boolean(result?.sent);
-      invitationError = result?.reason || "";
-    } catch (emailError) {
-      invitationError = emailError.message || "Unable to send invitation email";
     }
 
     await writeAuditLog(req, auth, {
-      action: "doctor.registered_with_portal",
+      action: allowDoctorPortal ? "doctor.registered_with_portal" : "doctor.registered_directory_only",
       resourceType: "Doctor",
       resourceId: doctor._id,
-      metadata: { userId: portalUser._id, email, invitationSent },
+      metadata: { userId: portalUser?._id, email, invitationSent, allowDoctorPortal },
     });
 
     return Response.json({
-      ...doctor.toObject(),
-      portalAccount: {
+      ...(doctor.toObject ? doctor.toObject() : doctor),
+      portalAccount: allowDoctorPortal && portalUser ? {
         userId: portalUser.userId,
         status: portalUser.status,
         email,
         invitationSent,
         invitationError: invitationSent ? "" : invitationError,
-      },
+      } : null,
     }, { status: 201 });
 
   } catch (err) {
