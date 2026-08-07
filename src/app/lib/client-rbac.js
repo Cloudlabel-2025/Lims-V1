@@ -17,10 +17,8 @@ export function getEnabledModules(theme) {
 }
 
 export function getAllowedNavItems(user, theme) {
-  const enabledModules = getEnabledModules(theme);
-
   return availableLabModules.filter(
-    (module) => enabledModules.has(module.id) && hasPermission(user, module.permission)
+    (module) => hasPermission(user, module.permission)
   );
 }
 
@@ -64,14 +62,6 @@ export function canAccessPath(user, theme, pathname) {
   if (pathname?.startsWith("/doctor/") && pathname !== "/doctor/profile" && !user?.doctorId) return false;
   const requiredPermissions = getRequiredPermissionsForPath(pathname);
   if (requiredPermissions.length === 0) return true;
-
-  if (pathname !== "/settings" && !pathname.startsWith("/settings/") && pathname !== "/users" && !pathname.startsWith("/users/")) {
-    const enabledModules = getEnabledModules(theme);
-    const moduleMatch = availableLabModules.find(
-      (module) => module.href !== "/dashboard" && (pathname === module.href || pathname.startsWith(`${module.href}/`))
-    );
-    if (moduleMatch && !enabledModules.has(moduleMatch.id)) return false;
-  }
 
   return hasAnyPermission(user, requiredPermissions);
 }

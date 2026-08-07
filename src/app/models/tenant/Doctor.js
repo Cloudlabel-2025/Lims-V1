@@ -53,11 +53,13 @@ const doctorSchema = new mongoose.Schema({
     mciNumber: {
         type: String,
         unique: true,
+        sparse: true,
         uppercase: true,
         trim: true,
         validate: {
-            validator: (v) => {
-                const cleaned = String(v || "").trim();
+            validator: function (v) {
+                if (!v || !String(v).trim()) return true;
+                const cleaned = String(v).trim();
                 if (/https?:\/\//i.test(cleaned) || /www\./i.test(cleaned)) return false;
                 return /^[A-Z]{2,}[A-Z\s/-]*\d[\d\s/-]*$/.test(cleaned.toUpperCase());
             },

@@ -1,5 +1,6 @@
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./globals.css";
+import ScreenShieldProvider from "@/app/components/ScreenShieldProvider";
 
 export const metadata = {
   title: "CHC LIMS — Patient Management",
@@ -12,9 +13,25 @@ export default function RootLayout({ children }) {
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
+        <style dangerouslySetInnerHTML={{ __html: `
+          body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+          }
+          input, textarea, [contenteditable="true"] {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+          }
+        ` }} />
       </head>
       <body suppressHydrationWarning>
-        {children}
+        <ScreenShieldProvider>
+          {children}
+        </ScreenShieldProvider>
       </body>
     </html>
   );

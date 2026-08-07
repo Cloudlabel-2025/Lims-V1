@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import connectMasterDB from "@/app/lib/master-db";
 import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
+import { seedDefaultTests } from "@/app/lib/test-seeder";
+import { seedDefaultInventory } from "@/app/lib/inventory-seeder";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { defaultLabModules } from "@/app/lib/modules";
 import rbacConfig from "@/app/lib/rbac-config.json";
@@ -205,6 +207,8 @@ export async function createTenant({ name, subdomain, createdBy }) {
     await initializeTenantCollections(tenantConnection);
     await createTenantRoles(masterConnection, tenantConnection);
     await seedSystemChartOfAccounts(tenantConnection, createdLab.tenantId);
+    await seedDefaultTests(tenantConnection);
+    await seedDefaultInventory(tenantConnection);
     await assignLabSubscription({
       tenantId: createdLab.tenantId,
       legacyPlan: createdLab.subscriptionPlan,

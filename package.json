@@ -10,7 +10,9 @@
     "lint": "eslint",
     "test": "node --test tests/**/*.test.mjs",
     "test:all": "npm run lint && npm test && npm run build",
-    "seed:subscriptions": "node scripts/seed-subscriptions.mjs"
+    "seed:subscriptions": "node scripts/seed-subscriptions.mjs",
+    "seed:tests": "node scripts/seed-tests.mjs",
+    "seed:inventory": "node scripts/seed-inventory.mjs"
   },
   "dependencies": {
     "bootstrap": "^5.3.8",

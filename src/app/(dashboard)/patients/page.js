@@ -139,35 +139,63 @@ export default function PatientList() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+      <div style={{
+        display: "inline-flex",
+        background: "rgba(241, 245, 249, 0.8)",
+        backdropFilter: "blur(8px)",
+        padding: "4px",
+        borderRadius: "12px",
+        border: "1.5px solid #edf2f7",
+        gap: "4px",
+        marginBottom: "20px"
+      }}>
         <button
           type="button"
-          className={tabFilter === "all" ? "btn-lims-primary" : "btn-lims-secondary"}
           onClick={() => { setTabFilter("all"); setCurrentPage(1); }}
-          style={{ fontSize: "13px", height: "36px", borderRadius: "8px" }}
+          style={{
+            fontSize: "13px",
+            height: "36px",
+            padding: "0 16px",
+            borderRadius: "10px",
+            border: "none",
+            background: tabFilter === "all" ? "#fff" : "transparent",
+            color: tabFilter === "all" ? "#0f766e" : "#64748b",
+            fontWeight: "700",
+            cursor: "pointer",
+            boxShadow: tabFilter === "all" ? "0 2px 8px rgba(15, 23, 42, 0.05)" : "none",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
         >
-          All Patients
+          👥 All Patients
         </button>
         <button
           type="button"
-          className={tabFilter === "referrals" ? "btn-lims-primary" : "btn-lims-secondary"}
           onClick={() => { setTabFilter("referrals"); setCurrentPage(1); }}
-          style={{ fontSize: "13px", height: "36px", borderRadius: "8px" }}
+          style={{
+            fontSize: "13px",
+            height: "36px",
+            padding: "0 16px",
+            borderRadius: "10px",
+            border: "none",
+            background: tabFilter === "referrals" ? "#fff" : "transparent",
+            color: tabFilter === "referrals" ? "#0f766e" : "#64748b",
+            fontWeight: "700",
+            cursor: "pointer",
+            boxShadow: tabFilter === "referrals" ? "0 2px 8px rgba(15, 23, 42, 0.05)" : "none",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
         >
-          👨‍⚕️ Doctor Referral Patients
+          👨‍⚕️ Doctor Referrals
         </button>
       </div>
 
-      <div
-        className="page-header patient-directory-header"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "20px",
-        }}
-      >
+      <div className="page-header patient-directory-header">
         <div className="patient-directory-heading" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <div className="page-header-icon">{Icons.users}</div>
           <div className="page-header-text">
@@ -177,47 +205,13 @@ export default function PatientList() {
           </div>
         </div>
 
-        <div
-          className="header-actions"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            flex: 1,
-            justifyContent: "flex-end",
-            minWidth: "300px",
-          }}
-        >
-          <div
-            className="patient-view-toggle"
-            style={{
-              display: "flex",
-              background: "var(--border-light)",
-              padding: "4px",
-              borderRadius: "10px",
-              marginRight: "8px",
-            }}
-          >
+        <div className="header-actions">
+          <div className="patient-view-toggle">
             <button
               type="button"
               aria-label="Grid view"
               aria-pressed={viewState === "grid"}
               onClick={() => setViewState("grid")}
-              style={{
-                padding: "6px 10px",
-                borderRadius: "8px",
-                border: "none",
-                background: viewState === "grid" ? "#fff" : "transparent",
-                color: viewState === "grid" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                fontWeight: "600",
-                transition: "all 0.2s",
-                boxShadow: viewState === "grid" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-              }}
             >
               {Icons.grid}
             </button>
@@ -226,35 +220,22 @@ export default function PatientList() {
               aria-label="Table view"
               aria-pressed={viewState === "list"}
               onClick={() => setViewState("list")}
-              style={{
-                padding: "6px 10px",
-                borderRadius: "8px",
-                border: "none",
-                background: viewState === "list" ? "#fff" : "transparent",
-                color: viewState === "list" ? "var(--brand-action, var(--primary))" : "var(--text-muted)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                fontWeight: "600",
-                transition: "all 0.2s",
-                boxShadow: viewState === "list" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-              }}
             >
               {Icons.list}
             </button>
           </div>
 
-          <div className="search-container patient-directory-search" style={{ position: "relative", flex: 1, maxWidth: "320px" }}>
+          <div className="search-container patient-directory-search" style={{ position: "relative" }}>
             <span
               style={{
                 position: "absolute",
-                left: "12px",
+                left: "14px",
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: "var(--text-muted)",
+                color: "#94a3b8",
                 fontSize: "14px",
+                display: "grid",
+                placeItems: "center"
               }}
             >
               {Icons.search}
@@ -262,13 +243,13 @@ export default function PatientList() {
             <input
               type="text"
               className="lims-input"
-              placeholder="Search by name, patient ID or phone"
+              placeholder="Search by name, patient ID or phone..."
               value={searchQuery}
               onChange={(event) => {
                 setSearchQuery(event.target.value);
                 setCurrentPage(1);
               }}
-              style={{ paddingLeft: "36px", height: "40px", fontSize: "13px" }}
+              style={{ paddingLeft: "38px" }}
             />
           </div>
 
@@ -276,7 +257,6 @@ export default function PatientList() {
             className="lims-input patient-directory-gender"
             value={genderFilter}
             onChange={(e) => { setGenderFilter(e.target.value); setCurrentPage(1); }}
-            style={{ height: "40px", fontSize: "12px", width: "100px" }}
           >
             <option value="">All genders</option>
             <option value="Male">Male</option>
@@ -301,7 +281,6 @@ export default function PatientList() {
                 }
               }
             }}
-            style={{ height: "40px", fontSize: "12px", width: "80px" }}
             maxLength={3}
           />
 
@@ -322,7 +301,6 @@ export default function PatientList() {
                 }
               }
             }}
-            style={{ height: "40px", fontSize: "12px", width: "80px" }}
             maxLength={3}
           />
 
@@ -344,13 +322,12 @@ export default function PatientList() {
           )}
 
           {canCreatePatient && (
-          <button
-            className="btn-lims-primary"
-            onClick={() => router.push("/patients/register")}
-            style={{ height: "40px", padding: "0 16px", fontSize: "13px", whiteSpace: "nowrap" }}
-          >
-            {Icons.plus} Register patient
-          </button>
+            <button
+              className="btn-lims-primary"
+              onClick={() => router.push("/patients/register")}
+            >
+              {Icons.plus} Register patient
+            </button>
           )}
         </div>
       </div>

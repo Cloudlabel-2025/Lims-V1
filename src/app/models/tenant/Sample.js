@@ -116,6 +116,11 @@ export const SampleSchema = new mongoose.Schema(
       trim: true,
       maxlength: 300,
     },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: 3000,
+    },
     custodyLog: {
       type: [CustodyEntrySchema],
       default: [],

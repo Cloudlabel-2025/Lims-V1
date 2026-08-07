@@ -20,10 +20,11 @@ export default function DoctorDashboardPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("patients");
+  const [viewMode, setViewMode] = useState("practice"); // "practice" | "investor"
 
   // Modals state
   const [showAddPatient, setShowAddPatient] = useState(false);
-  const [patientForm, setPatientForm] = useState({ name: "", phone: "", age: "", gender: "Male", address: "", email: "" });
+  const [patientForm, setPatientForm] = useState({ name: "", phone: "", age: "", dob: "", gender: "Male", address: "", email: "" });
   const [savingPatient, setSavingPatient] = useState(false);
 
   const [showTestRequest, setShowTestRequest] = useState(false);
@@ -43,6 +44,10 @@ export default function DoctorDashboardPage() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Unable to load doctor portal");
       setData(body);
+      if (body.doctor?.doctorType === "Investor") {
+        setViewMode("investor");
+        setTab("analytics");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -83,7 +88,7 @@ export default function DoctorDashboardPage() {
       if (!response.ok) throw new Error(body.error || "Failed to register patient");
       setActionSuccess(`Patient "${body.patient.name}" registered successfully.`);
       setShowAddPatient(false);
-      setPatientForm({ name: "", phone: "", age: "", gender: "Male", address: "", email: "" });
+      setPatientForm({ name: "", phone: "", age: "", dob: "", gender: "Male", address: "", email: "" });
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -198,27 +203,81 @@ export default function DoctorDashboardPage() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 22 }}>
-        <Card label="Registered Patients" value={summary.patientCount || 0} tone="#0d9488" />
-        <Card label="Test Requests Sent" value={summary.testRequestCount || 0} tone="#8b5cf6" />
-        <Card label="Referred Bills" value={summary.referralCount || 0} tone="#2563eb" />
-        <Card label="Released Reports" value={summary.releasedReportCount || 0} tone="#16a34a" />
-        <Card label="Earned Commission" value={`₹${money(summary.earnedCommission)}`} tone="#059669" />
-        <Card label="Pending Payout" value={`₹${money(summary.pendingPayout)}`} tone="#dc2626" />
-      </div>
+      {viewMode === "practice" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 22 }}>
+          <Card label="Registered Patients" value={summary.patientCount || 0} tone="#0d9488" />
+          <Card label="Test Requests Sent" value={summary.testRequestCount || 0} tone="#8b5cf6" />
+          <Card label="Referred Bills" value={summary.referralCount || 0} tone="#2563eb" />
+          <Card label="Released Reports" value={summary.releasedReportCount || 0} tone="#16a34a" />
+          <Card label="Earned Commission" value={`₹${money(summary.earnedCommission)}`} tone="#059669" />
+          <Card label="Pending Payout" value={`₹${money(summary.pendingPayout)}`} tone="#dc2626" />
+        </div>
+      )}
+
+      {data.doctor.doctorType === "Investor" && (
+        <div style={{ display: "flex", background: "#f1f5f9", padding: 4, borderRadius: 10, width: "fit-content", marginBottom: 16 }}>
+          <button
+            type="button"
+            onClick={() => { setViewMode("practice"); setTab("patients"); }}
+            style={{
+              padding: "8px 16px",
+              border: 0,
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: "pointer",
+              background: viewMode === "practice" ? "#ffffff" : "transparent",
+              color: viewMode === "practice" ? "#0f766e" : "#64748b",
+              boxShadow: viewMode === "practice" ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+            }}
+          >
+            🩺 Practice Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => { setViewMode("investor"); setTab("analytics"); }}
+            style={{
+              padding: "8px 16px",
+              border: 0,
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: "pointer",
+              background: viewMode === "investor" ? "#ffffff" : "transparent",
+              color: viewMode === "investor" ? "#0f766e" : "#64748b",
+              boxShadow: viewMode === "investor" ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+            }}
+          >
+            💼 Investor Dashboard
+          </button>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {[
-          ["patients", `Registered Patients (${data?.registeredPatients?.length || 0})`],
-          ["requests", `Sent Test Requests (${data?.testRequests?.length || 0})`],
-          ["referrals", `Lab Bills (${data?.referrals?.length || 0})`],
-          ["results", "Released Reports"],
-          ["commissions", "Commissions & Payouts"],
-        ].map(([id, label]) => (
-          <button key={id} className={tab === id ? "btn-lims-primary" : "btn-lims-secondary"} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
+        {viewMode === "practice" ? (
+          [
+            ["patients", `Registered Patients (${data?.registeredPatients?.length || 0})`],
+            ["requests", `Sent Test Requests (${data?.testRequests?.length || 0})`],
+            ["referrals", `Lab Bills (${data?.referrals?.length || 0})`],
+            ["results", "Released Reports"],
+            ["commissions", "Commissions & Payouts"],
+          ].map(([id, label]) => (
+            <button key={id} className={tab === id ? "btn-lims-primary" : "btn-lims-secondary"} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))
+        ) : (
+          [
+            ["analytics", "📈 Lab Analytics"],
+            ["lab-billings", "🧾 Lab Billings"],
+            ["lab-accounts", "🏦 Lab Accounts"],
+            ["all-patients", "👥 All Patients"],
+          ].map(([id, label]) => (
+            <button key={id} className={tab === id ? "btn-lims-primary" : "btn-lims-secondary"} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))
+        )}
       </div>
 
       {/* --- TAB 1: Registered Patients --- */}
@@ -461,6 +520,212 @@ export default function DoctorDashboardPage() {
           </div>
         </section>
       )}
+      {/* --- TAB 6: Lab Analytics --- */}
+      {tab === "analytics" && data.investorData && (
+        <section style={{ display: "grid", gap: 20 }}>
+          {/* Financial Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            <Card label="Total Revenue" value={`₹${money(data.investorData.analytics.totalRevenue)}`} tone="#0d9488" />
+            <Card label="Total Expenses" value={`₹${money(data.investorData.analytics.totalExpenses)}`} tone="#dc2626" />
+            <Card label="Net Profit" value={`₹${money(data.investorData.analytics.netProfit)}`} tone={data.investorData.analytics.netProfit >= 0 ? "#10b981" : "#ef4444"} />
+            <Card label="Profit Margin" value={`${money(data.investorData.analytics.profitMargin)}%`} tone="#8b5cf6" />
+            <Card label="Total Assets" value={`₹${money(data.investorData.analytics.totalAssets)}`} tone="#2563eb" />
+            <Card label="Total Liabilities" value={`₹${money(data.investorData.analytics.totalLiabilities)}`} tone="#f59e0b" />
+          </div>
+
+          {/* Monthly Trends */}
+          <div className="form-card" style={{ padding: 18 }}>
+            <h5 style={{ margin: "0 0 16px 0" }}>Monthly Performance Trends (Last 12 Months)</h5>
+            <div style={{ overflowX: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th>Revenue</th>
+                    <th>Expense</th>
+                    <th>Net Profit</th>
+                    <th style={{ width: "350px" }}>Visual Performance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.investorData.analytics.monthlyTrends.map((trend) => {
+                    const total = trend.revenue + trend.expense;
+                    const revPct = total > 0 ? (trend.revenue / total) * 100 : 0;
+                    const expPct = total > 0 ? (trend.expense / total) * 100 : 0;
+                    return (
+                      <tr key={trend.month}>
+                        <td><strong>{trend.month}</strong></td>
+                        <td style={{ color: "#0d9488" }}>₹{money(trend.revenue)}</td>
+                        <td style={{ color: "#dc2626" }}>₹{money(trend.expense)}</td>
+                        <td style={{ color: trend.netProfit >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>
+                          ₹{money(trend.netProfit)}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 4, alignItems: "center", width: "100%", height: 16 }}>
+                            <div style={{ height: "100%", width: `${revPct}%`, background: "#0d9488", borderRadius: 4 }} title={`Revenue: ${money(revPct)}%`} />
+                            <div style={{ height: "100%", width: `${expPct}%`, background: "#dc2626", borderRadius: 4 }} title={`Expense: ${money(expPct)}%`} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!data.investorData.analytics.monthlyTrends.length && (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", color: "#64748b" }}>No monthly trend data found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* --- TAB 7: Lab Billings --- */}
+      {tab === "lab-billings" && data.investorData && (
+        <section className="form-card" style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
+            <input className="lims-input" style={{ maxWidth: 380 }} placeholder="Search bills by ID, patient, status..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Bill ID</th>
+                  <th>Patient Details</th>
+                  <th>Total Amount</th>
+                  <th>Paid Amount</th>
+                  <th>Balance Due</th>
+                  <th>Billing Status</th>
+                  <th>Status</th>
+                  <th>Billing Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.investorData.billings
+                  .filter(b => [b.billId, b.patientName, b.patientId, b.phone, b.billingStatus, b.status].some(v => String(v || "").toLowerCase().includes(search.trim().toLowerCase())))
+                  .map((b) => (
+                    <tr key={b._id}>
+                      <td><strong>{b.billId}</strong></td>
+                      <td>
+                        <strong>{b.patientName}</strong>
+                        <br />
+                        <small>{b.patientId} · {b.age} yrs · {b.gender}</small>
+                      </td>
+                      <td style={{ fontWeight: 700 }}>₹{money(b.totalAmount)}</td>
+                      <td style={{ color: "#0d9488" }}>₹{money(b.totalPaid)}</td>
+                      <td style={{ color: b.balanceDue > 0 ? "#dc2626" : "#166534" }}>₹{money(b.balanceDue)}</td>
+                      <td>
+                        <span style={{
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: b.billingStatus === "paid" ? "#dcfce7" : b.billingStatus === "partial" ? "#fef3c7" : "#fee2e2",
+                          color: b.billingStatus === "paid" ? "#166534" : b.billingStatus === "partial" ? "#92400e" : "#991b1b",
+                        }}>
+                          {b.billingStatus}
+                        </span>
+                      </td>
+                      <td>{b.status}</td>
+                      <td>{date(b.createdAt)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* --- TAB 8: Lab Accounts --- */}
+      {tab === "lab-accounts" && data.investorData && (
+        <section className="form-card" style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
+            <input className="lims-input" style={{ maxWidth: 380 }} placeholder="Search accounts by code, name, type..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div style={{ background: "#f8fafc", padding: "8px 16px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+              <small style={{ color: "#64748b", fontWeight: 700 }}>Assets/Liabilities Ratio: </small>
+              <strong>{(data.investorData.analytics.totalAssets / (data.investorData.analytics.totalLiabilities || 1)).toFixed(2)}x</strong>
+            </div>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Account Name</th>
+                  <th>Type</th>
+                  <th>Subtype</th>
+                  <th style={{ textAlign: "right" }}>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.investorData.accounts
+                  .filter(a => [a.code, a.name, a.type, a.subtype].some(v => String(v || "").toLowerCase().includes(search.trim().toLowerCase())))
+                  .map((a) => (
+                    <tr key={a._id}>
+                      <td><strong>{a.code}</strong></td>
+                      <td><strong>{a.name}</strong></td>
+                      <td>
+                        <span style={{
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          background: a.type === "asset" ? "#e0f2fe" : a.type === "liability" ? "#fef3c7" : a.type === "revenue" ? "#dcfce7" : a.type === "expense" ? "#fecaca" : "#f1f5f9",
+                          color: a.type === "asset" ? "#0369a1" : a.type === "liability" ? "#92400e" : a.type === "revenue" ? "#166534" : a.type === "expense" ? "#991b1b" : "#475569"
+                        }}>
+                          {a.type}
+                        </span>
+                      </td>
+                      <td>{a.subtype || "-"}</td>
+                      <td style={{ textAlign: "right", fontWeight: 700 }}>₹{money(a.balance)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* --- TAB 9: All Patients --- */}
+      {tab === "all-patients" && data.investorData && (
+        <section className="form-card" style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
+            <input className="lims-input" style={{ maxWidth: 380 }} placeholder="Search patients by name, phone, ref doctor..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Patient ID</th>
+                  <th>Patient Name</th>
+                  <th>Age / Gender</th>
+                  <th>Phone Number</th>
+                  <th>Address</th>
+                  <th>Referral Doctor</th>
+                  <th>Registered On</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.investorData.patients
+                  .filter(p => [p.name, p.patientId, p.phone, p.email, p.address, p.refDoctorName].some(v => String(v || "").toLowerCase().includes(search.trim().toLowerCase())))
+                  .map((p) => (
+                    <tr key={p._id}>
+                      <td><strong>{p.patientId}</strong></td>
+                      <td><strong>{p.name}</strong></td>
+                      <td>{p.age ? `${p.age} yrs` : "-"} / {p.gender || "Male"}</td>
+                      <td>{p.phone}</td>
+                      <td>{p.address || "N/A"}</td>
+                      <td>{p.refDoctorName || "Direct / Self"}</td>
+                      <td>{date(p.createdAt)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* --- Modal: Add Patient --- */}
       {showAddPatient && (
@@ -478,24 +743,28 @@ export default function DoctorDashboardPage() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <div>
+                  <label style={{ fontSize: 12, fontWeight: 700 }}>Date of Birth *</label>
+                  <input required type="date" className="lims-input" value={patientForm.dob} onChange={(e) => setPatientForm({ ...patientForm, dob: e.target.value })} />
+                </div>
+                <div>
                   <label style={{ fontSize: 12, fontWeight: 700 }}>Age</label>
                   <input type="number" className="lims-input" value={patientForm.age} onChange={(e) => setPatientForm({ ...patientForm, age: e.target.value })} placeholder="35" />
                 </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700 }}>Gender</label>
-                  <select className="lims-input" value={patientForm.gender} onChange={(e) => setPatientForm({ ...patientForm, gender: e.target.value })}>
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
-                  </select>
-                </div>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700 }}>Address</label>
+                <label style={{ fontSize: 12, fontWeight: 700 }}>Gender</label>
+                <select className="lims-input" value={patientForm.gender} onChange={(e) => setPatientForm({ ...patientForm, gender: e.target.value })}>
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700 }}>Address (Optional)</label>
                 <input className="lims-input" value={patientForm.address} onChange={(e) => setPatientForm({ ...patientForm, address: e.target.value })} placeholder="Street / City" />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700 }}>Email Address</label>
+                <label style={{ fontSize: 12, fontWeight: 700 }}>Email Address (Optional)</label>
                 <input type="email" className="lims-input" value={patientForm.email} onChange={(e) => setPatientForm({ ...patientForm, email: e.target.value })} placeholder="patient@example.com" />
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>

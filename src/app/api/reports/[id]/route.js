@@ -21,12 +21,38 @@ export async function GET(req, { params }) {
     if (moduleAuth.error) return moduleAuth.error;
 
     const { id } = await params;
-    const { TestReport, BillingRecord } = await getTenantModels(auth.tenantId);
-    const report = await TestReport.findById(id).populate("patient", "name patientId age gender phone address");
+    const { TestReport, BillingRecord, User } = await getTenantModels(auth.tenantId);
+    const reportDoc = await TestReport.findById(id).populate("patient", "name patientId age gender phone address");
 
-    if (!report) {
+    if (!reportDoc) {
       return Response.json({ error: "Report not found" }, { status: 404 });
     }
+
+    const report = reportDoc.toObject();
+
+    const resolveNameAndRole = async (identifier) => {
+      if (!identifier) return identifier;
+      if (identifier.includes("(")) return identifier;
+
+      const query = identifier.includes("@")
+        ? { email: identifier.toLowerCase() }
+        : { userId: identifier.toUpperCase() };
+
+      const userDoc = await User.findOne(query).populate("role").lean();
+      if (userDoc) {
+        const fullName = [userDoc.firstName, userDoc.lastName].filter(Boolean).join(" ").trim();
+        if (fullName) {
+          return userDoc.role?.name
+            ? `${fullName} (${userDoc.role.name})`
+            : fullName;
+        }
+      }
+      return identifier;
+    };
+
+    report.reviewedBy = await resolveNameAndRole(report.reviewedBy);
+    report.approvedBy = await resolveNameAndRole(report.approvedBy);
+    report.releasedBy = await resolveNameAndRole(report.releasedBy);
 
     if (auth.session.doctorId) {
       const ownsReferral = report.status === "released" && report.billingRecord
@@ -126,16 +152,24 @@ export async function PATCH(req, { params }) {
 
       // Record the action timestamp and user
       const now = new Date();
-      const userName = auth.session.email || auth.session.name || "Unknown";
+      let displayName = "Unknown";
+      if (auth.session.name) {
+        displayName = auth.session.roleName
+          ? `${auth.session.name} (${auth.session.roleName})`
+          : auth.session.name;
+      } else if (auth.session.email) {
+        displayName = auth.session.email;
+      }
+
       if (action === "review") {
         report.reviewedAt = now;
-        report.reviewedBy = userName;
+        report.reviewedBy = displayName;
       } else if (action === "approve") {
         report.approvedAt = now;
-        report.approvedBy = userName;
+        report.approvedBy = displayName;
       } else if (action === "release") {
         report.releasedAt = now;
-        report.releasedBy = userName;
+        report.releasedBy = displayName;
 
         try {
           const { BillingRecord, Doctor, Patient, Notification } = await getTenantModels(auth.tenantId);

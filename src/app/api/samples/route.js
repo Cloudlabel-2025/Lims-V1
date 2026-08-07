@@ -129,16 +129,25 @@ export async function POST(req) {
       status: "registered",
     });
 
-    if (test.requiredInventoryItems?.length) {
-      const { InventoryItem } = await getTenantModels(auth.tenantId);
+    const { reservedInventory } = body;
+    if (reservedInventory && Array.isArray(reservedInventory) && reservedInventory.length > 0) {
+      const { InventoryItem, InventoryUom } = await getTenantModels(auth.tenantId);
       const reservations = [];
 
-      for (const reqItem of test.requiredInventoryItems) {
-        const item = reqItem.item;
-        const uom = reqItem.uom;
+      for (const reqItem of reservedInventory) {
+        const itemId = reqItem.item;
+        const uomId = reqItem.uom;
+        const qty = Number(reqItem.quantity);
+        if (!itemId || !uomId || isNaN(qty) || qty <= 0) continue;
+
+        const [item, uom] = await Promise.all([
+          InventoryItem.findById(itemId),
+          InventoryUom.findById(uomId)
+        ]);
+
         if (!item || !uom) continue;
 
-        const quantityInBase = reqItem.quantityPerTest * (uom.conversionToBase || 1);
+        const quantityInBase = qty * (uom.conversionToBase || 1);
         const available = (item.stockOnHandBase || 0) - (item.reservedBase || 0);
 
         if (available >= quantityInBase) {

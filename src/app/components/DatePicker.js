@@ -116,52 +116,33 @@ export default function DatePicker({ value, onChange, max, className, error, onD
       return;
     }
 
-    let rem = raw;
-    let day = "", month = "", year = "";
-
-    // Day — always 2-digit padded, with smart split if > 31
-    if (rem.length >= 2) {
-      const d = parseInt(rem.slice(0, 2), 10);
-      if (d >= 1 && d <= 31) {
-        day = rem.slice(0, 2);
-        rem = rem.slice(2);
-      } else {
-        day = "0" + rem[0];
-        rem = rem.slice(1);
-      }
+    let out = "";
+    // DD/MM/YYYY — build display progressively from raw digits
+    if (raw.length <= 2) {
+      // Still typing day
+      out = raw;
+    } else if (raw.length <= 4) {
+      // Day complete, typing month
+      out = raw.slice(0, 2) + "/" + raw.slice(2);
     } else {
-      day = rem;
-      rem = "";
+      // Day and month complete, typing year
+      out = raw.slice(0, 2) + "/" + raw.slice(2, 4) + "/" + raw.slice(4);
     }
 
-    // Month — 2-digit when possible, always padded; smart split if > 12
-    if (rem.length >= 2) {
-      const m = parseInt(rem.slice(0, 2), 10);
-      if (m >= 1 && m <= 12) {
-        month = rem.slice(0, 2);
-        rem = rem.slice(2);
-      } else {
-        month = "0" + rem[0];
-        rem = rem.slice(1);
-      }
-    } else if (rem.length === 1) {
-      month = "0" + rem;
-      rem = "";
-    }
-
-    // Year — up to 4 remaining digits
-    if (rem.length > 0) {
-      year = rem.slice(0, 4);
-    }
-
-    // Build display
-    let out = day;
-    if (month) out += "/" + month;
-    if (year) out += "/" + year;
     setTyped(out);
     onDraftChange?.(out);
-    const parsed = parseTyped(out);
-    onChange({ target: { name: "dob", value: parsed && isValid(parsed) ? format(parsed, "yyyy-MM-dd") : "" } });
+
+    // Only attempt to parse a full DD/MM/YYYY (8 digits)
+    if (raw.length === 8) {
+      const dd = raw.slice(0, 2);
+      const mm = raw.slice(2, 4);
+      const yyyy = raw.slice(4, 8);
+      const fullStr = dd + "/" + mm + "/" + yyyy;
+      const parsed = parseTyped(fullStr);
+      onChange({ target: { name: "dob", value: parsed && isValid(parsed) ? format(parsed, "yyyy-MM-dd") : "" } });
+    } else {
+      onChange({ target: { name: "dob", value: "" } });
+    }
   }
 
   function parseTyped(v) {

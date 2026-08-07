@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import LoginPage from "./components/LoginPage";
+import MarketingPage from "./components/MarketingPage";
 import {
   getHostnameFromHeaders,
   getTenantIdFromHostname,
@@ -77,6 +78,12 @@ export default async function Home({ searchParams }) {
 
   const initialTenantId = params?.tenantId || hostTenantId || "";
   const isDeveloperAccess = !onTenantSubdomain && params?.access === "developer";
+  
+  // Serve the marketing page for public visits to the platform root domain (no tenant specified)
+  if (!onTenantSubdomain && !initialTenantId && !isDeveloperAccess) {
+    return <MarketingPage />;
+  }
+
   const initialUserType = onTenantSubdomain || (initialTenantId && !isDeveloperAccess) ? "tenant" : "developer";
   const initialTheme =
     initialTenantId && initialUserType === "tenant" ? await getInitialTheme(initialTenantId) : null;

@@ -28,8 +28,8 @@ export default function NewVisit({ params }) {
   const [packages, setPackages] = useState([]);
   const [selectedTests, setSelectedTests] = useState([]);
   const [priority, setPriority] = useState("routine");
-  const [discountAmount, setDiscountAmount] = useState("");
-  const [taxAmount, setTaxAmount] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("0");
+  const [taxAmount, setTaxAmount] = useState("0");
   const [notes, setNotes] = useState("");
 
   const selectedTotal = useMemo(() => {

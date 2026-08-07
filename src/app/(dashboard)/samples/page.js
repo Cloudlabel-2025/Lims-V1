@@ -167,30 +167,32 @@ export default function SamplesPage() {
         </div>
 
         {filteredSamples.length ? (
-          <div className="samples-table" role="table" aria-label="Samples workflow queue">
-            <div className="samples-table-head" role="row">
-              <span>Specimen</span><span>Patient</span><span>Investigation</span><span>Collection & custody</span><span>Workflow</span><span>Actions</span>
+          <div className="samples-table-wrap">
+            <div className="samples-table" role="table" aria-label="Samples workflow queue">
+              <div className="samples-table-head" role="row">
+                <span>Specimen</span><span>Patient</span><span>Investigation</span><span>Collection & custody</span><span>Workflow</span><span>Actions</span>
+              </div>
+              {filteredSamples.map((sample) => {
+                const canProcess = ACTIVE_WORKFLOW_STATUSES.includes(sample.status);
+                const canReject = !TERMINAL_STATUSES.includes(sample.status);
+                const lastCustody = sample.custodyLog?.[sample.custodyLog.length - 1];
+                const processLabel = sample.status === "registered" ? "Begin process" : sample.status === "processing" ? "Enter results" : "Continue";
+                return (
+                  <article key={sample._id} className={`samples-table-row status-${sample.status}`} role="row">
+                    <div className="samples-specimen-cell" role="cell"><span>{Icons.vial}</span><div><strong>{sample.sampleId}</strong><code>{sample.barcode || "No barcode"}</code><small>Registered {formatDateTime(sample.createdAt)}</small></div></div>
+                    <div className="samples-patient-cell" role="cell"><strong>{sample.patient?.name || "Unknown patient"}</strong><code>{sample.patient?.patientId || "No patient ID"}</code><small>{sample.patient?.age ?? "—"} years · {sample.patient?.gender || "Not specified"}</small></div>
+                    <div className="samples-test-cell" role="cell"><strong>{sample.testSnapshot?.name || "Unknown test"}</strong><code>{sample.testSnapshot?.code || "No code"}</code><small>{sample.sampleType || sample.testSnapshot?.sampleType || "Sample type not set"}{sample.testSnapshot?.categoryName ? ` · ${sample.testSnapshot.categoryName}` : ""}</small></div>
+                    <div className="samples-custody-cell" role="cell"><strong>{sample.collectionTime ? `Collected ${formatDateTime(sample.collectionTime)}` : "Collection pending"}</strong><small>Received: {formatDateTime(sample.receivedAt)}</small><small>{lastCustody ? `${lastCustody.handledBy} · ${formatDateTime(lastCustody.timestamp)}` : sample.receivedBy || "Custodian not recorded"}</small></div>
+                    <div className="samples-status-cell" role="cell"><em className={sample.status}>{formatStatus(sample.status)}</em>{sample.billingRecord?.priority === "urgent" && <strong>Urgent</strong>}{sample.status === "rejected" && sample.rejectionReason && <p>{sample.rejectionReason}</p>}</div>
+                    <div className="samples-row-actions" role="cell">
+                      {canProcess && canViewSamples && <button type="button" className="primary" onClick={() => router.push(`/samples/wizard?sampleId=${sample._id}`)}>{Icons.chevronRight} {processLabel}</button>}
+                      {canReject && canViewSamples && <button type="button" className="danger" onClick={() => setRejecting({ id: sample._id, reason: "", saving: false })}>{Icons.alertCircle} Reject</button>}
+                      {!canProcess && !canReject && <span>Workflow closed</span>}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-            {filteredSamples.map((sample) => {
-              const canProcess = ACTIVE_WORKFLOW_STATUSES.includes(sample.status);
-              const canReject = !TERMINAL_STATUSES.includes(sample.status);
-              const lastCustody = sample.custodyLog?.[sample.custodyLog.length - 1];
-              const processLabel = sample.status === "registered" ? "Begin process" : sample.status === "processing" ? "Enter results" : "Continue";
-              return (
-                <article key={sample._id} className={`samples-table-row status-${sample.status}`} role="row">
-                  <div className="samples-specimen-cell" role="cell"><span>{Icons.vial}</span><div><strong>{sample.sampleId}</strong><code>{sample.barcode || "No barcode"}</code><small>Registered {formatDateTime(sample.createdAt)}</small></div></div>
-                  <div className="samples-patient-cell" role="cell"><strong>{sample.patient?.name || "Unknown patient"}</strong><code>{sample.patient?.patientId || "No patient ID"}</code><small>{sample.patient?.age ?? "—"} years · {sample.patient?.gender || "Not specified"}</small></div>
-                  <div className="samples-test-cell" role="cell"><strong>{sample.testSnapshot?.name || "Unknown test"}</strong><code>{sample.testSnapshot?.code || "No code"}</code><small>{sample.sampleType || sample.testSnapshot?.sampleType || "Sample type not set"}{sample.testSnapshot?.categoryName ? ` · ${sample.testSnapshot.categoryName}` : ""}</small></div>
-                  <div className="samples-custody-cell" role="cell"><strong>{sample.collectionTime ? `Collected ${formatDateTime(sample.collectionTime)}` : "Collection pending"}</strong><small>Received: {formatDateTime(sample.receivedAt)}</small><small>{lastCustody ? `${lastCustody.handledBy} · ${formatDateTime(lastCustody.timestamp)}` : sample.receivedBy || "Custodian not recorded"}</small></div>
-                  <div className="samples-status-cell" role="cell"><em className={sample.status}>{formatStatus(sample.status)}</em>{sample.billingRecord?.priority === "urgent" && <strong>Urgent</strong>}{sample.status === "rejected" && sample.rejectionReason && <p>{sample.rejectionReason}</p>}</div>
-                  <div className="samples-row-actions" role="cell">
-                    {canProcess && canViewSamples && <button type="button" className="primary" onClick={() => router.push(`/samples/wizard?sampleId=${sample._id}`)}>{Icons.chevronRight} {processLabel}</button>}
-                    {canReject && canViewSamples && <button type="button" className="danger" onClick={() => setRejecting({ id: sample._id, reason: "", saving: false })}>{Icons.alertCircle} Reject</button>}
-                    {!canProcess && !canReject && <span>Workflow closed</span>}
-                  </div>
-                </article>
-              );
-            })}
           </div>
         ) : (
           <div className="samples-empty-state"><span>{search ? Icons.search : Icons.vial}</span><strong>{search ? "No matching samples" : status === "all" ? "No samples registered" : `No ${status} samples`}</strong><p>{search ? "Try a different patient, sample, barcode, or test value." : "New specimens will appear here when they are registered or generated from billing."}</p>{canCreateSamples && status === "all" && !search && <button type="button" className="dash-btn-primary" onClick={() => router.push("/samples/register")}>{Icons.plus} Register first sample</button>}</div>

@@ -49,7 +49,7 @@ const TestParameterSchema = new mongoose.Schema(
       required: true,
       trim: true,
       maxlength: 40,
-      match: [/^[0-9]+(\.[0-9]+)?$/, "Unit should be only measured in numerals"],
+      match: [/^[A-Za-z0-9 .&'\/,()@_#%µ\-]*$/, "Unit contains invalid characters"],
       validate: {
         validator: (v) => !/https?:\/\/|www\./i.test(v),
         message: "Unit cannot contain a URL",

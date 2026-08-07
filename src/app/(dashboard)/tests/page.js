@@ -6,7 +6,7 @@ import { cachedJsonFetch, clearCachedApi, useCurrentUser } from "@/app/lib/use-c
 import TestMasterWorkspace, { TestMasterLoading } from "./TestMasterWorkspace";
 
 const NAME_PATTERN = /^[A-Za-z0-9-]+$/;
-const UNIT_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
+const UNIT_PATTERN = /^[A-Za-z0-9 .&'\/,()@_#%µ\-]*$/;
 const URL_RE = /https?:\/\/|www\./i;
 
 function isValidField(value, pattern) {
@@ -335,7 +335,7 @@ export default function TestsPage() {
         return;
       }
       if (!isValidField(p.unit, UNIT_PATTERN)) {
-        setError(`Parameter ${i + 1} unit should be only measured in numerals`);
+        setError(`Parameter ${i + 1} unit contains invalid characters`);
         return;
       }
       if (rejectUrl(p.unit)) {

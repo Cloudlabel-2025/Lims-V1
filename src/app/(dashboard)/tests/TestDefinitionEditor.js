@@ -110,7 +110,7 @@ export default function TestDefinitionEditor({
                   </label>
                   <label>
                     Measurement unit
-                    <input value={parameter.unit} onChange={(e) => updateParameter(index, "unit", e.target.value)} placeholder="Enter numeric unit" required pattern="[0-9]+(\.[0-9]+)?" />
+                    <input value={parameter.unit} onChange={(e) => updateParameter(index, "unit", e.target.value)} placeholder="e.g. g/dL, %" required pattern="[A-Za-z0-9 .&'\/,()@_#%µ\-]*" />
                   </label>
                 </div>
 
@@ -133,53 +133,7 @@ export default function TestDefinitionEditor({
           </div>
         </section>
 
-        <section className="test-editor-section">
-          <header>
-            <span>03</span>
-            <div>
-              <h3>Inventory consumption</h3>
-              <p>Optional stock quantities deducted when this test is processed.</p>
-            </div>
-            <button type="button" className="test-master-secondary-action" onClick={addRequiredItem}>
-              {Icons.plus} Add item
-            </button>
-          </header>
 
-          {form.requiredInventoryItems.length ? (
-            <div className="test-inventory-requirements">
-              {form.requiredInventoryItems.map((entry, index) => (
-                <article key={index}>
-                  <label>
-                    Inventory item
-                    <select value={entry.item} onChange={(e) => updateRequiredItem(index, "item", e.target.value)} required>
-                      <option value="">Select inventory item</option>
-                      {inventoryItems.map((item) => <option key={item._id} value={item._id}>{item.itemCode} - {item.name}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Quantity per test
-                    <input type="number" step="any" min="0" value={entry.quantityPerTest} onChange={(e) => updateRequiredItem(index, "quantityPerTest", e.target.value)} placeholder="0" required />
-                  </label>
-                  <label>
-                    Unit of measure
-                    <select value={entry.uom} onChange={(e) => updateRequiredItem(index, "uom", e.target.value)} required>
-                      <option value="">Select UOM</option>
-                      {inventoryUoms.filter((uom) => uom.status === "active").map((uom) => <option key={uom._id} value={uom._id}>{uom.name} ({uom.symbol})</option>)}
-                    </select>
-                  </label>
-                  <button type="button" className="test-master-icon-action danger" onClick={() => removeRequiredItem(index)} aria-label={`Remove inventory requirement ${index + 1}`}>
-                    {Icons.trash}
-                  </button>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="test-master-inline-empty">
-              <span>{Icons.vial}</span>
-              <div><strong>No inventory items linked</strong><p>Add reagents or consumables only when automatic stock deduction is required.</p></div>
-            </div>
-          )}
-        </section>
 
         <footer className="test-editor-actions">
           <div><strong>{form.parameters.length}</strong> result parameter{form.parameters.length === 1 ? "" : "s"} configured</div>

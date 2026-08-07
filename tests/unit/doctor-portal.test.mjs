@@ -31,3 +31,24 @@ test("login uses the explicit user-to-doctor relationship", async () => {
   assert.match(login, /user\.doctorId/);
   assert.doesNotMatch(login, /Doctor\.findOne\(\{ email: user\.email/);
 });
+
+test("doctor investor portal validates investor flag and analytics aggregations", async () => {
+  const portalSrc = await readFile(new URL("src/app/api/doctor/portal/route.js", root), "utf8");
+  const dashboardSrc = await readFile(new URL("src/app/(dashboard)/doctor/dashboard/page.js", root), "utf8");
+
+  // Backend validation: Investor checks, Account balances & monthly trends
+  assert.match(portalSrc, /doctor\.doctorType\s*===\s*"Investor"/);
+  assert.match(portalSrc, /totals\.revenue\s*-\s*totals\.expense/);
+  assert.match(portalSrc, /totals\.asset/);
+  assert.match(portalSrc, /totals\.liability/);
+  assert.match(portalSrc, /monthlyTrends/);
+  assert.match(portalSrc, /investorData/);
+
+  // Frontend validation: Toggle and Investor dashboard view rendering
+  assert.match(dashboardSrc, /doctorType\s*===\s*"Investor"/);
+  assert.match(dashboardSrc, /viewMode\s*===\s*"investor"/);
+  assert.match(dashboardSrc, /tab\s*===\s*"analytics"/);
+  assert.match(dashboardSrc, /tab\s*===\s*"lab-accounts"/);
+  assert.match(dashboardSrc, /tab\s*===\s*"lab-billings"/);
+  assert.match(dashboardSrc, /tab\s*===\s*"all-patients"/);
+});

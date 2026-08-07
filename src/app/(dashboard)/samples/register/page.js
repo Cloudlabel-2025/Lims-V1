@@ -10,6 +10,9 @@ export default function SampleRegistration() {
   const router = useRouter();
   const [patients, setPatients] = useState([]);
   const [tests, setTests] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [uoms, setUoms] = useState([]);
+  const [reservedInventory, setReservedInventory] = useState([]);
   const [form, setForm] = useState({ patient: "", testDefinition: "", sampleType: "", batchId: "", collectionTime: "", receivedTime: "" });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -20,12 +23,15 @@ export default function SampleRegistration() {
     setForm((prev) => ({ ...prev, receivedTime: getISTNow() }));
     async function fetchData() {
       try {
-        const [patRes, testRes] = await Promise.all([
+        const [patRes, testRes, invRes] = await Promise.all([
           cachedJsonFetch("/api/patient", { ttl: 15_000 }),
           cachedJsonFetch("/api/tests/definitions", { ttl: 30_000 }),
+          fetch("/api/inventory?limit=100").then(r => r.json()).catch(() => ({})),
         ]);
-        if (patRes.response.ok) setPatients(patRes.data.patients || []);
-        if (testRes.response.ok) setTests(testRes.data.tests || []);
+        if (patRes.response?.ok || patRes.patients) setPatients(patRes.patients || patRes.data?.patients || []);
+        if (testRes.response?.ok || testRes.tests) setTests(testRes.tests || testRes.data?.tests || []);
+        if (invRes.items) setInventoryItems(invRes.items || []);
+        if (invRes.uoms) setUoms(invRes.uoms || []);
       } catch (err) {
         console.error("Failed to fetch registration data:", err);
       }
@@ -42,6 +48,20 @@ export default function SampleRegistration() {
       return { ...prev, [name]: cleaned };
     });
   }
+
+  const addInventoryRow = () => {
+    setReservedInventory([...reservedInventory, { item: "", quantity: "", uom: "" }]);
+  };
+
+  const updateInventoryRow = (index, field, value) => {
+    setReservedInventory(
+      reservedInventory.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+    );
+  };
+
+  const removeInventoryRow = (index) => {
+    setReservedInventory(reservedInventory.filter((_, i) => i !== index));
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -78,7 +98,10 @@ export default function SampleRegistration() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          reservedInventory: reservedInventory.filter(ri => ri.item && ri.quantity && ri.uom)
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to register sample");
@@ -88,6 +111,7 @@ export default function SampleRegistration() {
 
       setSuccess(`Sample ${data.sample.sampleId} registered successfully.`);
       setForm({ patient: "", testDefinition: "", sampleType: "", batchId: "", collectionTime: "", receivedTime: getISTNow() });
+      setReservedInventory([]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -170,8 +194,94 @@ export default function SampleRegistration() {
           </div>
         </div>
 
+        {/* Inventory Consumption Form */}
+        <div className="form-card">
+          <div className="form-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h6>Inventory Consumption (Optional)</h6>
+            <button
+              type="button"
+              className="btn-lims-secondary"
+              style={{ padding: "4px 10px", fontSize: 12, height: "auto" }}
+              onClick={addInventoryRow}
+            >
+              + Add Item Used
+            </button>
+          </div>
+          <div className="form-card-body">
+            {reservedInventory.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {reservedInventory.map((entry, index) => (
+                  <div key={index} style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+                    <div style={{ flex: 2 }}>
+                      <label className="lims-label" style={{ fontSize: 11 }}>Inventory Item</label>
+                      <select
+                        className="lims-select"
+                        value={entry.item}
+                        onChange={(e) => updateInventoryRow(index, "item", e.target.value)}
+                        required
+                      >
+                        <option value="">Select inventory item</option>
+                        {inventoryItems.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {item.itemCode} - {item.name} (Stock: {item.stockOnHandBase} {item.baseUom?.symbol})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="lims-label" style={{ fontSize: 11 }}>Quantity</label>
+                      <input
+                        type="number"
+                        className="lims-input"
+                        step="any"
+                        min="0"
+                        value={entry.quantity}
+                        onChange={(e) => updateInventoryRow(index, "quantity", e.target.value)}
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="lims-label" style={{ fontSize: 11 }}>Unit of Measure</label>
+                      <select
+                        className="lims-select"
+                        value={entry.uom}
+                        onChange={(e) => updateInventoryRow(index, "uom", e.target.value)}
+                        required
+                      >
+                        <option value="">Select UOM</option>
+                        {uoms.filter((uom) => uom.status === "active").map((uom) => (
+                          <option key={uom._id} value={uom._id}>
+                            {uom.name} ({uom.symbol})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-lims-secondary"
+                      style={{ padding: "8px 12px", border: "1px solid #fee2e2", color: "#dc2626", height: 38 }}
+                      onClick={() => removeInventoryRow(index)}
+                      aria-label="Remove item"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: "#64748b", margin: 0, fontSize: 13 }}>
+                No inventory items selected. Add reagents or materials if consumed during sample collection.
+              </p>
+            )}
+          </div>
+        </div>
+
         <div className="form-actions">
-          <button type="button" className="btn-lims-secondary" onClick={() => setForm({ patient: "", testDefinition: "", sampleType: "", batchId: "", collectionTime: "", receivedTime: getISTNow() })}>Reset</button>
+          <button type="button" className="btn-lims-secondary" onClick={() => {
+            setForm({ patient: "", testDefinition: "", sampleType: "", batchId: "", collectionTime: "", receivedTime: getISTNow() });
+            setReservedInventory([]);
+          }}>Reset</button>
           <button type="submit" className="btn-lims-primary" disabled={loading}>{loading ? "Registering..." : "Register Sample"}</button>
         </div>
       </form>

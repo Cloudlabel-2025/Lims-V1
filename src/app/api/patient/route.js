@@ -1,7 +1,7 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
-import { createPatientAccessCredential } from "@/app/lib/patient-portal";
+import { createPatientAccessCredential, normalizeDob } from "@/app/lib/patient-portal";
 import { writeAuditLog } from "@/app/lib/audit";
 import { ensureQuotaPeriod, recordShadowUsage } from "@/app/lib/quota-meter";
 import { getShadowSubscriptionEntitlements } from "@/app/lib/subscription-service";
@@ -83,11 +83,34 @@ export async function POST(req) {
       }
     }
 
-    if (!force) {
-      const existing = await Patient.findOne({ phone: String(phone) }).sort({ createdAt: 1 });
-      if (existing) {
-        return Response.json({ warning: "Mobile already exists", patient: existing }, { status: 200 });
-      }
+    const cleanPhone = String(phone).replace(/\D/g, "");
+    const existingPatients = await Patient.find({
+      $or: [
+        { phone: cleanPhone },
+        { phone: `+91${cleanPhone}` },
+        { phone: `91${cleanPhone}` },
+      ],
+    }).lean();
+
+    if (existingPatients.length >= 2) {
+      return Response.json({
+        error: "Maximum of 2 patients can share the same mobile number. Registering a third patient is not allowed."
+      }, { status: 400 });
+    }
+
+    const inputDobNormalized = normalizeDob(dob);
+    const dobMatch = existingPatients.find(p => normalizeDob(p.dob) === inputDobNormalized);
+    if (dobMatch) {
+      return Response.json({
+        error: "A patient with this mobile number and date of birth is already registered."
+      }, { status: 400 });
+    }
+
+    if (existingPatients.length === 1 && !force) {
+      return Response.json({
+        warning: "Mobile already exists",
+        patient: existingPatients[0]
+      }, { status: 200 });
     }
 
     const [access, subscription] = await Promise.all([
@@ -106,10 +129,7 @@ export async function POST(req) {
       }], { session });
       await PatientPortalAccount.create([{
         patient: patient._id,
-        status: "invited",
-        activationTokenHash: access.tokenHash,
-        accessPinHash: access.accessPinHash,
-        activationExpiresAt: access.expiresAt,
+        status: "active",
         lastAccessSlipIssuedAt: new Date(),
       }], { session });
       quotaUsage = await recordShadowUsage({
@@ -135,7 +155,7 @@ export async function POST(req) {
     });
     return Response.json({
       ...patient.toObject(),
-      portalAccess: { activationUrl: access.activationUrl, accessPin: access.accessPin, expiresAt: access.expiresAt },
+      portalAccess: { activationUrl: access.portalUrl, expiresAt: access.expiresAt },
       quotaUsage: quotaUsage?.quota || null,
     }, { status: 201 });
   } catch (err) {

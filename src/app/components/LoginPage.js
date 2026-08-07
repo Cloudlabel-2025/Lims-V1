@@ -441,6 +441,12 @@ export default function LoginPage({
               </button>
             </form>
 
+            <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #e2e8f0", textAlign: "center" }}>
+              <a href={`/patient${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ""}`} style={{ color: "#0d9488", fontWeight: 700, textDecoration: "underline", fontSize: 14 }}>
+                🏥 Are you a Patient? Access Patient Portal here
+              </a>
+            </div>
+
           </div>
         </div>
       </div>

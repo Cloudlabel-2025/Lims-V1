@@ -14,13 +14,42 @@ export async function GET(req) {
       .select("billId items priority status totalAmount subtotalAmount discountAmount taxAmount paymentBreakdown billingStatus firstPaymentDate lastPaymentDate createdAt")
       .sort({ createdAt: -1 }).lean();
     const billIds = bills.map((bill) => bill._id);
-    const [reports, receipts] = await Promise.all([
+    const [reportsRaw, receipts] = await Promise.all([
       TestReport.find({ patient: patient._id, billingRecord: { $in: billIds }, status: "released" })
-        .select("reportId billingRecord testSnapshot results remarks status releasedAt createdAt")
+        .select("reportId billingRecord testSnapshot results remarks status reviewedBy reviewedAt approvedBy approvedAt releasedBy releasedAt version createdAt")
         .sort({ releasedAt: -1 }).lean(),
       PaymentReceipt.find({ tenantId: session.tenantId, patientId: patient._id, invoiceId: { $in: billIds } })
         .select("invoiceId amount method receivedAt isRefunded").sort({ receivedAt: -1 }).lean(),
     ]);
+
+    const { User } = await getTenantModels(session.tenantId);
+    const resolveNameAndRole = async (identifier) => {
+      if (!identifier) return identifier;
+      if (identifier.includes("(")) return identifier;
+
+      const query = identifier.includes("@")
+        ? { email: identifier.toLowerCase() }
+        : { userId: identifier.toUpperCase() };
+
+      const userDoc = await User.findOne(query).populate("role").lean();
+      if (userDoc) {
+        const fullName = [userDoc.firstName, userDoc.lastName].filter(Boolean).join(" ").trim();
+        if (fullName) {
+          return userDoc.role?.name
+            ? `${fullName} (${userDoc.role.name})`
+            : fullName;
+        }
+      }
+      return identifier;
+    };
+
+    const reports = [];
+    for (const report of reportsRaw) {
+      report.reviewedBy = await resolveNameAndRole(report.reviewedBy);
+      report.approvedBy = await resolveNameAndRole(report.approvedBy);
+      report.releasedBy = await resolveNameAndRole(report.releasedBy);
+      reports.push(report);
+    }
     await AuditLog.create({
       action: "patient.portal_viewed",
       tenantId: session.tenantId,

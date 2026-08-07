@@ -1,6 +1,7 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireTenantSession } from "@/app/lib/auth";
+import { normalizeDob } from "@/app/lib/patient-portal";
 
 function clean(value) {
   return String(value || "").trim();
@@ -47,6 +48,11 @@ export async function PUT(req, { params }) {
     const body = await req.json();
     const { id } = await params;
 
+    const existingPatient = await Patient.findById(id).lean();
+    if (!existingPatient) {
+      return Response.json({ error: "Patient not found" }, { status: 404 });
+    }
+
     // Remove immutable fields if present in body
     delete body.patientId;
     delete body._id;
@@ -54,6 +60,35 @@ export async function PUT(req, { params }) {
 
     if (body.phone && !/^\d{10}$/.test(String(body.phone))) {
       return Response.json({ error: "Mobile Number must be exactly 10 digits" }, { status: 400 });
+    }
+
+    const targetPhone = body.phone !== undefined ? body.phone : existingPatient.phone;
+    const targetDob = body.dob !== undefined ? body.dob : existingPatient.dob;
+
+    if (body.phone !== undefined || body.dob !== undefined) {
+      const cleanPhone = String(targetPhone).replace(/\D/g, "");
+      const existingPatientsSharingPhone = await Patient.find({
+        _id: { $ne: id },
+        $or: [
+          { phone: cleanPhone },
+          { phone: `+91${cleanPhone}` },
+          { phone: `91${cleanPhone}` },
+        ],
+      }).lean();
+
+      if (existingPatientsSharingPhone.length >= 2) {
+        return Response.json({
+          error: "Maximum of 2 patients can share the same mobile number. Registering a third patient is not allowed."
+        }, { status: 400 });
+      }
+
+      const targetDobNormalized = normalizeDob(targetDob);
+      const dobMatch = existingPatientsSharingPhone.find(p => normalizeDob(p.dob) === targetDobNormalized);
+      if (dobMatch) {
+        return Response.json({
+          error: "A patient with this mobile number and date of birth is already registered."
+        }, { status: 400 });
+      }
     }
 
     if (body.uhId && !/^[A-Za-z0-9]{14}$/.test(String(body.uhId))) {

@@ -3,6 +3,8 @@ import path from "node:path";
 import process from "node:process";
 import mongoose from "mongoose";
 import { hashPassword, validatePasswordPolicy } from "../src/app/lib/password.js";
+import { seedDefaultTests } from "../src/app/lib/test-seeder.js";
+import { seedDefaultInventory } from "../src/app/lib/inventory-seeder.js";
 import { getDoctorModel } from "../src/app/models/tenant/Doctor.js";
 import { getLabModel } from "../src/app/models/master/Lab.js";
 import { getRoleTemplateModel } from "../src/app/models/master/RoleTemplate.js";
@@ -170,6 +172,8 @@ async function main() {
     .asPromise();
 
   await initializeTenantCollections(tenantConnection);
+  await seedDefaultTests(tenantConnection);
+  await seedDefaultInventory(tenantConnection);
   const adminRole = await createTenantRoles(masterConnection, tenantConnection);
 
   const User = getUserModel(tenantConnection);

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import WysiwygEditor from "@/app/components/WysiwygEditor";
 
 function rangeText(parameter) {
   const hasMin = Number.isFinite(parameter.normalMin);
@@ -23,6 +24,7 @@ function getFlag(parameter, rawValue) {
 
 export default function StepReview({ testDef, sample, results, onBack, onSubmit, submitting }) {
   const [confirming, setConfirming] = useState(false);
+  const [notes, setNotes] = useState(sample?.notes || "");
   const parameters = useMemo(
     () => (testDef?.parameters || []).slice().sort((a, b) => a.sortOrder - b.sortOrder),
     [testDef]
@@ -82,6 +84,18 @@ export default function StepReview({ testDef, sample, results, onBack, onSubmit,
         })}
       </div>
 
+      <div style={{ marginBottom: 24 }}>
+        <label className="lims-label" style={{ fontWeight: 650, display: "flex", alignItems: "center", gap: 6 }}>
+          Optional Instructions / Result Description
+          <span style={{ fontSize: "11px", fontWeight: "normal", color: "var(--text-muted)", background: "var(--surface-light, #f8fafc)", padding: "2px 6px", borderRadius: "4px", border: "1px solid var(--border)" }}>Optional</span>
+        </label>
+        <WysiwygEditor
+          value={notes}
+          onChange={setNotes}
+          placeholder="Add clinical instructions, detailed observations, or test result description..."
+        />
+      </div>
+
       <div className="wizard-nav">
         <button className="dash-btn-secondary" onClick={onBack} disabled={submitting}>
           {Icons.arrowLeft} Back
@@ -101,7 +115,7 @@ export default function StepReview({ testDef, sample, results, onBack, onSubmit,
               <button className="dash-btn-secondary" onClick={() => setConfirming(false)} disabled={submitting}>
                 Cancel
               </button>
-              <button className="dash-btn-primary" onClick={() => { setConfirming(false); onSubmit(); }} disabled={submitting}>
+              <button className="dash-btn-primary" onClick={() => { setConfirming(false); onSubmit(notes); }} disabled={submitting}>
                 {submitting ? "Submitting..." : "Confirm"}
               </button>
             </div>

@@ -54,7 +54,7 @@ function WizardInner() {
       .finally(() => setLoading(false));
   }, [sampleId]);
 
-  async function handleSubmit() {
+  async function handleSubmit(finalNotes) {
     setSubmitting(true);
     setError("");
     try {
@@ -62,7 +62,7 @@ function WizardInner() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action: "record-results", results }),
+        body: JSON.stringify({ action: "record-results", results, notes: finalNotes }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save results");

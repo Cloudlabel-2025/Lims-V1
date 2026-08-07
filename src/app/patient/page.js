@@ -14,99 +14,52 @@ function tenantFromBrowser(params) {
 function PatientLogin() {
   const router = useRouter();
   const params = useSearchParams();
-  const initialTenant = tenantFromBrowser(params);
 
-  const [tenantId, setTenantId] = useState(() => initialTenant || "");
+  const [tenantId, setTenantId] = useState("");
+  const [initialTenant, setInitialTenant] = useState("");
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState("phone"); // 'phone' | 'otp'
+  const [dob, setDob] = useState("");
   const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [devOtp, setDevOtp] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Check for auto-login via WhatsApp token link parameter
   useEffect(() => {
-    const token = params.get("token");
-    const tenantParam = params.get("tenantId") || initialTenant;
-    if (token && tenantParam) {
-      setLoading(true);
-      fetch("/api/patient-portal/token-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId: tenantParam, token }),
-      })
-        .then(async (res) => {
-          const data = await res.json();
-          if (res.ok) {
-            router.replace(`/patient/portal?tenantId=${encodeURIComponent(tenantParam)}`);
-          } else {
-            setError(data.error || "Invalid or expired WhatsApp login link.");
-            setLoading(false);
-          }
-        })
-        .catch(() => {
-          setError("Unable to process WhatsApp login link.");
-          setLoading(false);
-        });
+    const tenant = tenantFromBrowser(params);
+    setInitialTenant(tenant);
+    if (tenant) {
+      setTenantId(tenant);
     }
-  }, [params, initialTenant, router]);
+  }, [params]);
 
-  // Handle Send OTP
-  async function handleSendOtp(e) {
+  // Handle Login
+  async function handleLogin(e) {
     e.preventDefault();
     if (!phone || phone.replace(/\D/g, "").length !== 10) {
       return setError("Please enter a valid 10-digit mobile number");
     }
-    setLoading(true);
-    setError("");
-    setSuccessMsg("");
-
-    try {
-      const res = await fetch("/api/patient-portal/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId, phone: phone.replace(/\D/g, "") }),
-      });
-      const data = await res.json();
-      setLoading(false);
-
-      if (!res.ok) {
-        return setError(data.error || "Unable to send OTP");
-      }
-
-      setSuccessMsg(data.message || "OTP sent successfully!");
-      if (data.devOtp) setDevOtp(data.devOtp);
-      setStep("otp");
-    } catch (err) {
-      setLoading(false);
-      setError("Network error. Please try again.");
-    }
-  }
-
-  // Handle Verify OTP
-  async function handleVerifyOtp(e) {
-    e.preventDefault();
-    if (!otp || otp.length !== 6) {
-      return setError("Please enter the 6-digit OTP sent to your mobile");
+    if (!dob) {
+      return setError("Please select your date of birth");
     }
     setLoading(true);
     setError("");
 
     try {
-      const res = await fetch("/api/patient-portal/verify-otp", {
+      const res = await fetch("/api/patient-portal/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId, phone: phone.replace(/\D/g, ""), otp }),
+        body: JSON.stringify({
+          tenantId: tenantId || "mega",
+          phone: phone.replace(/\D/g, ""),
+          dob
+        }),
       });
       const data = await res.json();
       setLoading(false);
 
       if (!res.ok) {
-        return setError(data.error || "Invalid OTP code");
+        return setError(data.error || "Invalid mobile number or date of birth");
       }
 
-      router.replace(`/patient/portal?tenantId=${encodeURIComponent(tenantId)}`);
+      router.replace(`/patient/portal?tenantId=${encodeURIComponent(tenantId || "mega")}`);
     } catch (err) {
       setLoading(false);
       setError("Network error. Please try again.");
@@ -120,115 +73,74 @@ function PatientLogin() {
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{ fontSize: 52, marginBottom: 8 }}>🏥</div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: "4px 0" }}>Patient Portal Login</h1>
-          <p style={{ color: "#0d9488", fontSize: 16, fontWeight: 700, margin: 0 }}>எனது ஆய்வக அறிக்கைகள்</p>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: "4px 0" }}>Patient Portal</h1>
+          <p style={{ color: "#0d9488", fontSize: 16, fontWeight: 700, margin: 0 }}>நோயாளி போர்டல்</p>
           <small style={{ color: "#64748b", fontSize: 13, display: "block", marginTop: 4 }}>Access your test reports, visit history & billing receipts</small>
         </div>
 
         {/* Error Alert */}
         {error && (
           <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", padding: "12px 16px", borderRadius: 12, marginBottom: 18, fontSize: 14, fontWeight: 600 }}>
-            {error}
+            ⚠️ {error}
           </div>
         )}
 
-        {/* Success Alert */}
-        {successMsg && (
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", padding: "12px 16px", borderRadius: 12, marginBottom: 18, fontSize: 14, fontWeight: 600 }}>
-            {successMsg}
-            {devOtp && (
-              <div style={{ marginTop: 6, fontSize: 13, background: "#dcfce7", padding: "4px 8px", borderRadius: 6, display: "inline-block" }}>
-                🔑 Dev Testing OTP: <strong>{devOtp}</strong>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Step 1: Phone Entry Form */}
-        {step === "phone" && (
-          <form onSubmit={handleSendOtp} style={{ display: "grid", gap: 18 }}>
-            {!initialTenant && (
-              <label style={labelStyle}>
-                Lab Code / lab ID
-                <input
-                  value={tenantId}
-                  onChange={(e) => setTenantId(e.target.value)}
-                  style={fieldStyle}
-                  placeholder="e.g. mega"
-                  required
-                />
-              </label>
-            )}
-
+        <form onSubmit={handleLogin} style={{ display: "grid", gap: 18 }}>
+          {!initialTenant && (
             <label style={labelStyle}>
-              Mobile Number / கைபேசி எண்
-              <div style={{ position: "relative", marginTop: 6 }}>
-                <span style={{ position: "absolute", left: 14, top: 16, fontSize: 16, fontWeight: 700, color: "#64748b" }}>+91</span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                  style={{ ...fieldStyle, marginTop: 0, paddingLeft: 54 }}
-                  placeholder="9876543210"
-                  required
-                  autoFocus
-                />
-              </div>
-            </label>
-
-            <button disabled={loading} style={primaryBtnStyle}>
-              {loading ? "Sending OTP..." : "📱 Get Login OTP / OTP பெறுக"}
-            </button>
-          </form>
-        )}
-
-        {/* Step 2: OTP Verification Form */}
-        {step === "otp" && (
-          <form onSubmit={handleVerifyOtp} style={{ display: "grid", gap: 18 }}>
-            <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: 10, fontSize: 14, color: "#334155", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Sending OTP to: <strong>+91 {phone}</strong></span>
-              <button
-                type="button"
-                onClick={() => { setStep("phone"); setError(""); setSuccessMsg(""); }}
-                style={{ border: 0, background: "transparent", color: "#0d9488", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
-              >
-                Change
-              </button>
-            </div>
-
-            <label style={labelStyle}>
-              Enter 6-digit OTP / OTP உள்ளிடவும்
+              Lab Code / lab ID
               <input
-                type="text"
+                value={tenantId}
+                onChange={(e) => setTenantId(e.target.value)}
+                style={fieldStyle}
+                placeholder="e.g. mega"
+                required
+              />
+            </label>
+          )}
+
+          <label style={labelStyle}>
+            Username (Mobile Number) / கைபேசி எண்
+            <div style={{ position: "relative", marginTop: 6 }}>
+              <span style={{ position: "absolute", left: 14, top: 16, fontSize: 16, fontWeight: 700, color: "#64748b" }}>+91</span>
+              <input
+                type="tel"
                 inputMode="numeric"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                style={{ ...fieldStyle, fontSize: 28, letterSpacing: 10, textAlign: "center", fontWeight: 800 }}
-                placeholder="••••••"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                style={{ ...fieldStyle, marginTop: 0, paddingLeft: 54 }}
+                placeholder="9876543210"
                 required
                 autoFocus
               />
-            </label>
+            </div>
+          </label>
 
-            <button disabled={loading} style={primaryBtnStyle}>
-              {loading ? "Verifying..." : "🔓 Verify & Open My Reports / அறிக்கைகளைத் திற"}
-            </button>
+          <label style={{ ...labelStyle, display: "block", marginTop: 10 }}>
+            Password (Date of Birth) / பிறந்த தேதி
+            <input
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              style={fieldStyle}
+              required
+            />
+          </label>
 
-            <button
-              type="button"
-              disabled={loading}
-              onClick={handleSendOtp}
-              style={{ border: "1px solid #cbd5e1", borderRadius: 12, background: "white", padding: 12, fontSize: 14, fontWeight: 700, color: "#475569", cursor: "pointer" }}
-            >
-              🔄 Resend OTP
-            </button>
-          </form>
-        )}
+          <button disabled={loading} style={primaryBtnStyle}>
+            {loading ? "Signing in..." : "🔓 Sign In / உள்நுழைக"}
+          </button>
+        </form>
+
 
         {/* Footer Guidance */}
-        <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #f1f5f9", textAlign: "center", color: "#64748b", fontSize: 13 }}>
-          💡 <strong>WhatsApp Login:</strong> If you received a login link on WhatsApp from your diagnostic lab, simply click the link to sign in instantly!
+        <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #f1f5f9", textAlign: "center", color: "#64748b", fontSize: 13, lineHeight: "1.5" }}>
+          🔒 Your Username is your registered Mobile Number and your Password is your Date of Birth.
+          <div style={{ marginTop: 12 }}>
+            <a href="/login" style={{ color: "#0d9488", fontWeight: 700, textDecoration: "underline" }}>
+              👨‍⚕️ Staff or Doctor? Sign in to Console here
+            </a>
+          </div>
         </div>
       </section>
     </main>

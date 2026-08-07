@@ -26,17 +26,16 @@ export async function POST(req, { params }) {
     const access = await createPatientAccessCredential(auth.tenantId, req.url);
     await PatientPortalAccount.findOneAndUpdate(
       { patient: patient._id },
-      { $set: { status: "invited", activationTokenHash: access.tokenHash, accessPinHash: access.accessPinHash, activationExpiresAt: access.expiresAt, lastAccessSlipIssuedAt: new Date() }, $inc: { credentialVersion: 1 } },
+      { $set: { status: "active", lastAccessSlipIssuedAt: new Date() }, $inc: { credentialVersion: 1 } },
       { upsert: true, runValidators: true, setDefaultsOnInsert: false }
     );
-    const qrDataUrl = await QRCode.toDataURL(access.activationUrl, { errorCorrectionLevel: "M", margin: 2, width: 320 });
-    const whatsAppShareUrl = buildWhatsAppShareUrl(auth.tenantId, req.url, patient.name, patient.phone, access.activationUrl);
+    const qrDataUrl = await QRCode.toDataURL(access.portalUrl, { errorCorrectionLevel: "M", margin: 2, width: 320 });
+    const whatsAppShareUrl = buildWhatsAppShareUrl(auth.tenantId, req.url, patient.name, patient.phone, access.portalUrl);
     await writeAuditLog(req, auth, { action: "patient.portal_access_slip_issued", resourceType: "Patient", resourceId: patient._id, metadata: { expiresAt: access.expiresAt } });
     return Response.json({
       patient: { name: patient.name, patientId: patient.patientId, phone: patient.phone, phoneLast4: String(patient.phone || "").slice(-4) },
-      activationUrl: access.activationUrl,
+      activationUrl: access.portalUrl,
       whatsAppShareUrl,
-      accessPin: access.accessPin,
       expiresAt: access.expiresAt,
       qrDataUrl,
     });

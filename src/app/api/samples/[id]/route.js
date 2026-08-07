@@ -122,6 +122,7 @@ export async function PUT(req, { params }) {
       }
 
       sample.results = results;
+      sample.notes = notes;
       try {
         const statusChain = ["registered", "collected", "processing", "completed"];
         const currentIdx = statusChain.indexOf(sample.status);
@@ -191,60 +192,6 @@ export async function PUT(req, { params }) {
           }
         }
         sample.reservedInventory = [];
-      } else if (testWithInventory?.requiredInventoryItems?.length) {
-        for (const reqItem of testWithInventory.requiredInventoryItems) {
-          const item = reqItem.item;
-          const uom = reqItem.uom;
-          if (!item || !uom) continue;
-
-          const quantityInBase = reqItem.quantityPerTest * (uom.conversionToBase || 1);
-
-          if ((item.stockOnHandBase || 0) < quantityInBase) {
-            console.warn(`[INVENTORY] Low stock for ${item.name}: needed ${quantityInBase} ${item.baseUom}, have ${item.stockOnHandBase}`);
-            continue;
-          }
-
-          let remaining = quantityInBase;
-          const availableBatches = (item.batches || [])
-            .filter((b) => b.status === "available" && b.quantityBase > 0)
-            .sort((a, b) => {
-              if (!a.expiryDate) return 1;
-              if (!b.expiryDate) return -1;
-              return new Date(a.expiryDate) - new Date(b.expiryDate);
-            });
-
-          for (const batch of availableBatches) {
-            if (remaining <= 0) break;
-            const deductQty = Math.min(remaining, batch.quantityBase);
-            remaining -= deductQty;
-
-            const batchUpdate = { $inc: { "batches.$.quantityBase": -deductQty } };
-            if (batch.quantityBase - deductQty <= 0) {
-              batchUpdate.$set = { "batches.$.status": "consumed" };
-            }
-
-            await InventoryItem.findOneAndUpdate(
-              { _id: item._id, "batches._id": batch._id },
-              { $inc: { stockOnHandBase: -deductQty }, ...batchUpdate }
-            );
-
-            await InventoryMovement.create({
-              item: item._id,
-              batchId: batch._id,
-              movementType: "issue",
-              quantityBase: -deductQty,
-              balanceAfterBase: Math.max(0, (item.stockOnHandBase || 0) - deductQty),
-              reason: `Auto-consumed for sample ${sample.sampleId}`,
-              referenceNo: sample.sampleId,
-              performedBy: handledBy,
-              movementDate: new Date(),
-            });
-          }
-
-          if (remaining > 0) {
-            console.warn(`[INVENTORY] Partial consumption for ${item.name}: ${quantityInBase - remaining}/${quantityInBase} consumed, ${remaining} short`);
-          }
-        }
       }
 
       const testSnapshot = {
@@ -262,6 +209,7 @@ export async function PUT(req, { params }) {
         sampleId: sample.sampleId,
         testSnapshot,
         results: sample.results,
+        remarks: sample.notes || "",
         status: "draft",
         enteredBy: handledBy,
         template: "test-report",

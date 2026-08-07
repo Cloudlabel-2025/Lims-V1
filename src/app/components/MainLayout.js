@@ -6,6 +6,7 @@ import Topbar from "./Topbar";
 import { canAccessPath, getFirstAllowedHref } from "@/app/lib/client-rbac";
 import { applyTheme } from "@/app/components/ThemeProvider";
 import { TenantShellProvider } from "@/app/lib/use-current-user";
+import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 
 function isCurrentTenantHost(tenantId) {
   if (typeof window === "undefined" || !tenantId) return false;
@@ -109,6 +110,50 @@ export default function MainLayout({ children }) {
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [timeLeft, setTimeLeft] = useState(12);
+  const [isLocked, setIsLocked] = useState(false);
+
+  const isPreviewMode = useMemo(() => {
+    if (loading || !theme) return false;
+    const enabledModules = new Set(theme.enabledModules || defaultLabModules);
+    const currentModule = availableLabModules.find(
+      (m) => m.href !== "/dashboard" && (pathname === m.href || pathname.startsWith(`${m.href}/`))
+    );
+    return currentModule && !enabledModules.has(currentModule.id);
+  }, [loading, theme, pathname]);
+
+  const currentModuleName = useMemo(() => {
+    const currentModule = availableLabModules.find(
+      (m) => m.href !== "/dashboard" && (pathname === m.href || pathname.startsWith(`${m.href}/`))
+    );
+    return currentModule?.label || "this";
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isPreviewMode) {
+      setIsLocked(false);
+      setTimeLeft(12);
+      return;
+    }
+
+    setIsLocked(false);
+    setTimeLeft(12);
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setIsLocked(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [isPreviewMode, pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,6 +238,14 @@ export default function MainLayout({ children }) {
           user={user}
         />
         <div className="dash-main">
+          {isPreviewMode && !isLocked && (
+            <div className="preview-topbar">
+              <span>
+                ⚡ <strong>Preview Mode:</strong> You are exploring the <strong>{currentModuleName}</strong> module. 
+                This page will lock in <strong>{timeLeft}</strong> seconds.
+              </span>
+            </div>
+          )}
           <Topbar
             onToggleSidebar={() => {
               if (window.innerWidth <= 768) {
@@ -205,16 +258,45 @@ export default function MainLayout({ children }) {
             theme={theme}
           />
           <div className="dash-content">
-            <main className="tenant-page-viewport">
-              {hasPageAccess ? (
-                children
-              ) : (
-                <section className="dash-card tenant-access-denied">
-                  <div className="dash-card-header">
-                    <h3>Access denied</h3>
+            <main className="tenant-page-viewport" style={{ position: "relative" }}>
+              <div className={isLocked ? "preview-locked-blur" : ""} style={{ transition: "filter 0.3s ease-in-out" }}>
+                {hasPageAccess ? (
+                  children
+                ) : (
+                  <section className="dash-card tenant-access-denied">
+                    <div className="dash-card-header">
+                      <h3>Access denied</h3>
+                    </div>
+                    <p>Your role does not have permission to view this page.</p>
+                  </section>
+                )}
+              </div>
+
+              {isLocked && (
+                <div className="preview-locked-overlay">
+                  <div className="preview-locked-card">
+                    <div className="preview-locked-icon">🔒</div>
+                    <h2>Unlock Full Access</h2>
+                    <p>
+                      The <strong>{currentModuleName}</strong> module is not included in your current subscription package. 
+                      Upgrade your plan to unlock full access and manage your workflows.
+                    </p>
+                    <div className="preview-locked-features">
+                      <div className="feature-item">✓ Full features & data management</div>
+                      <div className="feature-item">✓ Active system workflow support</div>
+                      <div className="feature-item">✓ 24/7 dedicated enterprise support</div>
+                    </div>
+                    <button
+                      className="dash-btn-primary preview-upgrade-btn"
+                      onClick={() => {
+                        const settingsPath = buildTenantQueryPath("/subscription", user?.tenantId);
+                        router.push(settingsPath);
+                      }}
+                    >
+                      Upgrade Subscription Plan
+                    </button>
                   </div>
-                  <p>Your role does not have permission to view this page.</p>
-                </section>
+                </div>
               )}
             </main>
           </div>

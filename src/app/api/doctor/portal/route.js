@@ -29,9 +29,9 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const search = String(searchParams.get("search") || "").trim().toLowerCase();
-    const { Doctor, Patient, TestRequest, BillingRecord, TestReport, JournalEntry } = await getTenantModels(auth.tenantId);
+    const { Doctor, Patient, TestRequest, BillingRecord, TestReport, JournalEntry, Account } = await getTenantModels(auth.tenantId);
     const doctor = await Doctor.findById(auth.session.doctorId)
-      .select("name doctorId speciality clinicName status commission pendingPayout")
+      .select("name doctorId speciality clinicName status commission pendingPayout doctorType")
       .lean();
     if (!doctor || doctor.status !== "Active") {
       return Response.json({ error: "Doctor profile is not active" }, { status: 403 });
@@ -102,6 +102,117 @@ export async function GET(req) {
         )
       : bills;
 
+    let investorData = null;
+    if (doctor.doctorType === "Investor") {
+      const [allPatients, allBills, allAccounts] = await Promise.all([
+        Patient.find({})
+          .select("patientId name age gender phone email address refDoctorName createdAt")
+          .sort({ createdAt: -1 })
+          .limit(1000)
+          .lean(),
+        BillingRecord.find({ status: { $ne: "cancelled" } })
+          .populate("patient", "name patientId age gender phone")
+          .select("billId patient items status billingStatus totalAmount totalPaid balanceDue referralDoctor createdAt")
+          .sort({ createdAt: -1 })
+          .limit(1000)
+          .lean(),
+        Account.find({ tenantId: auth.tenantId }).sort({ code: 1 }).lean(),
+      ]);
+
+      const totals = { asset: 0, liability: 0, equity: 0, revenue: 0, expense: 0 };
+      for (const a of allAccounts) {
+        totals[a.type] = (totals[a.type] || 0) + Number(a.balance || 0);
+      }
+      const netProfit = totals.revenue - totals.expense;
+      const profitMargin = totals.revenue > 0 ? (netProfit / totals.revenue) * 100 : 0;
+
+      // Group JournalEntry for last 12 months trends
+      const last12Months = new Date();
+      last12Months.setMonth(last12Months.getMonth() - 11);
+      last12Months.setDate(1);
+      last12Months.setHours(0, 0, 0, 0);
+
+      const journalLines = await JournalEntry.aggregate([
+        { $match: { tenantId: auth.tenantId, isReversed: false, date: { $gte: last12Months } } },
+        { $unwind: "$lines" },
+        {
+          $group: {
+            _id: {
+              month: { $dateToString: { format: "%Y-%m", date: "$date" } },
+              accountId: "$lines.accountId"
+            },
+            debit: { $sum: "$lines.debit" },
+            credit: { $sum: "$lines.credit" }
+          }
+        }
+      ]);
+
+      const accountMapForTrend = new Map(allAccounts.map(a => [String(a._id), a]));
+      const monthlyDataMap = {};
+
+      for (const line of journalLines) {
+        const acc = accountMapForTrend.get(String(line._id.accountId));
+        if (!acc || (acc.type !== "revenue" && acc.type !== "expense")) continue;
+        const month = line._id.month;
+        if (!monthlyDataMap[month]) {
+          monthlyDataMap[month] = { revenue: 0, expense: 0 };
+        }
+        const balance = acc.type === "revenue"
+          ? (line.credit - line.debit)
+          : (line.debit - line.credit);
+        
+        if (acc.type === "revenue") {
+          monthlyDataMap[month].revenue += balance;
+        } else {
+          monthlyDataMap[month].expense += balance;
+        }
+      }
+
+      const monthlyTrends = Object.entries(monthlyDataMap).map(([month, vals]) => ({
+        month,
+        revenue: Math.round(vals.revenue * 100) / 100,
+        expense: Math.round(vals.expense * 100) / 100,
+        netProfit: Math.round((vals.revenue - vals.expense) * 100) / 100
+      })).sort((a, b) => a.month.localeCompare(b.month));
+
+      investorData = {
+        patients: allPatients,
+        billings: allBills.map(b => ({
+          _id: b._id,
+          billId: b.billId,
+          patientName: b.patient?.name || "N/A",
+          patientId: b.patient?.patientId || "N/A",
+          phone: b.patient?.phone || "N/A",
+          age: b.patient?.age,
+          gender: b.patient?.gender,
+          totalAmount: b.totalAmount,
+          totalPaid: b.totalPaid || 0,
+          balanceDue: b.balanceDue || 0,
+          status: b.status,
+          billingStatus: b.billingStatus,
+          createdAt: b.createdAt
+        })),
+        accounts: allAccounts.map(a => ({
+          _id: a._id,
+          code: a.code,
+          name: a.name,
+          type: a.type,
+          subtype: a.subtype,
+          balance: a.balance || 0
+        })),
+        analytics: {
+          totalAssets: totals.asset,
+          totalLiabilities: totals.liability,
+          totalEquity: totals.equity,
+          totalRevenue: totals.revenue,
+          totalExpenses: totals.expense,
+          netProfit,
+          profitMargin,
+          monthlyTrends
+        }
+      };
+    }
+
     return Response.json({
       doctor,
       summary: {
@@ -137,6 +248,7 @@ export async function GET(req) {
         amount: amountFromJournal(entry),
         description: entry.description,
       })),
+      investorData
     });
   } catch (error) {
     return jsonError("Unable to load doctor portal", error, 500);
@@ -172,8 +284,8 @@ export async function POST(req) {
     // 1. Doctor Registers New Patient
     if (action === "register_patient") {
       const { name, phone, age, dob, gender, genderIdentity, address, email } = body;
-      if (!name || !phone) {
-        return Response.json({ error: "Patient name and phone number are required" }, { status: 400 });
+      if (!name || !phone || !dob) {
+        return Response.json({ error: "Patient name, phone number, and date of birth are required" }, { status: 400 });
       }
 
       const rawPhone = String(phone).replace(/\D/g, "");
@@ -181,8 +293,19 @@ export async function POST(req) {
         return Response.json({ error: "Phone number must be exactly 10 digits" }, { status: 400 });
       }
 
-      const parsedAge = Math.max(0, Math.min(150, Math.floor(Number(age) || 30)));
-      const computedDob = dob ? new Date(dob) : new Date(new Date().setFullYear(new Date().getFullYear() - parsedAge));
+      const computedDob = new Date(dob);
+      if (isNaN(computedDob.getTime())) {
+        return Response.json({ error: "Invalid date of birth" }, { status: 400 });
+      }
+
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - computedDob.getFullYear();
+      const m = today.getMonth() - computedDob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < computedDob.getDate())) {
+        calculatedAge--;
+      }
+      const parsedAge = Math.max(0, Math.min(150, calculatedAge));
+
       const validGender = ["Male", "Female", "Other"].includes(gender) ? gender : "Male";
       const validGenderIdentity = validGender === "Other" && ["Transwomen", "Transman"].includes(genderIdentity) ? genderIdentity : undefined;
       const validAddress = String(address || "").trim() || "N/A";

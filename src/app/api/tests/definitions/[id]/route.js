@@ -90,8 +90,8 @@ function normalizeParameters(parameters, errors) {
         return null;
       }
 
-      if (!/^[0-9]+(\.[0-9]+)?$/.test(unit)) {
-        errors.push(`Parameter ${index + 1} unit should be only measured in numerals`);
+      if (!/^[A-Za-z0-9 .&'\/,()@_#%µ\-]*$/.test(unit)) {
+        errors.push(`Parameter ${index + 1} unit contains invalid characters`);
         return null;
       }
 

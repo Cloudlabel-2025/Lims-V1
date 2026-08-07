@@ -31,7 +31,8 @@ test("doctor validation rejects invalid, empty, and illegal MCI numbers", () => 
   assert.equal(isValidMciNumber("^^)%$546$#@"), false);
   assert.equal(isValidMciNumber("https://www.youtube.com/watch?v=wFn8Exk6I9I"), false);
 
-  assert.match(validateDoctorPayload({ ...validDoctor, mciNumber: "" }).mciNumber, /required/);
+  // MCI is optional — empty value should NOT produce an error
+  assert.strictEqual(validateDoctorPayload({ ...validDoctor, mciNumber: "" }).mciNumber, undefined);
 });
 
 test("doctor validation rejects illegal qualification text", () => {

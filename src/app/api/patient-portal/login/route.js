@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { isValidPortalPin, normalizeDob } from "@/app/lib/patient-portal";
-import { verifyPassword } from "@/app/lib/password";
+import { normalizeDob } from "@/app/lib/patient-portal";
 import { checkRateLimit, getClientIp } from "@/app/lib/rate-limit";
 import { createPatientSessionToken, setPatientSessionCookie } from "@/app/lib/patient-session";
 import { jsonError } from "@/app/lib/api-response";
-
 import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
 import { hasPatientPortalEntitlement } from "@/app/lib/portal-policy";
 
@@ -14,52 +12,73 @@ export async function POST(req) {
   try {
     const body = await req.json();
     const tenantId = normalizeTenantId(body.tenantId);
-    const identifier = String(body.patientId || body.phone || body.username || "").trim();
-    const portalPin = String(body.portalPin || body.password || "").trim();
+    const phone = String(body.phone || body.username || "").trim().replace(/\D/g, "");
+    const dob = normalizeDob(body.dob || body.password || "");
 
-    if (!identifier || !portalPin) {
-      return Response.json({ error: "Enter patient ID or Phone number and Password / PIN" }, { status: 400 });
+    if (!phone || !dob) {
+      return Response.json({ error: "Please enter your mobile number and date of birth" }, { status: 400 });
     }
 
     const subscription = await getLabSubscriptionEntitlements(tenantId);
     if (!hasPatientPortalEntitlement(subscription)) {
       return Response.json({
-        error: "Patient Portal access is not included in your lab's active subscription package. Contact laboratory to enable portal access.",
+        error: "Patient Portal access is not enabled in your laboratory's active subscription package. Contact your laboratory administrator to enable Patient Portal.",
       }, { status: 403 });
     }
 
     const ip = getClientIp(req);
-    const limit = await checkRateLimit({ namespace: "patient-login", identifier: `${tenantId}:${identifier}:${ip}`, maxAttempts: 5, windowMs: 15 * 60 * 1000 });
+    const limit = await checkRateLimit({ namespace: "patient-login", identifier: `${tenantId}:${phone}:${ip}`, maxAttempts: 5, windowMs: 15 * 60 * 1000 });
     if (!limit.allowed) return Response.json({ error: `Too many attempts. Try again in ${limit.retryAfter} seconds.` }, { status: 429 });
 
     const { Patient, PatientPortalAccount } = await getTenantModels(tenantId);
-    const patient = await Patient.findOne({
+
+    // Find all patients sharing this mobile number
+    const patients = await Patient.find({
       $or: [
-        { patientId: identifier.toUpperCase() },
-        { phone: identifier },
-        { phone: identifier.replace(/[^0-9]/g, "") },
+        { phone },
+        { phone: `+91${phone}` },
+        { phone: `91${phone}` },
       ],
     }).select("name patientId dob phone").lean();
 
-    const account = patient ? await PatientPortalAccount.findOne({ patient: patient._id }).select("+portalPinHash status credentialVersion failedLoginAttempts lockedUntil") : null;
-    if (!patient || !account || !["active", "locked"].includes(account.status)) {
-      return Response.json({ error: "Invalid patient ID/Phone or Password/PIN" }, { status: 401 });
+    // Match the specific patient by date of birth
+    const patient = patients.find(p => normalizeDob(p.dob) === dob);
+
+    if (!patient) {
+      return Response.json({ error: "Invalid mobile number or date of birth" }, { status: 401 });
     }
-    if (account.lockedUntil && account.lockedUntil > new Date()) return Response.json({ error: "Portal is temporarily locked. Contact the laboratory or try later." }, { status: 423 });
-    if (!account.portalPinHash || !(await verifyPassword(portalPin, account.portalPinHash))) {
-      const attempts = Number(account.failedLoginAttempts || 0) + 1;
-      account.failedLoginAttempts = attempts;
-      if (attempts >= 5) { account.status = "locked"; account.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); }
+
+    // Retrieve or auto-create the PatientPortalAccount
+    let account = await PatientPortalAccount.findOne({ patient: patient._id }).select("status credentialVersion");
+    if (!account) {
+      account = await PatientPortalAccount.create({
+        patient: patient._id,
+        status: "active",
+        activatedAt: new Date(),
+        lastLoginAt: new Date(),
+        credentialVersion: 1
+      });
+    } else {
+      if (account.status === "disabled") {
+        return Response.json({ error: "Patient Portal access is disabled for this account." }, { status: 403 });
+      }
+      account.status = "active";
+      account.lastLoginAt = new Date();
       await account.save();
-      return Response.json({ error: "Invalid patient ID/Phone or Password/PIN" }, { status: 401 });
     }
-    account.status = "active";
-    account.failedLoginAttempts = 0;
-    account.lockedUntil = undefined;
-    account.lastLoginAt = new Date();
-    await account.save();
-    const token = createPatientSessionToken({ tenantId, patientId: String(patient._id), accountId: String(account._id), credentialVersion: account.credentialVersion });
-    const response = NextResponse.json({ message: "Signed in", patient: { name: patient.name, patientId: patient.patientId } });
+
+    const token = createPatientSessionToken({
+      tenantId,
+      patientId: String(patient._id),
+      accountId: String(account._id),
+      credentialVersion: account.credentialVersion,
+    });
+
+    const response = NextResponse.json({
+      message: "Signed in",
+      patient: { name: patient.name, patientId: patient.patientId }
+    });
+
     setPatientSessionCookie(response, token, req);
     return response;
   } catch (error) {

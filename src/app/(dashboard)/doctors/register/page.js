@@ -197,13 +197,12 @@ export default function DoctorRegistration() {
                 {errors.name && <div className="lims-error-text">{errors.name}</div>}
               </div>
               <div className="col-md-4">
-                <label className="lims-label">MCI Registration Number</label>
+                <label className="lims-label">MCI Registration Number <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: "normal" }}>(Optional)</span></label>
                 <input 
                   name="mciNumber" 
                   className={`lims-input ${errors.mciNumber ? 'invalid' : ''}`} 
                   placeholder="Enter medical council ID" 
                   value={form.mciNumber} 
-                  minLength={5}
                   maxLength={20}
                   pattern="[A-Za-z0-9/]+"
                   onChange={handleChange} 

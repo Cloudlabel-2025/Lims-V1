@@ -26,6 +26,18 @@ test("short patient PINs use scrypt without weakening staff password policy", as
 test("date of birth comparison uses stable calendar dates", () => {
   assert.equal(normalizeDob("2000-05-10"), "2000-05-10");
   assert.equal(normalizeDob("invalid"), "");
+
+  // Test collision resolution for patients sharing the same phone number
+  const patients = [
+    { name: "Father", phone: "9876543210", dob: new Date("1970-01-15") },
+    { name: "Son", phone: "9876543210", dob: new Date("2005-08-25") },
+  ];
+
+  const matchedSon = patients.find(p => normalizeDob(p.dob) === normalizeDob("2005-08-25"));
+  assert.equal(matchedSon?.name, "Son");
+
+  const matchedFather = patients.find(p => normalizeDob(p.dob) === normalizeDob("1970-01-15"));
+  assert.equal(matchedFather?.name, "Father");
 });
 
 test("patient portal data endpoint exposes released reports without commission fields", async () => {
@@ -60,4 +72,26 @@ test("OTP and token authentication endpoints check patient portal package entitl
   assert.match(verifyOtpSrc, /hasPatientPortalEntitlement\(subscription\)/);
   assert.match(tokenLoginSrc, /hasPatientPortalEntitlement\(subscription\)/);
 });
+
+test("patient registration and login enforce direct credentials flow and sharing constraints", async () => {
+  const registerSrc = await readFile(new URL("src/app/api/patient/route.js", root), "utf8");
+  const updateSrc = await readFile(new URL("src/app/api/patient/[id]/route.js", root), "utf8");
+  const loginSrc = await readFile(new URL("src/app/api/patient-portal/login/route.js", root), "utf8");
+
+  // Validate registration constraints
+  assert.match(registerSrc, /existingPatients\.length\s*>=\s*2/);
+  assert.match(registerSrc, /"Maximum of 2 patients can share the same mobile number/);
+  assert.match(registerSrc, /normalizeDob\(p\.dob\)\s*===\s*inputDobNormalized/);
+  assert.match(registerSrc, /"A patient with this mobile number and date of birth is already registered/);
+
+  // Validate update constraints
+  assert.match(updateSrc, /existingPatientsSharingPhone\.length\s*>=\s*2/);
+  assert.match(updateSrc, /"Maximum of 2 patients can share the same mobile number/);
+
+  // Validate login matching phone and dob credentials
+  assert.match(loginSrc, /body\.phone\s*\|\|\s*body\.username/);
+  assert.match(loginSrc, /body\.dob\s*\|\|\s*body\.password/);
+  assert.match(loginSrc, /normalizeDob\(p\.dob\)\s*===\s*dob/);
+});
+
 

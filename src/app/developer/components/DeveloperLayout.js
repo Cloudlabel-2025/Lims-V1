@@ -54,6 +54,7 @@ export default function DeveloperLayout({ children }) {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const isLoginPage = pathname === "/developer/login";
   const pageTitle = useMemo(() => getPageTitle(pathname), [pathname]);
 
   useEffect(() => {
@@ -61,6 +62,9 @@ export default function DeveloperLayout({ children }) {
   }, []);
 
   useEffect(() => {
+    if (isLoginPage) {
+      return;
+    }
     let cancelled = false;
 
     async function loadDeveloperSession() {
@@ -69,13 +73,13 @@ export default function DeveloperLayout({ children }) {
         const data = await response.json();
 
         if (!response.ok || data.user?.userType !== "developer") {
-          router.replace("/");
+          router.replace("/developer/login");
           return;
         }
 
         if (!cancelled) setUser(data.user);
       } catch {
-        if (!cancelled) router.replace("/");
+        if (!cancelled) router.replace("/developer/login");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -86,11 +90,15 @@ export default function DeveloperLayout({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, isLoginPage]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    router.replace("/");
+    router.replace("/developer/login");
+  }
+
+  if (isLoginPage) {
+    return <>{children}</>;
   }
 
   if (loading) return <main className="developer-page">Loading developer access...</main>;

@@ -92,7 +92,6 @@ export function validateDoctorPayload(payload, { partial = false } = {}) {
   if (cleanDoctorValue(form.mciNumber) && !isValidMciNumber(form.mciNumber)) {
     errors.mciNumber = "Enter a valid MCI registration number";
   }
-  requireField("mciNumber", "MCI registration number is required");
 
   requireField("speciality", "Speciality is required");
 
