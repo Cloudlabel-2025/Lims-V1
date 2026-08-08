@@ -6,6 +6,8 @@ import { sendDoctorInvitationEmail } from "@/app/lib/reset-email";
 import { buildTenantUrl } from "@/app/lib/subdomain";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { writeAuditLog } from "@/app/lib/audit";
+import connectMasterDB from "@/app/lib/master-db";
+import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPackage";
 
 export async function POST(req, { params }) {
   try {
@@ -29,6 +31,39 @@ export async function POST(req, { params }) {
 
     let user = await User.findOne({ doctorId: doctor._id })
       .select("userId email status +passwordResetTokenHash +passwordResetExpiresAt");
+
+    if (user && user.status === "active") {
+      return Response.json({ error: "This portal account is already active" }, { status: 409 });
+    }
+
+    const { getLabSubscriptionEntitlements } = await import("@/app/lib/subscription-service");
+    const subscription = await getLabSubscriptionEntitlements(auth.tenantId);
+    const limit = subscription.entitlements?.quotas?.staffUsers ?? null;
+    if (limit !== null) {
+      const activeCount = await User.countDocuments({ status: "active" });
+      if (activeCount >= limit) {
+        const masterConnection = await connectMasterDB();
+        const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
+        const pkg = await SubscriptionPackage.findOne({ key: subscription.packageKey }).lean();
+        const version = pkg?.versions?.find((item) => item.version === pkg.activeVersion) || pkg?.versions?.at(-1);
+        const addons = version?.addons || {
+          staffUsers: { units: 1, priceMinor: 20000 }
+        };
+        const currency = version?.pricing?.currency || "INR";
+        return Response.json(
+          { 
+            error: `Active staff account limit exceeded (${limit}). Cannot send portal invitation. Please upgrade your subscription package.`,
+            addon: {
+              quotaKey: "staffUsers",
+              units: addons.staffUsers?.units ?? 1,
+              priceMinor: addons.staffUsers?.priceMinor ?? 20000,
+              currency
+            }
+          },
+          { status: 403 }
+        );
+      }
+    }
 
     const invitation = createDoctorInvitation();
 

@@ -24,6 +24,7 @@ function DoctorSidebar({
   onResendInvitation,
   onEdit,
   onDeleteClick,
+  sendingInvite,
 }) {
   const { theme } = useTenantShell() || {};
   const allowDoctorPortal = hasDoctorPortalEntitlement(theme);
@@ -133,8 +134,34 @@ function DoctorSidebar({
 
       {canManageUsers && allowDoctorPortal && (
         <div style={{ padding: "0 24px 16px" }}>
-          <button type="button" className="btn-lims-secondary" onClick={onResendInvitation} style={{ width: "100%" }}>
-            {Icons.mail} Resend portal invitation
+          <button
+            type="button"
+            className="btn-lims-secondary"
+            onClick={onResendInvitation}
+            disabled={sendingInvite}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              cursor: sendingInvite ? "not-allowed" : "pointer",
+              opacity: sendingInvite ? 0.7 : 1,
+            }}
+          >
+            {sendingInvite ? (
+              <>
+                <svg className="animate-spin" style={{ width: "16px", height: "16px", color: "currentColor", animation: "spin 1s linear infinite" }} fill="none" viewBox="0 0 24 24">
+                  <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Sending invitation...
+              </>
+            ) : (
+              <>
+                {Icons.mail} Resend portal invitation
+              </>
+            )}
           </button>
           {actionError && <p style={{ color: "#b91c1c", fontSize: 12, marginTop: 8 }}>{actionError}</p>}
         </div>

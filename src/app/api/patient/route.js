@@ -5,6 +5,8 @@ import { createPatientAccessCredential, normalizeDob } from "@/app/lib/patient-p
 import { writeAuditLog } from "@/app/lib/audit";
 import { ensureQuotaPeriod, recordShadowUsage } from "@/app/lib/quota-meter";
 import { getShadowSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import connectMasterDB from "@/app/lib/master-db";
+import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPackage";
 
 function clean(value) {
   return String(value || "").trim();
@@ -15,6 +17,7 @@ function escapeRegex(value) {
 }
 
 export async function POST(req) {
+  let subscription = null;
   try {
     const auth = requireTenantSession(req, "patients.register");
     if (auth.error) return auth.error;
@@ -113,7 +116,8 @@ export async function POST(req) {
       }, { status: 200 });
     }
 
-    const [access, subscription] = await Promise.all([
+    let access;
+    [access, subscription] = await Promise.all([
       createPatientAccessCredential(tenantId, req.url),
       getShadowSubscriptionEntitlements(tenantId),
     ]);
@@ -145,6 +149,11 @@ export async function POST(req) {
         metadata: { source: "patient-api", shadowMode: true },
         session,
       });
+      if (!quotaUsage.duplicate && quotaUsage.event?.wouldExceedLimit) {
+        const error = new Error("Patient registration quota exceeded");
+        error.name = "QuotaExceededError";
+        throw error;
+      }
     });
 
     await writeAuditLog(req, auth, {
@@ -160,6 +169,29 @@ export async function POST(req) {
     }, { status: 201 });
   } catch (err) {
     console.error("POST /api/patient error:", err);
+
+    if (err.name === "QuotaExceededError") {
+      const masterConnection = await connectMasterDB();
+      const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
+      const pkg = await SubscriptionPackage.findOne({ key: subscription.packageKey }).lean();
+      const version = pkg?.versions?.find((item) => item.version === pkg.activeVersion) || pkg?.versions?.at(-1);
+      const addons = version?.addons || {
+        patientRegistrations: { units: 100, priceMinor: 10000 }
+      };
+      const currency = version?.pricing?.currency || "INR";
+      return Response.json(
+        { 
+          error: "Usage limit exceeded. Please upgrade your subscription package to register more patients.",
+          addon: {
+            quotaKey: "patientRegistrations",
+            units: addons.patientRegistrations?.units ?? 100,
+            priceMinor: addons.patientRegistrations?.priceMinor ?? 10000,
+            currency
+          }
+        },
+        { status: 403 }
+      );
+    }
 
     if (err.name === "ValidationError") {
       const messages = Object.values(err.errors).map((e) => e.message);

@@ -7,6 +7,7 @@ import connectMasterDB from "@/app/lib/master-db";
 import { getLabModel } from "@/app/models/master/Lab";
 import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPackage";
 import { getSubscriptionUpgradeRequestModel } from "@/app/models/master/SubscriptionUpgradeRequest";
+import { getSubscriptionAddonRequestModel } from "@/app/models/master/SubscriptionAddonRequest";
 
 function isVersionOne(value) {
   // Records created before releaseVersion was introduced are the original
@@ -55,9 +56,11 @@ export async function GET(req) {
     period = await QuotaPeriod.findById(period._id);
     const masterConnection = await connectMasterDB();
     const UpgradeRequest = getSubscriptionUpgradeRequestModel(masterConnection);
-    const [versionOnePlans, pendingUpgrade] = await Promise.all([
+    const SubscriptionAddonRequest = getSubscriptionAddonRequestModel(masterConnection);
+    const [versionOnePlans, pendingUpgrade, addOnHistory] = await Promise.all([
       getVersionOnePlans(masterConnection),
       UpgradeRequest.findOne({ tenantId: auth.tenantId, status: "pending" }).sort({ createdAt: -1 }).lean(),
+      SubscriptionAddonRequest.find({ tenantId: auth.tenantId, status: "approved" }).sort({ createdAt: -1 }).lean(),
     ]);
     const currentRank = versionOnePlans.findIndex((plan) => plan.key === subscription.packageKey);
     const upgradePlans = versionOnePlans.map((plan) => ({
@@ -65,6 +68,15 @@ export async function GET(req) {
       isDowngrade: currentRank !== -1 && plan.catalogRank < currentRank,
       canUpgrade: currentRank === -1 || plan.catalogRank !== currentRank,
     }));
+
+    const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
+    const pkg = await SubscriptionPackage.findOne({ key: subscription.packageKey }).lean();
+    const version = pkg?.versions?.find((item) => item.version === pkg.activeVersion) || pkg?.versions?.at(-1);
+    const addons = version?.addons || {
+      patientRegistrations: { units: 100, priceMinor: 10000 },
+      billingRecords: { units: 250, priceMinor: 12500 },
+      staffUsers: { units: 1, priceMinor: 20000 },
+    };
 
     return Response.json({
       subscription: {
@@ -79,6 +91,20 @@ export async function GET(req) {
         periodStart: subscription.currentPeriodStart,
         periodEnd: subscription.currentPeriodEnd,
       },
+      addons: {
+        patientRegistrations: {
+          units: addons.patientRegistrations?.units ?? 100,
+          priceMinor: addons.patientRegistrations?.priceMinor ?? 10000,
+        },
+        billingRecords: {
+          units: addons.billingRecords?.units ?? 250,
+          priceMinor: addons.billingRecords?.priceMinor ?? 12500,
+        },
+        staffUsers: {
+          units: addons.staffUsers?.units ?? 1,
+          priceMinor: addons.staffUsers?.priceMinor ?? 20000,
+        },
+      },
       usage: serializeQuotaPeriod(period),
       upgradePlans,
       pendingUpgrade: pendingUpgrade ? {
@@ -87,6 +113,16 @@ export async function GET(req) {
         releaseVersion: "1",
         requestedAt: pendingUpgrade.createdAt,
       } : null,
+      addOnHistory: addOnHistory.map((req) => ({
+        id: String(req._id),
+        quotaKey: req.quotaKey,
+        units: req.units,
+        amountMinor: req.amountMinor,
+        initialLimit: req.initialLimit,
+        newLimit: req.newLimit,
+        expiresAt: req.expiresAt,
+        purchasedAt: req.createdAt,
+      })),
     });
   } catch (error) {
     return jsonError("Unable to load subscription", error, 500);

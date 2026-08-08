@@ -71,6 +71,7 @@ export async function POST(req) {
 
     const otpHash = hashOtp(otp);
     let user = null;
+    let lab = null;
 
     if (userType === "developer") {
       const masterConnection = await connectMasterDB();
@@ -96,7 +97,7 @@ export async function POST(req) {
 
       const masterConnection = await connectMasterDB();
       const Lab = getLabModel(masterConnection);
-      const lab = await Lab.findOne({ tenantId, status: "active" }).select("tenantId").lean();
+      lab = await Lab.findOne({ tenantId, status: "active" }).select("tenantId").lean();
       if (!lab) {
         return Response.json({ error: "Invalid or expired OTP" }, { status: 400 });
       }
@@ -111,6 +112,22 @@ export async function POST(req) {
 
     if (!user) {
       return Response.json({ error: "Invalid or expired OTP" }, { status: 400 });
+    }
+
+    const willBecomeActive = userType !== "developer" && ["invited", "locked"].includes(user.status);
+    if (willBecomeActive) {
+      const { getShadowSubscriptionEntitlements } = await import("@/app/lib/subscription-service");
+      const subscription = await getShadowSubscriptionEntitlements(lab.tenantId);
+      const limit = subscription.entitlements?.quotas?.staffUsers ?? null;
+      if (limit !== null) {
+        const activeCount = await user.constructor.countDocuments({ status: "active" });
+        if (activeCount >= limit) {
+          return Response.json(
+            { error: `Active staff account limit exceeded (${limit}). Activation is not allowed. Please contact support or upgrade the subscription package.` },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     const now = new Date();

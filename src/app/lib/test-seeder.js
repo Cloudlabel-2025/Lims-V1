@@ -2294,11 +2294,234 @@ const testsData = [
     sampleType: "Urine",
     price: 650,
     parameters: [
-      { name: "Urine Creatinine level", unit: "mg/dL", normalMin: 20, normalMax: 320 },
-      { name: "Serum Creatinine level", unit: "mg/dL", normalMin: 0.6, normalMax: 1.2 },
-      { name: "Urine Volume Total", unit: "mL/24h", normalMin: 800, normalMax: 2000 },
       { name: "Creatinine Clearance", unit: "mL/min", normalMin: 90, normalMax: 139, maleMin: 97, maleMax: 137, femaleMin: 88, femaleMax: 128 }
     ]
+  },
+  {
+    categoryName: "Clinical Pathology",
+    name: "Calprotectin Stool Test",
+    code: "CALPRO",
+    sampleType: "Stool",
+    price: 1500,
+    parameters: [{ name: "Fecal Calprotectin", unit: "µg/g", normalMin: 0, normalMax: 50 }]
+  },
+  {
+    categoryName: "Clinical Pathology",
+    name: "Pancreatic Elastase Stool Test",
+    code: "PANELAST",
+    sampleType: "Stool",
+    price: 2500,
+    parameters: [{ name: "Pancreatic Elastase", unit: "µg/g", normalMin: 200, normalMax: 500 }]
+  },
+  {
+    categoryName: "Biochemistry",
+    name: "Serum Lipoprotein Associated Phospholipase A2",
+    code: "LPPLA2",
+    sampleType: "Serum",
+    price: 3200,
+    parameters: [{ name: "Lp-PLA2 Activity", unit: "nmol/min/mL", normalMin: 0, normalMax: 200 }]
+  },
+  {
+    categoryName: "Biochemistry",
+    name: "Serum Cystatin C",
+    code: "CYSTATINC",
+    sampleType: "Serum",
+    price: 850,
+    parameters: [{ name: "Cystatin C", unit: "mg/L", normalMin: 0.5, normalMax: 1.0 }]
+  },
+  {
+    categoryName: "Biochemistry",
+    name: "Serum Homocysteine",
+    code: "HCYS",
+    sampleType: "Serum",
+    price: 900,
+    parameters: [{ name: "Homocysteine", unit: "µmol/L", normalMin: 5.0, normalMax: 15.0 }]
+  },
+  {
+    categoryName: "Biochemistry",
+    name: "Serum Apolipoprotein E Genotyping",
+    code: "APOE",
+    sampleType: "Serum",
+    price: 4500,
+    parameters: [{ name: "ApoE Genotype", unit: "genotype", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Endocrinology",
+    name: "Serum Insulin-Like Growth Factor Binding Protein 3",
+    code: "IGFBP3",
+    sampleType: "Serum",
+    price: 2100,
+    parameters: [{ name: "IGFBP-3 level", unit: "µg/mL", normalMin: 2.0, normalMax: 6.0 }]
+  },
+  {
+    categoryName: "Endocrinology",
+    name: "Plasma Free Metanephrines",
+    code: "METANEPHRINES",
+    sampleType: "Plasma",
+    price: 3500,
+    parameters: [
+      { name: "Free Metanephrine", unit: "pg/mL", normalMin: 0, normalMax: 90 },
+      { name: "Free Normetanephrine", unit: "pg/mL", normalMin: 0, normalMax: 180 }
+    ]
+  },
+  {
+    categoryName: "Endocrinology",
+    name: "Plasma Active Renin Concentration",
+    code: "ACTIVERENIN",
+    sampleType: "Plasma",
+    price: 2800,
+    parameters: [{ name: "Active Renin", unit: "pg/mL", normalMin: 4.0, normalMax: 38.0 }]
+  },
+  {
+    categoryName: "Endocrinology",
+    name: "Dehydroepiandrosterone Unconjugated",
+    code: "DHEANON",
+    sampleType: "Serum",
+    price: 1500,
+    parameters: [{ name: "DHEA Unconjugated", unit: "ng/dL", normalMin: 100, normalMax: 1000 }]
+  },
+  {
+    categoryName: "Endocrinology",
+    name: "Serum Reverse T3 rT3",
+    code: "REVERSET3",
+    sampleType: "Serum",
+    price: 2500,
+    parameters: [{ name: "Reverse T3", unit: "ng/dL", normalMin: 9.0, normalMax: 24.0 }]
+  },
+  {
+    categoryName: "Serology & Immunology",
+    name: "Anti Glomerular Basement Membrane Antibody",
+    code: "ANTIGBM",
+    sampleType: "Serum",
+    price: 1600,
+    parameters: [{ name: "Anti-GBM IgG", unit: "RU/mL", normalMin: 0, normalMax: 20 }]
+  },
+  {
+    categoryName: "Serology & Immunology",
+    name: "Anti Saccharomyces Cerevisiae Antibodies",
+    code: "ASCA",
+    sampleType: "Serum",
+    price: 2200,
+    parameters: [
+      { name: "ASCA IgA", unit: "U/mL", normalMin: 0, normalMax: 20 },
+      { name: "ASCA IgG", unit: "U/mL", normalMin: 0, normalMax: 20 }
+    ]
+  },
+  {
+    categoryName: "Serology & Immunology",
+    name: "Anti Mitochondrial Antibody M2 Quantitative",
+    code: "AMAM2",
+    sampleType: "Serum",
+    price: 1500,
+    parameters: [{ name: "AMA-M2 IgG", unit: "Units", normalMin: 0, normalMax: 20 }]
+  },
+  {
+    categoryName: "Serology & Immunology",
+    name: "Anti Smooth Muscle Antibody",
+    code: "ASMAAB",
+    sampleType: "Serum",
+    price: 1400,
+    parameters: [{ name: "ASMA Titer", unit: "titer", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Serology & Immunology",
+    name: "Anti Aquaporin-4 AQP4 Antibody",
+    code: "AQP4",
+    sampleType: "Serum",
+    price: 3800,
+    parameters: [{ name: "AQP4 IgG", unit: "titer", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Biochemistry",
+    name: "C-Reactive Protein High Sensitivity",
+    code: "HSCRP",
+    sampleType: "Serum",
+    price: 500,
+    parameters: [{ name: "hs-CRP", unit: "mg/L", normalMin: 0.0, normalMax: 3.0 }]
+  },
+  {
+    categoryName: "Tumour Markers",
+    name: "Serum Free Light Chains",
+    code: "FREELIGHT",
+    sampleType: "Serum",
+    price: 3000,
+    parameters: [
+      { name: "Kappa Free Light Chain", unit: "mg/L", normalMin: 3.3, normalMax: 19.4 },
+      { name: "Lambda Free Light Chain", unit: "mg/L", normalMin: 5.7, normalMax: 26.3 },
+      { name: "Kappa/Lambda Ratio", unit: "ratio", normalMin: 0.26, normalMax: 1.65 }
+    ]
+  },
+  {
+    categoryName: "Tumour Markers",
+    name: "Cancer Antigen 50 CA 50",
+    code: "CA50",
+    sampleType: "Serum",
+    price: 1800,
+    parameters: [{ name: "CA 50 level", unit: "U/mL", normalMin: 0, normalMax: 25 }]
+  },
+  {
+    categoryName: "Clinical Pathology",
+    name: "Fecal Immunochemical Test FIT",
+    code: "FITTEST",
+    sampleType: "Stool",
+    price: 450,
+    parameters: [{ name: "Fecal Hemoglobin", unit: "ng/mL", normalMin: 0, normalMax: 100 }]
+  },
+  {
+    categoryName: "Clinical Pathology",
+    name: "Viscosity CSF Test",
+    code: "CSFVISCOS",
+    sampleType: "CSF",
+    price: 300,
+    parameters: [{ name: "CSF Viscosity", unit: "relative", normalMin: 1.0, normalMax: 1.1 }]
+  },
+  {
+    categoryName: "Clinical Pathology",
+    name: "Joint Fluid Mucin Clot Test",
+    code: "SYNMUCIN",
+    sampleType: "Synovial Fluid",
+    price: 350,
+    parameters: [{ name: "Mucin Clot Grade", unit: "status", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Microbiology & Molecular",
+    name: "Chlamydia Trachomatis Antigen DFA",
+    code: "CHLAMYDIADFA",
+    sampleType: "Swab",
+    price: 800,
+    parameters: [{ name: "Chlamydia Antigen DFA", unit: "status", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Microbiology & Molecular",
+    name: "Mycoplasma Pneumoniae PCR",
+    code: "MYCOPCR",
+    sampleType: "Sputum",
+    price: 2200,
+    parameters: [{ name: "Mycoplasma DNA", unit: "status", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Microbiology & Molecular",
+    name: "Bordetella Pertussis PCR",
+    code: "PERTUSSISPCR",
+    sampleType: "Swab",
+    price: 2400,
+    parameters: [{ name: "Bordetella DNA", unit: "status", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Microbiology & Molecular",
+    name: "Streptococcus Pneumoniae Antigen Test",
+    code: "STREPANTE",
+    sampleType: "Urine",
+    price: 950,
+    parameters: [{ name: "Streptococcus Antigen", unit: "status", normalMin: 0, normalMax: 0 }]
+  },
+  {
+    categoryName: "Microbiology & Molecular",
+    name: "Rotavirus Antigen Stool Test",
+    code: "ROTAVIRUS",
+    sampleType: "Stool",
+    price: 800,
+    parameters: [{ name: "Rotavirus Antigen", unit: "status", normalMin: 0, normalMax: 0 }]
   }
 ];
 
@@ -2325,7 +2548,13 @@ export async function seedDefaultTests(connection) {
     const categoryId = categoryMap.get(test.categoryName);
     if (!categoryId) continue;
 
-    const existingTest = await TestDefinition.findOne({ code: test.code });
+    // To prevent duplicate key errors on either name-category compound index or code unique index
+    const existingTest = await TestDefinition.findOne({
+      $or: [
+        { code: test.code },
+        { name: test.name, category: categoryId }
+      ]
+    });
     if (!existingTest) {
       const formattedParams = test.parameters.map((param, index) => ({
         ...param,

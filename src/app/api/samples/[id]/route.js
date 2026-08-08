@@ -133,6 +133,41 @@ export async function PUT(req, { params }) {
       } catch (transitionErr) {
         return Response.json({ error: transitionErr.message }, { status: 400 });
       }
+
+      // Handle inventory consumption submitted from the wizard
+      const { reservedInventory: wizardInventory } = body;
+      if (wizardInventory && Array.isArray(wizardInventory) && wizardInventory.length > 0 && !sample.reservedInventory?.length) {
+        const { InventoryItem: InvItem, InventoryUom: InvUom } = await getTenantModels(auth.tenantId);
+        const reservations = [];
+
+        for (const reqItem of wizardInventory) {
+          const itemId = reqItem.item;
+          const uomId = reqItem.uom;
+          const qty = Number(reqItem.quantity);
+          if (!itemId || !uomId || isNaN(qty) || qty <= 0) continue;
+
+          const [item, uom] = await Promise.all([
+            InvItem.findById(itemId),
+            InvUom.findById(uomId)
+          ]);
+          if (!item || !uom) continue;
+
+          const quantityInBase = qty * (uom.conversionToBase || 1);
+          const available = (item.stockOnHandBase || 0) - (item.reservedBase || 0);
+
+          if (available >= quantityInBase) {
+            await InvItem.findOneAndUpdate(
+              { _id: item._id },
+              { $inc: { reservedBase: quantityInBase } }
+            );
+            reservations.push({ item: item._id, quantityBase: quantityInBase, uom: uom._id });
+          }
+        }
+
+        if (reservations.length > 0) {
+          sample.reservedInventory = reservations;
+        }
+      }
     } else {
       return Response.json({ error: "Invalid action" }, { status: 400 });
     }

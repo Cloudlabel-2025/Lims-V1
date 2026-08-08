@@ -49,6 +49,20 @@ function packageDraft(pkg = {}, { duplicate = false } = {}) {
       monthlyAmount: amountInputFromMinor(pkg.pricing?.monthlyAmountMinor),
       annualAmount: amountInputFromMinor(pkg.pricing?.annualAmountMinor),
     },
+    addons: {
+      patientRegistrations: {
+        units: pkg.addons?.patientRegistrations?.units ?? 100,
+        price: amountInputFromMinor(pkg.addons?.patientRegistrations?.priceMinor ?? 10000),
+      },
+      billingRecords: {
+        units: pkg.addons?.billingRecords?.units ?? 250,
+        price: amountInputFromMinor(pkg.addons?.billingRecords?.priceMinor ?? 12500),
+      },
+      staffUsers: {
+        units: pkg.addons?.staffUsers?.units ?? 1,
+        price: amountInputFromMinor(pkg.addons?.staffUsers?.priceMinor ?? 20000),
+      },
+    },
   };
 }
 
@@ -175,8 +189,19 @@ function PackageDrawer({ draft, setDraft, saving, mode, onClose, onSave }) {
     if (step === 2 && draft.pricing.annualAmount !== "" && Number(draft.pricing.annualAmount) < 0) {
       return "Annual pricing cannot be negative.";
     }
-    if (step === 3 && Object.values(draft.quotas).some((value) => value !== "" && (!Number.isInteger(Number(value)) || Number(value) < 0))) {
-      return "Allowances must be whole numbers or left blank for unlimited usage.";
+    if (step === 3) {
+      if (Object.values(draft.quotas).some((value) => value !== "" && (!Number.isInteger(Number(value)) || Number(value) < 0))) {
+        return "Allowances must be whole numbers or left blank for unlimited usage.";
+      }
+      for (const key of ["patientRegistrations", "billingRecords", "staffUsers"]) {
+        const addon = draft.addons?.[key] || {};
+        if (addon.units === "" || addon.units === undefined || !Number.isInteger(Number(addon.units)) || Number(addon.units) <= 0) {
+          return `Add-on pack size for ${key === "patientRegistrations" ? "Patients" : key === "billingRecords" ? "Bills" : "Staff"} must be a positive whole number.`;
+        }
+        if (addon.price === "" || addon.price === undefined || Number(addon.price) < 0) {
+          return `Add-on price for ${key === "patientRegistrations" ? "Patients" : key === "billingRecords" ? "Bills" : "Staff"} must be a valid positive value.`;
+        }
+      }
     }
     return "";
   }
@@ -307,6 +332,57 @@ function PackageDrawer({ draft, setDraft, saving, mode, onClose, onSave }) {
               ))}
             </div>
             <div className="subscription-quota-guidance">Leave a field blank only when that resource should be unlimited.</div>
+
+            <div className="subscription-form-heading" style={{ marginTop: "24px" }}>
+              <span>+</span>
+              <div><h3>Capacity Add-ons</h3><p>Configure pack size and pricing for laboratories to purchase extra resources.</p></div>
+            </div>
+            <div className="subscription-quota-fields" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              {[
+                { key: "patientRegistrations", label: "Patient Add-on" },
+                { key: "billingRecords", label: "Billing Add-on" },
+                { key: "staffUsers", label: "Staff Add-on" },
+              ].map((field) => (
+                <div key={field.key} style={{ gridColumn: "span 2", display: "flex", gap: "12px", border: "1px dashed #cbd5e1", padding: "12px", borderRadius: "8px", background: "#f8fafc" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: "11px", fontWeight: 700, color: "#475569" }}>{field.label} Pack Size</label>
+                    <input 
+                      type="number" min="1" step="1" required 
+                      value={draft.addons?.[field.key]?.units ?? ""} 
+                      style={{ marginTop: "4px" }}
+                      onChange={(event) => setDraft((current) => ({
+                        ...current,
+                        addons: {
+                          ...current.addons,
+                          [field.key]: {
+                            ...current.addons?.[field.key],
+                            units: event.target.value
+                          }
+                        }
+                      }))} 
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: "11px", fontWeight: 700, color: "#475569" }}>{field.label} Pack Price ({draft.pricing.currency})</label>
+                    <input 
+                      type="number" min="0" step="0.01" required 
+                      value={draft.addons?.[field.key]?.price ?? ""} 
+                      style={{ marginTop: "4px" }}
+                      onChange={(event) => setDraft((current) => ({
+                        ...current,
+                        addons: {
+                          ...current.addons,
+                          [field.key]: {
+                            ...current.addons?.[field.key],
+                            price: event.target.value
+                          }
+                        }
+                      }))} 
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>}
 
           {activeStep === 4 && <section className="subscription-form-section">

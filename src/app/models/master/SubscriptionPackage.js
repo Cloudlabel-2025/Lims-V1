@@ -18,6 +18,23 @@ const packagePricingSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const addonQuotaSchema = new mongoose.Schema(
+  {
+    units: { type: Number, min: 0, default: null },
+    priceMinor: { type: Number, min: 0, default: null },
+  },
+  { _id: false }
+);
+
+const packageAddonsSchema = new mongoose.Schema(
+  {
+    patientRegistrations: { type: addonQuotaSchema, default: () => ({ units: 100, priceMinor: 10000 }) },
+    billingRecords: { type: addonQuotaSchema, default: () => ({ units: 250, priceMinor: 12500 }) },
+    staffUsers: { type: addonQuotaSchema, default: () => ({ units: 1, priceMinor: 20000 }) },
+  },
+  { _id: false }
+);
+
 const packageVersionSchema = new mongoose.Schema(
   {
     version: { type: Number, required: true, min: 1 },
@@ -27,6 +44,14 @@ const packageVersionSchema = new mongoose.Schema(
     pricing: {
       type: packagePricingSchema,
       default: () => ({ currency: "INR", monthlyAmountMinor: null, annualAmountMinor: null }),
+    },
+    addons: {
+      type: packageAddonsSchema,
+      default: () => ({
+        patientRegistrations: { units: 100, priceMinor: 10000 },
+        billingRecords: { units: 250, priceMinor: 12500 },
+        staffUsers: { units: 1, priceMinor: 20000 },
+      }),
     },
     effectiveAt: { type: Date, default: Date.now },
     publishedAt: { type: Date, default: Date.now },

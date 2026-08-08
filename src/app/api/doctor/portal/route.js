@@ -325,6 +325,61 @@ export async function POST(req) {
       return Response.json({ message: "Patient registered successfully", patient }, { status: 201 });
     }
 
+    // 1b. Doctor Edits Registered Patient
+    if (action === "edit_patient") {
+      const { id, name, phone, dob, gender, genderIdentity, address, email } = body;
+      if (!id) {
+        return Response.json({ error: "Patient ID is required" }, { status: 400 });
+      }
+      if (!name || !phone || !dob) {
+        return Response.json({ error: "Patient name, phone number, and date of birth are required" }, { status: 400 });
+      }
+
+      const existingPatient = await Patient.findById(id);
+      if (!existingPatient) {
+        return Response.json({ error: "Patient not found" }, { status: 404 });
+      }
+
+      if (existingPatient.refDoctorName !== doctor.name && String(existingPatient.referralDoctor) !== String(doctor._id)) {
+        return Response.json({ error: "Unauthorized: You can only edit patients referred to you" }, { status: 403 });
+      }
+
+      const rawPhone = String(phone).replace(/\D/g, "");
+      if (rawPhone.length !== 10) {
+        return Response.json({ error: "Phone number must be exactly 10 digits" }, { status: 400 });
+      }
+
+      const computedDob = new Date(dob);
+      if (isNaN(computedDob.getTime())) {
+        return Response.json({ error: "Invalid date of birth" }, { status: 400 });
+      }
+
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - computedDob.getFullYear();
+      const m = today.getMonth() - computedDob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < computedDob.getDate())) {
+        calculatedAge--;
+      }
+      const parsedAge = Math.max(0, Math.min(150, calculatedAge));
+
+      const validGender = ["Male", "Female", "Other"].includes(gender) ? gender : "Male";
+      const validGenderIdentity = validGender === "Other" && ["Transwomen", "Transman"].includes(genderIdentity) ? genderIdentity : undefined;
+      const validAddress = String(address || "").trim() || "N/A";
+
+      existingPatient.name = String(name).trim();
+      existingPatient.phone = rawPhone;
+      existingPatient.age = parsedAge;
+      existingPatient.dob = computedDob;
+      existingPatient.gender = validGender;
+      existingPatient.genderIdentity = validGenderIdentity;
+      existingPatient.address = validAddress;
+      existingPatient.email = email ? String(email).trim().toLowerCase() : "";
+
+      await existingPatient.save();
+
+      return Response.json({ message: "Patient updated successfully", patient: existingPatient }, { status: 200 });
+    }
+
     // 2. Fetch Available Test Packages & Definitions for Doctor
     if (action === "fetch_packages") {
       const [packages, tests] = await Promise.all([

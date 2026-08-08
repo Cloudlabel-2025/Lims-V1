@@ -129,8 +129,17 @@ function DoctorGrid({
                   {canDeleteDoctors && (
                     <button
                       className="btn-icon-delete"
-                      title="Delete"
-                      onClick={(e) => { e.stopPropagation(); onDeleteDoctor(doc); }}
+                      title={doc.deleteRestrictionReason || "Delete"}
+                      disabled={Boolean(doc.deleteRestrictionReason)}
+                      style={{
+                        opacity: doc.deleteRestrictionReason ? 0.4 : 1,
+                        cursor: doc.deleteRestrictionReason ? "not-allowed" : "pointer"
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (doc.deleteRestrictionReason) return;
+                        onDeleteDoctor(doc);
+                      }}
                     >
                       {Icons.trash}
                     </button>

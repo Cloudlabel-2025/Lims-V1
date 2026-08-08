@@ -50,12 +50,38 @@ export default function SampleRegistration() {
   }
 
   const addInventoryRow = () => {
-    setReservedInventory([...reservedInventory, { item: "", quantity: "", uom: "" }]);
+    setReservedInventory([...reservedInventory, { item: "", quantity: "", uom: "", searchQuery: "", isOpen: false }]);
   };
 
   const updateInventoryRow = (index, field, value) => {
     setReservedInventory(
-      reservedInventory.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+      reservedInventory.map((row, i) => {
+        if (i !== index) return row;
+        if (field === "item") {
+          const selectedItem = inventoryItems.find((inv) => inv._id === value);
+          const uomId = selectedItem?.baseUom?._id || selectedItem?.baseUom || "";
+          return {
+            ...row,
+            item: value,
+            uom: uomId,
+            searchQuery: selectedItem ? `${selectedItem.itemCode} - ${selectedItem.name}` : "",
+            isOpen: false
+          };
+        }
+        if (field === "search") {
+          const matchedItem = inventoryItems.find(
+            (inv) => `${inv.itemCode} - ${inv.name}`.toLowerCase() === value.toLowerCase()
+          );
+          return {
+            ...row,
+            searchQuery: value,
+            item: matchedItem ? matchedItem._id : "",
+            uom: matchedItem ? (matchedItem.baseUom?._id || matchedItem.baseUom || "") : "",
+            isOpen: true
+          };
+        }
+        return { ...row, [field]: value };
+      })
     );
   };
 
@@ -212,21 +238,71 @@ export default function SampleRegistration() {
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {reservedInventory.map((entry, index) => (
                   <div key={index} style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
-                    <div style={{ flex: 2 }}>
+                    <div style={{ flex: 2, position: "relative" }}>
                       <label className="lims-label" style={{ fontSize: 11 }}>Inventory Item</label>
-                      <select
-                        className="lims-select"
-                        value={entry.item}
-                        onChange={(e) => updateInventoryRow(index, "item", e.target.value)}
+                      <input
+                        type="text"
+                        className="lims-input"
+                        placeholder="Search by name or code..."
+                        value={entry.searchQuery || ""}
+                        onChange={(e) => updateInventoryRow(index, "search", e.target.value)}
+                        onFocus={() => updateInventoryRow(index, "isOpen", true)}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            updateInventoryRow(index, "isOpen", false);
+                          }, 250);
+                        }}
                         required
-                      >
-                        <option value="">Select inventory item</option>
-                        {inventoryItems.map((item) => (
-                          <option key={item._id} value={item._id}>
-                            {item.itemCode} - {item.name} (Stock: {item.stockOnHandBase} {item.baseUom?.symbol})
-                          </option>
-                        ))}
-                      </select>
+                      />
+                      {entry.isOpen && (
+                        <div style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          background: "#fff",
+                          border: "1.5px solid var(--border, #e2e8f0)",
+                          borderRadius: 6,
+                          maxHeight: 180,
+                          overflowY: "auto",
+                          zIndex: 1000,
+                          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                          marginTop: 4
+                        }}>
+                          {inventoryItems
+                            .filter(item => {
+                              const query = (entry.searchQuery || "").trim().toLowerCase();
+                              if (!query) return true;
+                              return (
+                                (item.name || "").toLowerCase().includes(query) ||
+                                (item.itemCode || "").toLowerCase().includes(query)
+                              );
+                            })
+                            .map((item) => (
+                              <div
+                                key={item._id}
+                                style={{
+                                  padding: "8px 12px",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                  borderBottom: "1px solid #f1f5f9",
+                                  transition: "background 0.2s"
+                                }}
+                                onMouseDown={() => {
+                                  updateInventoryRow(index, "item", item._id);
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = "#f1f5f9"}
+                                onMouseLeave={(e) => e.target.style.background = "#fff"}
+                              >
+                                <strong>{item.itemCode}</strong> - {item.name}
+                                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                                  Stock: {item.stockOnHandBase} {item.baseUom?.symbol}
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      )}
                     </div>
                     <div style={{ flex: 1 }}>
                       <label className="lims-label" style={{ fontSize: 11 }}>Quantity</label>
@@ -247,10 +323,11 @@ export default function SampleRegistration() {
                         className="lims-select"
                         value={entry.uom}
                         onChange={(e) => updateInventoryRow(index, "uom", e.target.value)}
+                        disabled
                         required
                       >
                         <option value="">Select UOM</option>
-                        {uoms.filter((uom) => uom.status === "active").map((uom) => (
+                        {uoms.map((uom) => (
                           <option key={uom._id} value={uom._id}>
                             {uom.name} ({uom.symbol})
                           </option>

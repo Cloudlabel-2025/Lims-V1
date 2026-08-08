@@ -26,6 +26,9 @@ function WizardInner() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [uoms, setUoms] = useState([]);
+  const [reservedInventory, setReservedInventory] = useState([]);
 
   useEffect(() => {
     if (!sampleId) {
@@ -52,6 +55,15 @@ function WizardInner() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    // Fetch inventory items and UOMs for consumption form (both come from same endpoint)
+    fetch("/api/inventory?limit=100", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        setInventoryItems(data.items || []);
+        setUoms(data.uoms || []);
+      })
+      .catch(() => {});
   }, [sampleId]);
 
   async function handleSubmit(finalNotes) {
@@ -62,7 +74,14 @@ function WizardInner() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action: "record-results", results, notes: finalNotes }),
+        body: JSON.stringify({
+          action: "record-results",
+          results,
+          notes: finalNotes,
+          reservedInventory: reservedInventory
+            .filter((r) => r.item && r.uom && Number(r.quantity) > 0)
+            .map((r) => ({ item: r.item, uom: r.uom, quantity: r.quantity }))
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save results");
@@ -92,7 +111,16 @@ function WizardInner() {
   function renderStep() {
     switch (currentStep) {
       case 0:
-        return <StepDetails sample={sample} onNext={() => setCurrentStep(1)} />;
+        return (
+          <StepDetails
+            sample={sample}
+            onNext={() => setCurrentStep(1)}
+            inventoryItems={inventoryItems}
+            uoms={uoms}
+            reservedInventory={reservedInventory}
+            setReservedInventory={setReservedInventory}
+          />
+        );
       case 1:
         return (
           <StepResults

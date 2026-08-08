@@ -65,16 +65,17 @@ async function main() {
   for (const lab of labs) {
     console.log(`Seeding inventory for lab: ${lab.name} (${lab.tenantId}) in database: ${lab.dbName}...`);
     
-    const tenantConnection = await mongoose
-      .createConnection(lab.dbConnectionString, {
-        dbName: lab.dbName,
-        bufferCommands: false,
-        maxPoolSize: 5,
-        serverSelectionTimeoutMS: 5000,
-      })
-      .asPromise();
-
+    let tenantConnection = null;
     try {
+      tenantConnection = await mongoose
+        .createConnection(lab.dbConnectionString, {
+          dbName: lab.dbName,
+          bufferCommands: false,
+          maxPoolSize: 5,
+          serverSelectionTimeoutMS: 5000,
+        })
+        .asPromise();
+
       const result = await seedDefaultInventory(tenantConnection);
       console.log(`Successfully seeded inventory:`);
       console.log(`  - ${result.uomsSeeded} UOMs`);
@@ -82,9 +83,11 @@ async function main() {
       console.log(`  - ${result.suppliersSeeded} Suppliers`);
       console.log(`  - ${result.itemsSeeded} new Items & Batches`);
     } catch (err) {
-      console.error(`Error seeding inventory for lab ${lab.tenantId}:`, err.message);
+      console.error(`Failed to connect or seed inventory for lab ${lab.tenantId}:`, err.message);
     } finally {
-      await tenantConnection.close();
+      if (tenantConnection) {
+        await tenantConnection.close();
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import connectMasterDB from "@/app/lib/master-db";
 import { getLabModel } from "@/app/models/master/Lab";
+import { getSubscriptionAddonRequestModel } from "@/app/models/master/SubscriptionAddonRequest";
 import mongoose from "mongoose";
 
 export async function GET(req, context) {
@@ -31,10 +32,16 @@ export async function GET(req, context) {
       { $set: { "quotas.staffUsers.consumed": activeStaffUsers } }
     );
     period = await QuotaPeriod.findById(period._id);
-    const recentEvents = await QuotaUsageEvent.find({ tenantId: normalizedTenantId })
-      .sort({ occurredAt: -1 })
-      .limit(25)
-      .lean();
+    const SubscriptionAddonRequest = getSubscriptionAddonRequestModel(masterConnection);
+    const [recentEvents, addOnHistory] = await Promise.all([
+      QuotaUsageEvent.find({ tenantId: normalizedTenantId })
+        .sort({ occurredAt: -1 })
+        .limit(25)
+        .lean(),
+      SubscriptionAddonRequest.find({ tenantId: normalizedTenantId })
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
 
     return NextResponse.json({
       subscription: {
@@ -71,6 +78,18 @@ export async function GET(req, context) {
         resourceId: event.relatedResourceId ? String(event.relatedResourceId) : null,
         actorEmail: event.actorEmail,
         occurredAt: event.occurredAt,
+      })),
+      addOnHistory: addOnHistory.map((req) => ({
+        id: String(req._id),
+        quotaKey: req.quotaKey,
+        units: req.units,
+        amountMinor: req.amountMinor,
+        status: req.status,
+        requestedByEmail: req.requestedByEmail,
+        initialLimit: req.initialLimit,
+        newLimit: req.newLimit,
+        expiresAt: req.expiresAt,
+        createdAt: req.createdAt,
       })),
     });
   } catch (error) {

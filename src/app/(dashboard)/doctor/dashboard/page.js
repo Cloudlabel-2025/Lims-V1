@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { calculateAge } from "@/app/utils/patient-helpers";
 
 const money = (value) => Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = (value) => value ? new Date(value).toLocaleDateString("en-IN") : "-";
@@ -24,7 +25,8 @@ export default function DoctorDashboardPage() {
 
   // Modals state
   const [showAddPatient, setShowAddPatient] = useState(false);
-  const [patientForm, setPatientForm] = useState({ name: "", phone: "", age: "", dob: "", gender: "Male", address: "", email: "" });
+  const [patientForm, setPatientForm] = useState({ name: "", phone: "", age: "", dob: "", gender: "Male", genderIdentity: "", address: "", email: "" });
+  const [editingPatientId, setEditingPatientId] = useState(null);
   const [savingPatient, setSavingPatient] = useState(false);
 
   const [showTestRequest, setShowTestRequest] = useState(false);
@@ -76,25 +78,55 @@ export default function DoctorDashboardPage() {
 
   const handleRegisterPatient = async (e) => {
     e.preventDefault();
+    if (!patientForm.name || !patientForm.phone || !patientForm.dob || !patientForm.address) {
+      setError("Please fill all required fields (Full Name, Phone Number, Date of Birth, Address).");
+      return;
+    }
+    if (patientForm.gender === "Other" && !patientForm.genderIdentity) {
+      setError("Gender identity is required when gender is Other.");
+      return;
+    }
     setSavingPatient(true);
     setError("");
     try {
+      const payload = editingPatientId 
+        ? { action: "edit_patient", id: editingPatientId, ...patientForm }
+        : { action: "register_patient", ...patientForm };
+
       const response = await fetch("/api/doctor/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "register_patient", ...patientForm }),
+        body: JSON.stringify(payload),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Failed to register patient");
-      setActionSuccess(`Patient "${body.patient.name}" registered successfully.`);
+      if (!response.ok) throw new Error(body.error || "Failed to register/update patient");
+      
+      setActionSuccess(editingPatientId ? "Patient details updated successfully." : `Patient "${body.patient.name}" registered successfully.`);
       setShowAddPatient(false);
-      setPatientForm({ name: "", phone: "", age: "", dob: "", gender: "Male", address: "", email: "" });
+      setEditingPatientId(null);
+      setPatientForm({ name: "", phone: "", age: "", dob: "", gender: "Male", genderIdentity: "", address: "", email: "" });
       await loadData();
     } catch (err) {
       setError(err.message);
     } finally {
       setSavingPatient(false);
     }
+  };
+
+  const handleOpenEditPatient = (patient) => {
+    setEditingPatientId(patient._id);
+    setPatientForm({
+      name: patient.name || "",
+      phone: patient.phone || "",
+      dob: patient.dob ? new Date(patient.dob).toISOString().split("T")[0] : "",
+      age: patient.age ?? "",
+      gender: patient.gender || "Male",
+      genderIdentity: patient.genderIdentity || "",
+      address: patient.address || "",
+      email: patient.email || ""
+    });
+    setError("");
+    setShowAddPatient(true);
   };
 
   const handleOpenTestRequest = (patientId = "") => {
@@ -285,7 +317,12 @@ export default function DoctorDashboardPage() {
         <section className="form-card" style={{ padding: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
             <input className="lims-input" style={{ maxWidth: 380 }} placeholder="Search patient name, ID, phone..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            <button type="button" className="btn-lims-secondary" onClick={() => setShowAddPatient(true)}>
+            <button type="button" className="btn-lims-secondary" onClick={() => {
+              setEditingPatientId(null);
+              setPatientForm({ name: "", phone: "", age: "", dob: "", gender: "Male", genderIdentity: "", address: "", email: "" });
+              setError("");
+              setShowAddPatient(true);
+            }}>
               + Register Patient
             </button>
           </div>
@@ -312,14 +349,24 @@ export default function DoctorDashboardPage() {
                     <td>{p.address || "N/A"}</td>
                     <td>{date(p.createdAt)}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn-lims-primary"
-                        style={{ fontSize: 12, padding: "6px 12px" }}
-                        onClick={() => handleOpenTestRequest(p._id)}
-                      >
-                        📋 Order Tests &amp; Send to Lab
-                      </button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className="btn-lims-primary"
+                          style={{ fontSize: 12, padding: "6px 12px" }}
+                          onClick={() => handleOpenTestRequest(p._id)}
+                        >
+                          📋 Order Tests
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-lims-secondary"
+                          style={{ fontSize: 12, padding: "6px 12px", border: "1.5px solid var(--border)", display: "flex", alignItems: "center", gap: 4 }}
+                          onClick={() => handleOpenEditPatient(p)}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -731,45 +778,130 @@ export default function DoctorDashboardPage() {
       {showAddPatient && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
           <div className="form-card" style={{ maxWidth: 440, width: "100%", padding: 24, background: "#fff" }}>
-            <h4 style={{ margin: "0 0 16px 0" }}>Register New Patient</h4>
+            <h4 style={{ margin: "0 0 16px 0" }}>{editingPatientId ? "Edit Patient Details" : "Register New Patient"}</h4>
             <form onSubmit={handleRegisterPatient} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700 }}>Patient Full Name *</label>
-                <input required className="lims-input" value={patientForm.name} onChange={(e) => setPatientForm({ ...patientForm, name: e.target.value })} placeholder="John Doe" />
+                <input 
+                  required 
+                  className="lims-input" 
+                  value={patientForm.name} 
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const sanitized = value.replace(/[^A-Za-z ]/g, "").slice(0, 30);
+                    const capitalized = sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
+                    setPatientForm({ ...patientForm, name: capitalized });
+                  }} 
+                  placeholder="Enter full name" 
+                />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700 }}>Phone Number *</label>
-                <input required className="lims-input" value={patientForm.phone} onChange={(e) => setPatientForm({ ...patientForm, phone: e.target.value })} placeholder="9876543210" />
+                <label style={{ fontSize: 12, fontWeight: 700 }}>Mobile Number *</label>
+                <input 
+                  required 
+                  className="lims-input" 
+                  value={patientForm.phone} 
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const sanitized = value.replace(/\D/g, "").slice(0, 10);
+                    setPatientForm({ ...patientForm, phone: sanitized });
+                  }} 
+                  placeholder="Enter 10-digit mobile number" 
+                />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700 }}>Date of Birth *</label>
-                  <input required type="date" className="lims-input" value={patientForm.dob} onChange={(e) => setPatientForm({ ...patientForm, dob: e.target.value })} />
+                  <input 
+                    required 
+                    type="date" 
+                    className="lims-input" 
+                    max={new Date().toISOString().split("T")[0]}
+                    value={patientForm.dob} 
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const calculatedAge = calculateAge(value);
+                      setPatientForm({ ...patientForm, dob: value, age: calculatedAge });
+                    }} 
+                  />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700 }}>Age</label>
-                  <input type="number" className="lims-input" value={patientForm.age} onChange={(e) => setPatientForm({ ...patientForm, age: e.target.value })} placeholder="35" />
+                  <label style={{ fontSize: 12, fontWeight: 700 }}>Age *</label>
+                  <input 
+                    type="text" 
+                    className="lims-input" 
+                    value={patientForm.age !== "" && patientForm.age !== undefined && patientForm.age !== null ? `${patientForm.age} Yrs` : ""} 
+                    readOnly 
+                    disabled 
+                    style={{ backgroundColor: 'var(--surface, #f1f5f9)', textAlign: 'center', fontWeight: '600' }} 
+                  />
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700 }}>Gender</label>
-                <select className="lims-input" value={patientForm.gender} onChange={(e) => setPatientForm({ ...patientForm, gender: e.target.value })}>
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
+                <label style={{ fontSize: 12, fontWeight: 700 }}>Gender *</label>
+                <select 
+                  className="lims-input" 
+                  value={patientForm.gender} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPatientForm({
+                      ...patientForm,
+                      gender: val,
+                      ...(val !== "Other" ? { genderIdentity: "" } : {})
+                    });
+                  }}
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
+              {patientForm.gender === "Other" && (
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700 }}>Gender Identity *</label>
+                  <select 
+                    required 
+                    className="lims-input" 
+                    value={patientForm.genderIdentity} 
+                    onChange={(e) => setPatientForm({ ...patientForm, genderIdentity: e.target.value })}
+                  >
+                    <option value="">Select identity</option>
+                    <option value="Transwomen">Transwomen</option>
+                    <option value="Transman">Transman</option>
+                  </select>
+                </div>
+              )}
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700 }}>Address (Optional)</label>
-                <input className="lims-input" value={patientForm.address} onChange={(e) => setPatientForm({ ...patientForm, address: e.target.value })} placeholder="Street / City" />
+                <label style={{ fontSize: 12, fontWeight: 700 }}>Address *</label>
+                <input 
+                  required 
+                  className="lims-input" 
+                  value={patientForm.address} 
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const sanitized = value.replace(/[^A-Za-z0-9 .,/-]/g, "").slice(0, 100);
+                    setPatientForm({ ...patientForm, address: sanitized });
+                  }} 
+                  placeholder="Enter address" 
+                />
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700 }}>Email Address (Optional)</label>
-                <input type="email" className="lims-input" value={patientForm.email} onChange={(e) => setPatientForm({ ...patientForm, email: e.target.value })} placeholder="patient@example.com" />
+                <input 
+                  type="email" 
+                  className="lims-input" 
+                  value={patientForm.email} 
+                  onChange={(e) => setPatientForm({ ...patientForm, email: e.target.value })} 
+                  placeholder="patient@example.com" 
+                />
               </div>
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-                <button type="button" className="btn-lims-secondary" onClick={() => setShowAddPatient(false)}>Cancel</button>
-                <button type="submit" className="btn-lims-primary" disabled={savingPatient}>{savingPatient ? "Registering..." : "Register Patient"}</button>
+              <div style={{ display: "flex", gap: 8, justifySelf: "flex-end", marginTop: 12, width: "100%" }}>
+                <button type="button" className="btn-lims-secondary" style={{ flex: 1 }} onClick={() => setShowAddPatient(false)}>Cancel</button>
+                <button type="submit" className="btn-lims-primary" style={{ flex: 1 }} disabled={savingPatient}>
+                  {savingPatient 
+                    ? (editingPatientId ? "Saving..." : "Registering...") 
+                    : (editingPatientId ? "Save Changes" : "Register Patient")}
+                </button>
               </div>
             </form>
           </div>

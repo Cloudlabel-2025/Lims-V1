@@ -126,6 +126,77 @@ export default function LabSubscriptionUsagePage({ params }) {
 
           <section className="developer-panel">
             <div className="developer-panel-header">
+              <h2>Capacity Add-on Purchases</h2>
+              <p>Approved and pending quota packages purchased by the lab.</p>
+            </div>
+            {!data.addOnHistory || data.addOnHistory.length === 0 ? (
+              <p className="developer-empty">No capacity add-ons purchased by this lab yet.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ background: "var(--border-color)", borderBottom: "1px solid var(--border-color)", textAlign: "left" }}>
+                      {["Date", "Resource", "Pack size", "Level change", "Cost", "Requested By", "Status", "Expiry"].map((h) => (
+                        <th key={h} style={{ padding: "10px 12px", color: "var(--text-secondary)", fontWeight: "600" }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.addOnHistory.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: "1px solid var(--border-color)" }}>
+                        <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
+                          {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </td>
+                        <td style={{ padding: "12px 12px", fontWeight: "600" }}>
+                          {quotaLabels[item.quotaKey] || item.quotaKey}
+                        </td>
+                        <td style={{ padding: "12px 12px", color: "#0d9488", fontWeight: "700" }}>
+                          {item.quotaKey === "patientRegistrations" ? "+100" : item.quotaKey === "billingRecords" ? "+250" : "+1"}
+                        </td>
+                        <td style={{ padding: "12px 12px" }}>
+                          {item.initialLimit !== undefined && item.newLimit !== undefined ? (
+                            <span>{item.initialLimit} → <strong>{item.newLimit}</strong></span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td style={{ padding: "12px 12px", fontWeight: "700" }}>
+                          {formatPrice(item.amountMinor)}
+                        </td>
+                        <td style={{ padding: "12px 12px", color: "var(--text-muted)" }}>
+                          {item.requestedByEmail || "—"}
+                        </td>
+                        <td style={{ padding: "12px 12px" }}>
+                          <span style={{
+                            padding: "2px 8px",
+                            borderRadius: "12px",
+                            fontSize: "11px",
+                            fontWeight: "700",
+                            backgroundColor: item.status === "approved" ? "#dcfce7" : item.status === "pending" ? "#fef3c7" : "#fee2e2",
+                            color: item.status === "approved" ? "#166534" : item.status === "pending" ? "#92400e" : "#991b1b",
+                          }}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 12px", color: item.expiresAt ? "#d97706" : "var(--text-muted)", fontWeight: "500" }}>
+                          {item.expiresAt ? (
+                            new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                          ) : (
+                            <span style={{ color: "#166534", backgroundColor: "#dcfce7", padding: "2px 8px", borderRadius: "12px", fontSize: "11px" }}>Permanent</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="developer-panel">
+            <div className="developer-panel-header">
               <h2>Recent Usage Events</h2>
               <p>Immutable patient and confirmed-billing measurements.</p>
             </div>

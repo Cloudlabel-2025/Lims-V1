@@ -18,6 +18,9 @@ function escapeRegex(value) {
 
 import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
 import { hasDoctorPortalEntitlement } from "@/app/lib/portal-policy";
+import connectMasterDB from "@/app/lib/master-db";
+import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPackage";
+import { getDeleteRestrictionReason } from "@/app/lib/deletion-policy";
 
 // ── POST: Create a new Doctor ──
 export async function POST(req) {
@@ -88,6 +91,33 @@ export async function POST(req) {
         || await Role.findOne({ name: "Doctor", status: "active" })
         || await Role.findOne({ status: "active" });
       if (doctorRole) {
+        const limit = subscription.entitlements?.quotas?.staffUsers ?? null;
+        if (limit !== null) {
+          const activeCount = await User.countDocuments({ status: "active" });
+          if (activeCount >= limit) {
+            const masterConnection = await connectMasterDB();
+            const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
+            const pkg = await SubscriptionPackage.findOne({ key: subscription.packageKey }).lean();
+            const version = pkg?.versions?.find((item) => item.version === pkg.activeVersion) || pkg?.versions?.at(-1);
+            const addons = version?.addons || {
+              staffUsers: { units: 1, priceMinor: 20000 }
+            };
+            const currency = version?.pricing?.currency || "INR";
+            return Response.json(
+              { 
+                error: `Active staff account limit exceeded (${limit}). Cannot register portal account for doctor. Please upgrade your subscription package.`,
+                addon: {
+                  quotaKey: "staffUsers",
+                  units: addons.staffUsers?.units ?? 1,
+                  priceMinor: addons.staffUsers?.priceMinor ?? 20000,
+                  currency
+                }
+              },
+              { status: 403 }
+            );
+          }
+        }
+
         const invitation = createDoctorInvitation();
         const { firstName, lastName } = splitDoctorName(payload.name);
 
@@ -114,23 +144,10 @@ export async function POST(req) {
           }], { session });
         });
 
-        const lab = await getTenantConfig(tenantId);
-        const activationPath = `/activate-account?tenantId=${encodeURIComponent(tenantId)}&email=${encodeURIComponent(email)}`;
-        const activationUrl = buildTenantUrl(tenantId, req.url, activationPath);
-        try {
-          const result = await sendDoctorInvitationEmail({
-            to: email,
-            doctorName: doctor.name,
-            labName: lab?.name,
-            otp: invitation.otp,
-            expiresAt: invitation.expiresAt,
-            activationUrl,
-          });
-          invitationSent = Boolean(result?.sent);
-          invitationError = result?.reason || "";
-        } catch (emailError) {
-          invitationError = emailError.message || "Unable to send invitation email";
-        }
+        // Do not automatically send portal activation email.
+        // The lab will send the access portal invitation link manually.
+        invitationSent = false;
+        invitationError = "";
       } else {
         doctor = await Doctor.create({
           ...payload,
@@ -233,7 +250,7 @@ export async function GET(req) {
       ? null
       : "-commission -pendingPayout";
 
-    const [doctors, total] = await Promise.all([
+    const [doctors, total, subscription] = await Promise.all([
       Doctor.find(query)
         .select(selectFields)
         .sort({ createdAt: -1 })
@@ -241,10 +258,16 @@ export async function GET(req) {
         .limit(limit)
         .lean(),
       Doctor.countDocuments(query),
+      getLabSubscriptionEntitlements(tenantId),
     ]);
 
+    const enrichedDoctors = doctors.map((doc) => ({
+      ...doc,
+      deleteRestrictionReason: getDeleteRestrictionReason(doc, subscription, "doctors"),
+    }));
+
     return Response.json({
-      doctors,
+      doctors: enrichedDoctors,
       pagination: {
         page,
         limit,

@@ -165,10 +165,126 @@ export default function SubscriptionPage() {
     }
   }
 
+  const [addonLoading, setAddonLoading] = useState(false);
+  const [addonConfirmOpen, setAddonConfirmOpen] = useState(false);
+  const [selectedQuotaKey, setSelectedQuotaKey] = useState("");
+  const [addonSuccessMessage, setAddonSuccessMessage] = useState("");
+  const [addonError, setAddonError] = useState("");
+  const addonsConfig = data?.addons || {
+    patientRegistrations: { units: 100, priceMinor: 10000 },
+    billingRecords: { units: 250, priceMinor: 12500 },
+    staffUsers: { units: 1, priceMinor: 20000 },
+  };
+
+  const currentCurrency = data?.subscription?.pricing?.currency || "INR";
+
+  const addonPacks = {
+    patientRegistrations: { 
+      units: addonsConfig.patientRegistrations.units,
+      cost: formatMoney(addonsConfig.patientRegistrations.priceMinor, currentCurrency) 
+    },
+    billingRecords: { 
+      units: addonsConfig.billingRecords.units,
+      cost: formatMoney(addonsConfig.billingRecords.priceMinor, currentCurrency) 
+    },
+    staffUsers: { 
+      units: addonsConfig.staffUsers.units,
+      cost: formatMoney(addonsConfig.staffUsers.priceMinor, currentCurrency) 
+    },
+  };
+
+  function handleBuyAddon(quotaKey) {
+    setSelectedQuotaKey(quotaKey);
+    setAddonSuccessMessage("");
+    setAddonError("");
+    setAddonConfirmOpen(true);
+  }
+
+  useEffect(() => {
+    if (!loading && data) {
+      const params = new URLSearchParams(window.location.search);
+      const buyKey = params.get("buy");
+      if (buyKey && ["patientRegistrations", "billingRecords", "staffUsers"].includes(buyKey)) {
+        handleBuyAddon(buyKey);
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
+      }
+    }
+  }, [loading, data]);
+
+  async function executeAddonPurchase(quotaKey) {
+    setAddonLoading(true);
+    setAddonError("");
+    try {
+      const response = await fetch("/api/subscription/addon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ quotaKey }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to request add-on");
+
+      const { request } = payload;
+      const { id: addonRequestId, rzpOrderId, amount, keyId, label } = request;
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        throw new Error("Failed to load Razorpay SDK. Please check your internet connection.");
+      }
+
+      const options = {
+        key: keyId,
+        amount: amount,
+        currency: "INR",
+        name: "LIMS Quota Add-on",
+        description: `Add-on purchase: ${label}`,
+        order_id: rzpOrderId,
+        handler: async function (paymentResponse) {
+          try {
+            const confirmRes = await fetch("/api/subscription/addon/confirm", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                addonRequestId,
+                razorpayOrderId: paymentResponse.razorpay_order_id,
+                razorpayPaymentId: paymentResponse.razorpay_payment_id,
+                razorpaySignature: paymentResponse.razorpay_signature,
+              }),
+            });
+            const confirmPayload = await confirmRes.json();
+            if (!confirmRes.ok) throw new Error(confirmPayload.error || "Payment verification failed");
+
+            setAddonSuccessMessage(confirmPayload.message);
+          } catch (err) {
+            setAddonError(err.message);
+          } finally {
+            setAddonLoading(false);
+          }
+        },
+        theme: {
+          color: "#0d9488",
+        },
+        modal: {
+          ondismiss: function () {
+            setAddonLoading(false);
+          }
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+    } catch (err) {
+      setAddonError(err.message);
+      setAddonLoading(false);
+    }
+  }
+
   if (loading) return <section className="module-page"><div className="module-card subscription-tenant-state">Loading subscription...</div></section>;
   if (error) return <section className="module-page"><div className="lims-alert error">{error}</div></section>;
 
-  const { subscription, usage, upgradePlans = [], pendingUpgrade } = data;
+  const { subscription, usage, upgradePlans = [], pendingUpgrade, addOnHistory = [] } = data;
   const currency = subscription.pricing?.currency || "INR";
   const selectedUpgradePlan = upgradePlans.find((plan) => plan.key === selectedPlanKey);
   const statusLabel = subscription.status.replaceAll("_", " ");
@@ -245,7 +361,7 @@ export default function SubscriptionPage() {
                 <article className={`tenant-capacity-row ${tone}`} key={key}>
                   <div className="tenant-capacity-label">
                     <strong>{quotaLabels[key] || key}</strong>
-                    <span>{quotaDescriptions[key] || "Package usage allowance"}</span>
+                    <span>{quotaDescriptions[key] || "Package usage allowance"} (Add-on: +{addonPacks[key]?.units} Pack)</span>
                   </div>
                   {quota.unlimited ? (
                     <div className="tenant-capacity-unlimited">
@@ -259,9 +375,29 @@ export default function SubscriptionPage() {
                         <span>{quota.utilizationPercent || 0}%</span>
                       </div>
                       <div className="tenant-usage-track"><span style={{ width: `${percent}%` }} /></div>
-                      <div className="tenant-capacity-foot">
+                      <div className="tenant-capacity-foot" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span>{quota.remaining} available</span>
                         <span>{tone === "critical" ? "Limit reached" : tone === "warning" ? "Approaching limit" : "Within allowance"}</span>
+                      </div>
+                      <div style={{ marginTop: "8px", textAlign: "right" }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          style={{
+                            fontSize: "11px",
+                            padding: "2px 8px",
+                            color: "#0d9488",
+                            borderColor: "#0d9488",
+                            backgroundColor: "transparent",
+                            borderRadius: "4px",
+                            fontWeight: "500",
+                            cursor: "pointer"
+                          }}
+                          onClick={() => handleBuyAddon(key)}
+                          disabled={addonLoading}
+                        >
+                          {addonLoading ? "Processing..." : `Buy Add-on (${addonPacks[key]?.cost || ""})`}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -270,6 +406,64 @@ export default function SubscriptionPage() {
             })}
           </div>
         </section>
+
+        {addOnHistory.length > 0 && (
+          <section className="module-card" style={{ marginTop: "24px", padding: "24px" }}>
+            <header style={{ marginBottom: "16px", display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Transaction History
+              </span>
+              <h2 style={{ fontSize: "18px", fontWeight: "700", color: "var(--text-primary)", margin: 0 }}>
+                Capacity Add-ons
+              </h2>
+            </header>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <thead>
+                  <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border-light)" }}>
+                    {["Date", "Resource", "Pack size", "Level change", "Cost", "Expiry"].map((h) => (
+                      <th key={h} style={{ padding: "10px 12px", textAlign: "left", color: "var(--text-secondary)", fontWeight: "600" }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {addOnHistory.map((item) => (
+                    <tr key={item.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+                      <td style={{ padding: "12px 12px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                        {new Date(item.purchasedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </td>
+                      <td style={{ padding: "12px 12px", fontWeight: "600", color: "var(--text-primary)" }}>
+                        {quotaLabels[item.quotaKey] || item.quotaKey}
+                      </td>
+                      <td style={{ padding: "12px 12px", color: "#0d9488", fontWeight: "700" }}>
+                        {item.quotaKey === "patientRegistrations" ? "+100" : item.quotaKey === "billingRecords" ? "+250" : "+1"}
+                      </td>
+                      <td style={{ padding: "12px 12px", color: "var(--text-secondary)" }}>
+                        {item.initialLimit !== undefined && item.newLimit !== undefined ? (
+                          <span>{item.initialLimit} → <strong>{item.newLimit}</strong></span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td style={{ padding: "12px 12px", fontWeight: "700", color: "var(--text-primary)" }}>
+                        {formatMoney(item.amountMinor, "INR")}
+                      </td>
+                      <td style={{ padding: "12px 12px", color: item.expiresAt ? "#d97706" : "var(--text-muted)", fontWeight: "500" }}>
+                        {item.expiresAt ? (
+                          new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                        ) : (
+                          <span style={{ color: "#166534", backgroundColor: "#dcfce7", padding: "2px 8px", borderRadius: "12px", fontSize: "11px" }}>Permanent</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         <aside className="tenant-account-sidebar">
           <section className="module-card tenant-entitlements-panel">
@@ -489,6 +683,117 @@ export default function SubscriptionPage() {
                 Yes, degrade my plan anyway 💔
               </button>
             </footer>
+          </section>
+        </div>
+      )}
+      {addonConfirmOpen && selectedQuotaKey && (
+        <div className="tenant-upgrade-modal" role="dialog" aria-modal="true" style={{ zIndex: 1100 }}>
+          <button type="button" className="tenant-upgrade-backdrop" aria-label="Close" onClick={() => setAddonConfirmOpen(false)} />
+          <section className="tenant-upgrade-dialog" style={{ maxWidth: "480px", width: "100%", margin: "0 auto" }}>
+            {addonSuccessMessage ? (
+              <div style={{ padding: "32px 24px", textAlign: "center" }}>
+                <div style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  backgroundColor: "#dcfce7",
+                  color: "#15803d",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "28px",
+                  fontWeight: "bold",
+                  margin: "0 auto 16px"
+                }}>
+                  ✓
+                </div>
+                <h2 style={{ fontSize: "20px", color: "var(--text)", margin: "0 0 8px" }}>Capacity Added</h2>
+                <p style={{ fontSize: "14px", color: "var(--text-secondary)", margin: "0 0 24px", lineHeight: 1.5 }}>
+                  {addonSuccessMessage}
+                </p>
+                <button
+                  type="button"
+                  className="tenant-upgrade-submit"
+                  onClick={() => {
+                    setAddonConfirmOpen(false);
+                    setAddonSuccessMessage("");
+                    window.location.reload();
+                  }}
+                  style={{ minHeight: "40px", width: "100%", fontWeight: "700", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}
+                >
+                  Continue
+                </button>
+              </div>
+            ) : (
+              <>
+                <header className="tenant-upgrade-dialog-header" style={{ padding: "20px 24px 14px", borderBottom: "1px solid var(--border-light)" }}>
+                  <div>
+                    <span className="tenant-subscription-eyebrow">Capacity Add-on</span>
+                    <h2 style={{ fontSize: "19px", margin: "4px 0", color: "var(--text)" }}>Confirm Purchase</h2>
+                    <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "12px" }}>Add capacity to your laboratory workspace immediately.</p>
+                  </div>
+                  <button type="button" className="tenant-upgrade-close" onClick={() => setAddonConfirmOpen(false)} aria-label="Close">×</button>
+                </header>
+
+                <div style={{ padding: "20px 24px" }}>
+                  {addonError && (
+                    <div className="lims-alert error" style={{ marginBottom: "16px" }}>
+                      {addonError}
+                    </div>
+                  )}
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                    padding: "16px",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "12px",
+                    backgroundColor: "var(--surface)",
+                    marginBottom: "20px"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "600" }}>Resource</span>
+                      <strong style={{ fontSize: "14px", color: "var(--text)" }}>{quotaLabels[selectedQuotaKey]}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "600" }}>Add-on Pack</span>
+                      <strong style={{ fontSize: "14px", color: "#0d9488" }}>
+                        {selectedQuotaKey === "patientRegistrations" ? `+${addonPacks.patientRegistrations.units} Patients` : selectedQuotaKey === "billingRecords" ? `+${addonPacks.billingRecords.units} Bills` : `+${addonPacks.staffUsers.units} Staff User`}
+                      </strong>
+                    </div>
+                    <div style={{ height: "1px", backgroundColor: "var(--border-light)", margin: "4px 0" }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "14px", color: "var(--text)", fontWeight: "700" }}>Total Cost</span>
+                      <strong style={{ fontSize: "18px", color: "#0d9488", fontWeight: "850" }}>{addonPacks[selectedQuotaKey]?.cost}</strong>
+                    </div>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                    Secure payment will be processed via Razorpay. Once payment is successful, your resource capacity will be updated instantly.
+                  </p>
+                </div>
+
+                <footer className="tenant-upgrade-dialog-footer" style={{ padding: "14px 24px 20px", borderTop: "1px solid var(--border-light)" }}>
+                  <button
+                    type="button"
+                    className="tenant-upgrade-cancel"
+                    onClick={() => setAddonConfirmOpen(false)}
+                    disabled={addonLoading}
+                    style={{ minHeight: "38px", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "700" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="tenant-upgrade-submit"
+                    onClick={() => executeAddonPurchase(selectedQuotaKey)}
+                    disabled={addonLoading}
+                    style={{ minHeight: "38px", padding: "8px 16px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "700" }}
+                  >
+                    {addonLoading ? "Processing..." : "Pay Now"}
+                  </button>
+                </footer>
+              </>
+            )}
           </section>
         </div>
       )}

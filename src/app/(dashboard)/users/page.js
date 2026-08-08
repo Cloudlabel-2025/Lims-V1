@@ -34,6 +34,8 @@ export default function UserAssignmentPage() {
   const [userSaving, setUserSaving] = useState(false);
   const [pageError, setPageError] = useState("");
   const [userMessage, setUserMessage] = useState("");
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [quotaAddonDetails, setQuotaAddonDetails] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +115,15 @@ export default function UserAssignmentPage() {
         body: JSON.stringify(newUser),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.details || "Unable to create user");
+      if (!response.ok) {
+        if (data.error && data.error.includes("Active staff account limit exceeded")) {
+          if (data.addon) {
+            setQuotaAddonDetails(data.addon);
+          }
+          setShowQuotaModal(true);
+        }
+        throw new Error(data.error || data.details || "Unable to create user");
+      }
 
       clearCachedApi("/api/settings/users");
       setUsers((current) => [data.user, ...current]);
@@ -166,7 +176,15 @@ export default function UserAssignmentPage() {
         body: JSON.stringify(editingUser),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.details || "Unable to update user");
+      if (!response.ok) {
+        if (data.error && data.error.includes("Active staff account limit exceeded")) {
+          if (data.addon) {
+            setQuotaAddonDetails(data.addon);
+          }
+          setShowQuotaModal(true);
+        }
+        throw new Error(data.error || data.details || "Unable to update user");
+      }
 
       clearCachedApi("/api/settings/users");
       setUsers((current) => current.map((item) => (item.id === data.user.id ? data.user : item)));
@@ -303,6 +321,82 @@ export default function UserAssignmentPage() {
           <p className="developer-empty">Your role does not have permission to manage users.</p>
         </section>
       )}
+
+      {/* Quota Exceeded Buy Add-on Modal */}
+      {showQuotaModal && (
+        <>
+          <div 
+            style={{ 
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", 
+              backdropFilter: "blur(4px)", zIndex: 1000,
+              animation: "fadeIn 0.2s ease"
+            }} 
+            onClick={() => setShowQuotaModal(false)} 
+          />
+          <div style={{ 
+            position: "fixed", top: "50%", left: "50%", 
+            transform: "translate(-50%, -50%)", 
+            background: "#fff", borderRadius: "16px", 
+            padding: "32px", width: "440px", maxWidth: "90vw",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.15)", 
+            zIndex: 1001,
+            animation: "slideUp 0.25s ease"
+          }}>
+            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <div style={{ 
+                width: "56px", height: "56px", borderRadius: "28px", 
+                background: "#fef3c7", display: "flex", alignItems: "center", 
+                justifyContent: "center", margin: "0 auto 16px", color: "#d97706" 
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h3 style={{ fontSize: "18px", fontWeight: "700", color: "var(--text-primary)", margin: "0 0 8px" }}>Active Staff Limit Reached</h3>
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.5", margin: "0 0 16px" }}>
+                You have used all active staff seats. To add or activate this user, you can purchase the **Staff User Add-on** ({quotaAddonDetails?.units === 1 ? "+1 Seat" : `+${quotaAddonDetails?.units ?? 1} Seats`} for {quotaAddonDetails ? new Intl.NumberFormat("en-IN", { style: "currency", currency: quotaAddonDetails.currency || "INR", maximumFractionDigits: 2 }).format(quotaAddonDetails.priceMinor / 100) : "₹200"}).
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                onClick={() => setShowQuotaModal(false)}
+                style={{ 
+                  flex: 1, height: "42px", border: "1.5px solid var(--border)", 
+                  borderRadius: "10px", background: "#fff", color: "var(--text-primary)",
+                  cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                  transition: "all 0.2s"
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => router.push("/subscription?buy=staffUsers")}
+                style={{ 
+                  flex: 1, height: "42px", border: "none", 
+                  borderRadius: "10px", background: "#0d9488", color: "#fff",
+                  cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.2s"
+                }}
+              >
+                Buy Add-on ({quotaAddonDetails ? new Intl.NumberFormat("en-IN", { style: "currency", currency: quotaAddonDetails.currency || "INR", maximumFractionDigits: 2 }).format(quotaAddonDetails.priceMinor / 100) : "₹200"})
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translate(-50%, -45%); }
+          to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+      `}</style>
     </section>
   );
 }

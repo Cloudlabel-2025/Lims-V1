@@ -5,6 +5,8 @@ import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { ensureQuotaPeriod, recordShadowUsage } from "@/app/lib/quota-meter";
 import { getShadowSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import connectMasterDB from "@/app/lib/master-db";
+import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPackage";
 
 function clean(value) {
   return String(value || "").trim();
@@ -68,6 +70,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  let subscription = null;
   try {
     const auth = requireTenantSession(req, "billing.create");
     if (auth.error) return auth.error;
@@ -218,7 +221,7 @@ export async function POST(req) {
     const commissionRate = doctor?.commission || 0;
     const commissionAmount = (invoiceAmount * commissionRate) / 100;
 
-    const subscription = await getShadowSubscriptionEntitlements(auth.tenantId);
+    subscription = await getShadowSubscriptionEntitlements(auth.tenantId);
     await ensureQuotaPeriod(connection, auth.tenantId, subscription);
     let quotaUsage;
     const [billingRecord, samples] = await connection.transaction(async (session) => {
@@ -303,6 +306,12 @@ export async function POST(req) {
         session,
       });
 
+      if (!quotaUsage.duplicate && quotaUsage.event?.wouldExceedLimit) {
+        const error = new Error("Billing record quota exceeded");
+        error.name = "QuotaExceededError";
+        throw error;
+      }
+
       return [createdBillingRecord, createdSamples];
     });
 
@@ -317,6 +326,28 @@ export async function POST(req) {
 
     return Response.json({ billingRecord, samples, quotaUsage: quotaUsage?.quota || null }, { status: 201 });
   } catch (error) {
+    if (error.name === "QuotaExceededError") {
+      const masterConnection = await connectMasterDB();
+      const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
+      const pkg = await SubscriptionPackage.findOne({ key: subscription.packageKey }).lean();
+      const version = pkg?.versions?.find((item) => item.version === pkg.activeVersion) || pkg?.versions?.at(-1);
+      const addons = version?.addons || {
+        billingRecords: { units: 250, priceMinor: 12500 }
+      };
+      const currency = version?.pricing?.currency || "INR";
+      return Response.json(
+        { 
+          error: "Billing record limit exceeded. Please upgrade your subscription package to create more bills.",
+          addon: {
+            quotaKey: "billingRecords",
+            units: addons.billingRecords?.units ?? 250,
+            priceMinor: addons.billingRecords?.priceMinor ?? 12500,
+            currency
+          }
+        },
+        { status: 403 }
+      );
+    }
     return jsonError("Unable to create billing record", error, 500);
   }
 }

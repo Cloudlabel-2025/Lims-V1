@@ -27,6 +27,11 @@ function serializePackage(pkg, labCount = 0) {
     features: version?.features || [],
     quotas: version?.quotas || {},
     pricing: version?.pricing || { currency: "INR", monthlyAmountMinor: null, annualAmountMinor: null },
+    addons: version?.addons || {
+      patientRegistrations: { units: 100, priceMinor: 10000 },
+      billingRecords: { units: 250, priceMinor: 12500 },
+      staffUsers: { units: 1, priceMinor: 20000 },
+    },
   };
 }
 
@@ -103,12 +108,45 @@ function parsePackageDefinition(body, fallback = {}) {
     return { error: "Monthly package price is required" };
   }
 
+  const sourceAddons = body.addons && typeof body.addons === "object" ? body.addons : {};
+  const fallbackAddons = fallback.addons || {};
+  const parseAddonField = (quotaKey, defaultUnits, defaultPriceMinor) => {
+    const sourceVal = sourceAddons[quotaKey] && typeof sourceAddons[quotaKey] === "object" ? sourceAddons[quotaKey] : {};
+    const fallbackVal = fallbackAddons[quotaKey] || {};
+    
+    const unitsRaw = "units" in sourceVal ? sourceVal.units : fallbackVal.units ?? defaultUnits;
+    const priceRaw = "price" in sourceVal ? sourceVal.price : undefined;
+    
+    const units = (unitsRaw === "" || unitsRaw === null) ? defaultUnits : Number.parseInt(unitsRaw, 10);
+    const priceMinor = (priceRaw !== undefined && priceRaw !== "" && priceRaw !== null) ? moneyToMinor(priceRaw) : (fallbackVal.priceMinor ?? defaultPriceMinor);
+    
+    if (isNaN(units) || units < 0 || priceMinor === undefined || priceMinor === null || priceMinor < 0) {
+      return undefined;
+    }
+    return { units, priceMinor };
+  };
+
+  const patientRegistrationsAddon = parseAddonField("patientRegistrations", 100, 10000);
+  const billingRecordsAddon = parseAddonField("billingRecords", 250, 12500);
+  const staffUsersAddon = parseAddonField("staffUsers", 1, 20000);
+
+  if (!patientRegistrationsAddon || !billingRecordsAddon || !staffUsersAddon) {
+    return { error: "Add-on pack sizes must be whole numbers, and prices must be valid positive values" };
+  }
+
+  const addons = {
+    patientRegistrations: patientRegistrationsAddon,
+    billingRecords: billingRecordsAddon,
+    staffUsers: staffUsersAddon,
+  };
+
   return {
     definition: {
       modules: resolvePackageModules(body.modules ?? fallback.modules),
       features: [...new Set((body.features ?? fallback.features ?? []).filter((item) => allowedFeatures.has(item)))],
       quotas,
       pricing,
+      addons,
     },
   };
 }
@@ -126,6 +164,20 @@ function sameDefinition(left, right) {
       currency: definition.pricing?.currency || "INR",
       monthlyAmountMinor: definition.pricing?.monthlyAmountMinor ?? null,
       annualAmountMinor: definition.pricing?.annualAmountMinor ?? null,
+    },
+    addons: {
+      patientRegistrations: {
+        units: definition.addons?.patientRegistrations?.units ?? 100,
+        priceMinor: definition.addons?.patientRegistrations?.priceMinor ?? 10000,
+      },
+      billingRecords: {
+        units: definition.addons?.billingRecords?.units ?? 250,
+        priceMinor: definition.addons?.billingRecords?.priceMinor ?? 12500,
+      },
+      staffUsers: {
+        units: definition.addons?.staffUsers?.units ?? 1,
+        priceMinor: definition.addons?.staffUsers?.priceMinor ?? 20000,
+      },
     },
   });
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
@@ -243,6 +295,11 @@ export async function PATCH(req) {
         monthlyAmountMinor: null,
         annualAmountMinor: null,
       },
+      addons: currentVersion.addons?.toObject?.() || currentVersion.addons || {
+        patientRegistrations: { units: 100, priceMinor: 10000 },
+        billingRecords: { units: 250, priceMinor: 12500 },
+        staffUsers: { units: 1, priceMinor: 20000 },
+      },
     };
     const parsed = parsePackageDefinition(body, currentDefinition);
     if (parsed.error) return NextResponse.json({ error: parsed.error }, { status: 400 });
@@ -261,6 +318,7 @@ export async function PATCH(req) {
       [`versions.${versionIndex}.features`]: parsed.definition.features,
       [`versions.${versionIndex}.quotas`]: parsed.definition.quotas,
       [`versions.${versionIndex}.pricing`]: parsed.definition.pricing,
+      [`versions.${versionIndex}.addons`]: parsed.definition.addons,
     };
     if (definitionChanged) setFields[`versions.${versionIndex}.publishedAt`] = new Date();
 

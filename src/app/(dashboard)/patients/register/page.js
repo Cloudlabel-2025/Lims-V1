@@ -26,6 +26,8 @@ export default function PatientRegistration() {
   const [duplicateWarning, setDuplicateWarning] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
   const [duplicatePatient, setDuplicatePatient] = useState(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [quotaAddonDetails, setQuotaAddonDetails] = useState(null);
   const [errors, setErrors] = useState({});
   const [showErrors, setShowErrors] = useState(false);
   const [form, setForm] = useState(getEmptyForm);
@@ -236,6 +238,12 @@ export default function PatientRegistration() {
         setShowErrors(false);
         setTimeout(() => router.push(billCreated ? "/billing" : "/patients"), 5000);
       } else {
+        if (res.status === 403 && data.error && (data.error.includes("limit exceeded") || data.error.includes("quota exceeded"))) {
+          if (data.addon) {
+            setQuotaAddonDetails(data.addon);
+          }
+          setShowQuotaModal(true);
+        }
         setStatus({ type: "danger", message: data.error || "Something went wrong." });
       }
     } catch {
@@ -464,13 +472,85 @@ export default function PatientRegistration() {
                     const billMsg = billId ? ` Bill ${billId} has been generated.` : "";
                     setStatus({ type: "success", message: `Patient registered successfully. Patient ID: ${data.patientId}.${billMsg}` }); setForm(getEmptyForm()); setDobDraft(""); setHasRefDoctor(false);
                   }
-                  else setStatus({ type: "danger", message: data.error || "Failed" });
+                  else {
+                    if (res.status === 403 && data.error && (data.error.includes("limit exceeded") || data.error.includes("quota exceeded"))) {
+                      if (data.addon) {
+                        setQuotaAddonDetails(data.addon);
+                      }
+                      setShowQuotaModal(true);
+                    }
+                    setStatus({ type: "danger", message: data.error || "Failed" });
+                  }
                 } catch { setStatus({ type: "danger", message: "Network error" }); }
                 finally { setLoading(false); }
               }}>OK, Proceed</button>
             </div>
           </div>
         </div>
+      )}
+      {/* Quota Exceeded Buy Add-on Modal */}
+      {showQuotaModal && (
+        <>
+          <div 
+            style={{ 
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", 
+              backdropFilter: "blur(4px)", zIndex: 1000,
+              animation: "fadeIn 0.2s ease"
+            }} 
+            onClick={() => setShowQuotaModal(false)} 
+          />
+          <div style={{ 
+            position: "fixed", top: "50%", left: "50%", 
+            transform: "translate(-50%, -50%)", 
+            background: "#fff", borderRadius: "16px", 
+            padding: "32px", width: "440px", maxWidth: "90vw",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.15)", 
+            zIndex: 1001,
+            animation: "slideUp 0.25s ease"
+          }}>
+            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <div style={{ 
+                width: "56px", height: "56px", borderRadius: "28px", 
+                background: "#fef3c7", display: "flex", alignItems: "center", 
+                justifyContent: "center", margin: "0 auto 16px", color: "#d97706" 
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h3 style={{ fontSize: "18px", fontWeight: "700", color: "var(--text-primary)", margin: "0 0 8px" }}>Patient Limit Reached</h3>
+              <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.5", margin: "0 0 16px" }}>
+                You have used all patient registrations for this period. To register this patient, you can purchase the **Patients Add-on** (+{quotaAddonDetails?.units ?? 100} Patients for {quotaAddonDetails ? new Intl.NumberFormat("en-IN", { style: "currency", currency: quotaAddonDetails.currency || "INR", maximumFractionDigits: 2 }).format(quotaAddonDetails.priceMinor / 100) : "₹149"}).
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                onClick={() => setShowQuotaModal(false)}
+                style={{ 
+                  flex: 1, height: "42px", border: "1.5px solid var(--border)", 
+                  borderRadius: "10px", background: "#fff", color: "var(--text-primary)",
+                  cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                  transition: "all 0.2s"
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => router.push("/subscription?buy=patientRegistrations")}
+                style={{ 
+                  flex: 1, height: "42px", border: "none", 
+                  borderRadius: "10px", background: "#0d9488", color: "#fff",
+                  cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.2s"
+                }}
+              >
+                Buy Add-on ({quotaAddonDetails ? new Intl.NumberFormat("en-IN", { style: "currency", currency: quotaAddonDetails.currency || "INR", maximumFractionDigits: 2 }).format(quotaAddonDetails.priceMinor / 100) : "₹149"})
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </>
   );

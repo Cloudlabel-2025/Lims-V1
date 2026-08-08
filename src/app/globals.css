@@ -9150,11 +9150,18 @@ input[type="number"] {
 }
 
 .tenant-page-viewport :is(.form-card, .module-panel, .settings-panel, .patient-list-container, .doctor-list-container) {
-  overflow: hidden;
   border: 1px solid var(--corporate-border);
   border-radius: 10px;
   background: var(--corporate-panel);
   box-shadow: 0 1px 2px rgba(15,23,42,.04);
+}
+
+.tenant-page-viewport :is(.module-panel, .settings-panel, .patient-list-container, .doctor-list-container) {
+  overflow: hidden;
+}
+
+.tenant-page-viewport .form-card {
+  overflow: visible;
 }
 
 .tenant-page-viewport :is(.form-card, .module-panel, .settings-panel):hover {

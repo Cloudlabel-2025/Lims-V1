@@ -65,22 +65,25 @@ async function main() {
   for (const lab of labs) {
     console.log(`Seeding lab: ${lab.name} (${lab.tenantId}) in database: ${lab.dbName}...`);
     
-    const tenantConnection = await mongoose
-      .createConnection(lab.dbConnectionString, {
-        dbName: lab.dbName,
-        bufferCommands: false,
-        maxPoolSize: 5,
-        serverSelectionTimeoutMS: 5000,
-      })
-      .asPromise();
-
+    let tenantConnection = null;
     try {
+      tenantConnection = await mongoose
+        .createConnection(lab.dbConnectionString, {
+          dbName: lab.dbName,
+          bufferCommands: false,
+          maxPoolSize: 5,
+          serverSelectionTimeoutMS: 5000,
+        })
+        .asPromise();
+
       const result = await seedDefaultTests(tenantConnection);
       console.log(`Successfully seeded: ${result.categoriesSeeded} categories, ${result.testsSeeded} new tests.`);
     } catch (err) {
-      console.error(`Error seeding lab ${lab.tenantId}:`, err.message);
+      console.error(`Failed to connect or seed lab ${lab.tenantId}:`, err.message);
     } finally {
-      await tenantConnection.close();
+      if (tenantConnection) {
+        await tenantConnection.close();
+      }
     }
   }
 

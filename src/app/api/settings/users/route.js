@@ -3,6 +3,8 @@ import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
 import { ensureUserDoctorIdIndex } from "@/app/models/tenant/User";
+import connectMasterDB from "@/app/lib/master-db";
+import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPackage";
 
 const URL_RE = /https?:\/\//;
 const SAFE_NAME = /^[A-Za-z0-9 .&'\/,()@_-]+$/;
@@ -168,6 +170,35 @@ export async function POST(req) {
       return Response.json({ error: describeExistingUser(existingEmailUser) }, { status: 409 });
     }
 
+    const { getShadowSubscriptionEntitlements } = await import("@/app/lib/subscription-service");
+    const subscription = await getShadowSubscriptionEntitlements(auth.tenantId);
+    const limit = subscription.entitlements?.quotas?.staffUsers ?? null;
+    if (limit !== null) {
+      const activeCount = await User.countDocuments({ status: "active" });
+      if (activeCount >= limit) {
+        const masterConnection = await connectMasterDB();
+        const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
+        const pkg = await SubscriptionPackage.findOne({ key: subscription.packageKey }).lean();
+        const version = pkg?.versions?.find((item) => item.version === pkg.activeVersion) || pkg?.versions?.at(-1);
+        const addons = version?.addons || {
+          staffUsers: { units: 1, priceMinor: 20000 }
+        };
+        const currency = version?.pricing?.currency || "INR";
+        return Response.json(
+          { 
+            error: `Active staff account limit exceeded (${limit}). Please upgrade your subscription package.`,
+            addon: {
+              quotaKey: "staffUsers",
+              units: addons.staffUsers?.units ?? 1,
+              priceMinor: addons.staffUsers?.priceMinor ?? 20000,
+              currency
+            }
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const user = await User.create({
       firstName,
       lastName,
@@ -266,6 +297,38 @@ export async function PATCH(req) {
 
     if (existingEmailUser) {
       return Response.json({ error: describeExistingUser(existingEmailUser) }, { status: 409 });
+    }
+
+    const willBecomeActive = (status === "active" && user.status !== "active") || (password && user.status === "locked");
+    if (willBecomeActive) {
+      const { getShadowSubscriptionEntitlements } = await import("@/app/lib/subscription-service");
+      const subscription = await getShadowSubscriptionEntitlements(auth.tenantId);
+      const limit = subscription.entitlements?.quotas?.staffUsers ?? null;
+      if (limit !== null) {
+        const activeCount = await User.countDocuments({ status: "active" });
+        if (activeCount >= limit) {
+          const masterConnection = await connectMasterDB();
+          const SubscriptionPackage = getSubscriptionPackageModel(masterConnection);
+          const pkg = await SubscriptionPackage.findOne({ key: subscription.packageKey }).lean();
+          const version = pkg?.versions?.find((item) => item.version === pkg.activeVersion) || pkg?.versions?.at(-1);
+          const addons = version?.addons || {
+            staffUsers: { units: 1, priceMinor: 20000 }
+          };
+          const currency = version?.pricing?.currency || "INR";
+          return Response.json(
+            { 
+              error: `Active staff account limit exceeded (${limit}). Please upgrade your subscription package.`,
+              addon: {
+                quotaKey: "staffUsers",
+                units: addons.staffUsers?.units ?? 1,
+                priceMinor: addons.staffUsers?.priceMinor ?? 20000,
+                currency
+              }
+            },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     user.set({
