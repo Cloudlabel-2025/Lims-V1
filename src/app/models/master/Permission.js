@@ -44,7 +44,7 @@ export const PermissionSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      match: /^[a-z]+(?:\.[a-z]+)+$/,
+      match: /^[a-z0-9_-]+(?:\.[a-z0-9_-]+)+$/,
     },
     module: {
       type: String,
@@ -82,7 +82,7 @@ export const PermissionSchema = new mongoose.Schema(
           type: String,
           trim: true,
           lowercase: true,
-          match: /^[a-z]+(?:\.[a-z]+)+$/,
+          match: /^[a-z0-9_-]+(?:\.[a-z0-9_-]+)+$/,
         },
       ],
       default: [],

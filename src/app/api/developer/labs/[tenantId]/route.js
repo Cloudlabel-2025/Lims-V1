@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import connectMasterDB from "@/app/lib/master-db";
 import { hashPassword } from "@/app/lib/password";
+import { hasAllDefaultInventory } from "@/app/lib/inventory-seeder";
+import { hasAllDefaultTests } from "@/app/lib/test-seeder";
 import { defaultLabModules, normalizeEnabledModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 import { getLabModel } from "@/app/models/master/Lab";
@@ -126,6 +128,10 @@ function serializeLab(lab, req) {
     reportHeaderUrl: lab.branding?.reportHeader?.url || null,
     loginHighlights: lab.branding?.loginHighlights || [],
     enabledModules: lab.enabledModules?.length ? lab.enabledModules : defaultLabModules,
+    seededDefaults: {
+      tests: Boolean(lab.defaultData?.tests?.seeded),
+      inventory: Boolean(lab.defaultData?.inventory?.seeded),
+    },
     loginUrl: buildLabLoginUrl(req, lab.tenantId),
     createdAt: lab.createdAt,
     updatedAt: lab.updatedAt,
@@ -155,11 +161,52 @@ async function getLabById(req, params) {
     "adminAccess.email": 1,
     branding: 1,
     enabledModules: 1,
+    defaultData: 1,
     createdAt: 1,
     updatedAt: 1,
   });
 
   return { lab, masterConnection };
+}
+
+async function backfillDefaultDataStatus(lab) {
+  const needsTestsCheck = !lab.defaultData?.tests?.seeded;
+  const needsInventoryCheck = !lab.defaultData?.inventory?.seeded;
+  if (!needsTestsCheck && !needsInventoryCheck) return;
+
+  let tenantConnection = null;
+  try {
+    tenantConnection = await mongoose
+      .createConnection(lab.dbConnectionString, {
+        ...connectionOptions,
+        dbName: lab.dbName,
+      })
+      .asPromise();
+
+    const [hasTests, hasInventory] = await Promise.all([
+      needsTestsCheck ? hasAllDefaultTests(tenantConnection) : false,
+      needsInventoryCheck ? hasAllDefaultInventory(tenantConnection) : false,
+    ]);
+
+    if (hasTests) {
+      lab.set("defaultData.tests", { seeded: true, seededAt: new Date() });
+    }
+    if (hasInventory) {
+      lab.set("defaultData.inventory", { seeded: true, seededAt: new Date() });
+    }
+    if (hasTests || hasInventory) {
+      await lab.save();
+    }
+  } catch (error) {
+    console.warn("Unable to inspect existing default data status", {
+      tenantId: lab.tenantId,
+      message: error?.message,
+    });
+  } finally {
+    if (tenantConnection) {
+      await tenantConnection.close();
+    }
+  }
 }
 
 export async function GET(req, context) {
@@ -171,6 +218,8 @@ export async function GET(req, context) {
     if (!lab) {
       return NextResponse.json({ error: "Lab not found" }, { status: 404 });
     }
+
+    await backfillDefaultDataStatus(lab);
 
     return NextResponse.json({ lab: serializeLab(lab, req) });
   } catch (error) {

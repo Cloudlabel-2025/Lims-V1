@@ -8,15 +8,19 @@ export default function SearchableSelect({
   onChange,
   placeholder = "Select...",
   name = "",
+  id,
   className = "",
   error = false,
+  required = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef(null);
   const selectedOption = options.find((opt) => opt.value === value);
   const selectedLabel = selectedOption?.label || "";
   const inputValue = isOpen ? searchTerm : selectedLabel;
+  const listboxId = `${id || name || "searchable-select"}-options`;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -50,6 +54,7 @@ export default function SearchableSelect({
   const handleInputChange = (event) => {
     const nextValue = event.target.value;
     setSearchTerm(nextValue);
+    setHighlightedIndex(0);
 
     if (!isOpen) setIsOpen(true);
     if (nextValue === "") {
@@ -60,6 +65,29 @@ export default function SearchableSelect({
   const handleFocus = () => {
     setIsOpen(true);
     setSearchTerm("");
+    setHighlightedIndex(0);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Escape") {
+      setIsOpen(false);
+      setSearchTerm("");
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setIsOpen(true);
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      setHighlightedIndex((current) => {
+        if (!filteredOptions.length) return 0;
+        return (current + direction + filteredOptions.length) % filteredOptions.length;
+      });
+      return;
+    }
+    if (event.key === "Enter" && isOpen && filteredOptions[highlightedIndex]) {
+      event.preventDefault();
+      handleSelect(filteredOptions[highlightedIndex]);
+    }
   };
 
   return (
@@ -70,15 +98,25 @@ export default function SearchableSelect({
     >
       <div className="searchable-select-input-wrapper">
         <input
+          id={id}
           type="text"
           className={`lims-input ${className} ${error ? "invalid" : ""}`}
           placeholder={placeholder}
           value={inputValue}
           onChange={handleInputChange}
           onFocus={handleFocus}
+          onKeyDown={handleKeyDown}
           autoComplete="off"
+          required={required}
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-autocomplete="list"
+          aria-controls={listboxId}
+          aria-activedescendant={isOpen && filteredOptions[highlightedIndex] ? `${listboxId}-${highlightedIndex}` : undefined}
         />
         <div
+          id={listboxId}
+          role="listbox"
           className="searchable-select-icon"
           style={{
             position: "absolute",
@@ -111,9 +149,12 @@ export default function SearchableSelect({
           }}
         >
           {filteredOptions.length > 0 ? (
-            filteredOptions.map((option) => (
+            filteredOptions.map((option, index) => (
               <div
                 key={option.value}
+                id={`${listboxId}-${index}`}
+                role="option"
+                aria-selected={value === option.value}
                 className="searchable-select-item"
                 onClick={() => handleSelect(option)}
                 style={{
@@ -121,15 +162,9 @@ export default function SearchableSelect({
                   cursor: "pointer",
                   fontSize: "13.5px",
                   borderBottom: "1px solid var(--border-light)",
-                  backgroundColor: value === option.value ? "var(--primary-50)" : "transparent",
+                  backgroundColor: highlightedIndex === index || value === option.value ? "var(--primary-50)" : "transparent",
                 }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.backgroundColor = "var(--primary-50)";
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.backgroundColor =
-                    value === option.value ? "var(--primary-50)" : "transparent";
-                }}
+                onMouseEnter={() => setHighlightedIndex(index)}
               >
                 <div
                   style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}

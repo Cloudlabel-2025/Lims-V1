@@ -3,6 +3,9 @@
 import { Icons } from "@/app/components/Icons";
 
 export default function StepDetails({ sample, onNext, inventoryItems = [], uoms = [], reservedInventory = [], setReservedInventory }) {
+  const investigations = sample.investigations?.length
+    ? sample.investigations
+    : [{ testSnapshot: sample.testSnapshot }];
 
   const addInventoryRow = () => {
     setReservedInventory([...reservedInventory, { item: "", quantity: "", uom: "", searchQuery: "", isOpen: false }]);
@@ -75,20 +78,20 @@ export default function StepDetails({ sample, onNext, inventoryItems = [], uoms 
         </div>
         <div className="col-md-4">
           <div className="wizard-info-card">
-            <small className="text-muted">Test Name</small>
-            <strong>{sample.testSnapshot?.name || "-"}</strong>
+            <small className="text-muted">Investigations ({investigations.length})</small>
+            <strong>{investigations.map((item) => item.testSnapshot?.name).filter(Boolean).join(", ") || "-"}</strong>
           </div>
         </div>
         <div className="col-md-4">
           <div className="wizard-info-card">
             <small className="text-muted">Category</small>
-            <strong>{sample.testSnapshot?.categoryName || "-"}</strong>
+            <strong>{[...new Set(investigations.map((item) => item.testSnapshot?.categoryName).filter(Boolean))].join(", ") || "-"}</strong>
           </div>
         </div>
         <div className="col-md-4">
           <div className="wizard-info-card">
             <small className="text-muted">Sample Type</small>
-            <strong>{sample.sampleType || sample.testSnapshot?.sampleType || "-"}</strong>
+            <strong>{sample.sampleType || [...new Set(investigations.map((item) => item.testSnapshot?.sampleType).filter(Boolean))].join(", ") || "-"}</strong>
           </div>
         </div>
       </div>

@@ -47,11 +47,28 @@ const ResultParameterSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const ReportInvestigationSchema = new mongoose.Schema(
+  {
+    billingItemId: { type: mongoose.Schema.Types.ObjectId },
+    testDefinition: { type: mongoose.Schema.Types.ObjectId, ref: "TestDefinition", required: true },
+    testSnapshot: {
+      testId: String,
+      name: String,
+      code: String,
+      categoryName: String,
+      sampleType: String,
+    },
+    results: { type: [ResultParameterSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const PreviousVersionSchema = new mongoose.Schema(
   {
     version: { type: Number, required: true },
     status: { type: String, required: true },
     results: { type: [ResultParameterSchema], default: [] },
+    investigations: { type: [ReportInvestigationSchema], default: [] },
     remarks: { type: String, trim: true },
     createdAt: { type: Date },
     updatedAt: { type: Date },
@@ -76,7 +93,6 @@ export const TestReportSchema = new mongoose.Schema(
     testDefinition: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TestDefinition",
-      required: true,
       index: true,
     },
     sample: {
@@ -103,6 +119,10 @@ export const TestReportSchema = new mongoose.Schema(
     },
     results: {
       type: [ResultParameterSchema],
+      default: [],
+    },
+    investigations: {
+      type: [ReportInvestigationSchema],
       default: [],
     },
     remarks: {
@@ -144,14 +164,23 @@ export const TestReportSchema = new mongoose.Schema(
 );
 
 TestReportSchema.pre("validate", function validateResults() {
-  if (this.results && Array.isArray(this.results)) {
-    for (let i = 0; i < this.results.length; i++) {
-      const tv = this.results[i].textValue;
+  const resultGroups = [
+    { path: "results", values: this.results },
+    ...(this.investigations || []).map((investigation, index) => ({
+      path: `investigations.${index}.results`,
+      values: investigation.results,
+    })),
+  ];
+
+  for (const group of resultGroups) {
+    if (!Array.isArray(group.values)) continue;
+    for (let i = 0; i < group.values.length; i++) {
+      const tv = group.values[i].textValue;
       if (!tv || tv === "") continue;
       if (isExponentialNotation(tv)) {
-        this.invalidate(`results.${i}.textValue`, `Exponential notation is not allowed: "${tv}"`);
+        this.invalidate(`${group.path}.${i}.textValue`, `Exponential notation is not allowed: "${tv}"`);
       } else if (!Number.isFinite(Number(tv))) {
-        this.invalidate(`results.${i}.textValue`, `Invalid numeric value: "${tv}"`);
+        this.invalidate(`${group.path}.${i}.textValue`, `Invalid numeric value: "${tv}"`);
       }
     }
   }
@@ -173,6 +202,12 @@ TestReportSchema.methods.createNewVersion = function () {
     version: this.version,
     status: this.status,
     results: this.results.map((r) => ({ ...r })),
+    investigations: this.investigations.map((investigation) => ({
+      billingItemId: investigation.billingItemId,
+      testDefinition: investigation.testDefinition,
+      testSnapshot: investigation.testSnapshot,
+      results: investigation.results.map((result) => ({ ...result })),
+    })),
     remarks: this.remarks,
     createdAt: this.createdAt,
     updatedAt: new Date(),
@@ -181,7 +216,14 @@ TestReportSchema.methods.createNewVersion = function () {
 };
 
 export function getTestReportModel(connection = mongoose) {
-  return connection.models.TestReport || connection.model("TestReport", TestReportSchema);
+  const existingModel = connection.models.TestReport;
+  if (existingModel) {
+    if (!existingModel.schema.path("investigations")) {
+      existingModel.schema.add({ investigations: { type: [ReportInvestigationSchema], default: [] } });
+    }
+    return existingModel;
+  }
+  return connection.model("TestReport", TestReportSchema);
 }
 
 const TestReport = getTestReportModel();

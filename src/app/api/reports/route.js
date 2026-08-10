@@ -61,7 +61,8 @@ export async function GET(req) {
     const { TestReport } = await getTenantModels(auth.tenantId);
     const reports = await TestReport.find(query)
       .populate("patient", "name patientId age gender phone")
-      .select("reportId sampleId patient testDefinition testSnapshot results remarks status enteredBy version template createdAt updatedAt")
+      .populate("billingRecord", "billId")
+      .select("reportId sampleId patient testDefinition testSnapshot investigations results remarks status enteredBy version template billingRecord createdAt updatedAt")
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();

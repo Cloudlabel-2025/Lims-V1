@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 const rootDir = process.cwd();
 const envPath = path.join(rootDir, ".env.local");
 const rbacConfigPath = path.join(rootDir, "src", "app", "lib", "rbac-config.json");
-const permissionKeyPattern = /^[a-z]+(?:\.[a-z]+)+$/;
+const permissionKeyPattern = /^[a-z0-9_-]+(?:\.[a-z0-9_-]+)+$/;
 const defaultPlans = ["trial", "basic", "professional", "enterprise"];
 
 function loadLocalEnv() {
@@ -65,7 +65,7 @@ function createPermissionModel(connection) {
         unique: true,
         trim: true,
         lowercase: true,
-        match: /^[a-z]+(?:\.[a-z]+)+$/,
+        match: /^[a-z0-9_-]+(?:\.[a-z0-9_-]+)+$/,
       },
       module: { type: String, required: true, trim: true, lowercase: true },
       action: { type: String, required: true, trim: true, lowercase: true },
@@ -83,7 +83,7 @@ function createPermissionModel(connection) {
             type: String,
             trim: true,
             lowercase: true,
-            match: /^[a-z]+(?:\.[a-z]+)+$/,
+            match: /^[a-z0-9_-]+(?:\.[a-z0-9_-]+)+$/,
           },
         ],
         default: [],
@@ -120,7 +120,7 @@ function createRoleTemplateModel(connection) {
     type: String,
     trim: true,
     lowercase: true,
-    match: /^(?:\*|[a-z]+(?:\.[a-z]+)+)$/,
+    match: /^(?:\*|[a-z0-9_-]+(?:\.[a-z0-9_-]+)+)$/,
   };
 
   const schema = new mongoose.Schema(

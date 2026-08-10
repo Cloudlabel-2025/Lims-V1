@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Icons } from "@/app/components/Icons";
+import { usePasswordTypeGuard } from "@/app/lib/use-password-type-guard";
 
 export default function PasswordField({
   id,
@@ -17,11 +18,14 @@ export default function PasswordField({
   toggleLabel = "password",
 }) {
   const [visible, setVisible] = useState(false);
+  const inputRef = useRef(null);
+  usePasswordTypeGuard(inputRef, visible);
   const hasValue = Boolean(value);
 
   return (
     <div className="password-field-wrapper">
       <input
+        ref={inputRef}
         id={id}
         className={invalid ? "invalid" : ""}
         type={visible ? "text" : "password"}

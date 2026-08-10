@@ -27,12 +27,15 @@ const defaultForm = {
   accentColor: "#f59e0b",
   packageKey: "",
   enabledModules: defaultLabModules,
+  seedDefaultTests: false,
+  seedDefaultInventory: false,
   loginHighlights: [],
 };
 
 const wizardSteps = [
   { id: "details", title: "Lab Details" },
   { id: "subscription", title: "Subscription" },
+  { id: "data", title: "Initial Data" },
   { id: "highlights", title: "Login Page Highlights" },
   { id: "branding", title: "Login Branding" },
 ];
@@ -193,6 +196,8 @@ export default function DeveloperCreateLabPage() {
   const [logoInputTouched, setLogoInputTouched] = useState(false);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [showSeedConfirmation, setShowSeedConfirmation] = useState(false);
+  const [seedSelection, setSeedSelection] = useState({ tests: false, inventory: false });
   const logoInputRef = useRef(null);
 
   function handleRemoveLogo() {
@@ -202,6 +207,36 @@ export default function DeveloperCreateLabPage() {
     if (logoInputRef.current) {
       logoInputRef.current.value = "";
     }
+  }
+
+  function openSeedConfirmation() {
+    setSeedSelection({
+      tests: form.seedDefaultTests,
+      inventory: form.seedDefaultInventory,
+    });
+    setShowSeedConfirmation(true);
+  }
+
+  function toggleSeedSelection(key) {
+    setSeedSelection((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  function confirmSeedSelection() {
+    setForm((current) => ({
+      ...current,
+      seedDefaultTests: seedSelection.tests,
+      seedDefaultInventory: seedSelection.inventory,
+    }));
+    setShowSeedConfirmation(false);
+  }
+
+  function keepSeedCatalogsEmpty() {
+    setForm((current) => ({
+      ...current,
+      seedDefaultTests: false,
+      seedDefaultInventory: false,
+    }));
+    setShowSeedConfirmation(false);
   }
   const [touchedFields, setTouchedFields] = useState({});
   const [attemptedSteps, setAttemptedSteps] = useState({});
@@ -226,6 +261,17 @@ export default function DeveloperCreateLabPage() {
 
     return () => URL.revokeObjectURL(objectUrl);
   }, [logoFile, logoFileError]);
+
+  useEffect(() => {
+    if (!showSeedConfirmation) return undefined;
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setShowSeedConfirmation(false);
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showSeedConfirmation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,7 +540,9 @@ export default function DeveloperCreateLabPage() {
 
       clearCachedApi("/api/developer/labs");
       setCreatedLab(data);
-      setSuccess(`Lab "${data.lab.name}" created successfully.`);
+      const seededDefaults = data.lab.seededDefaults || {};
+      const seededCatalogs = [seededDefaults.tests && "default tests", seededDefaults.inventory && "default inventory"].filter(Boolean);
+      setSuccess(`Lab "${data.lab.name}" created successfully${seededCatalogs.length ? ` with ${seededCatalogs.join(" and ")}` : " with empty test and inventory catalogs"}.`);
       setForm(defaultForm);
       setLogoFile(null);
       setCustomHighlight("");
@@ -529,6 +577,56 @@ export default function DeveloperCreateLabPage() {
 
       {error && <div className="developer-alert">{error}</div>}
       <SuccessDialog message={success} onClose={() => setSuccess("")} />
+      {showSeedConfirmation && (
+        <div className="cms-success-dialog-backdrop" role="presentation">
+          <section
+            className="developer-seed-confirmation"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="seed-confirmation-title"
+            aria-describedby="seed-confirmation-description"
+          >
+            <p className="developer-kicker">Initial Lab Data</p>
+            <h2 id="seed-confirmation-title">Select the default data this lab needs</h2>
+            <p id="seed-confirmation-description">
+              Select either catalog or both. Only the selected data will be added to {form.name.trim() || "this lab"}.
+            </p>
+            <div className="developer-seed-confirmation-list">
+              <button
+                type="button"
+                className={seedSelection.tests ? "selected" : ""}
+                aria-pressed={seedSelection.tests}
+                onClick={() => toggleSeedSelection("tests")}
+              >
+                <span className="developer-seed-check" aria-hidden="true">{seedSelection.tests ? "✓" : ""}</span>
+                <span><strong>Tests</strong><small>Default categories and test definitions</small></span>
+              </button>
+              <button
+                type="button"
+                className={seedSelection.inventory ? "selected" : ""}
+                aria-pressed={seedSelection.inventory}
+                onClick={() => toggleSeedSelection("inventory")}
+              >
+                <span className="developer-seed-check" aria-hidden="true">{seedSelection.inventory ? "✓" : ""}</span>
+                <span><strong>Inventory</strong><small>UOMs, categories, suppliers, items, and batches</small></span>
+              </button>
+            </div>
+            <div className="developer-seed-confirmation-actions">
+              <button type="button" onClick={keepSeedCatalogsEmpty}>
+                No, Keep Empty
+              </button>
+              <button
+                type="button"
+                className="developer-submit"
+                onClick={confirmSeedSelection}
+                disabled={!seedSelection.tests && !seedSelection.inventory}
+              >
+                Confirm Selection
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {createdLab && (
         <section className="developer-success">
@@ -741,6 +839,41 @@ export default function DeveloperCreateLabPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {stepId === "data" && (
+          <div className="developer-module-picker flush">
+            <div className="developer-panel-header">
+              <h2>Initial Lab Data</h2>
+              <p>Decide whether this lab starts with standard catalogs or an empty setup.</p>
+            </div>
+            <div className={`developer-seed-choice ${form.seedDefaultTests || form.seedDefaultInventory ? "selected" : ""}`}>
+              <div>
+                <span className="developer-seed-choice-status">
+                  {form.seedDefaultTests && form.seedDefaultInventory
+                    ? "Tests and inventory selected"
+                    : form.seedDefaultTests
+                      ? "Tests selected"
+                      : form.seedDefaultInventory
+                        ? "Inventory selected"
+                        : "Empty setup selected"}
+                </span>
+                <h3>{form.seedDefaultTests || form.seedDefaultInventory ? "Selected catalogs will be added" : "The lab will start empty"}</h3>
+                <p>
+                  {form.seedDefaultTests && form.seedDefaultInventory
+                    ? "Default tests and inventory records will be created."
+                    : form.seedDefaultTests
+                      ? "Default test categories and test definitions will be created; inventory will remain empty."
+                      : form.seedDefaultInventory
+                        ? "Default inventory UOMs, categories, suppliers, items, and batches will be created; tests will remain empty."
+                    : "No default tests or inventory records will be added. The lab can build its own catalogs later."}
+                </p>
+              </div>
+              <button type="button" onClick={openSeedConfirmation}>
+                {form.seedDefaultTests || form.seedDefaultInventory ? "Change Initial Data" : "Choose Default Data"}
+              </button>
+            </div>
           </div>
         )}
 

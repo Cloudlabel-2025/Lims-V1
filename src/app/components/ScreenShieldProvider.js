@@ -15,6 +15,9 @@ import { useEffect } from "react";
  */
 export default function ScreenShieldProvider({ children }) {
   useEffect(() => {
+    // Local development must remain inspectable for debugging and UI work.
+    if (process.env.NODE_ENV !== "production") return undefined;
+
     /* ---- 1. Block keyboard shortcuts ---- */
     function handleKeyDown(e) {
       // PrintScreen

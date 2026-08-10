@@ -248,14 +248,32 @@ export async function POST(req) {
         { session }
       );
 
-      const createdSamples = await Sample.create(
-        createdBillingRecord.items.map((item) => ({
+      const investigationNames = createdBillingRecord.items
+        .map((item) => item.testSnapshot?.name)
+        .filter(Boolean);
+      const sampleTypes = [...new Set(
+        createdBillingRecord.items.map((item) => item.testSnapshot?.sampleType).filter(Boolean)
+      )];
+      const firstItem = createdBillingRecord.items[0];
+      const [createdSample] = await Sample.create(
+        [{
           billingRecord: createdBillingRecord._id,
-          billingItemId: item._id,
           patient: patient._id,
-          testDefinition: item.testDefinition,
-          testSnapshot: item.testSnapshot,
-        })),
+          testDefinition: firstItem.testDefinition,
+          testSnapshot: {
+            ...firstItem.testSnapshot,
+            name: investigationNames.join(", "),
+            code: createdBillingRecord.billId,
+            sampleType: sampleTypes.join(", "),
+          },
+          sampleType: sampleTypes.join(", ") || undefined,
+          investigations: createdBillingRecord.items.map((item) => ({
+            billingItemId: item._id,
+            testDefinition: item.testDefinition,
+            testSnapshot: item.testSnapshot,
+            status: "pending",
+          })),
+        }],
         { session, ordered: true }
       );
 
@@ -312,7 +330,7 @@ export async function POST(req) {
         throw error;
       }
 
-      return [createdBillingRecord, createdSamples];
+      return [createdBillingRecord, [createdSample]];
     });
 
     await billingRecord.populate("patient", "name patientId age gender phone");

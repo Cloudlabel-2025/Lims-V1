@@ -135,10 +135,17 @@ export default function DeveloperEditLabPage({ params }) {
   const [logoRemoved, setLogoRemoved] = useState(false);
   const [logoAltText, setLogoAltText] = useState("");
   const [packages, setPackages] = useState([]);
+  const [showSeedConfirmation, setShowSeedConfirmation] = useState(false);
+  const [seedSelection, setSeedSelection] = useState({ tests: false, inventory: false });
+  const [seededDefaults, setSeededDefaults] = useState({ tests: false, inventory: false });
+  const [seedingDefaults, setSeedingDefaults] = useState(false);
+  const [seedError, setSeedError] = useState("");
 
   const formErrors = useMemo(() => validateForm(form), [form]);
   const canSubmit = Object.keys(formErrors).length === 0;
   const selectedPackage = useMemo(() => packages.find((pkg) => pkg.key === form.packageKey) || null, [packages, form.packageKey]);
+  const seededCatalogNames = [seededDefaults.tests && "Tests", seededDefaults.inventory && "Inventory"].filter(Boolean);
+  const defaultDataStatus = seededCatalogNames.length ? `${seededCatalogNames.join(" and ")} added` : "No default data added";
 
   useEffect(() => {
     let cancelled = false;
@@ -186,6 +193,7 @@ export default function DeveloperEditLabPage({ params }) {
             loginHighlights: data.lab.loginHighlights || [],
           });
           setExistingLogo(data.lab.logo || null);
+          setSeededDefaults(data.lab.seededDefaults || { tests: false, inventory: false });
           setLogoAltText(data.lab.logoAltText || `${data.lab.name || "Lab"} logo`);
           setPackages(packagesData.packages || []);
         }
@@ -210,6 +218,75 @@ export default function DeveloperEditLabPage({ params }) {
     }));
     setSuccess("");
   }
+
+  function openSeedConfirmation() {
+    setSeedSelection(seededDefaults);
+    setSeedError("");
+    setShowSeedConfirmation(true);
+  }
+
+  function toggleSeedSelection(key) {
+    if (seededDefaults[key]) return;
+    setSeedSelection((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  async function confirmSeedSelection() {
+    const requestedTests = seedSelection.tests && !seededDefaults.tests;
+    const requestedInventory = seedSelection.inventory && !seededDefaults.inventory;
+    if (!requestedTests && !requestedInventory) return;
+
+    setSeedingDefaults(true);
+    setSeedError("");
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`/api/developer/labs/${encodeURIComponent(id)}/seed-defaults`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          seedDefaultTests: requestedTests,
+          seedDefaultInventory: requestedInventory,
+        }),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) {
+        throw new Error(data.details || data.error || "Unable to seed default data");
+      }
+
+      setSeededDefaults(data.seededDefaults || seedSelection);
+      clearCachedApi(`/api/developer/labs/${encodeURIComponent(id)}`);
+      setShowSeedConfirmation(false);
+
+      const details = [];
+      if (data.results?.tests) details.push(`${data.results.tests.testsSeeded} new test definitions`);
+      if (data.results?.inventory) details.push(`${data.results.inventory.itemsSeeded} new inventory items`);
+      setSuccess(`${data.message}${details.length ? ` ${details.join(" and ")} added; existing records were preserved.` : ""}`);
+    } catch (seedFailure) {
+      setSeedError(seedFailure.message);
+    } finally {
+      setSeedingDefaults(false);
+    }
+  }
+
+  function cancelDefaultDataAddition() {
+    if (seedingDefaults) return;
+    setShowSeedConfirmation(false);
+    setSeedError("");
+    setSuccess("");
+  }
+
+  useEffect(() => {
+    if (!showSeedConfirmation) return undefined;
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape" && !seedingDefaults) setShowSeedConfirmation(false);
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showSeedConfirmation, seedingDefaults]);
 
   function selectPackage(pkg) {
     setForm((current) => ({ ...current, packageKey: pkg.key, enabledModules: pkg.modules }));
@@ -442,6 +519,58 @@ export default function DeveloperEditLabPage({ params }) {
 
       {error && <div className="developer-alert">{error}</div>}
       <CmsSuccessDialog message={success} onClose={() => setSuccess("")} />
+      {showSeedConfirmation && (
+        <div className="cms-success-dialog-backdrop" role="presentation">
+          <section
+            className="developer-seed-confirmation"
+            role="dialog"
+            aria-modal="true"
+            aria-busy={seedingDefaults}
+            aria-labelledby="edit-seed-confirmation-title"
+            aria-describedby="edit-seed-confirmation-description"
+          >
+            <p className="developer-kicker">Add Default Data</p>
+            <h2 id="edit-seed-confirmation-title">Select the default data to add</h2>
+            <p id="edit-seed-confirmation-description">
+              Select either catalog or both. Seeding starts immediately after confirmation, and existing records in {form.name.trim() || "this lab"} will be preserved.
+            </p>
+            {seedError && <div className="developer-alert" role="alert">{seedError}</div>}
+            <div className="developer-seed-confirmation-list">
+              <button
+                type="button"
+                className={seedSelection.tests ? "selected" : ""}
+                aria-pressed={seedSelection.tests}
+                disabled={seededDefaults.tests || seedingDefaults}
+                onClick={() => toggleSeedSelection("tests")}
+              >
+                <span className="developer-seed-check" aria-hidden="true">{seedSelection.tests ? "✓" : ""}</span>
+                <span><strong>Tests {seededDefaults.tests && <em>Already added</em>}</strong><small>Add missing default categories and test definitions</small></span>
+              </button>
+              <button
+                type="button"
+                className={seedSelection.inventory ? "selected" : ""}
+                aria-pressed={seedSelection.inventory}
+                disabled={seededDefaults.inventory || seedingDefaults}
+                onClick={() => toggleSeedSelection("inventory")}
+              >
+                <span className="developer-seed-check" aria-hidden="true">{seedSelection.inventory ? "✓" : ""}</span>
+                <span><strong>Inventory {seededDefaults.inventory && <em>Already added</em>}</strong><small>Add missing UOMs, categories, suppliers, items, and batches</small></span>
+              </button>
+            </div>
+            <div className="developer-seed-confirmation-actions">
+              <button type="button" onClick={cancelDefaultDataAddition} disabled={seedingDefaults}>Cancel</button>
+              <button
+                type="button"
+                className="developer-submit"
+                onClick={confirmSeedSelection}
+                disabled={seedingDefaults || ((!seedSelection.tests || seededDefaults.tests) && (!seedSelection.inventory || seededDefaults.inventory))}
+              >
+                {seedingDefaults ? "Seeding Default Data..." : "Confirm And Seed Now"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {loading ? (
         <section className="developer-panel">
@@ -659,6 +788,43 @@ export default function DeveloperEditLabPage({ params }) {
                 </button>
               </div>
             )}
+          </div>
+
+          <div className="developer-module-picker">
+            <div className="developer-panel-header">
+              <h2>Add Default Data</h2>
+              <p>Add missing standard test or inventory records immediately without saving the rest of the form.</p>
+            </div>
+            <div className={`developer-seed-choice ${seededDefaults.tests || seededDefaults.inventory ? "selected" : ""}`} aria-live="polite">
+              <div>
+                <span className="developer-seed-choice-status">
+                  {defaultDataStatus}
+                </span>
+                <div className="developer-seed-status-grid" aria-label="Default data status">
+                  <span className={seededDefaults.tests ? "added" : "missing"}>
+                    <strong>Tests</strong>
+                    <small>{seededDefaults.tests ? "Default data added" : "Default data not added"}</small>
+                  </span>
+                  <span className={seededDefaults.inventory ? "added" : "missing"}>
+                    <strong>Inventory</strong>
+                    <small>{seededDefaults.inventory ? "Default data added" : "Default data not added"}</small>
+                  </span>
+                </div>
+                <h3>{seedingDefaults ? "Seeding default data now..." : seededDefaults.tests || seededDefaults.inventory ? "Default catalog status is stored" : "Existing catalogs will remain unchanged"}</h3>
+                <p>
+                  {seededDefaults.tests && seededDefaults.inventory
+                    ? "Default tests and inventory have already been added to this lab."
+                    : seededDefaults.tests
+                          ? "Default tests have already been added; inventory can still be added if needed."
+                          : seededDefaults.inventory
+                            ? "Default inventory has already been added; tests can still be added if needed."
+                            : "Choose a catalog only when this lab needs the standard default records."}
+                </p>
+              </div>
+              <button type="button" onClick={openSeedConfirmation} disabled={seedingDefaults}>
+                {seedingDefaults ? "Seeding..." : seededDefaults.tests || seededDefaults.inventory ? "View Or Add Defaults" : "Choose Default Data"}
+              </button>
+            </div>
           </div>
 
           <div className="developer-module-picker developer-package-assignment">

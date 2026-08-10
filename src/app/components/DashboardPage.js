@@ -132,6 +132,10 @@ export default function DashboardPage() {
   const visibleStatCards = statCards.filter((stat) => hasPermission(user, stat.permission));
   const canRegisterPatients = hasPermission(user, "patients.register");
   const canViewPatients = hasPermission(user, "patients.view");
+  const adminName = [user?.firstName, user?.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim() || user?.name?.trim() || (user?.email || "Admin").split("@")[0];
 
   const recentPatients = stats?.recentPatients || [];
   const activityFeed = recentPatients.map((patient) => ({
@@ -170,7 +174,7 @@ export default function DashboardPage() {
           <span className="dashboard-eyebrow">Laboratory overview</span>
           <h1>
             {getGreeting()},{" "}
-            <span>{(user?.email || "Admin").split("@")[0]}</span>
+            <span>{adminName}</span>
           </h1>
           <p>Review today&apos;s workload, pending actions and latest registrations.</p>
           <span className="dashboard-current-date">{Icons.calendar} {today}</span>

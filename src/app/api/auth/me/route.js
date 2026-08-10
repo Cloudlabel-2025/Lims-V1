@@ -29,6 +29,7 @@ export async function GET(req) {
     }
 
     const { session } = auth;
+    let persistedUser = null;
 
     if (session.userType === "tenant") {
       const tenantConnection = await connectTenantDB(session.tenantId);
@@ -52,8 +53,9 @@ export async function GET(req) {
 
       const User = getUserModel(tenantConnection);
       const currentUser = await User.findById(session.userId)
-        .select("passwordChangedAt status")
+        .select("firstName lastName passwordChangedAt status")
         .lean();
+      persistedUser = currentUser;
 
       if (!currentUser || currentUser.status !== "active") {
         debugRequestLog("user-inactive", { userId: session.userId, status: currentUser?.status });
@@ -81,8 +83,9 @@ export async function GET(req) {
       const masterConnection = await connectMasterDB();
       const DeveloperUser = getDeveloperUserModel(masterConnection);
       const devUser = await DeveloperUser.findById(session.userId)
-        .select("passwordChangedAt status")
+        .select("firstName lastName passwordChangedAt status")
         .lean();
+      persistedUser = devUser;
 
       if (!devUser || devUser.status !== "active") {
         debugRequestLog("user-inactive", { userId: session.userId, status: devUser?.status });
@@ -112,6 +115,10 @@ export async function GET(req) {
       userType: session.userType,
       tenantId: session.tenantId,
     });
+    const firstName = persistedUser?.firstName || null;
+    const lastName = persistedUser?.lastName || null;
+    const persistedFullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
     return NextResponse.json({
       session,
       user: {
@@ -119,7 +126,9 @@ export async function GET(req) {
         userType: session.userType,
         tenantId: session.tenantId || null,
         userCode: session.userCode || null,
-        name: session.name || null,
+        firstName,
+        lastName,
+        name: persistedFullName || session.name || null,
         email: session.email,
         roleId: session.roleId || null,
         roleName: session.roleName || (session.isSystemOwner ? "System Owner" : null),

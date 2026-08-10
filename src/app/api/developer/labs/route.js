@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import connectMasterDB from "@/app/lib/master-db";
 import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
+import { seedDefaultInventory } from "@/app/lib/inventory-seeder";
 import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
+import { seedDefaultTests } from "@/app/lib/test-seeder";
 import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { getLabModel } from "@/app/models/master/Lab";
 import { getPatientModel } from "@/app/models/tenant/Patient";
@@ -306,6 +308,8 @@ export async function POST(req) {
 
     stage = "reading request";
     const body = await req.json();
+    const shouldSeedDefaultTests = body.seedDefaultTests === true || body.seedDefaultData === true;
+    const shouldSeedDefaultInventory = body.seedDefaultInventory === true || body.seedDefaultData === true;
     const name = cleanString(body.name);
     const tenantId = normalizeTenantId(body.tenantId);
     const contactEmail = cleanString(body.contactEmail).toLowerCase();
@@ -465,6 +469,16 @@ export async function POST(req) {
 
     stage = "initializing tenant collections";
     await initializeTenantCollections(tenantConnection);
+    if (shouldSeedDefaultTests) {
+      stage = "seeding default tests";
+      await seedDefaultTests(tenantConnection);
+      lab.set("defaultData.tests", { seeded: true, seededAt: new Date() });
+    }
+    if (shouldSeedDefaultInventory) {
+      stage = "seeding default inventory";
+      await seedDefaultInventory(tenantConnection);
+      lab.set("defaultData.inventory", { seeded: true, seededAt: new Date() });
+    }
     stage = "creating tenant roles";
     const adminRole = await createTenantRoles(masterConnection, tenantConnection);
     stage = "seeding chart of accounts";
@@ -545,6 +559,11 @@ export async function POST(req) {
           loginHighlights,
           logoUrl: logo?.url || null,
           adminEmail: adminUser.email,
+          defaultDataSeeded: shouldSeedDefaultTests || shouldSeedDefaultInventory,
+          seededDefaults: {
+            tests: shouldSeedDefaultTests,
+            inventory: shouldSeedDefaultInventory,
+          },
         },
         admin: {
           email: adminEmail,

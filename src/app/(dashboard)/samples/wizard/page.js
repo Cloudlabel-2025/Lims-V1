@@ -20,7 +20,7 @@ function WizardInner() {
   const sampleId = searchParams.get("sampleId");
   const [currentStep, setCurrentStep] = useState(0);
   const [sample, setSample] = useState(null);
-  const [testDef, setTestDef] = useState(null);
+  const [testDefs, setTestDefs] = useState([]);
   const [results, setResults] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -36,25 +36,33 @@ function WizardInner() {
       setLoading(false);
       return;
     }
-    fetch(`/api/samples/${sampleId}`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error);
-        const s = data.sample || data;
-        setSample(s);
-        return s.testDefinition;
-      })
-      .then((testDefId) => {
-        if (!testDefId) throw new Error("No test definition linked to this sample.");
-        return fetch(`/api/tests/definitions/${testDefId}`, { credentials: "include" });
-      })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error);
-        setTestDef(data.test || data);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    async function loadSample() {
+      try {
+        const response = await fetch(`/api/samples/${sampleId}`, { credentials: "include" });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "Unable to load sample");
+        const loadedSample = data.sample || data;
+        setSample(loadedSample);
+
+        if (loadedSample.investigations?.length) {
+          setTestDefs(loadedSample.investigations.map((investigation) => ({
+            ...investigation.testDefinition,
+            investigationKey: investigation._id,
+            snapshot: investigation.testSnapshot,
+          })));
+        } else if (loadedSample.testDefinition && typeof loadedSample.testDefinition === "object") {
+          setTestDefs([{ ...loadedSample.testDefinition, investigationKey: "legacy", snapshot: loadedSample.testSnapshot }]);
+        } else {
+          throw new Error("No test definitions are linked to this sample.");
+        }
+      } catch (loadError) {
+        setError(loadError.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadSample();
 
     // Fetch inventory items and UOMs for consumption form (both come from same endpoint)
     fetch("/api/inventory?limit=100", { credentials: "include" })
@@ -77,6 +85,11 @@ function WizardInner() {
         body: JSON.stringify({
           action: "record-results",
           results,
+          investigationResults: testDefs.map((testDef) => ({
+            investigationId: String(testDef.investigationKey),
+            testDefinitionId: String(testDef._id || ""),
+            values: results[testDef.investigationKey] || {},
+          })),
           notes: finalNotes,
           reservedInventory: reservedInventory
             .filter((r) => r.item && r.uom && Number(r.quantity) > 0)
@@ -124,7 +137,7 @@ function WizardInner() {
       case 1:
         return (
           <StepResults
-            testDef={testDef}
+            testDefs={testDefs}
             results={results}
             setResults={setResults}
             onNext={() => setCurrentStep(2)}
@@ -134,7 +147,7 @@ function WizardInner() {
       case 2:
         return (
           <StepReview
-            testDef={testDef}
+            testDefs={testDefs}
             sample={sample}
             results={results}
             onBack={() => setCurrentStep(1)}

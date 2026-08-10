@@ -55,7 +55,12 @@ export function getTenantIdFromHost(host) {
   }
 
   if (hostname.endsWith(".localhost")) {
-    return normalizeTenantId(hostname.slice(0, -".localhost".length));
+    const tenantCandidate = normalizeTenantId(hostname.slice(0, -".localhost".length));
+    if (platformSubdomains.has(tenantCandidate)) {
+      throw new Error("Tenant not found for platform host.");
+    }
+
+    return tenantCandidate;
   }
 
   throw new Error("Tenant not found for host.");
@@ -74,7 +79,8 @@ export function getTenantIdFromHostname(hostname) {
   }
   if (normalizedHostname === "localhost") return null;
   if (normalizedHostname.endsWith(".localhost")) {
-    return normalizeTenantId(normalizedHostname.slice(0, -".localhost".length));
+    const tenantCandidate = normalizeTenantId(normalizedHostname.slice(0, -".localhost".length));
+    return platformSubdomains.has(tenantCandidate) ? null : tenantCandidate;
   }
 
   return null;

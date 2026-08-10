@@ -94,6 +94,10 @@ export default function ReportViewPage() {
     if (result.flag === "low") summary.low += 1;
     return summary;
   }, { total: 0, high: 0, low: 0 }), [report]);
+  const reportInvestigations = useMemo(() => report?.investigations?.length
+    ? report.investigations
+    : report ? [{ testSnapshot: report.testSnapshot, results: report.results || [] }] : [], [report]);
+  const reportInvestigationNames = reportInvestigations.map((item) => item.testSnapshot?.name).filter(Boolean);
 
   const performAction = useCallback(async (action) => {
     setUpdating(true);
@@ -193,8 +197,8 @@ export default function ReportViewPage() {
         <div className="report-detail-title">
           <button type="button" className="report-back-link" onClick={() => router.push("/reports")}>{Icons.arrowLeft} Reports</button>
           <p>Clinical report review</p>
-          <h1>{report.testSnapshot?.name || "Diagnostic report"}</h1>
-          <div><span>{report.reportId}</span><span>{report.sampleId || "No sample ID"}</span>{report.version > 1 && <span>Version {report.version}</span>}</div>
+          <h1>{reportInvestigationNames.join(", ") || "Diagnostic report"}</h1>
+          <div><span>{report.reportId}</span>{report.billingRecord?.billId && <span>{report.billingRecord.billId}</span>}<span>{report.sampleId || "No sample ID"}</span>{report.version > 1 && <span>Version {report.version}</span>}</div>
         </div>
         <div className="report-detail-actions">
           <span className={`report-detail-status ${report.status}`}>{formatStatus(report.status)}</span>
@@ -235,23 +239,28 @@ export default function ReportViewPage() {
             </section>
 
             <section className="clinical-investigation-summary corporate-report-section">
-              <div className="clinical-investigation-name"><small>Investigation requested</small><h2>{report.testSnapshot?.name || "Diagnostic investigation"}</h2><span>{report.testSnapshot?.categoryName || "Laboratory test"}</span></div>
-              <div><small>Test code</small><strong>{report.testSnapshot?.code || "—"}</strong></div>
-              <div><small>Specimen</small><strong>{report.testSnapshot?.sampleType || "—"}</strong></div>
+              <div className="clinical-investigation-name"><small>Investigations requested</small><h2>{reportInvestigationNames.join(", ") || "Diagnostic investigation"}</h2><span>{reportInvestigations.length} test{reportInvestigations.length === 1 ? "" : "s"} grouped under this bill</span></div>
+              <div><small>Test codes</small><strong>{reportInvestigations.map((item) => item.testSnapshot?.code).filter(Boolean).join(", ") || "—"}</strong></div>
+              <div><small>Specimen</small><strong>{[...new Set(reportInvestigations.map((item) => item.testSnapshot?.sampleType).filter(Boolean))].join(", ") || "—"}</strong></div>
             </section>
 
             {(resultSummary.high > 0 || resultSummary.low > 0) && <section className="clinical-attention-note corporate-report-section"><span>{Icons.alertCircle}</span><div><strong>Attention required</strong><p>This report contains {resultSummary.high + resultSummary.low} result{resultSummary.high + resultSummary.low === 1 ? "" : "s"} outside the stated reference interval.</p></div><em>{resultSummary.high ? `${resultSummary.high} high` : ""}{resultSummary.high && resultSummary.low ? " · " : ""}{resultSummary.low ? `${resultSummary.low} low` : ""}</em></section>}
 
             <section className="clinical-results-block corporate-report-section">
               <header><div><small>Laboratory findings</small><h2>Result summary</h2></div><span>{resultSummary.total} parameter{resultSummary.total === 1 ? "" : "s"}</span></header>
-              <div className="corporate-results-table clinical-results-table" role="table" aria-label="Report results">
-                <div className="corporate-result-head" role="row"><span>Investigation / Parameter</span><span>Observed value</span><span>Unit</span><span>Biological reference interval</span><span>Flag</span></div>
-                {(report.results || []).map((result) => (
-                  <div key={result.key} className={`corporate-result-row ${result.flag || "normal"}`} role="row">
-                    <span data-label="Parameter">{result.name}</span><strong data-label="Observed value">{result.textValue || result.value || "—"}</strong><span data-label="Unit">{result.unit || "—"}</span><span data-label="Reference interval">{rangeText(result)}</span><span data-label="Flag" className="corporate-result-flag">{result.flag === "normal" ? "Normal" : `${result.flag === "high" ? "↑" : "↓"} ${formatStatus(result.flag)}`}</span>
+              {reportInvestigations.map((investigation, investigationIndex) => (
+                <div key={`${investigation.testSnapshot?.testId || investigationIndex}`} style={{ marginBottom: 18 }}>
+                  <h3 style={{ fontSize: 15, margin: "0 0 8px", color: "#0f172a" }}>{investigation.testSnapshot?.name || `Investigation ${investigationIndex + 1}`}</h3>
+                  <div className="corporate-results-table clinical-results-table" role="table" aria-label={`${investigation.testSnapshot?.name || "Investigation"} results`}>
+                    <div className="corporate-result-head" role="row"><span>Parameter</span><span>Observed value</span><span>Unit</span><span>Biological reference interval</span><span>Flag</span></div>
+                    {(investigation.results || []).map((result) => (
+                      <div key={result.key} className={`corporate-result-row ${result.flag || "normal"}`} role="row">
+                        <span data-label="Parameter">{result.name}</span><strong data-label="Observed value">{result.textValue || result.value || "—"}</strong><span data-label="Unit">{result.unit || "—"}</span><span data-label="Reference interval">{rangeText(result)}</span><span data-label="Flag" className="corporate-result-flag">{result.flag === "normal" ? "Normal" : `${result.flag === "high" ? "↑" : "↓"} ${formatStatus(result.flag)}`}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
               <p className="clinical-reference-note">Reference intervals may vary with age, gender, clinical condition, and analytical method. Please correlate results clinically.</p>
             </section>
 

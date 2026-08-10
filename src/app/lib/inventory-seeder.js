@@ -1255,3 +1255,10 @@ export async function seedDefaultInventory(connection) {
     itemsSeeded,
   };
 }
+
+export async function hasAllDefaultInventory(connection) {
+  const InventoryItem = getInventoryItemModel(connection);
+  const defaultItemCodes = [...new Set(itemsData.map((item) => item.itemCode))];
+  const existingCount = await InventoryItem.countDocuments({ itemCode: { $in: defaultItemCodes } });
+  return existingCount === defaultItemCodes.length;
+}

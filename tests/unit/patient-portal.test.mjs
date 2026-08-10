@@ -58,7 +58,7 @@ test("mobile OTP generator produces 6-digit codes and hashes", () => {
   assert.equal(hashOtpToken(otp), otpHash);
   assert.equal(expiresAt instanceof Date, true);
 
-  const waUrl = buildWhatsAppShareUrl("mega", "http://localhost", "John Doe", "9876543210", "http://localhost/link");
+  const waUrl = buildWhatsAppShareUrl("sample-lab", "http://localhost", "John Doe", "9876543210", "http://localhost/link");
   assert.match(waUrl, /https:\/\/api\.whatsapp\.com\/send\?phone=919876543210/);
   assert.match(waUrl, /John%20Doe/);
 });

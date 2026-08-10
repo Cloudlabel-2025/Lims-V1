@@ -47,7 +47,7 @@ function PatientLogin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tenantId: tenantId || "mega",
+          tenantId,
           phone: phone.replace(/\D/g, ""),
           dob
         }),
@@ -59,7 +59,7 @@ function PatientLogin() {
         return setError(data.error || "Invalid mobile number or date of birth");
       }
 
-      router.replace(`/patient/portal?tenantId=${encodeURIComponent(tenantId || "mega")}`);
+      router.replace(`/patient/portal?tenantId=${encodeURIComponent(tenantId)}`);
     } catch (err) {
       setLoading(false);
       setError("Network error. Please try again.");
@@ -93,7 +93,7 @@ function PatientLogin() {
                 value={tenantId}
                 onChange={(e) => setTenantId(e.target.value)}
                 style={fieldStyle}
-                placeholder="e.g. mega"
+                placeholder="e.g. your-lab-code"
                 required
               />
             </label>

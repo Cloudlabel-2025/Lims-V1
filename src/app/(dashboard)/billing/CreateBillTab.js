@@ -8,6 +8,11 @@ const MultiSelect = dynamic(() => import("@/app/components/MultiSelect"), {
   loading: () => <div className={styles.control}>Loading investigations…</div>,
 });
 
+const SearchableSelect = dynamic(() => import("@/app/components/SearchableSelect"), {
+  ssr: false,
+  loading: () => <div className={styles.control}>Loading patients…</div>,
+});
+
 const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
@@ -63,18 +68,21 @@ export default function CreateBillTab({
           <div className={styles.formGrid}>
             <div className={styles.field}>
               <label htmlFor="billing-patient">Patient <span className={styles.required}>*</span></label>
-              <select
+              <SearchableSelect
                 id="billing-patient"
                 className={styles.control}
                 value={patient}
                 onChange={(event) => setPatient(event.target.value)}
+                name="patient"
+                placeholder="Search by patient name, ID, or phone"
+                options={patients.map((item) => ({
+                  value: item._id,
+                  label: item.name,
+                  sublabel: item.patientId,
+                  searchTerms: `${item.name || ""} ${item.patientId || ""} ${item.phone || ""}`,
+                }))}
                 required
-              >
-                <option value="">Select a registered patient</option>
-                {patients.map((item) => (
-                  <option key={item._id} value={item._id}>{item.name} ({item.patientId})</option>
-                ))}
-              </select>
+              />
               <div className={styles.fieldHint}>Invoices are linked permanently to the selected patient record.</div>
             </div>
 

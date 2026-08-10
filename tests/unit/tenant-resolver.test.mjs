@@ -22,6 +22,9 @@ test("root and platform subdomains are not treated as tenants", () => {
     assert.equal(getTenantIdFromHostname("www.lims.store"), null);
     assert.equal(getTenantIdFromHostname("app.lims.store"), null);
     assert.equal(getTenantIdFromHostname("blood.lims.store"), "blood");
+    assert.equal(getTenantIdFromHostname("developer.localhost"), null);
+    assert.equal(getTenantIdFromHostname("app.localhost"), null);
+    assert.equal(getTenantIdFromHostname("blood.localhost"), "blood");
   } finally {
     if (previousRootDomain === undefined) {
       delete process.env.ROOT_DOMAIN;

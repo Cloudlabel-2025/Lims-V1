@@ -22,12 +22,15 @@ function getFlag(parameter, rawValue) {
   return "normal";
 }
 
-export default function StepReview({ testDef, sample, results, onBack, onSubmit, submitting }) {
+export default function StepReview({ testDefs, sample, results, onBack, onSubmit, submitting }) {
   const [confirming, setConfirming] = useState(false);
   const [notes, setNotes] = useState(sample?.notes || "");
-  const parameters = useMemo(
-    () => (testDef?.parameters || []).slice().sort((a, b) => a.sortOrder - b.sortOrder),
-    [testDef]
+  const investigations = useMemo(
+    () => (testDefs || []).map((testDef) => ({
+      ...testDef,
+      parameters: (testDef.parameters || []).slice().sort((a, b) => a.sortOrder - b.sortOrder),
+    })),
+    [testDefs]
   );
 
   return (
@@ -49,40 +52,31 @@ export default function StepReview({ testDef, sample, results, onBack, onSubmit,
         </div>
         <div className="col-md-6">
           <div className="wizard-info-card">
-            <small className="text-muted">Test</small>
-            <strong>{testDef?.name || "-"}</strong>
+            <small className="text-muted">Investigations</small>
+            <strong>{investigations.map((testDef) => testDef.name).join(", ") || "-"}</strong>
           </div>
         </div>
         <div className="col-md-6">
           <div className="wizard-info-card">
             <small className="text-muted">Sample Type</small>
-            <strong>{sample.sampleType || testDef?.sampleType || "-"}</strong>
+            <strong>{sample.sampleType || [...new Set(investigations.map((testDef) => testDef.sampleType).filter(Boolean))].join(", ") || "-"}</strong>
           </div>
         </div>
       </div>
 
-      <div className="result-entry-table" style={{ marginBottom: 24 }}>
-        <div className="result-entry-head">
-          <span>Parameter</span>
-          <span>Result</span>
-          <span>Unit</span>
-          <span>Normal Range</span>
-          <span>Flag</span>
-        </div>
-        {parameters.map((p) => {
-          const rawValue = results[p.key] || "";
-          const flag = getFlag(p, rawValue);
-          return (
-            <div key={p.key} className={`result-entry-row ${flag}`}>
-              <span>{p.name}</span>
-              <strong>{rawValue || "-"}</strong>
-              <span>{p.unit || "-"}</span>
-              <span>{rangeText(p)}</span>
-              <strong>{flag === "not-entered" ? "-" : flag}</strong>
-            </div>
-          );
-        })}
-      </div>
+      {investigations.map((testDef) => (
+        <section key={testDef.investigationKey} style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>{testDef.name}</h3>
+          <div className="result-entry-table">
+            <div className="result-entry-head"><span>Parameter</span><span>Result</span><span>Unit</span><span>Normal Range</span><span>Flag</span></div>
+            {testDef.parameters.map((parameter) => {
+              const rawValue = results[testDef.investigationKey]?.[parameter.key] || "";
+              const flag = getFlag(parameter, rawValue);
+              return <div key={parameter.key} className={`result-entry-row ${flag}`}><span>{parameter.name}</span><strong>{rawValue || "-"}</strong><span>{parameter.unit || "-"}</span><span>{rangeText(parameter)}</span><strong>{flag === "not-entered" ? "-" : flag}</strong></div>;
+            })}
+          </div>
+        </section>
+      ))}
 
       <div style={{ marginBottom: 24 }}>
         <label className="lims-label" style={{ fontWeight: 650, display: "flex", alignItems: "center", gap: 6 }}>

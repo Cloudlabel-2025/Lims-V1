@@ -51,6 +51,31 @@ const ResultParameterSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const SampleInvestigationSchema = new mongoose.Schema(
+  {
+    billingItemId: { type: mongoose.Schema.Types.ObjectId, index: true },
+    testDefinition: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TestDefinition",
+      required: true,
+    },
+    testSnapshot: {
+      testId: String,
+      name: String,
+      code: String,
+      categoryName: String,
+      sampleType: String,
+    },
+    results: { type: [ResultParameterSchema], default: [] },
+    status: {
+      type: String,
+      enum: ["pending", "completed"],
+      default: "pending",
+    },
+  },
+  { timestamps: true }
+);
+
 export const SampleSchema = new mongoose.Schema(
   {
     sampleId: {
@@ -83,7 +108,6 @@ export const SampleSchema = new mongoose.Schema(
     testDefinition: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TestDefinition",
-      required: true,
     },
     testSnapshot: {
       testId: String,
@@ -103,6 +127,10 @@ export const SampleSchema = new mongoose.Schema(
     batchId: { type: String, trim: true, index: true },
     results: {
       type: [ResultParameterSchema],
+      default: [],
+    },
+    investigations: {
+      type: [SampleInvestigationSchema],
       default: [],
     },
     status: {
@@ -192,7 +220,14 @@ SampleSchema.methods.transitionStatus = function (newStatus, handledBy, notes) {
 SampleSchema.index({ createdAt: -1 });
 SampleSchema.index({ status: 1, createdAt: -1 });
 export function getSampleModel(connection = mongoose) {
-  return connection.models.Sample || connection.model("Sample", SampleSchema);
+  const existingModel = connection.models.Sample;
+  if (existingModel) {
+    if (!existingModel.schema.path("investigations")) {
+      existingModel.schema.add({ investigations: { type: [SampleInvestigationSchema], default: [] } });
+    }
+    return existingModel;
+  }
+  return connection.model("Sample", SampleSchema);
 }
 
 const Sample = getSampleModel();

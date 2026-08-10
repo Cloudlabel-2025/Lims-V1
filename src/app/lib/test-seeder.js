@@ -2577,3 +2577,10 @@ export async function seedDefaultTests(connection) {
 
   return { categoriesSeeded: categoriesData.length, testsSeeded };
 }
+
+export async function hasAllDefaultTests(connection) {
+  const TestDefinition = getTestDefinitionModel(connection);
+  const defaultCodes = [...new Set(testsData.map((test) => test.code))];
+  const existingCount = await TestDefinition.countDocuments({ code: { $in: defaultCodes } });
+  return existingCount === defaultCodes.length;
+}

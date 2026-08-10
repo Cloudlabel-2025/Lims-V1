@@ -56,15 +56,17 @@ export default function SamplesPage() {
   const filteredSamples = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return samples;
-    return samples.filter((sample) => [
-      sample.sampleId,
-      sample.barcode,
-      sample.patient?.name,
-      sample.patient?.patientId,
-      sample.testSnapshot?.name,
-      sample.testSnapshot?.code,
-      sample.batchId,
-    ].some((value) => String(value || "").toLowerCase().includes(query)));
+    return samples.filter((sample) => {
+      const investigations = sample.investigations?.length ? sample.investigations : [{ testSnapshot: sample.testSnapshot }];
+      return [
+        sample.sampleId,
+        sample.barcode,
+        sample.patient?.name,
+        sample.patient?.patientId,
+        ...investigations.flatMap((item) => [item.testSnapshot?.name, item.testSnapshot?.code]),
+        sample.batchId,
+      ].some((value) => String(value || "").toLowerCase().includes(query));
+    });
   }, [samples, search]);
 
   const totalSamples = Object.values(statusCounts).reduce((sum, count) => sum + Number(count || 0), 0);
@@ -173,6 +175,10 @@ export default function SamplesPage() {
                 <span>Specimen</span><span>Patient</span><span>Investigation</span><span>Collection & custody</span><span>Workflow</span><span>Actions</span>
               </div>
               {filteredSamples.map((sample) => {
+                const investigations = sample.investigations?.length ? sample.investigations : [{ testSnapshot: sample.testSnapshot }];
+                const investigationNames = investigations.map((item) => item.testSnapshot?.name).filter(Boolean);
+                const investigationCodes = investigations.map((item) => item.testSnapshot?.code).filter(Boolean);
+                const categories = [...new Set(investigations.map((item) => item.testSnapshot?.categoryName).filter(Boolean))];
                 const canProcess = ACTIVE_WORKFLOW_STATUSES.includes(sample.status);
                 const canReject = !TERMINAL_STATUSES.includes(sample.status);
                 const lastCustody = sample.custodyLog?.[sample.custodyLog.length - 1];
@@ -181,7 +187,7 @@ export default function SamplesPage() {
                   <article key={sample._id} className={`samples-table-row status-${sample.status}`} role="row">
                     <div className="samples-specimen-cell" role="cell"><span>{Icons.vial}</span><div><strong>{sample.sampleId}</strong><code>{sample.barcode || "No barcode"}</code><small>Registered {formatDateTime(sample.createdAt)}</small></div></div>
                     <div className="samples-patient-cell" role="cell"><strong>{sample.patient?.name || "Unknown patient"}</strong><code>{sample.patient?.patientId || "No patient ID"}</code><small>{sample.patient?.age ?? "—"} years · {sample.patient?.gender || "Not specified"}</small></div>
-                    <div className="samples-test-cell" role="cell"><strong>{sample.testSnapshot?.name || "Unknown test"}</strong><code>{sample.testSnapshot?.code || "No code"}</code><small>{sample.sampleType || sample.testSnapshot?.sampleType || "Sample type not set"}{sample.testSnapshot?.categoryName ? ` · ${sample.testSnapshot.categoryName}` : ""}</small></div>
+                    <div className="samples-test-cell" role="cell"><strong>{investigationNames.join(", ") || "Unknown investigation"}</strong><code>{investigationCodes.join(", ") || "No code"}</code><small>{investigations.length} investigation{investigations.length === 1 ? "" : "s"}{sample.billingRecord?.billId ? ` · ${sample.billingRecord.billId}` : ""}{categories.length ? ` · ${categories.join(", ")}` : ""}</small></div>
                     <div className="samples-custody-cell" role="cell"><strong>{sample.collectionTime ? `Collected ${formatDateTime(sample.collectionTime)}` : "Collection pending"}</strong><small>Received: {formatDateTime(sample.receivedAt)}</small><small>{lastCustody ? `${lastCustody.handledBy} · ${formatDateTime(lastCustody.timestamp)}` : sample.receivedBy || "Custodian not recorded"}</small></div>
                     <div className="samples-status-cell" role="cell"><em className={sample.status}>{formatStatus(sample.status)}</em>{sample.billingRecord?.priority === "urgent" && <strong>Urgent</strong>}{sample.status === "rejected" && sample.rejectionReason && <p>{sample.rejectionReason}</p>}</div>
                     <div className="samples-row-actions" role="cell">

@@ -1,5 +1,16 @@
 import mongoose from "mongoose";
 
+const defaultDataDefinition = {
+  tests: {
+    seeded: { type: Boolean, default: false },
+    seededAt: { type: Date, default: null },
+  },
+  inventory: {
+    seeded: { type: Boolean, default: false },
+    seededAt: { type: Date, default: null },
+  },
+};
+
 function getCounterModel(connection) {
   return (
     connection.models.Counter ||
@@ -114,6 +125,7 @@ export const LabSchema = new mongoose.Schema(
         type: Date,
       },
     },
+    defaultData: defaultDataDefinition,
     branding: {
       logo: {
         url: {
@@ -231,7 +243,15 @@ LabSchema.pre("save", async function generateLabId() {
 });
 
 export function getLabModel(connection = mongoose) {
-  return connection.models.Lab || connection.model("Lab", LabSchema);
+  const existingModel = connection.models.Lab;
+  if (existingModel) {
+    if (!existingModel.schema.path("defaultData.tests.seeded")) {
+      existingModel.schema.add({ defaultData: defaultDataDefinition });
+    }
+    return existingModel;
+  }
+
+  return connection.model("Lab", LabSchema);
 }
 
 const Lab = getLabModel();

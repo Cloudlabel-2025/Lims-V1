@@ -28,6 +28,12 @@ function getResultSignals(report) {
   return { high, low, total: results.length };
 }
 
+function getInvestigations(report) {
+  return report.investigations?.length
+    ? report.investigations
+    : [{ testSnapshot: report.testSnapshot, results: report.results || [] }];
+}
+
 export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange, onDateToChange, loading }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -42,12 +48,12 @@ export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     return reports.filter((report) => {
+      const investigations = getInvestigations(report);
       const matchesStatus = statusFilter === "all" || report.status === statusFilter;
       const matchesSearch = !query || [
         report.patient?.name,
         report.patient?.patientId,
-        report.testSnapshot?.name,
-        report.testSnapshot?.code,
+        ...investigations.flatMap((item) => [item.testSnapshot?.name, item.testSnapshot?.code]),
         report.reportId,
         report.sampleId,
       ].some((value) => String(value || "").toLowerCase().includes(query));
@@ -108,11 +114,14 @@ export default function ReportList({ reports, dateFrom, dateTo, onDateFromChange
           <div className="reports-table-head" role="row"><span>Report & investigation</span><span>Patient</span><span>Specimen</span><span>Result signals</span><span>Created</span><span>Status</span><span aria-label="Actions" /></div>
           {filtered.map((report) => {
             const signals = getResultSignals(report);
+            const investigations = getInvestigations(report);
+            const investigationNames = investigations.map((item) => item.testSnapshot?.name).filter(Boolean);
+            const investigationCodes = investigations.map((item) => item.testSnapshot?.code).filter(Boolean);
             return (
               <article className="reports-table-row" role="row" key={report._id}>
                 <div className="reports-report-cell" role="cell" data-label="Report">
                   <span className="reports-file-icon">{Icons.report}</span>
-                  <div><strong>{report.testSnapshot?.name || "Unnamed investigation"}</strong><span>{report.reportId || "Report ID pending"}{report.version > 1 ? ` · Version ${report.version}` : ""}</span><small>{report.testSnapshot?.code || report.testSnapshot?.categoryName || "Diagnostic report"}</small></div>
+                  <div><strong>{investigationNames.join(", ") || "Unnamed investigation"}</strong><span>{report.reportId || "Report ID pending"}{report.billingRecord?.billId ? ` · ${report.billingRecord.billId}` : ""}{report.version > 1 ? ` · Version ${report.version}` : ""}</span><small>{investigations.length} investigation{investigations.length === 1 ? "" : "s"} · {investigationCodes.join(", ") || "Diagnostic report"}</small></div>
                 </div>
                 <div className="reports-patient-cell" role="cell" data-label="Patient"><strong>{report.patient?.name || "Patient unavailable"}</strong><span>{report.patient?.patientId || "No patient ID"}</span><small>{report.patient?.age || "—"} yrs · {report.patient?.gender || "Not specified"}</small></div>
                 <div className="reports-specimen-cell" role="cell" data-label="Specimen"><strong>{report.sampleId || "Not linked"}</strong><span>{report.testSnapshot?.sampleType || "Sample type unavailable"}</span></div>

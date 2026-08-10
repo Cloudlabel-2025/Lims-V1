@@ -188,13 +188,13 @@ function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatie
                         } else {
                           const rawPhone = String(patient.phone).replace(/\D/g, "");
                           const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-                          const msg = `Hello ${patient.name},\n\nAccess your lab visit history, receipts and test reports on the Patient Portal:\n${window.location.origin}/patient?tenantId=mega\n\nThank you!`;
+                          const msg = `Hello ${patient.name},\n\nAccess your lab visit history, receipts and test reports on the Patient Portal:\n${window.location.origin}/patient?tenantId=${encodeURIComponent(window.location.hostname.split(".")[0])}\n\nThank you!`;
                           window.open(`https://api.whatsapp.com/send?phone=${encodeURIComponent(targetPhone)}&text=${encodeURIComponent(msg)}`, "_blank");
                         }
                       } catch {
                         const rawPhone = String(patient.phone).replace(/\D/g, "");
                         const targetPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-                        const msg = `Hello ${patient.name},\n\nAccess your lab visit history, receipts and test reports on the Patient Portal:\n${window.location.origin}/patient?tenantId=mega\n\nThank you!`;
+                        const msg = `Hello ${patient.name},\n\nAccess your lab visit history, receipts and test reports on the Patient Portal:\n${window.location.origin}/patient?tenantId=${encodeURIComponent(window.location.hostname.split(".")[0])}\n\nThank you!`;
                         window.open(`https://api.whatsapp.com/send?phone=${encodeURIComponent(targetPhone)}&text=${encodeURIComponent(msg)}`, "_blank");
                       }
                     }}

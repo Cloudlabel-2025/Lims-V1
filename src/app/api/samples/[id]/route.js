@@ -4,7 +4,7 @@ import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 function clean(value) {
-  return String(value || "").trim();
+  return value === null || value === undefined ? "" : String(value).trim();
 }
 
 function getFlag(parameter, rawValue) {
@@ -14,6 +14,35 @@ function getFlag(parameter, rawValue) {
   if (Number.isFinite(parameter.normalMin) && value < parameter.normalMin) return "low";
   if (Number.isFinite(parameter.normalMax) && value > parameter.normalMax) return "high";
   return "normal";
+}
+
+function buildInvestigationResults(test, rawValues = {}) {
+  const missingRequired = [];
+  const invalidValues = [];
+  const results = test.parameters
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((parameter) => {
+      const textValue = clean(rawValues[parameter.key]);
+      const numericValue = textValue === "" ? undefined : Number(textValue);
+
+      if (parameter.required && textValue === "") missingRequired.push(parameter.name);
+      if (textValue !== "" && !Number.isFinite(numericValue)) invalidValues.push(parameter.name);
+
+      return {
+        key: parameter.key,
+        name: parameter.name,
+        unit: parameter.unit,
+        normalMin: parameter.normalMin,
+        normalMax: parameter.normalMax,
+        required: parameter.required,
+        value: Number.isFinite(numericValue) ? numericValue : undefined,
+        textValue,
+        flag: getFlag(parameter, textValue),
+      };
+    });
+
+  return { results, missingRequired, invalidValues };
 }
 
 export async function GET(req, { params }) {
@@ -26,7 +55,10 @@ export async function GET(req, { params }) {
 
     const { id } = await params;
     const { Sample } = await getTenantModels(auth.tenantId);
-    const sample = await Sample.findById(id).populate("patient", "name patientId age gender phone");
+    const sample = await Sample.findById(id)
+      .populate("patient", "name patientId age gender phone")
+      .populate("testDefinition")
+      .populate("investigations.testDefinition");
     if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
 
     return Response.json({ sample });
@@ -53,13 +85,11 @@ export async function PUT(req, { params }) {
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "samples.view");
     if (moduleAuth.error) return moduleAuth.error;
 
-    const { Sample, TestDefinition, TestReport } = await getTenantModels(auth.tenantId);
+    const { Sample, TestDefinition, TestReport, BillingRecord } = await getTenantModels(auth.tenantId);
     const sample = await Sample.findById(id).populate("patient", "name patientId age gender phone");
     if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
 
     const handledBy = auth.session.email;
-    let test;
-
     if (action === "reject") {
       const reason = clean(body.reason || "");
       if (!reason) {
@@ -83,36 +113,44 @@ export async function PUT(req, { params }) {
       sample.rejectionReason = reason;
     } else if (action === "record-results") {
       const rawValues = body.results || {};
-
-      test = await TestDefinition.findById(sample.testDefinition).populate("category", "name");
-      if (!test || test.status !== "active") {
-        return Response.json({ error: "Active test definition not found for this sample" }, { status: 404 });
-      }
-
+      const submittedInvestigations = Array.isArray(body.investigationResults)
+        ? body.investigationResults
+        : [];
+      const groupedInvestigations = sample.investigations?.length
+        ? sample.investigations
+        : [{
+            _id: "legacy",
+            billingItemId: sample.billingItemId,
+            testDefinition: sample.testDefinition,
+            testSnapshot: sample.testSnapshot,
+          }];
+      const testIds = groupedInvestigations.map((investigation) => investigation.testDefinition?._id || investigation.testDefinition);
+      const tests = await TestDefinition.find({ _id: { $in: testIds } }).populate("category", "name");
+      const testMap = new Map(tests.map((testDefinition) => [String(testDefinition._id), testDefinition]));
+      const completedInvestigations = [];
       const missingRequired = [];
-      const results = test.parameters
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((parameter) => {
-          const rawValue = rawValues[parameter.key];
-          const textValue = clean(rawValue);
-          const numericValue = textValue === "" ? undefined : Number(textValue);
+      const invalidValues = [];
 
-          if (parameter.required && textValue === "") {
-            missingRequired.push(parameter.name);
-          }
+      for (const investigation of groupedInvestigations) {
+        const testId = investigation.testDefinition?._id || investigation.testDefinition;
+        const activeTest = testMap.get(String(testId));
+        if (!activeTest || activeTest.status !== "active") {
+          return Response.json({ error: "An active test definition was not found for this bill" }, { status: 404 });
+        }
 
-          return {
-            key: parameter.key,
-            name: parameter.name,
-            unit: parameter.unit,
-            normalMin: parameter.normalMin,
-            normalMax: parameter.normalMax,
-            required: parameter.required,
-            value: Number.isFinite(numericValue) ? numericValue : undefined,
-            textValue,
-            flag: getFlag(parameter, textValue),
-          };
-        });
+        const investigationKey = String(investigation._id || "legacy");
+        const submittedInvestigation = submittedInvestigations.find((entry) =>
+          String(entry?.investigationId || "") === investigationKey
+          || String(entry?.testDefinitionId || "") === String(testId)
+        );
+        const investigationValues = submittedInvestigation?.values
+          || rawValues[investigationKey]
+          || (sample.investigations?.length ? {} : rawValues);
+        const built = buildInvestigationResults(activeTest, investigationValues);
+        missingRequired.push(...built.missingRequired.map((name) => `${activeTest.name}: ${name}`));
+        invalidValues.push(...built.invalidValues.map((name) => `${activeTest.name}: ${name}`));
+        completedInvestigations.push({ investigation, test: activeTest, results: built.results });
+      }
 
       if (missingRequired.length > 0) {
         return Response.json(
@@ -121,7 +159,25 @@ export async function PUT(req, { params }) {
         );
       }
 
-      sample.results = results;
+      if (sample.investigations?.length) {
+        for (const completed of completedInvestigations) {
+          completed.investigation.results = completed.results;
+          completed.investigation.status = "completed";
+        }
+      }
+      if (invalidValues.length > 0) {
+        return Response.json(
+          { error: `Invalid numeric results: ${invalidValues.join(", ")}` },
+          { status: 400 }
+        );
+      }
+      sample.results = completedInvestigations.flatMap(({ test: activeTest, results }) =>
+        results.map((result) => ({
+          ...result,
+          key: `${activeTest.testId || activeTest._id}:${result.key}`,
+          name: completedInvestigations.length > 1 ? `${activeTest.name} - ${result.name}` : result.name,
+        }))
+      );
       sample.notes = notes;
       try {
         const statusChain = ["registered", "collected", "processing", "completed"];
@@ -177,11 +233,6 @@ export async function PUT(req, { params }) {
     if (sample.status === "completed") {
       const { InventoryItem, InventoryMovement, InventoryUom } = await getTenantModels(auth.tenantId);
 
-      const testWithInventory = await TestDefinition.findById(sample.testDefinition)
-        .populate("category", "name")
-        .populate("requiredInventoryItems.item")
-        .populate("requiredInventoryItems.uom");
-
       if (sample.reservedInventory?.length) {
         for (const res of sample.reservedInventory) {
           const itemDoc = await InventoryItem.findById(res.item);
@@ -229,27 +280,59 @@ export async function PUT(req, { params }) {
         sample.reservedInventory = [];
       }
 
-      const testSnapshot = {
-        testId: testWithInventory.testId,
-        name: testWithInventory.name,
-        code: testWithInventory.code,
-        categoryName: testWithInventory.category?.name,
-        sampleType: testWithInventory.sampleType,
-      };
-      await TestReport.create({
-        patient: sample.patient,
-        testDefinition: sample.testDefinition,
-        sample: sample._id,
-        billingRecord: sample.billingRecord,
-        sampleId: sample.sampleId,
-        testSnapshot,
-        results: sample.results,
-        remarks: sample.notes || "",
-        status: "draft",
-        enteredBy: handledBy,
-        template: "test-report",
-        version: 1,
-      });
+      const reportInvestigations = sample.investigations?.length
+        ? sample.investigations.map((investigation) => ({
+            billingItemId: investigation.billingItemId,
+            testDefinition: investigation.testDefinition,
+            testSnapshot: investigation.testSnapshot,
+            results: investigation.results,
+          }))
+        : [{
+            billingItemId: sample.billingItemId,
+            testDefinition: sample.testDefinition,
+            testSnapshot: sample.testSnapshot,
+            results: sample.results,
+          }];
+      const reportSnapshot = reportInvestigations.length > 1
+        ? {
+            name: `${reportInvestigations.length} investigations`,
+            code: sample.billingRecord ? "Bill grouped" : sample.testSnapshot?.code,
+            categoryName: "Combined diagnostic report",
+            sampleType: sample.sampleType || reportInvestigations.map((item) => item.testSnapshot?.sampleType).filter(Boolean).join(", "),
+          }
+        : reportInvestigations[0].testSnapshot;
+
+      const existingReport = await TestReport.findOne({ sample: sample._id }).select("_id").lean();
+      if (!existingReport) {
+        await TestReport.create({
+            patient: sample.patient,
+            testDefinition: reportInvestigations[0].testDefinition,
+            sample: sample._id,
+            billingRecord: sample.billingRecord,
+            sampleId: sample.sampleId,
+            testSnapshot: reportSnapshot,
+            results: sample.results,
+            investigations: reportInvestigations,
+            remarks: sample.notes || "",
+            status: "draft",
+            enteredBy: handledBy,
+            template: "test-report",
+            version: 1,
+        });
+      }
+
+      if (sample.billingRecord) {
+        const billingRecord = await BillingRecord.findById(sample.billingRecord);
+        if (billingRecord) {
+          const completedItemIds = new Set(reportInvestigations.map((item) => String(item.billingItemId)).filter(Boolean));
+          for (const item of billingRecord.items) {
+            if (completedItemIds.has(String(item._id))) item.status = "reported";
+          }
+          if (billingRecord.items.every((item) => item.status === "reported")) billingRecord.status = "completed";
+          else billingRecord.status = "in-progress";
+          await billingRecord.save();
+        }
+      }
     }
 
     await writeAuditLog(req, auth, {

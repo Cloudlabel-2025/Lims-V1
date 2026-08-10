@@ -22,7 +22,9 @@ export async function GET(req, { params }) {
 
     const { id } = await params;
     const { TestReport, BillingRecord, User } = await getTenantModels(auth.tenantId);
-    const reportDoc = await TestReport.findById(id).populate("patient", "name patientId age gender phone address");
+    const reportDoc = await TestReport.findById(id)
+      .populate("patient", "name patientId age gender phone address")
+      .populate("billingRecord", "billId");
 
     if (!reportDoc) {
       return Response.json({ error: "Report not found" }, { status: 404 });
@@ -57,7 +59,7 @@ export async function GET(req, { params }) {
     if (auth.session.doctorId) {
       const ownsReferral = report.status === "released" && report.billingRecord
         ? await BillingRecord.exists({
-            _id: report.billingRecord,
+            _id: report.billingRecord?._id || report.billingRecord,
             tenantId: auth.tenantId,
             referralDoctor: auth.session.doctorId,
           })

@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import { applyCmsTheme, buildThemeVariables } from "@/app/components/ThemeProvider";
+import { usePasswordTypeGuard } from "@/app/lib/use-password-type-guard";
 
 const developerLoginFeatures = [
   "Tenant Lab Onboarding",
@@ -63,11 +64,14 @@ export default function LoginPage({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const isTenantLogin = userType === "tenant";
+  const passwordVisible = !isTenantLogin && showPassword;
+  const passwordInputRef = useRef(null);
+  usePasswordTypeGuard(passwordInputRef, passwordVisible);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
-  const isTenantLogin = userType === "tenant";
   const credentialScope = isTenantLogin
     ? `section-tenant-${tenantId.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || "lab"}-login`
     : "section-cms-developer-login";
@@ -371,9 +375,10 @@ export default function LoginPage({
                 <div className="login-input-wrapper">
                   <span className="login-input-icon">{Icons.lock}</span>
                   <input
+                    ref={passwordInputRef}
                     id={passwordInputId}
                     name={isTenantLogin ? "tenant-login-password" : "cms-developer-login-password"}
-                    type={showPassword ? "text" : "password"}
+                    type={passwordVisible ? "text" : "password"}
                     className="login-input"
                     placeholder="Enter password"
                     value={password}
@@ -382,15 +387,17 @@ export default function LoginPage({
                     required
                     suppressHydrationWarning
                   />
-                  <button
-                    type="button"
-                    className="login-toggle-pw"
-                    onClick={() => setShowPassword((p) => !p)}
-                    tabIndex={-1}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? Icons.eyeOff : Icons.eye}
-                  </button>
+                  {!isTenantLogin && (
+                    <button
+                      type="button"
+                      className="login-toggle-pw"
+                      onClick={() => setShowPassword((p) => !p)}
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? Icons.eyeOff : Icons.eye}
+                    </button>
+                  )}
                 </div>
               </div>
 

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 function ActivateRedirect() {
   const router = useRouter();
   const params = useSearchParams();
-  const tenantId = params.get("tenantId") || "mega";
+  const tenantId = params.get("tenantId") || (typeof window !== "undefined" ? window.location.hostname.split(".")[0] : "");
 
   useEffect(() => {
     // Direct patient to the dedicated login page since activation is no longer required

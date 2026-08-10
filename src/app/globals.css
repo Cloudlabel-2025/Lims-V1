@@ -4549,6 +4549,256 @@ input[type="number"] {
   font-weight: 700;
 }
 
+.developer-seed-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  padding: 20px;
+}
+
+.developer-seed-choice.selected {
+  border-color: var(--primary-200);
+  background: var(--primary-50);
+}
+
+.developer-seed-choice-status {
+  display: inline-flex;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: var(--text-secondary);
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.developer-seed-choice.selected .developer-seed-choice-status {
+  background: var(--primary-100);
+  color: var(--primary-dark);
+}
+
+.developer-seed-choice h3 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.developer-seed-choice p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.developer-seed-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+
+.developer-seed-status-grid > span {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 9px 11px;
+}
+
+.developer-seed-status-grid > span.added {
+  border-color: var(--primary-200);
+  background: var(--primary-50);
+}
+
+.developer-seed-status-grid strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.developer-seed-status-grid small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.developer-seed-status-grid > span.added small {
+  color: var(--primary-dark);
+  font-weight: 750;
+}
+
+.developer-seed-choice > button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--primary-dark);
+  padding: 0 16px;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.developer-seed-confirmation {
+  width: min(100%, 520px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  padding: 26px;
+}
+
+.developer-seed-confirmation h2 {
+  margin: 4px 0 8px;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.developer-seed-confirmation > p:not(.developer-kicker) {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.developer-seed-confirmation-list {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.developer-seed-confirmation-list > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+  color: var(--text-secondary);
+  padding: 11px 12px;
+  font-family: var(--font-main);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.developer-seed-confirmation-list > button.selected {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.1);
+}
+
+.developer-seed-confirmation-list > button > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.developer-seed-check {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.developer-seed-confirmation-list > button.selected .developer-seed-check {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.developer-seed-confirmation-list strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.developer-seed-confirmation-list strong em {
+  display: inline-flex;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--primary-100);
+  color: var(--primary-dark);
+  padding: 2px 6px;
+  font-size: 9px;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.developer-seed-confirmation-list > button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.developer-seed-confirmation-list small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.developer-seed-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.developer-seed-confirmation-actions button {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--text-secondary);
+  padding: 0 16px;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.developer-seed-confirmation-actions .developer-submit {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.developer-seed-confirmation-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 680px) {
+  .developer-seed-choice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .developer-seed-choice > button,
+  .developer-seed-confirmation-actions button {
+    width: 100%;
+  }
+
+  .developer-seed-confirmation-actions {
+    flex-direction: column-reverse;
+  }
+
+  .developer-seed-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .developer-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

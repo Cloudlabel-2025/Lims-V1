@@ -143,6 +143,60 @@ test("lab creation and editing require an active catalog package", () => {
   }
 });
 
+test("new labs receive default tests and inventory only when requested", () => {
+  const createRoute = fs.readFileSync(path.join(rootDir, "src/app/api/developer/labs/route.js"), "utf8");
+  const createPage = fs.readFileSync(path.join(rootDir, "src/app/developer/labs/create/page.js"), "utf8");
+
+  assert.match(createRoute, /import \{ seedDefaultTests \} from "@\/app\/lib\/test-seeder"/);
+  assert.match(createRoute, /import \{ seedDefaultInventory \} from "@\/app\/lib\/inventory-seeder"/);
+  assert.match(createRoute, /const shouldSeedDefaultTests = body\.seedDefaultTests === true/);
+  assert.match(createRoute, /const shouldSeedDefaultInventory = body\.seedDefaultInventory === true/);
+  assert.match(createRoute, /if \(shouldSeedDefaultTests\) \{[\s\S]*await seedDefaultTests\(tenantConnection\)/);
+  assert.match(createRoute, /if \(shouldSeedDefaultInventory\) \{[\s\S]*await seedDefaultInventory\(tenantConnection\)/);
+  assert.match(createPage, /seedDefaultTests: false/);
+  assert.match(createPage, /seedDefaultInventory: false/);
+  assert.match(createPage, /Select the default data this lab needs/);
+  assert.match(createPage, /Confirm Selection/);
+  assert.match(createPage, /No, Keep Empty/);
+});
+
+test("existing labs can add default tests and inventory independently", () => {
+  const editRoute = fs.readFileSync(
+    path.join(rootDir, "src/app/api/developer/labs/[tenantId]/route.js"),
+    "utf8"
+  );
+  const seedRoute = fs.readFileSync(
+    path.join(rootDir, "src/app/api/developer/labs/[tenantId]/seed-defaults/route.js"),
+    "utf8"
+  );
+  const editPage = fs.readFileSync(
+    path.join(rootDir, "src/app/developer/labs/[id]/edit/page.js"),
+    "utf8"
+  );
+  const labModel = fs.readFileSync(path.join(rootDir, "src/app/models/master/Lab.js"), "utf8");
+
+  assert.match(seedRoute, /export async function POST/);
+  assert.match(seedRoute, /if \(seedTests\) \{[\s\S]*await seedDefaultTests\(tenantConnection\)/);
+  assert.match(seedRoute, /if \(seedInventory\) \{[\s\S]*await seedDefaultInventory\(tenantConnection\)/);
+  assert.match(seedRoute, /statusUpdate\["defaultData\.tests\.seeded"\] = true/);
+  assert.match(seedRoute, /statusUpdate\["defaultData\.inventory\.seeded"\] = true/);
+  assert.match(seedRoute, /Lab\.collection\.updateOne/);
+  assert.match(labModel, /existingModel\.schema\.add\(\{ defaultData: defaultDataDefinition \}\)/);
+  assert.match(editRoute, /tests: Boolean\(lab\.defaultData\?\.tests\?\.seeded\)/);
+  assert.match(editRoute, /inventory: Boolean\(lab\.defaultData\?\.inventory\?\.seeded\)/);
+  assert.match(editRoute, /await backfillDefaultDataStatus\(lab\)/);
+  assert.match(editRoute, /hasAllDefaultTests\(tenantConnection\)/);
+  assert.match(editRoute, /hasAllDefaultInventory\(tenantConnection\)/);
+  assert.match(editPage, /Add Default Data/);
+  assert.match(editPage, /existing records/);
+  assert.match(editPage, /setSeededDefaults\(data\.lab\.seededDefaults/);
+  assert.match(editPage, /\/seed-defaults/);
+  assert.match(editPage, /Seeding Default Data\.\.\./);
+  assert.match(editPage, /Confirm And Seed Now/);
+  assert.match(editPage, /developer-seed-status-grid/);
+  assert.match(editPage, /Default data added/);
+});
+
 test("tenant subscription experience exposes usage and notification thresholds", () => {
   const tenantRoute = fs.readFileSync(path.join(rootDir, "src/app/api/subscription/route.js"), "utf8");
   const notificationRules = fs.readFileSync(path.join(rootDir, "src/app/lib/notifications.js"), "utf8");
