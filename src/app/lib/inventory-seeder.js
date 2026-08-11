@@ -2,6 +2,7 @@ import { getInventoryUomModel } from "../models/tenant/InventoryUom.js";
 import { getInventoryCategoryModel } from "../models/tenant/InventoryCategory.js";
 import { getInventorySupplierModel } from "../models/tenant/InventorySupplier.js";
 import { getInventoryItemModel } from "../models/tenant/InventoryItem.js";
+import { mapInBatches } from "./seeder-utils.js";
 
 const uomsData = [
   { name: "Microgram", symbol: "mcg", type: "weight", conversionToBase: 0.000001, baseSymbol: "g" },
@@ -1149,48 +1150,52 @@ export async function seedDefaultInventory(connection) {
   const InventorySupplier = getInventorySupplierModel(connection);
   const InventoryItem = getInventoryItemModel(connection);
 
-  // 1. Seed UOMs
-  const uomMap = new Map();
-  for (const uom of uomsData) {
-    let uomDoc = await InventoryUom.findOne({ name: uom.name });
-    if (!uomDoc) {
-      uomDoc = await InventoryUom.create(uom);
-    }
-    uomMap.set(uom.symbol, uomDoc._id);
-  }
+  const [existingUoms, existingCategories, existingSuppliers] = await Promise.all([
+    InventoryUom.find({ name: { $in: uomsData.map((uom) => uom.name) } }),
+    InventoryCategory.find({ code: { $in: categoriesData.map((category) => category.code) } }),
+    InventorySupplier.find({ code: { $in: suppliersData.map((supplier) => supplier.code) } }),
+  ]);
+  const uomMap = new Map(existingUoms.map((uom) => [uom.symbol, uom._id]));
+  const categoryMap = new Map(existingCategories.map((category) => [category.code, category._id]));
+  const supplierMap = new Map(existingSuppliers.map((supplier) => [supplier.code, supplier._id]));
 
-  // 2. Seed Categories
-  const categoryMap = new Map();
-  for (const cat of categoriesData) {
-    let catDoc = await InventoryCategory.findOne({ code: cat.code });
-    if (!catDoc) {
-      catDoc = await InventoryCategory.create(cat);
-    }
-    categoryMap.set(cat.code, catDoc._id);
-  }
+  const [createdUoms, createdCategories, createdSuppliers] = await Promise.all([
+    mapInBatches(
+      uomsData.filter((uom) => !existingUoms.some((existing) => existing.name === uom.name)),
+      8,
+      (uom) => InventoryUom.create(uom)
+    ),
+    mapInBatches(
+      categoriesData.filter((category) => !categoryMap.has(category.code)),
+      8,
+      (category) => InventoryCategory.create(category)
+    ),
+    mapInBatches(
+      suppliersData.filter((supplier) => !supplierMap.has(supplier.code)),
+      8,
+      (supplier) => InventorySupplier.create(supplier)
+    ),
+  ]);
 
-  // 3. Seed Suppliers
-  const supplierMap = new Map();
-  for (const sup of suppliersData) {
-    let supDoc = await InventorySupplier.findOne({ code: sup.code });
-    if (!supDoc) {
-      supDoc = await InventorySupplier.create(sup);
-    }
-    supplierMap.set(sup.code, supDoc._id);
-  }
+  for (const uom of createdUoms) uomMap.set(uom.symbol, uom._id);
+  for (const category of createdCategories) categoryMap.set(category.code, category._id);
+  for (const supplier of createdSuppliers) supplierMap.set(supplier.code, supplier._id);
 
-  // 4. Seed Items & Batches
-  let itemsSeeded = 0;
-  for (const item of itemsData) {
-    const existingItem = await InventoryItem.findOne({ itemCode: item.itemCode });
-    if (!existingItem) {
+  const existingItems = await InventoryItem.find({
+    itemCode: { $in: itemsData.map((item) => item.itemCode) },
+  })
+    .select("itemCode")
+    .lean();
+  const existingItemCodes = new Set(existingItems.map((item) => item.itemCode));
+  const missingItems = itemsData.filter((item) => !existingItemCodes.has(item.itemCode));
+  const createdItems = await mapInBatches(missingItems, 10, async (item) => {
       const categoryId = categoryMap.get(item.categoryCode);
       const baseUomId = uomMap.get(item.baseUomSymbol);
       const purchaseUomId = uomMap.get(item.purchaseUomSymbol);
       const supplierId = supplierMap.get(item.supplierCode);
 
       if (!categoryId || !baseUomId || !purchaseUomId) {
-        continue; // skip if dependencies are somehow missing
+        return null;
       }
 
       // Calculate total stock on hand from batches
@@ -1237,22 +1242,33 @@ export async function seedDefaultInventory(connection) {
         batches: formattedBatches,
       });
 
-      // Link item to supplier
-      if (supplierId) {
-        await InventorySupplier.findByIdAndUpdate(supplierId, {
-          $addToSet: { items: newItem._id }
-        });
-      }
-
-      itemsSeeded++;
-    }
+      return { item: newItem, supplierId };
+  });
+  const createdItemLinks = createdItems.filter(Boolean);
+  const itemsBySupplier = new Map();
+  for (const { item, supplierId } of createdItemLinks) {
+    if (!supplierId) continue;
+    const key = String(supplierId);
+    const supplierItems = itemsBySupplier.get(key) || [];
+    supplierItems.push(item._id);
+    itemsBySupplier.set(key, supplierItems);
+  }
+  if (itemsBySupplier.size > 0) {
+    await InventorySupplier.bulkWrite(
+      [...itemsBySupplier.entries()].map(([supplierId, itemIds]) => ({
+        updateOne: {
+          filter: { _id: supplierId },
+          update: { $addToSet: { items: { $each: itemIds } } },
+        },
+      }))
+    );
   }
 
   return {
-    uomsSeeded: uomsData.length,
-    categoriesSeeded: categoriesData.length,
-    suppliersSeeded: suppliersData.length,
-    itemsSeeded,
+    uomsSeeded: createdUoms.length,
+    categoriesSeeded: createdCategories.length,
+    suppliersSeeded: createdSuppliers.length,
+    itemsSeeded: createdItemLinks.length,
   };
 }
 

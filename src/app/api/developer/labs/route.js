@@ -37,7 +37,7 @@ import { getQuotaPeriodModel } from "@/app/models/tenant/QuotaPeriod";
 import { getQuotaUsageEventModel } from "@/app/models/tenant/QuotaUsageEvent";
 import { getLabSubscriptionModel } from "@/app/models/master/LabSubscription";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const tenantIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const connectionOptions = {

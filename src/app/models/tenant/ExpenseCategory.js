@@ -13,8 +13,6 @@ export const ExpenseCategorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-ExpenseCategorySchema.index({ name: 1 }, { unique: true });
-
 export function getExpenseCategoryModel(connection = mongoose) {
   return connection.models.ExpenseCategory || connection.model("ExpenseCategory", ExpenseCategorySchema);
 }

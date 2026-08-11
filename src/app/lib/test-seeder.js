@@ -1,5 +1,6 @@
 import { getTestCategoryModel } from "../models/tenant/TestCategory.js";
 import { getTestDefinitionModel } from "../models/tenant/TestDefinition.js";
+import { mapInBatches } from "./seeder-utils.js";
 
 const categoriesData = [
   { name: "Hematology", description: "Studies blood cells and coagulation" },
@@ -2529,53 +2530,65 @@ export async function seedDefaultTests(connection) {
   const TestCategory = getTestCategoryModel(connection);
   const TestDefinition = getTestDefinitionModel(connection);
 
-  const categoryMap = new Map();
+  const categoryNames = [...new Set(categoriesData.map((category) => category.name))];
+  const existingCategories = await TestCategory.find({ name: { $in: categoryNames } });
+  const categoryMap = new Map(existingCategories.map((category) => [category.name, category._id]));
+  const missingCategories = categoriesData.filter((category) => !categoryMap.has(category.name));
+  const createdCategories = await mapInBatches(missingCategories, 8, (category) =>
+    TestCategory.create({
+      name: category.name,
+      description: category.description,
+      status: "active",
+    })
+  );
 
-  for (const cat of categoriesData) {
-    let categoryDoc = await TestCategory.findOne({ name: cat.name });
-    if (!categoryDoc) {
-      categoryDoc = await TestCategory.create({
-        name: cat.name,
-        description: cat.description,
-        status: "active"
-      });
-    }
-    categoryMap.set(cat.name, categoryDoc._id);
+  for (const category of createdCategories) {
+    categoryMap.set(category.name, category._id);
   }
 
-  let testsSeeded = 0;
-  for (const test of testsData) {
+  const defaultCodes = [...new Set(testsData.map((test) => test.code))];
+  const defaultNames = [...new Set(testsData.map((test) => test.name))];
+  const categoryIds = [...categoryMap.values()];
+  const existingTests = await TestDefinition.find({
+    $or: [
+      { code: { $in: defaultCodes } },
+      { name: { $in: defaultNames }, category: { $in: categoryIds } },
+    ],
+  })
+    .select("code name category")
+    .lean();
+  const existingCodes = new Set(existingTests.map((test) => test.code).filter(Boolean));
+  const existingNameCategories = new Set(
+    existingTests.map((test) => `${String(test.category)}:${test.name}`)
+  );
+  const missingTests = testsData.filter((test) => {
     const categoryId = categoryMap.get(test.categoryName);
-    if (!categoryId) continue;
+    return (
+      categoryId &&
+      !existingCodes.has(test.code) &&
+      !existingNameCategories.has(`${String(categoryId)}:${test.name}`)
+    );
+  });
 
-    // To prevent duplicate key errors on either name-category compound index or code unique index
-    const existingTest = await TestDefinition.findOne({
-      $or: [
-        { code: test.code },
-        { name: test.name, category: categoryId }
-      ]
+  const createdTests = await mapInBatches(missingTests, 12, (test) => {
+    const formattedParams = test.parameters.map((param, index) => ({
+      ...param,
+      required: true,
+      sortOrder: index,
+    }));
+
+    return TestDefinition.create({
+      name: test.name,
+      code: test.code,
+      category: categoryMap.get(test.categoryName),
+      sampleType: test.sampleType,
+      price: test.price,
+      parameters: formattedParams,
+      status: "active",
     });
-    if (!existingTest) {
-      const formattedParams = test.parameters.map((param, index) => ({
-        ...param,
-        required: true,
-        sortOrder: index,
-      }));
+  });
 
-      await TestDefinition.create({
-        name: test.name,
-        code: test.code,
-        category: categoryId,
-        sampleType: test.sampleType,
-        price: test.price,
-        parameters: formattedParams,
-        status: "active",
-      });
-      testsSeeded++;
-    }
-  }
-
-  return { categoriesSeeded: categoriesData.length, testsSeeded };
+  return { categoriesSeeded: createdCategories.length, testsSeeded: createdTests.length };
 }
 
 export async function hasAllDefaultTests(connection) {

@@ -7,7 +7,7 @@ import { seedDefaultInventory } from "@/app/lib/inventory-seeder";
 import { seedDefaultTests } from "@/app/lib/test-seeder";
 import { getLabModel } from "@/app/models/master/Lab";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const connectionOptions = {
   bufferCommands: false,
