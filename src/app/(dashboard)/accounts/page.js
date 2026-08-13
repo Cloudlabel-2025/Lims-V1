@@ -52,7 +52,6 @@ export default function AccountsDashboard() {
     { href: "/accounts/commissions", label: "Commissions", icon: Icons.users, desc: "Doctor commission payouts" },
     { href: "/accounts/corporate", label: "Corporate Accounts", icon: Icons.users, desc: "Corporate client management" },
     { href: "/accounts/reports", label: "Reports", icon: Icons.report, desc: "Daily, weekly, monthly & P&L reports" },
-    { href: "/accounts/stats", label: "Statistics", icon: Icons.barChart, desc: "Patients, income & commission stats" },
   ];
 
   return (

@@ -1110,7 +1110,7 @@ export default function BillingPage() {
                 onClick={() => router.push("/subscription?buy=billingRecords")}
                 style={{ 
                   flex: 1, height: "42px", border: "none", 
-                  borderRadius: "10px", background: "#0d9488", color: "#fff",
+                  borderRadius: "10px", background: "var(--primary)", color: "#fff",
                   cursor: "pointer", fontWeight: "600", fontSize: "13px",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.2s"

@@ -88,8 +88,8 @@ export default function DashboardPage() {
       change: "Today",
       detail: "Collected since midnight",
       icon: Icons.flask,
-      color: "#0d9488",
-      bg: "#f0fdfa",
+      color: "var(--primary)",
+      bg: "var(--primary-50)",
       href: "/samples",
     },
     {
@@ -212,16 +212,16 @@ export default function DashboardPage() {
       </section>
       {/* 👨‍⚕️ Doctor Referred Patients Widget */}
       {stats?.pendingDoctorRequests && stats.pendingDoctorRequests.length > 0 && (
-        <section className="dashboard-panel" style={{ marginBottom: "24px", border: "1px solid #99f6e4", background: "#f0fdf4" }}>
-          <div className="dashboard-panel-header" style={{ borderBottom: "1px solid #ccfbf1" }}>
+        <section className="dashboard-panel" style={{ marginBottom: "24px", border: "1px solid var(--primary-200)", background: "#f0fdf4" }}>
+          <div className="dashboard-panel-header" style={{ borderBottom: "1px solid var(--primary-100)" }}>
             <div>
-              <span className="dashboard-panel-icon" style={{ background: "#ccfbf1", color: "#0d9488" }}>👨‍⚕️</span>
+              <span className="dashboard-panel-icon" style={{ background: "var(--primary-100)", color: "var(--primary)" }}>👨‍⚕️</span>
               <div>
-                <h2 style={{ color: "#0f766e" }}>Doctor Referred Patients ({stats.pendingDoctorRequests.length})</h2>
-                <p style={{ color: "#115e59" }}>Incoming doctor test requests waiting for lab billing & processing.</p>
+                <h2 style={{ color: "var(--primary-dark)" }}>Doctor Referred Patients ({stats.pendingDoctorRequests.length})</h2>
+                <p style={{ color: "var(--primary-dark)" }}>Incoming doctor test requests waiting for lab billing & processing.</p>
               </div>
             </div>
-            <button className="dashboard-text-action" onClick={() => router.push("/billing")} style={{ color: "#0d9488" }}>
+            <button className="dashboard-text-action" onClick={() => router.push("/billing")} style={{ color: "var(--primary)" }}>
               View all orders {Icons.chevronRight}
             </button>
           </div>
@@ -247,7 +247,7 @@ export default function DashboardPage() {
                       <strong style={{ fontSize: "15px", color: "#0f172a" }}>{req.patient?.name || "Patient"}</strong>
                       <div style={{ fontSize: "12px", color: "#64748b" }}>{req.patient?.age} Yrs · {req.patient?.gender} · <code>{req.patient?.patientId}</code></div>
                     </div>
-                    <span style={{ fontSize: "11px", fontWeight: "600", color: "#0d9488", background: "#ccfbf1", padding: "3px 8px", borderRadius: "12px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--primary)", background: "var(--primary-100)", padding: "3px 8px", borderRadius: "12px" }}>
                       Dr. {req.doctor?.name || "Doctor"}
                     </span>
                   </div>

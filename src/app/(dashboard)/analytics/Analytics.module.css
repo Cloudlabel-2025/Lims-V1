@@ -1,6 +1,6 @@
 .page {
   --analytics-brand: var(--brand-action, var(--primary));
-  --analytics-brand-soft: var(--primary-50, #f0fdfa);
+  --analytics-brand-soft: var(--primary-50);
   --analytics-ink: #0f172a;
   --analytics-muted: #64748b;
   --analytics-border: #dbe4ee;
@@ -125,7 +125,7 @@
 }
 
 .refreshButton:focus-visible {
-  outline: 3px solid var(--primary-200, #99f6e4);
+  outline: 3px solid var(--primary-200);
   outline-offset: 2px;
 }
 

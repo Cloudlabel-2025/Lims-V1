@@ -28,8 +28,8 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  background: #f0fdfa;
-  color: #0d9488;
+  background: var(--primary-50);
+  color: var(--primary);
 }
 
 .identityIcon svg { width: 23px; height: 23px; }
@@ -90,8 +90,8 @@
 }
 
 .searchInput:focus {
-  border-color: #0d9488;
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, .1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .refreshButton,
@@ -121,7 +121,7 @@
 
 .refreshButton:hover,
 .tab:hover,
-.viewButton:hover { border-color: #8cc6c1; color: #0f766e; }
+.viewButton:hover { border-color: var(--primary-200); color: var(--primary-dark); }
 .refreshButton:disabled { cursor: not-allowed; opacity: .55; }
 
 .workspaceBar {
@@ -157,8 +157,8 @@
 }
 
 .tab svg { width: 17px; height: 17px; }
-.tabActive { border-color: #0d9488; background: #0d9488; color: #fff; }
-.tabActive:hover { color: #fff; background: #0f766e; border-color: #0f766e; }
+.tabActive { border-color: var(--primary); background: var(--primary); color: #fff; }
+.tabActive:hover { color: #fff; background: var(--primary-dark); border-color: var(--primary-dark); }
 
 .viewToggle {
   padding: 3px;
@@ -185,7 +185,7 @@
 .viewButtonActive {
   border-color: #e2e8f0;
   background: #fff;
-  color: #0d9488;
+  color: var(--primary);
   box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
 }
 
@@ -255,7 +255,7 @@
 
 .filterLabel { margin-right: 2px; color: #7b899d; font-size: 12px; font-weight: 700; }
 .filterChip { min-height: 32px; padding: 0 13px; border-color: transparent; border-radius: 99px; background: #fff; font-size: 12px; font-weight: 750; }
-.filterChipActive { border-color: #b8dcd8; background: #f0fdfa; color: #0f766e; }
+.filterChipActive { border-color: var(--primary-200); background: var(--primary-50); color: var(--primary-dark); }
 .filterChipWarn.filterChipActive { border-color: #fde68a; background: #fffbeb; color: #a16207; }
 .filterChipDanger.filterChipActive { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
 
@@ -298,8 +298,8 @@
 }
 
 .page :global(.lims-input):focus {
-  border-color: #0d9488 !important;
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, .1) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent) !important;
 }
 
 .tableCard {
@@ -347,9 +347,9 @@
 .thresholds { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tableActions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .iconButton { width: 34px; height: 34px; border: 1px solid #d9e2ec; border-radius: 7px; display: inline-grid; place-items: center; background: #fff; color: #52627a; cursor: pointer; }
-.iconButton:hover { border-color: #8cc6c1; background: #f0fdfa; color: #0f766e; }
-.orderButton { min-height: 34px; padding: 0 10px; border: 1px solid #b8dcd8; border-radius: 7px; background: #fff; color: #0f766e; font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
-.orderButton:hover { background: #f0fdfa; }
+.iconButton:hover { border-color: var(--primary-200); background: var(--primary-50); color: var(--primary-dark); }
+.orderButton { min-height: 34px; padding: 0 10px; border: 1px solid var(--primary-200); border-radius: 7px; background: #fff; color: var(--primary-dark); font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
+.orderButton:hover { background: var(--primary-50); }
 
 .badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 800; white-space: nowrap; }
 .badgeNeutral { background: #f1f5f9; color: #52627a; }

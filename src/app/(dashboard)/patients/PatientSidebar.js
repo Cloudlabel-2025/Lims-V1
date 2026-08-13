@@ -8,7 +8,7 @@ import { cachedJsonFetch, useTenantShell } from "@/app/lib/use-current-user";
 import { hasPatientPortalEntitlement } from "@/app/lib/portal-policy";
 
 const PREMIUM_GRADIENTS = [
-  "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)", // Teal
+  "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)", // Teal
   "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)", // Indigo
   "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", // Sky
   "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)", // Violet
@@ -104,7 +104,7 @@ function PatientSidebar({ patient, onClose }) {
     <div className="patient-detail-drawer" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <header className="patient-detail-header" style={{ padding: "16px 20px" }}>
         <div>
-          <span style={{ fontSize: "11px", fontWeight: "800", color: "#0d9488", textTransform: "uppercase", letterSpacing: "0.05em" }}>Patient record</span>
+          <span style={{ fontSize: "11px", fontWeight: "800", color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Patient record</span>
           <strong style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a" }}>Patient Details</strong>
         </div>
         <button type="button" onClick={onClose} aria-label="Close patient details" style={{ borderRadius: "10px" }}>
@@ -149,7 +149,7 @@ function PatientSidebar({ patient, onClose }) {
         <section className="patient-detail-section patient-health-section" style={{ border: "1.5px solid #edf2f7", borderRadius: "14px" }}>
           <header style={{ padding: "14px 18px", borderBottom: "1.5px solid #edf2f7" }}>
             <div>
-              <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", color: "#0d9488", letterSpacing: "0.05em" }}>Latest verified results</span>
+              <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", color: "var(--primary)", letterSpacing: "0.05em" }}>Latest verified results</span>
               <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>Basic health information</h3>
             </div>
           </header>
@@ -162,7 +162,7 @@ function PatientSidebar({ patient, onClose }) {
         <section className="patient-detail-section" style={{ border: "1.5px solid #edf2f7", borderRadius: "14px" }}>
           <header style={{ padding: "14px 18px", borderBottom: "1.5px solid #edf2f7" }}>
             <div>
-              <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", color: "#0d9488", letterSpacing: "0.05em" }}>Clinical identity</span>
+              <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", color: "var(--primary)", letterSpacing: "0.05em" }}>Clinical identity</span>
               <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>Patient information</h3>
             </div>
           </header>
@@ -189,13 +189,13 @@ function PatientSidebar({ patient, onClose }) {
         <section className="patient-detail-section" style={{ border: "1.5px solid #edf2f7", borderRadius: "14px" }}>
           <header style={{ padding: "14px 18px", borderBottom: "1.5px solid #edf2f7" }}>
             <div>
-              <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", color: "#0d9488", letterSpacing: "0.05em" }}>Communication</span>
+              <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", color: "var(--primary)", letterSpacing: "0.05em" }}>Communication</span>
               <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>Contact information</h3>
             </div>
           </header>
           <div className="patient-detail-contact-list" style={{ padding: "16px", display: "grid", gap: "14px" }}>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              <span style={{ color: "#0d9488", fontSize: "16px", background: "#f0fdfa", width: "32px", height: "32px", borderRadius: "8px", display: "grid", placeItems: "center" }}>
+              <span style={{ color: "var(--primary)", fontSize: "16px", background: "var(--primary-50)", width: "32px", height: "32px", borderRadius: "8px", display: "grid", placeItems: "center" }}>
                 {Icons.phone}
               </span>
               <div>
@@ -204,7 +204,7 @@ function PatientSidebar({ patient, onClose }) {
               </div>
             </div>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              <span style={{ color: "#0d9488", fontSize: "16px", background: "#f0fdfa", width: "32px", height: "32px", borderRadius: "8px", display: "grid", placeItems: "center" }}>
+              <span style={{ color: "var(--primary)", fontSize: "16px", background: "var(--primary-50)", width: "32px", height: "32px", borderRadius: "8px", display: "grid", placeItems: "center" }}>
                 {Icons.mapPin}
               </span>
               <div>

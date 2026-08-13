@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
+import { applyTheme } from "@/app/components/ThemeProvider";
 
 const money = (v) => Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = (v) => v ? new Date(v).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" }) : "-";
@@ -27,14 +28,17 @@ export default function PatientPortalPage() {
   useEffect(() => {
     async function init() {
       try {
+        const tenantId = new URLSearchParams(window.location.search).get("tenantId");
+        const themeUrl = tenantId ? `/api/theme?tenantId=${encodeURIComponent(tenantId)}` : "/api/theme";
         const [portalRes, themeRes] = await Promise.all([
           fetch("/api/patient-portal/me", { cache: "no-store" }).then(r => r.json()),
-          fetch("/api/theme").then(r => r.json()).catch(() => ({}))
+          fetch(themeUrl, { credentials: "include" }).then(r => r.json()).catch(() => ({}))
         ]);
         if (portalRes.error) throw new Error(portalRes.error);
         setData(portalRes);
         if (themeRes.theme) {
           setLabConfig(themeRes.theme);
+          applyTheme(themeRes.theme);
         }
       } catch (e) {
         setError(e.message);
@@ -92,7 +96,7 @@ export default function PatientPortalPage() {
           background: "white",
           color: "#182230",
           boxShadow: isPrint ? "none" : "0 4px 20px rgba(0,0,0,0.08)",
-          border: isPrint ? "none" : "1px solid #cde8e5",
+          border: isPrint ? "none" : "1px solid var(--brand-border)",
           borderRadius: isPrint ? 0 : 12,
           margin: isPrint ? "0" : "20px auto",
           width: "100%",
@@ -105,19 +109,19 @@ export default function PatientPortalPage() {
         <div className="clinical-report-accent" />
         <header className="clinical-letterhead" style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #9ba9b8", paddingBottom: 16 }}>
           <div className="clinical-letterhead-brand" style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span className="clinical-letterhead-logo" style={{ width: 58, height: 58, display: "inline-flex", alignItems: "center", justify: "center", overflow: "hidden", border: "1px solid #cde8e5", borderRadius: 8, background: "#0d9488", color: "#fff" }}>
+            <span className="clinical-letterhead-logo" style={{ width: 58, height: 58, display: "inline-flex", alignItems: "center", justify: "center", overflow: "hidden", border: "1px solid var(--primary-200)", borderRadius: 8, background: "var(--primary)", color: "var(--on-primary, #fff)" }}>
               {labLogo ? <img src={labLogo} alt={labName} style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }} /> : Icons.logo}
             </span>
             <div>
               <strong style={{ display: "block", fontSize: 21, fontWeight: 850 }}>{labName}</strong>
               <span style={{ display: "block", color: "#475569", fontSize: 11.5, fontWeight: 700 }}>Diagnostic Laboratory Services</span>
-              <small style={{ display: "block", color: "#0f766e", fontSize: 9.5, fontWeight: 700 }}>Accurate results · Responsible care</small>
+              <small style={{ display: "block", color: "var(--brand-action, var(--primary-dark))", fontSize: 9.5, fontWeight: 700 }}>Accurate results · Responsible care</small>
             </div>
           </div>
           <div className="clinical-document-title" style={{ textAlign: "right" }}>
             <small style={{ display: "block", color: "#64748b", fontSize: 9.5, fontWeight: 800, textTransform: "uppercase" }}>Confidential medical record</small>
             <h2 style={{ margin: "4px 0 8px", fontSize: 17 }}>{templateLabel}</h2>
-            <span className="clinical-document-status released" style={{ display: "inline-flex", border: "1px solid #99f6e4", background: "#ecfdf5", color: "#047857", padding: "4px 7px", fontSize: 9.5, fontWeight: 850, borderRadius: 4 }}>
+            <span className="clinical-document-status released" style={{ display: "inline-flex", border: "1px solid var(--primary-200)", background: "#ecfdf5", color: "#047857", padding: "4px 7px", fontSize: 9.5, fontWeight: 850, borderRadius: 4 }}>
               Released
             </span>
           </div>
@@ -209,7 +213,7 @@ export default function PatientPortalPage() {
           </div>
         </section>
 
-        <footer className="clinical-report-footer" style={{ borderTop: "2px solid #0d9488", paddingTop: 12, marginTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <footer className="clinical-report-footer" style={{ borderTop: "2px solid var(--primary)", paddingTop: 12, marginTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div><strong style={{ display: "block", fontSize: 13 }}>{labName}</strong><span style={{ fontSize: 11, color: "#64748b" }}>{report.reportId} · Diagnostic Test Report</span></div>
           <p style={{ margin: 0, fontSize: 10, color: "#64748b", flex: "1 1 100%" }}>
             This report relates only to the specimen tested. It is confidential and intended for the patient and authorized healthcare professionals.
@@ -251,7 +255,7 @@ export default function PatientPortalPage() {
         <div style={{ width: "100%", maxWidth: 900 }}>
           <header style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
             <div>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#0d9488", letterSpacing: "0.05em" }}>Patient Self-Service Portal</span>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--brand-action, var(--primary))", letterSpacing: "0.05em" }}>Patient Self-Service Portal</span>
               <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Welcome, {data.patient.name}</h1>
               <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13 }}>
                 Patient ID: <strong>{data.patient.patientId}</strong> · Phone: +91 {data.patient.phone || "N/A"}
@@ -284,7 +288,7 @@ export default function PatientPortalPage() {
                 <h3 style={{ margin: "0 0 12px 0", fontSize: 18 }}>Patient Visit Timeline</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {data.bills.map((bill) => (
-                    <div key={bill._id} style={{ display: "flex", gap: 16, borderLeft: "3px solid #0d9488", paddingLeft: 14, paddingTop: 4, paddingBottom: 4 }}>
+                    <div key={bill._id} style={{ display: "flex", gap: 16, borderLeft: "3px solid var(--primary)", paddingLeft: 14, paddingTop: 4, paddingBottom: 4 }}>
                       <div>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>{date(bill.createdAt)}</span>
                         <h4 style={{ margin: "2px 0", fontSize: 15 }}>Visit Ref: {bill.billId}</h4>
@@ -357,5 +361,5 @@ export default function PatientPortalPage() {
 
 const shell = { minHeight: "100vh", background: "#f8fafc", padding: "16px", display: "flex", justifyContent: "center", fontFamily: "Inter, Arial, sans-serif" };
 const card = { background: "white", borderRadius: 12, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" };
-const primary = { border: 0, borderRadius: 8, background: "#0d9488", color: "white", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" };
+const primary = { border: 0, borderRadius: 8, background: "var(--primary)", color: "var(--on-primary, white)", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" };
 const secondary = { border: "1px solid #cbd5e1", borderRadius: 8, background: "white", padding: "8px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "#334155" };

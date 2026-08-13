@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { buildThemeVariables } from "@/app/components/ThemeProvider";
 
 function tenantFromBrowser(params) {
   const explicit = params.get("tenantId");
@@ -21,6 +22,7 @@ function PatientLogin() {
   const [dob, setDob] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [theme, setTheme] = useState(null);
 
   useEffect(() => {
     const tenant = tenantFromBrowser(params);
@@ -29,6 +31,34 @@ function PatientLogin() {
       setTenantId(tenant);
     }
   }, [params]);
+
+  useEffect(() => {
+    const activeTenantId = tenantId.trim();
+    if (!activeTenantId) {
+      setTheme(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/theme?tenantId=${encodeURIComponent(activeTenantId)}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.theme?.tenantId === activeTenantId.toLowerCase()) setTheme(data.theme);
+      } catch (error) {
+        if (error?.name !== "AbortError") setTheme(null);
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [tenantId]);
 
   // Handle Login
   async function handleLogin(e) {
@@ -67,14 +97,14 @@ function PatientLogin() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%)", padding: "24px 14px", display: "grid", placeItems: "center" }}>
-      <section style={{ width: "100%", maxWidth: 460, background: "white", borderRadius: 24, padding: 32, boxShadow: "0 20px 40px rgba(15,118,110,.12)", border: "1px solid #ccfbf1" }}>
+    <main style={{ ...buildThemeVariables(theme), minHeight: "100vh", background: "linear-gradient(135deg, var(--primary-50) 0%, var(--brand-surface) 100%)", padding: "24px 14px", display: "grid", placeItems: "center" }}>
+      <section style={{ width: "100%", maxWidth: 460, background: "white", borderRadius: 24, padding: 32, boxShadow: "0 20px 40px color-mix(in srgb, var(--primary) 12%, transparent)", border: "1px solid var(--primary-100)" }}>
         
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{ fontSize: 52, marginBottom: 8 }}>🏥</div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: "4px 0" }}>Patient Portal</h1>
-          <p style={{ color: "#0d9488", fontSize: 16, fontWeight: 700, margin: 0 }}>நோயாளி போர்டல்</p>
+          <p style={{ color: "var(--brand-action, var(--primary))", fontSize: 16, fontWeight: 700, margin: 0 }}>நோயாளி போர்டல்</p>
           <small style={{ color: "#64748b", fontSize: 13, display: "block", marginTop: 4 }}>Access your test reports, visit history & billing receipts</small>
         </div>
 
@@ -137,7 +167,7 @@ function PatientLogin() {
         <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #f1f5f9", textAlign: "center", color: "#64748b", fontSize: 13, lineHeight: "1.5" }}>
           🔒 Your Username is your registered Mobile Number and your Password is your Date of Birth.
           <div style={{ marginTop: 12 }}>
-            <a href="/login" style={{ color: "#0d9488", fontWeight: 700, textDecoration: "underline" }}>
+            <a href="/login" style={{ color: "var(--brand-action, var(--primary))", fontWeight: 700, textDecoration: "underline" }}>
               👨‍⚕️ Staff or Doctor? Sign in to Console here
             </a>
           </div>
@@ -149,7 +179,7 @@ function PatientLogin() {
 
 const labelStyle = { fontWeight: 700, fontSize: 15, color: "#334155" };
 const fieldStyle = { width: "100%", boxSizing: "border-box", marginTop: 6, minHeight: 52, border: "2px solid #cbd5e1", borderRadius: 12, padding: "10px 14px", fontSize: 18, outline: "none" };
-const primaryBtnStyle = { minHeight: 56, border: 0, borderRadius: 12, background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)", color: "white", fontSize: 17, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.3)" };
+const primaryBtnStyle = { minHeight: 56, border: 0, borderRadius: 12, background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)", color: "var(--on-primary, white)", fontSize: 17, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent)" };
 
 export default function PatientLoginPage() {
   return (

@@ -24,8 +24,10 @@ test("patient portal loads signature fields on report get", async () => {
 test("patient portal page.js fetches theme and supports high-fidelity printing", async () => {
   const pageSrc = await readFile(new URL("src/app/patient/portal/page.js", root), "utf8");
 
-  // Verify that it fetches /api/theme
-  assert.match(pageSrc, /fetch\("\/api\/theme"\)/);
+  // Verify that it fetches and applies the current tenant's theme.
+  assert.match(pageSrc, /const themeUrl = tenantId/);
+  assert.match(pageSrc, /fetch\(themeUrl/);
+  assert.match(pageSrc, /applyTheme\(themeRes\.theme\)/);
   
   // Verify that it defines print stylesheet override
   assert.match(pageSrc, /@media print/);

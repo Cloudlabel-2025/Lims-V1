@@ -6,7 +6,7 @@ import { formatDate, getInitials } from "@/app/utils/patient-helpers";
 import { canDeleteRecord } from "@/app/lib/deletion-policy";
 
 const PREMIUM_GRADIENTS = [
-  "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)", // Teal
+  "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)", // Teal
   "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)", // Indigo
   "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", // Sky
   "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)", // Violet
@@ -26,7 +26,7 @@ function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatie
         const gradient = getGradientForName(patient.name);
         
         // Define gender badge styling
-        let genderTheme = { bg: "#f0fdfa", color: "#0f766e", icon: "👤" };
+        let genderTheme = { bg: "var(--primary-50)", color: "var(--primary-dark)", icon: "👤" };
         if (patient.gender === "Male") {
           genderTheme = { bg: "#eff6ff", color: "#1d4ed8", icon: "👨" };
         } else if (patient.gender === "Female") {
@@ -50,7 +50,7 @@ function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatie
                 <strong>{patient.name}</strong>
                 <span>{patient.patientId}</span>
               </div>
-              {isSelected && <em style={{ background: "#ccfbf1", color: "#0f766e" }}>Selected</em>}
+              {isSelected && <em style={{ background: "var(--primary-100)", color: "var(--primary-dark)" }}>Selected</em>}
             </header>
 
             <dl>
@@ -140,9 +140,9 @@ function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatie
                       gap: "4px",
                       whiteSpace: "nowrap",
                       fontWeight: "750",
-                      background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)",
+                      background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
                       border: "none",
-                      boxShadow: "0 2px 4px rgba(13, 148, 136, 0.15)",
+                      boxShadow: "0 2px 4px color-mix(in srgb, var(--primary) 15%, transparent)",
                       color: "#fff",
                       cursor: "pointer"
                     }}

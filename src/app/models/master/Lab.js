@@ -167,13 +167,13 @@ export const LabSchema = new mongoose.Schema(
         type: String,
         trim: true,
         match: /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/,
-        default: "#0f766e",
+        default: "#0d9488",
       },
       secondaryColor: {
         type: String,
         trim: true,
         match: /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/,
-        default: "#164e63",
+        default: "#0f766e",
       },
       accentColor: {
         type: String,

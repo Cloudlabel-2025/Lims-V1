@@ -13,7 +13,7 @@ export default function PatientPortalAccessSlipPage() {
   if (!data) return <div className="form-card" style={{ padding: 30 }}>Preparing secure access slip...</div>;
   return <div style={{ maxWidth: 720, margin: "0 auto" }}>
     <div className="no-print" style={{ display: "flex", gap: 10, marginBottom: 16 }}><button className="btn-lims-secondary" onClick={() => router.back()}>Back</button><button className="btn-lims-primary" onClick={() => window.print()}>Print access slip</button></div>
-    <section className="form-card" style={{ padding: 32, textAlign: "center", border: "2px solid #0d9488" }}>
+    <section className="form-card" style={{ padding: 32, textAlign: "center", border: "2px solid var(--primary)" }}>
       <h2 style={{ marginBottom: 4 }}>Patient Portal Access</h2>
       <p style={{ color: "#64748b" }}>Access test reports, visit history, and receipts via Mobile OTP or WhatsApp</p>
       <h3>{data.patient.name}</h3>

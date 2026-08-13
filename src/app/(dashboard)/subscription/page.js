@@ -126,7 +126,7 @@ export default function SubscriptionPage() {
           }
         },
         theme: {
-          color: "#0d9488",
+          color: "var(--primary)",
         },
         modal: {
           ondismiss: function () {
@@ -264,7 +264,7 @@ export default function SubscriptionPage() {
           }
         },
         theme: {
-          color: "#0d9488",
+          color: "var(--primary)",
         },
         modal: {
           ondismiss: function () {
@@ -386,8 +386,8 @@ export default function SubscriptionPage() {
                           style={{
                             fontSize: "11px",
                             padding: "2px 8px",
-                            color: "#0d9488",
-                            borderColor: "#0d9488",
+                            color: "var(--primary)",
+                            borderColor: "var(--primary)",
                             backgroundColor: "transparent",
                             borderRadius: "4px",
                             fontWeight: "500",
@@ -437,7 +437,7 @@ export default function SubscriptionPage() {
                       <td style={{ padding: "12px 12px", fontWeight: "600", color: "var(--text-primary)" }}>
                         {quotaLabels[item.quotaKey] || item.quotaKey}
                       </td>
-                      <td style={{ padding: "12px 12px", color: "#0d9488", fontWeight: "700" }}>
+                      <td style={{ padding: "12px 12px", color: "var(--primary)", fontWeight: "700" }}>
                         {item.quotaKey === "patientRegistrations" ? "+100" : item.quotaKey === "billingRecords" ? "+250" : "+1"}
                       </td>
                       <td style={{ padding: "12px 12px", color: "var(--text-secondary)" }}>
@@ -757,14 +757,14 @@ export default function SubscriptionPage() {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "600" }}>Add-on Pack</span>
-                      <strong style={{ fontSize: "14px", color: "#0d9488" }}>
+                      <strong style={{ fontSize: "14px", color: "var(--primary)" }}>
                         {selectedQuotaKey === "patientRegistrations" ? `+${addonPacks.patientRegistrations.units} Patients` : selectedQuotaKey === "billingRecords" ? `+${addonPacks.billingRecords.units} Bills` : `+${addonPacks.staffUsers.units} Staff User`}
                       </strong>
                     </div>
                     <div style={{ height: "1px", backgroundColor: "var(--border-light)", margin: "4px 0" }} />
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: "14px", color: "var(--text)", fontWeight: "700" }}>Total Cost</span>
-                      <strong style={{ fontSize: "18px", color: "#0d9488", fontWeight: "850" }}>{addonPacks[selectedQuotaKey]?.cost}</strong>
+                      <strong style={{ fontSize: "18px", color: "var(--primary)", fontWeight: "850" }}>{addonPacks[selectedQuotaKey]?.cost}</strong>
                     </div>
                   </div>
                   <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>

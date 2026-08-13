@@ -6,7 +6,7 @@ import { calculateAge } from "@/app/utils/patient-helpers";
 const money = (value) => Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = (value) => value ? new Date(value).toLocaleDateString("en-IN") : "-";
 
-function Card({ label, value, tone = "#0d9488" }) {
+function Card({ label, value, tone = "var(--primary)" }) {
   return (
     <div className="form-card" style={{ padding: 18, borderTop: `3px solid ${tone}` }}>
       <div style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 700 }}>{label}</div>
@@ -237,7 +237,7 @@ export default function DoctorDashboardPage() {
 
       {viewMode === "practice" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 22 }}>
-          <Card label="Registered Patients" value={summary.patientCount || 0} tone="#0d9488" />
+          <Card label="Registered Patients" value={summary.patientCount || 0} tone="var(--primary)" />
           <Card label="Test Requests Sent" value={summary.testRequestCount || 0} tone="#8b5cf6" />
           <Card label="Referred Bills" value={summary.referralCount || 0} tone="#2563eb" />
           <Card label="Released Reports" value={summary.releasedReportCount || 0} tone="#16a34a" />
@@ -259,7 +259,7 @@ export default function DoctorDashboardPage() {
               fontSize: 14,
               cursor: "pointer",
               background: viewMode === "practice" ? "#ffffff" : "transparent",
-              color: viewMode === "practice" ? "#0f766e" : "#64748b",
+              color: viewMode === "practice" ? "var(--primary-dark)" : "#64748b",
               boxShadow: viewMode === "practice" ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
             }}
           >
@@ -276,7 +276,7 @@ export default function DoctorDashboardPage() {
               fontSize: 14,
               cursor: "pointer",
               background: viewMode === "investor" ? "#ffffff" : "transparent",
-              color: viewMode === "investor" ? "#0f766e" : "#64748b",
+              color: viewMode === "investor" ? "var(--primary-dark)" : "#64748b",
               boxShadow: viewMode === "investor" ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
             }}
           >
@@ -572,7 +572,7 @@ export default function DoctorDashboardPage() {
         <section style={{ display: "grid", gap: 20 }}>
           {/* Financial Cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-            <Card label="Total Revenue" value={`₹${money(data.investorData.analytics.totalRevenue)}`} tone="#0d9488" />
+            <Card label="Total Revenue" value={`₹${money(data.investorData.analytics.totalRevenue)}`} tone="var(--primary)" />
             <Card label="Total Expenses" value={`₹${money(data.investorData.analytics.totalExpenses)}`} tone="#dc2626" />
             <Card label="Net Profit" value={`₹${money(data.investorData.analytics.netProfit)}`} tone={data.investorData.analytics.netProfit >= 0 ? "#10b981" : "#ef4444"} />
             <Card label="Profit Margin" value={`${money(data.investorData.analytics.profitMargin)}%`} tone="#8b5cf6" />
@@ -602,14 +602,14 @@ export default function DoctorDashboardPage() {
                     return (
                       <tr key={trend.month}>
                         <td><strong>{trend.month}</strong></td>
-                        <td style={{ color: "#0d9488" }}>₹{money(trend.revenue)}</td>
+                        <td style={{ color: "var(--primary)" }}>₹{money(trend.revenue)}</td>
                         <td style={{ color: "#dc2626" }}>₹{money(trend.expense)}</td>
                         <td style={{ color: trend.netProfit >= 0 ? "#10b981" : "#ef4444", fontWeight: 700 }}>
                           ₹{money(trend.netProfit)}
                         </td>
                         <td>
                           <div style={{ display: "flex", gap: 4, alignItems: "center", width: "100%", height: 16 }}>
-                            <div style={{ height: "100%", width: `${revPct}%`, background: "#0d9488", borderRadius: 4 }} title={`Revenue: ${money(revPct)}%`} />
+                            <div style={{ height: "100%", width: `${revPct}%`, background: "var(--primary)", borderRadius: 4 }} title={`Revenue: ${money(revPct)}%`} />
                             <div style={{ height: "100%", width: `${expPct}%`, background: "#dc2626", borderRadius: 4 }} title={`Expense: ${money(expPct)}%`} />
                           </div>
                         </td>
@@ -660,7 +660,7 @@ export default function DoctorDashboardPage() {
                         <small>{b.patientId} · {b.age} yrs · {b.gender}</small>
                       </td>
                       <td style={{ fontWeight: 700 }}>₹{money(b.totalAmount)}</td>
-                      <td style={{ color: "#0d9488" }}>₹{money(b.totalPaid)}</td>
+                      <td style={{ color: "var(--primary)" }}>₹{money(b.totalPaid)}</td>
                       <td style={{ color: b.balanceDue > 0 ? "#dc2626" : "#166534" }}>₹{money(b.balanceDue)}</td>
                       <td>
                         <span style={{

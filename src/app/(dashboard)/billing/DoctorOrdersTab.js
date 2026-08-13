@@ -15,7 +15,7 @@ const DoctorAvatar = ({ name }) => (
     width: 32,
     height: 32,
     borderRadius: "50%",
-    background: "linear-gradient(135deg, #0f766e, #0d9488)",
+    background: "linear-gradient(135deg, var(--primary-dark), var(--primary))",
     color: "#fff",
     display: "flex",
     alignItems: "center",
@@ -24,7 +24,7 @@ const DoctorAvatar = ({ name }) => (
     fontSize: 11,
     marginRight: 10,
     flexShrink: 0,
-    boxShadow: "0 2px 4px rgba(15, 118, 110, 0.15)"
+    boxShadow: "0 2px 4px color-mix(in srgb, var(--primary-dark) 15%, transparent)"
   }}>
     {getInitials(name)}
   </div>
@@ -313,7 +313,7 @@ export default function DoctorOrdersTab({ onAcceptRequest }) {
                         fontSize: 12, 
                         padding: "8px 14px", 
                         borderRadius: 8, 
-                        background: "linear-gradient(135deg, #0f766e, #0d9488)", 
+                        background: "linear-gradient(135deg, var(--primary-dark), var(--primary))",
                         color: "#ffffff",
                         border: "none",
                         fontWeight: 700,
@@ -321,7 +321,7 @@ export default function DoctorOrdersTab({ onAcceptRequest }) {
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 6,
-                        boxShadow: "0 2px 4px rgba(15, 118, 110, 0.15)",
+                        boxShadow: "0 2px 4px color-mix(in srgb, var(--primary-dark) 15%, transparent)",
                         transition: "all 0.2s"
                       }}
                       onClick={() => onAcceptRequest(req)}

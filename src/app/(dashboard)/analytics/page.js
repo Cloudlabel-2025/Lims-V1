@@ -23,7 +23,7 @@ const statusColors = {
   registered: "#ca8a04", collected: "#7c3aed", processing: "#e11d48",
   completed: "#2563eb", rejected: "#dc2626", archived: "#9333ea",
   paid: "#059669", partial: "#d97706", unpaid: "#dc2626", cancelled: "#6b7280",
-  open: "#0d9488", "in-progress": "#ea580c",
+  open: "var(--primary)", "in-progress": "#ea580c",
   confirmed: "#16a34a", unknown: "#9ca3af",
 };
 

@@ -7,6 +7,7 @@ import { defaultLabModules } from "@/app/lib/modules";
 import { clearTenantConfigCache, getTenantConfig, warmTenantConfigCache } from "@/app/lib/tenant-cache";
 
 import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import { readPatientSession } from "@/app/lib/patient-session";
 
 function debugRequestLog(message, details = {}) {
   if (process.env.NODE_ENV === "production" || process.env.DEBUG_REQUESTS === "false") return;
@@ -38,7 +39,8 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const session = getSessionFromRequest(req);
-    let tenantId = session?.userType === "tenant" ? session.tenantId : null;
+    const patientSession = readPatientSession(req);
+    let tenantId = session?.userType === "tenant" ? session.tenantId : patientSession?.tenantId || null;
     const hostname = getRequestHostname(req);
     const source = tenantId ? "session" : "request";
 
@@ -175,10 +177,10 @@ export async function PATCH(req) {
 
     // 2. Colors Update
     if (body.primaryColor !== undefined) {
-      lab.set("branding.primaryColor", normalizeColor(body.primaryColor, lab.branding?.primaryColor || "#0f766e"));
+      lab.set("branding.primaryColor", normalizeColor(body.primaryColor, lab.branding?.primaryColor || defaultTheme.primaryColor));
     }
     if (body.secondaryColor !== undefined) {
-      lab.set("branding.secondaryColor", normalizeColor(body.secondaryColor, lab.branding?.secondaryColor || "#164e63"));
+      lab.set("branding.secondaryColor", normalizeColor(body.secondaryColor, lab.branding?.secondaryColor || defaultTheme.secondaryColor));
     }
     if (body.accentColor !== undefined) {
       lab.set("branding.accentColor", normalizeColor(body.accentColor, lab.branding?.accentColor || "#f59e0b"));
