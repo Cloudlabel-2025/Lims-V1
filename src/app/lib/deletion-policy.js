@@ -15,15 +15,6 @@ export function isWithinDeleteWindow(record) {
 /**
  * Returns remaining deletion grace window in seconds (0 if expired).
  */
-export function getRemainingDeleteSeconds(record) {
-  if (!record || !record.createdAt) return 0;
-  const createdAtTime = new Date(record.createdAt).getTime();
-  if (isNaN(createdAtTime)) return 0;
-  const elapsedMs = Date.now() - createdAtTime;
-  const remainingMs = DELETE_GRACE_PERIOD_MS - elapsedMs;
-  return Math.max(0, Math.floor(remainingMs / 1000));
-}
-
 /**
  * Checks if the tenant subscription includes any deletion feature entitlement.
  */

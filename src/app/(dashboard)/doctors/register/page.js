@@ -32,7 +32,6 @@ export default function DoctorRegistration() {
   const [status, setStatus] = useState({ type: "", message: "" });
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [pendingPayload, setPendingPayload] = useState(null);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [quotaAddonDetails, setQuotaAddonDetails] = useState(null);
 

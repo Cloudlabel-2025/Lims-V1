@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { nextJsonError } from "@/app/lib/api-response";
+import { cleanString } from "@/app/lib/string-utils";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import connectMasterDB from "@/app/lib/master-db";
 import { seedDefaultInventory } from "@/app/lib/inventory-seeder";
@@ -14,10 +15,6 @@ const connectionOptions = {
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
 };
-
-function cleanString(value) {
-  return String(value || "").trim();
-}
 
 export async function POST(req, context) {
   let tenantConnection = null;

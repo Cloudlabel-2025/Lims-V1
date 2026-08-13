@@ -1,11 +1,10 @@
 import mongoose from "mongoose";
 import { jsonError } from "@/app/lib/api-response";
+import { escapeRegex } from "@/app/lib/string-utils";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
 
 function clean(value) { return String(value || "").trim(); }
-function escapeRegex(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-
 async function requireInventory(req, permission = "inventory.manage") {
   const auth = requireTenantSession(req, permission);
   if (auth.error) return { error: auth.error };

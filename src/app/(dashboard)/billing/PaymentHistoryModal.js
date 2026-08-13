@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
-import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
+import { cachedJsonFetch } from "@/app/lib/use-current-user";
 
 const METHOD_LABEL = { cash: "Cash", card: "Card", upi: "UPI", "corporate-credit": "Corporate", cheque: "Cheque" };
 
@@ -11,7 +11,7 @@ function formatMethod(method) {
   return METHOD_LABEL[method] || method;
 }
 
-function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh, onRevert, canRefundBilling, reverting }) {
+function PaymentHistoryModal({ billId, isOpen, onClose, onRevert, canRefundBilling, reverting }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +32,7 @@ function PaymentHistoryModal({ billId, isOpen, onClose, onRefresh, onRevert, can
             setError(res.data.error || "Failed to load payment history");
           }
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) setError("Failed to load payment history");
       } finally {
         if (!cancelled) setLoading(false);

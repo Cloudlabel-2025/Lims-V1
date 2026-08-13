@@ -8,18 +8,6 @@ const moduleDependencies = {
   analytics: ["dashboard"],
 };
 
-export const SUBSCRIPTION_STATUS = [
-  "trialing",
-  "active",
-  "past_due",
-  "grace_period",
-  "paused",
-  "expired",
-  "cancelled",
-];
-
-export const ENFORCEMENT_MODES = ["off", "shadow", "hard"];
-
 export const QUOTA_KEYS = {
   patientRegistrations: "patientRegistrations",
   billingRecords: "billingRecords",

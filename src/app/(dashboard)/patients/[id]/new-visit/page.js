@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
-import { formatDate, getInitials } from "@/app/utils/patient-helpers";
+import { formatDate } from "@/app/utils/patient-helpers";
 import { cachedJsonFetch, clearCachedApi } from "@/app/lib/use-current-user";
 
 const MultiSelect = dynamic(() => import("@/app/components/MultiSelect"), {

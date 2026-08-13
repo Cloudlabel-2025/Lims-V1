@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { jsonError } from "@/app/lib/api-response";
+import { escapeRegex } from "@/app/lib/string-utils";
 import { writeAuditLog } from "@/app/lib/audit";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
@@ -60,10 +61,6 @@ function validateExpiryDate(value) {
   const maxFuture = new Date(today.getFullYear() + 15, today.getMonth(), today.getDate());
   if (expiry > maxFuture) return "Expiry date is too far in the future";
   return "";
-}
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function expiryState(item) {
@@ -841,7 +838,7 @@ export async function POST(req) {
                 movement.expenseEntryId = expense._id;
                 await movement.save();
               }
-            } catch (_) {}
+            } catch {}
           }
 
           writeAuditLog(req, auth, { action: "create", resourceType: "InventoryMovement", resourceId: movement._id, metadata: { item: item.name, movementType, quantityBase: newBalance } }).catch(() => {});
@@ -930,7 +927,7 @@ export async function POST(req) {
               movement.expenseEntryId = expense._id;
               await movement.save();
             }
-          } catch (_) {}
+          } catch {}
         }
 
         writeAuditLog(req, auth, { action: "create", resourceType: "InventoryMovement", resourceId: movement._id, metadata: { item: item.name, movementType: "adjustment", quantityBase: delta, batchNo: selectedBatch.batchNo } }).catch(() => {});

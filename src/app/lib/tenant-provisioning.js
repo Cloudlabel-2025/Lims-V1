@@ -4,6 +4,7 @@ import { seedSystemChartOfAccounts } from "@/app/lib/accounting";
 import { seedDefaultTests } from "@/app/lib/test-seeder";
 import { seedDefaultInventory } from "@/app/lib/inventory-seeder";
 import { clearTenantConfigCache, warmTenantConfigCache } from "@/app/lib/tenant-cache";
+import { cleanString } from "@/app/lib/string-utils";
 import { defaultLabModules } from "@/app/lib/modules";
 import rbacConfig from "@/app/lib/rbac-config.json";
 import { getDoctorModel } from "@/app/models/tenant/Doctor";
@@ -37,10 +38,6 @@ const connectionOptions = {
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
 };
-
-function cleanString(value) {
-  return String(value || "").trim();
-}
 
 function normalizeDbName(value) {
   return cleanString(value)

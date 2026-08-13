@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 
 function money(value) {
   return Math.max(0, Math.round((Number(value) || 0) * 100) / 100);

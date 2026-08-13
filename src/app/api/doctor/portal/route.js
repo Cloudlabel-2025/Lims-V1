@@ -283,7 +283,7 @@ export async function POST(req) {
 
     // 1. Doctor Registers New Patient
     if (action === "register_patient") {
-      const { name, phone, age, dob, gender, genderIdentity, address, email } = body;
+      const { name, phone, dob, gender, genderIdentity, address, email } = body;
       if (!name || !phone || !dob) {
         return Response.json({ error: "Patient name, phone number, and date of birth are required" }, { status: 400 });
       }

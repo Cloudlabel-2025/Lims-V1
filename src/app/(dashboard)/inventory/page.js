@@ -96,11 +96,6 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function formatDateTime(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
 function isExponential(value) {
   if (value === undefined || value === null) return false;
   return /[eE]/.test(String(value));
@@ -190,8 +185,6 @@ const COMMON_UOMS = [
   { symbol: "vial", name: "Vial", type: "pack", baseSymbol: "each", conversionToBase: 1 },
   { symbol: "ampoule", name: "Ampoule", type: "pack", baseSymbol: "each", conversionToBase: 1 },
 ];
-
-const BASE_UNIT_SYMBOLS = [...new Set(COMMON_UOMS.filter((u) => u.symbol === u.baseSymbol).map((u) => u.symbol))];
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -1674,11 +1667,10 @@ function MasterTable({ headings, rows }) {
   );
 }
 
-function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {}, setErrors, viewMode, onRelease, movements = [], movementPagination = {}, onMovementPageChange, locations = [], setLocations, suppliers = [], inventory = { items: [] }, filters = {}, setFilters, onFilterSearch }) {
+function StockPanel({ form, setForm, item, items, saving, onSubmit, errors = {}, setErrors, viewMode, movements = [], movementPagination = {}, onMovementPageChange, locations = [], setLocations, suppliers = [], inventory = { items: [] }, filters = {}, setFilters, onFilterSearch }) {
   const isAdjustment = form.movementType === "adjustment";
   const isReceipt = form.movementType === "receipt";
   const isPurchase = form.movementType === "purchase";
-  const actionBtnStyle = { width: 30, height: 30, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", border: "none" };
   const baseUomSymbol = item?.baseUom?.symbol || "";
   const availableUoms = useMemo(() => {
     const fromCommon = COMMON_UOMS.filter((u) => u.type === "count" || u.type === "pack");

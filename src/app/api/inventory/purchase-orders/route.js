@@ -11,10 +11,6 @@ function hasUrl(value) {
   return /https?:\/\//.test(value);
 }
 
-function isValidName(value) {
-  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
-}
-
 async function requireInventory(req, permission = "inventory.view") {
   const auth = requireTenantSession(req, permission);
   if (auth.error) return { error: auth.error };

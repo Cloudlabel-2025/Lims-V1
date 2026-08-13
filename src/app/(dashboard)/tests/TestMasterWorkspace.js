@@ -25,8 +25,6 @@ export default function TestMasterWorkspace({
   categories,
   tests,
   packages,
-  inventoryItems,
-  inventoryUoms,
   form,
   packageForm,
   setPackageForm,
@@ -52,9 +50,6 @@ export default function TestMasterWorkspace({
   updateParameter,
   addParameter,
   removeParameter,
-  addRequiredItem,
-  removeRequiredItem,
-  updateRequiredItem,
   saveCategory,
   saveTest,
   savePackage,
@@ -129,7 +124,7 @@ export default function TestMasterWorkspace({
       )}
 
       {activeTab === "tests" && canEditTests && (
-        <TestDefinitionEditor editingId={editingId} form={form} categories={categories} inventoryItems={inventoryItems} inventoryUoms={inventoryUoms} saving={saving} canSave={canSave} updateField={updateField} updateParameter={updateParameter} addParameter={addParameter} removeParameter={removeParameter} addRequiredItem={addRequiredItem} updateRequiredItem={updateRequiredItem} removeRequiredItem={removeRequiredItem} saveTest={saveTest} resetForm={resetForm} />
+        <TestDefinitionEditor editingId={editingId} form={form} categories={categories} saving={saving} canSave={canSave} updateField={updateField} updateParameter={updateParameter} addParameter={addParameter} removeParameter={removeParameter} saveTest={saveTest} resetForm={resetForm} />
       )}
 
       {activeTab === "packages" && (

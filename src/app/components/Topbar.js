@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icons } from "@/app/components/Icons";
-import { availableLabModules } from "@/app/lib/modules";
 import { getAllowedNavItems } from "@/app/lib/client-rbac";
 
 const RECENT_KEY = "lims_recent_searches";

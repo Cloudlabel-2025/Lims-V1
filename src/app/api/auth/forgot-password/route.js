@@ -94,14 +94,12 @@ export async function POST(req) {
     }
 
     let user = null;
-    let resetTenantId = null;
 
     if (userType === "developer") {
       user = await resolveDeveloperUser(email);
     } else {
       const resolved = await resolveUserByEmailAndTenant(email, bodyTenantId);
       user = resolved.user;
-      resetTenantId = resolved.tenantId;
     }
 
     if (!user) {

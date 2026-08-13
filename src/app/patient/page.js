@@ -60,7 +60,7 @@ function PatientLogin() {
       }
 
       router.replace(`/patient/portal?tenantId=${encodeURIComponent(tenantId)}`);
-    } catch (err) {
+    } catch {
       setLoading(false);
       setError("Network error. Please try again.");
     }

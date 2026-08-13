@@ -1,8 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icons } from "@/app/components/Icons";
-import { money, formatDate, inputStyle } from "../_components/helpers";
-import Badge from "../_components/Badge";
+import { money, formatDate } from "../_components/helpers";
 import Table from "../_components/Table";
 import PaginationControls from "../_components/PaginationControls";
 import BackToDashboard from "../_components/BackToDashboard";

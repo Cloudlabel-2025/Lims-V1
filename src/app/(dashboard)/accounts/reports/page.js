@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import { money, formatDate, inputStyle } from "../_components/helpers";
 import StatCard from "../_components/StatCard";
-import Badge from "../_components/Badge";
 import Table from "../_components/Table";
 import Field from "../_components/Field";
 import PaginationControls from "../_components/PaginationControls";

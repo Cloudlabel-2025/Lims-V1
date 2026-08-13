@@ -225,7 +225,6 @@ function DoctorLegend({ data }) {
 }
 
 function InventoryTable({ data }) {
-  const totalVal = data.reduce((s, e) => s + (e.totalValue || 0), 0);
   return (
     <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
       <thead>

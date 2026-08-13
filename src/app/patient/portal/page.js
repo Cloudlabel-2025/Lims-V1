@@ -359,4 +359,3 @@ const shell = { minHeight: "100vh", background: "#f8fafc", padding: "16px", disp
 const card = { background: "white", borderRadius: 12, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" };
 const primary = { border: 0, borderRadius: 8, background: "#0d9488", color: "white", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" };
 const secondary = { border: "1px solid #cbd5e1", borderRadius: 8, background: "white", padding: "8px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "#334155" };
-const cell = { borderBottom: "1px solid #e2e8f0", padding: "10px 8px", textAlign: "left", fontSize: 13 };

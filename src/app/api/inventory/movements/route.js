@@ -1,15 +1,11 @@
-import mongoose from "mongoose";
 import { jsonError } from "@/app/lib/api-response";
+import { escapeRegex } from "@/app/lib/string-utils";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { processExpiredBatches } from "@/app/lib/inventory-expiry";
 
 function clean(value) {
   return String(value || "").trim();
-}
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function requireInventory(req, permission = "inventory.view") {

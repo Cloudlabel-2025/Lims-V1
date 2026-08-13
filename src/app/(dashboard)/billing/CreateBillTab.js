@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import styles from "./Billing.module.css";
+import { formatCurrency } from "./formatters";
 
 const MultiSelect = dynamic(() => import("@/app/components/MultiSelect"), {
   ssr: false,
@@ -12,16 +13,6 @@ const SearchableSelect = dynamic(() => import("@/app/components/SearchableSelect
   ssr: false,
   loading: () => <div className={styles.control}>Loading patients…</div>,
 });
-
-const currency = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 2,
-});
-
-function formatCurrency(value) {
-  return currency.format(Number(value) || 0);
-}
 
 export default function CreateBillTab({
   patients,

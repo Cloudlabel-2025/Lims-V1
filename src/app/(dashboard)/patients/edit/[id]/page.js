@@ -16,7 +16,6 @@ export default function EditPatient({ params }) {
   const minDobStr = minDob.toISOString().split("T")[0];
   
   const [errors, setErrors] = useState({});
-  const [showErrors, setShowErrors] = useState(false);
   const [form, setForm] = useState(null);
   const [hasRefDoctor, setHasRefDoctor] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
@@ -39,7 +38,7 @@ export default function EditPatient({ params }) {
         } else {
           setStatus({ type: "danger", message: data.error || "Failed to load patient data." });
         }
-      } catch (err) {
+      } catch {
         setStatus({ type: "danger", message: "Network error loading patient." });
       } finally {
         setFetching(false);

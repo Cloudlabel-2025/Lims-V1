@@ -1,4 +1,5 @@
 import { nextJsonError } from "@/app/lib/api-response";
+import { cleanString } from "@/app/lib/string-utils";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { requireDeveloperSession } from "@/app/lib/auth";
@@ -18,10 +19,6 @@ const connectionOptions = {
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
 };
-
-function cleanString(value) {
-  return String(value || "").trim();
-}
 
 function legacyPlanForPackage(pkg) {
   const normalized = String(pkg?.name || "").trim().toLowerCase();

@@ -16,6 +16,6 @@ export async function POST(req) {
   }
 }
 
-export async function GET(req) {
+export async function GET() {
   return Response.json({ error: "Deprecated" }, { status: 410 });
 }

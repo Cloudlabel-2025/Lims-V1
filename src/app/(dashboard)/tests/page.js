@@ -33,12 +33,6 @@ const blankParameter = {
   required: true,
 };
 
-const blankRequiredItem = {
-  item: "",
-  quantityPerTest: "",
-  uom: "",
-};
-
 const blankForm = {
   name: "",
   code: "",
@@ -65,8 +59,6 @@ export default function TestsPage() {
   const [categories, setCategories] = useState([]);
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const [inventoryUoms, setInventoryUoms] = useState([]);
   const [form, setForm] = useState(blankForm);
   const [packageForm, setPackageForm] = useState(blankPackageForm);
   const [categoryForm, setCategoryForm] = useState({ name: "", description: "", status: "active" });
@@ -128,16 +120,14 @@ export default function TestsPage() {
     setError("");
     setSuccess("");
     try {
-      const [categoryResponse, testResponse, packageResponse, inventoryResponse] = await Promise.all([
+      const [categoryResponse, testResponse, packageResponse] = await Promise.all([
         cachedJsonFetch("/api/tests/categories", { ttl: 30_000 }),
         cachedJsonFetch("/api/tests/definitions", { ttl: 30_000 }),
         cachedJsonFetch("/api/tests/packages", { ttl: 30_000 }),
-        cachedJsonFetch("/api/inventory?limit=9999", { ttl: 30_000 }),
       ]);
       const categoryData = categoryResponse.data;
       const testData = testResponse.data;
       const packageData = packageResponse.data;
-      const inventoryData = inventoryResponse.data;
 
       if (!categoryResponse.response.ok) throw new Error(categoryData.error || "Unable to load categories");
       if (!testResponse.response.ok) throw new Error(testData.error || "Unable to load tests");
@@ -146,8 +136,6 @@ export default function TestsPage() {
       setCategories(categoryData.categories || []);
       setTests(testData.tests || []);
       setPackages(packageData.packages || []);
-      setInventoryItems(inventoryData.items || []);
-      setInventoryUoms(inventoryData.uoms || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -192,29 +180,6 @@ export default function TestsPage() {
         current.parameters.length === 1
           ? [{ ...blankParameter }]
           : current.parameters.filter((_, parameterIndex) => parameterIndex !== index),
-    }));
-  }
-
-  function addRequiredItem() {
-    setForm((current) => ({
-      ...current,
-      requiredInventoryItems: [...current.requiredInventoryItems, { ...blankRequiredItem }],
-    }));
-  }
-
-  function removeRequiredItem(index) {
-    setForm((current) => ({
-      ...current,
-      requiredInventoryItems: current.requiredInventoryItems.filter((_, i) => i !== index),
-    }));
-  }
-
-  function updateRequiredItem(index, name, value) {
-    setForm((current) => ({
-      ...current,
-      requiredInventoryItems: current.requiredInventoryItems.map((entry, i) =>
-        i === index ? { ...entry, [name]: value } : entry
-      ),
     }));
   }
 
@@ -610,8 +575,6 @@ export default function TestsPage() {
       categories={categories}
       tests={tests}
       packages={packages}
-      inventoryItems={inventoryItems}
-      inventoryUoms={inventoryUoms}
       form={form}
       packageForm={packageForm}
       setPackageForm={setPackageForm}
@@ -637,9 +600,6 @@ export default function TestsPage() {
       updateParameter={updateParameter}
       addParameter={addParameter}
       removeParameter={removeParameter}
-      addRequiredItem={addRequiredItem}
-      removeRequiredItem={removeRequiredItem}
-      updateRequiredItem={updateRequiredItem}
       saveCategory={saveCategory}
       saveTest={saveTest}
       savePackage={savePackage}

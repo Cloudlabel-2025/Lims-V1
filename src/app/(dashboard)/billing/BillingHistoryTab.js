@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Icons } from "@/app/components/Icons";
 import styles from "./Billing.module.css";
+import { formatCurrency } from "./formatters";
 
 const SORT_OPTIONS = [
   { value: "recent", label: "Most recent payment" },
@@ -16,12 +17,6 @@ const SORT_OPTIONS = [
 ];
 
 const METHOD_LABEL = { cash: "Cash", card: "Card", upi: "UPI", "corporate-credit": "Corporate", cheque: "Cheque" };
-const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
-
-function formatCurrency(value) {
-  return currency.format(Number(value) || 0);
-}
-
 function formatMethod(method) {
   if (!method) return "—";
   return METHOD_LABEL[method] || method;

@@ -25,7 +25,6 @@ export default function RoleManager({
   rolesDirty,
   cancelRoleChanges,
   saveRoleConfiguration,
-  importStandardRoles,
 }) {
   const [newRoleError, setNewRoleError] = useState("");
 

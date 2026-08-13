@@ -14,16 +14,8 @@ function numberValue(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function isValidName(value) {
-  return /^[A-Za-z0-9 .&'\/,()@_-]*$/.test(value);
-}
-
 function isValidItemCode(value) {
   return /^[A-Z0-9-]*$/.test(value);
-}
-
-function hasUrl(value) {
-  return /https?:\/\//.test(value);
 }
 
 const fieldMap = {

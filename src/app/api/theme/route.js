@@ -1,4 +1,5 @@
 import { nextJsonError } from "@/app/lib/api-response";
+import { cleanString } from "@/app/lib/string-utils";
 import { NextResponse } from "next/server";
 import { getSessionFromRequest, requireTenantSession } from "@/app/lib/auth";
 import { getHostnameFromHeaders, getTenantIdFromRequest } from "@/app/lib/tenant-resolver";
@@ -106,10 +107,6 @@ export async function GET(req) {
   } catch (error) {
     return nextJsonError("Unable to load theme", error, 500);
   }
-}
-
-function cleanString(value) {
-  return String(value || "").trim();
 }
 
 function normalizeLogo(value, fallbackAltText) {

@@ -1,4 +1,5 @@
 import { jsonError } from "@/app/lib/api-response";
+import { escapeRegex } from "@/app/lib/string-utils";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { createPatientAccessCredential, normalizeDob } from "@/app/lib/patient-portal";
@@ -10,10 +11,6 @@ import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPac
 
 function clean(value) {
   return String(value || "").trim();
-}
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export async function POST(req) {

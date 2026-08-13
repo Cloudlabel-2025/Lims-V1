@@ -1,19 +1,13 @@
 import { jsonError } from "@/app/lib/api-response";
+import { escapeRegex } from "@/app/lib/string-utils";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { formatDoctorValidationErrors, validateDoctorPayload } from "@/app/utils/doctor-validation";
 import { createDoctorInvitation, splitDoctorName } from "@/app/lib/doctor-invitation";
-import { sendDoctorInvitationEmail } from "@/app/lib/reset-email";
-import { buildTenantUrl } from "@/app/lib/subdomain";
-import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { writeAuditLog } from "@/app/lib/audit";
 
 function clean(value) {
   return String(value || "").trim();
-}
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";

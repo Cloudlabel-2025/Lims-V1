@@ -1,4 +1,5 @@
 import { nextJsonError } from "@/app/lib/api-response";
+import { cleanString } from "@/app/lib/string-utils";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectMasterDB from "@/app/lib/master-db";
@@ -28,10 +29,6 @@ function normalizePermissionKeys(permissionKeys, enabledModules) {
   return [...new Set(Array.isArray(permissionKeys) ? permissionKeys : [])].filter((key) =>
     allowedPermissionKeys.has(key)
   );
-}
-
-function cleanString(value) {
-  return String(value || "").trim();
 }
 
 async function getLab(tenantId) {

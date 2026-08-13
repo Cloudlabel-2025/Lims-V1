@@ -49,7 +49,6 @@ export default function DeveloperDashboardPage() {
   const archivedLabs = labs.filter((lab) => lab.status === "archived").length;
   const deletedLabs = labs.filter((lab) => lab.status === "deleted").length;
   const recentLabs = labs.filter((lab) => lab.status === "active").slice(0, 5);
-  const moduleCount = new Set(labs.flatMap((lab) => lab.enabledModules || [])).size;
 
   return (
     <section className="developer-page">

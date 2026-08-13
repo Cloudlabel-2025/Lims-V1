@@ -16,7 +16,7 @@ export function getEnabledModules(theme) {
   return new Set(theme.enabledModules);
 }
 
-export function getAllowedNavItems(user, theme) {
+export function getAllowedNavItems(user) {
   return availableLabModules.filter(
     (module) => hasPermission(user, module.permission)
   );

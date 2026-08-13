@@ -318,25 +318,6 @@ export default function DeveloperCreateLabPage() {
     return Boolean(formErrors[name] && (touchedFields[name] || attemptedSteps.details));
   }
 
-  function toggleModule(moduleId) {
-    setForm((current) => {
-      const selected = new Set(current.enabledModules);
-      if (selected.has(moduleId)) {
-        selected.delete(moduleId);
-      } else {
-        selected.add(moduleId);
-      }
-
-      selected.add("dashboard");
-      return {
-        ...current,
-        enabledModules: availableLabModules
-          .map((module) => module.id)
-          .filter((id) => selected.has(id)),
-      };
-    });
-  }
-
   function selectPackage(pkg) {
     setForm((current) => ({
       ...current,

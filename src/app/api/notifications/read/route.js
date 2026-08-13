@@ -9,7 +9,7 @@ export async function POST(req) {
     if (auth.error) return auth.error;
 
     const body = await req.json();
-    const { notifications, activeTypes } = await buildNotifications(auth.tenantId, auth.session);
+    const { activeTypes } = await buildNotifications(auth.tenantId, auth.session);
 
     const requestedTypes = Array.isArray(body?.types) ? body.types.map((type) => String(type)) : [];
     const targetTypes = body?.all === true

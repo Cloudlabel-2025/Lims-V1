@@ -293,27 +293,6 @@ export default function DeveloperEditLabPage({ params }) {
     setSuccess("");
   }
 
-  function toggleModule(moduleId) {
-    setForm((current) => {
-      const selected = new Set(current.enabledModules);
-      if (selected.has(moduleId)) {
-        selected.delete(moduleId);
-      } else {
-        selected.add(moduleId);
-      }
-
-      selected.add("dashboard");
-
-      return {
-        ...current,
-        enabledModules: availableLabModules
-          .map((module) => module.id)
-          .filter((module) => selected.has(module)),
-      };
-    });
-    setSuccess("");
-  }
-
   function toggleLoginHighlight(highlight) {
     setForm((current) => {
       const selected = new Set(current.loginHighlights);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { nextJsonError } from "@/app/lib/api-response";
+import { cleanString } from "@/app/lib/string-utils";
 import { requireDeveloperSession } from "@/app/lib/auth";
 import connectMasterDB from "@/app/lib/master-db";
 import {
@@ -33,10 +34,6 @@ function serializePackage(pkg, labCount = 0) {
       staffUsers: { units: 1, priceMinor: 20000 },
     },
   };
-}
-
-function cleanString(value) {
-  return String(value || "").trim();
 }
 
 function packageKeyFromName(value) {

@@ -116,7 +116,7 @@ export async function POST(req) {
 
     const values = body.results || {};
 
-    for (const [key, rawValue] of Object.entries(values)) {
+    for (const rawValue of Object.values(values)) {
       const textValue = clean(rawValue);
       if (textValue === "") continue;
       if (isExponentialNotation(textValue)) {

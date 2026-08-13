@@ -113,7 +113,7 @@ export async function PATCH(req, { params }) {
         if (typeof body.results !== "object" || Array.isArray(body.results)) {
           return Response.json({ error: "Results must be an object" }, { status: 400 });
         }
-        for (const [key, rawValue] of Object.entries(body.results)) {
+        for (const rawValue of Object.values(body.results)) {
           const textValue = clean(rawValue);
           if (textValue === "") continue;
           if (isExponentialNotation(textValue)) {

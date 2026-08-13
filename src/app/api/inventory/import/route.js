@@ -35,10 +35,6 @@ function clean(value) {
   return String(value || "").trim();
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 async function requireInventory(req) {
   const auth = requireTenantSession(req, "inventory.manage");
   if (auth.error) return { error: auth.error };
@@ -47,7 +43,7 @@ async function requireInventory(req) {
   return auth;
 }
 
-function validateItemRow(row, headers, index, categoryMap, uomMap) {
+function validateItemRow(row, headers, categoryMap, uomMap) {
   const errors = [];
   const get = (field) => {
     const idx = headers.indexOf(field);
@@ -86,7 +82,7 @@ function validateItemRow(row, headers, index, categoryMap, uomMap) {
   return { errors, itemCode, name, categoryVal, baseUomVal, purchaseUomVal };
 }
 
-function validateCategoryRow(row, headers, index) {
+function validateCategoryRow(row, headers) {
   const errors = [];
   const get = (field) => {
     const idx = headers.indexOf(field);
@@ -108,7 +104,7 @@ function validateCategoryRow(row, headers, index) {
   return { errors, name, code };
 }
 
-function validateUomRow(row, headers, index) {
+function validateUomRow(row, headers) {
   const errors = [];
   const get = (field) => {
     const idx = headers.indexOf(field);
@@ -187,7 +183,7 @@ export async function POST(req) {
       let validCount = 0;
 
       for (let i = 0; i < dataRows.length; i++) {
-        const result = validateItemRow(dataRows[i], headers, i + 2, categoryMap, uomMap);
+        const result = validateItemRow(dataRows[i], headers, categoryMap, uomMap);
         if (result.errors.length) {
           errors.push({ row: i + 2, errors: result.errors });
         } else {
@@ -207,7 +203,7 @@ export async function POST(req) {
       let imported = 0;
       let skipped = 0;
       for (let i = 0; i < dataRows.length; i++) {
-        const result = validateItemRow(dataRows[i], headers, i + 2, categoryMap, uomMap);
+        const result = validateItemRow(dataRows[i], headers, categoryMap, uomMap);
         if (result.errors.length) { skipped++; continue; }
 
         const get = (field) => {
@@ -263,7 +259,7 @@ export async function POST(req) {
       const existingCodes = new Set(existingCats.map((c) => c.code.toLowerCase()));
 
       for (let i = 0; i < dataRows.length; i++) {
-        const result = validateCategoryRow(dataRows[i], headers, i + 2);
+        const result = validateCategoryRow(dataRows[i], headers);
         if (result.errors.length) {
           errors.push({ row: i + 2, errors: result.errors });
         } else if (existingNames.has(result.name.toLowerCase()) || existingCodes.has(result.code.toLowerCase())) {
@@ -282,7 +278,7 @@ export async function POST(req) {
       let imported = 0;
       let skipped = 0;
       for (let i = 0; i < dataRows.length; i++) {
-        const result = validateCategoryRow(dataRows[i], headers, i + 2);
+        const result = validateCategoryRow(dataRows[i], headers);
         if (result.errors.length) { skipped++; continue; }
         try {
           const get = (field) => {
@@ -317,7 +313,7 @@ export async function POST(req) {
       const existingSymbols = new Set(existingUoms.map((u) => u.symbol.toLowerCase()));
 
       for (let i = 0; i < dataRows.length; i++) {
-        const result = validateUomRow(dataRows[i], headers, i + 2);
+        const result = validateUomRow(dataRows[i], headers);
         if (result.errors.length) {
           errors.push({ row: i + 2, errors: result.errors });
         } else if (existingNames.has(result.name.toLowerCase()) || existingSymbols.has(result.symbol.toLowerCase())) {
@@ -336,7 +332,7 @@ export async function POST(req) {
       let imported = 0;
       let skipped = 0;
       for (let i = 0; i < dataRows.length; i++) {
-        const result = validateUomRow(dataRows[i], headers, i + 2);
+        const result = validateUomRow(dataRows[i], headers);
         if (result.errors.length) { skipped++; continue; }
         try {
           await InventoryUom.create({

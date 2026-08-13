@@ -48,7 +48,7 @@ function ExpensesTable({ expenses, onEdit, onDelete }) {
   );
 }
 
-function CategorySelectWithActions({ categories, value, onChange, onCategoriesChange, loadingCategories }) {
+function CategorySelectWithActions({ categories, value, onChange, onCategoriesChange }) {
   const [showInput, setShowInput] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [inputValue, setInputValue] = useState("");
@@ -208,7 +208,6 @@ export default function ExpensesPage() {
   const [creditFilter, setCreditFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [categories, setCategories] = useState([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
 
   async function fetchJson(url, options) {
     const response = await fetch(url, { cache: "no-store", ...options });
@@ -218,7 +217,6 @@ export default function ExpensesPage() {
   }
 
   const loadCategories = useCallback(async () => {
-    setLoadingCategories(true);
     try {
       const data = await fetchJson("/api/expenses/categories");
       const cats = data.categories || [];
@@ -227,8 +225,6 @@ export default function ExpensesPage() {
       }
     } catch (err) {
       console.error("Failed to load categories", err);
-    } finally {
-      setLoadingCategories(false);
     }
   }, []);
 
@@ -360,7 +356,6 @@ export default function ExpensesPage() {
               value={form.category}
               onChange={(v) => setForm({ ...form, category: v })}
               onCategoriesChange={setCategories}
-              loadingCategories={loadingCategories}
             />
             {categories.length === 0 && <small style={{ color: "var(--text-muted)", fontSize: 11 }}>Loading categories...</small>}
           </Field>
