@@ -16,6 +16,8 @@ import { getUserModel } from "@/app/models/tenant/User";
 import { getDoctorModel } from "@/app/models/tenant/Doctor";
 import { checkRateLimit, resetRateLimit, getClientIp } from "@/app/lib/rate-limit";
 
+export const dynamic = "force-dynamic";
+
 function resolveTenantId(req, bodyTenantId) {
   let requestTenantId = null;
   let normalizedBodyTenantId = null;

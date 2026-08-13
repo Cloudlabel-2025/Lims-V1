@@ -65,7 +65,7 @@ export default function LoginPage({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const isTenantLogin = userType === "tenant";
-  const passwordVisible = !isTenantLogin && showPassword;
+  const passwordVisible = showPassword;
   const passwordInputRef = useRef(null);
   usePasswordTypeGuard(passwordInputRef, passwordVisible);
   const [rememberMe, setRememberMe] = useState(false);
@@ -387,17 +387,15 @@ export default function LoginPage({
                     required
                     suppressHydrationWarning
                   />
-                  {!isTenantLogin && (
-                    <button
-                      type="button"
-                      className="login-toggle-pw"
-                      onClick={() => setShowPassword((p) => !p)}
-                      tabIndex={-1}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? Icons.eyeOff : Icons.eye}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="login-toggle-pw"
+                    onClick={() => setShowPassword((p) => !p)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? Icons.eyeOff : Icons.eye}
+                  </button>
                 </div>
               </div>
 

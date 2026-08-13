@@ -16,8 +16,9 @@ test("password fields restore their controlled type after DOM mutations", () => 
   assert.match(guard, /attributeFilter:\s*\["type", "value"\]/);
   assert.match(guard, /input\.setAttribute\("type", expectedType\)/);
   assert.match(guard, /input\.removeAttribute\("value"\)/);
-  assert.match(login, /const passwordVisible = !isTenantLogin && showPassword/);
+  assert.match(login, /const passwordVisible = showPassword/);
   assert.match(login, /usePasswordTypeGuard\(passwordInputRef, passwordVisible\)/);
-  assert.match(login, /\{!isTenantLogin && \(/);
+  assert.doesNotMatch(login, /\{!isTenantLogin && \(/);
+  assert.match(login, /aria-label=\{showPassword \? "Hide password" : "Show password"\}/);
   assert.match(passwordField, /usePasswordTypeGuard\(inputRef, visible\)/);
 });
