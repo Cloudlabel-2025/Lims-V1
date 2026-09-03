@@ -7,7 +7,7 @@ export function hasPatientPortalEntitlement(subscription) {
   const features = subscription.features || subscription.subscriptionFeatures || subscription.entitlements?.features || [];
   const enabledModules = subscription.enabledModules || subscription.entitlements?.enabledModules || [];
   const hasPackageFeature = Array.isArray(features) && features.length > 0 ? features.includes("patient-portal") : true;
-  const isModuleEnabled = !Array.isArray(enabledModules) || enabledModules.length === 0 || enabledModules.includes("patient-portal");
+  const isModuleEnabled = !Array.isArray(enabledModules) || enabledModules.length === 0 || enabledModules.includes("patient-portal") || hasPackageFeature;
   return Boolean(hasPackageFeature && isModuleEnabled);
 }
 
@@ -20,6 +20,6 @@ export function hasDoctorPortalEntitlement(subscription) {
   const features = subscription.features || subscription.subscriptionFeatures || subscription.entitlements?.features || [];
   const enabledModules = subscription.enabledModules || subscription.entitlements?.enabledModules || [];
   const hasPackageFeature = Array.isArray(features) && features.length > 0 ? features.includes("doctor-portal") : true;
-  const isModuleEnabled = !Array.isArray(enabledModules) || enabledModules.length === 0 || enabledModules.includes("doctor-portal");
+  const isModuleEnabled = !Array.isArray(enabledModules) || enabledModules.length === 0 || enabledModules.includes("doctor-portal") || hasPackageFeature;
   return Boolean(hasPackageFeature && isModuleEnabled);
 }

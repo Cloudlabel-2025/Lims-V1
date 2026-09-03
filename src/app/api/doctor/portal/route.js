@@ -13,7 +13,7 @@ import { hasDoctorPortalEntitlement } from "@/app/lib/portal-policy";
 
 export async function GET(req) {
   try {
-    const auth = requireTenantSession(req, "reports.view");
+    const auth = requireTenantSession(req);
     if (auth.error) return auth.error;
 
     const subscription = await getLabSubscriptionEntitlements(auth.tenantId);

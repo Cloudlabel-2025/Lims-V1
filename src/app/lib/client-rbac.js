@@ -30,7 +30,7 @@ export function getFirstAllowedHref(user, theme) {
 export function getRequiredPermissionsForPath(pathname) {
   if (!pathname) return [];
 
-  if (pathname === "/doctor/dashboard" || pathname.startsWith("/doctor/patients/")) return ["reports.view"];
+  if (pathname === "/doctor/dashboard" || pathname.startsWith("/doctor/patients/")) return ["doctor-portal.access", "reports.view"];
 
   if (pathname === "/users" || pathname.startsWith("/users/")) {
     return ["users.manage"];
@@ -47,7 +47,7 @@ export function getRequiredPermissionsForPath(pathname) {
   if (pathname.startsWith("/doctors/register")) return ["doctors.register"];
   if (pathname.startsWith("/doctors/edit")) return ["doctors.edit"];
   if (pathname === "/doctors" || pathname.startsWith("/doctors/")) return ["doctors.view"];
-  if (pathname === "/doctor/profile") return ["doctors.view", "doctors.edit"];
+  if (pathname === "/doctor/profile") return ["doctor-portal.access", "doctors.view", "doctors.edit"];
 
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return ["dashboard.view"];
 
@@ -59,7 +59,10 @@ export function getRequiredPermissionsForPath(pathname) {
 }
 
 export function canAccessPath(user, theme, pathname) {
-  if (pathname?.startsWith("/doctor/") && pathname !== "/doctor/profile" && !user?.doctorId) return false;
+  if (pathname?.startsWith("/doctor/")) {
+    if (!user?.doctorId) return false;
+    return true;
+  }
   const requiredPermissions = getRequiredPermissionsForPath(pathname);
   if (requiredPermissions.length === 0) return true;
 

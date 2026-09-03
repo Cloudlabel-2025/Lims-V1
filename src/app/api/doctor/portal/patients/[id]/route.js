@@ -4,7 +4,7 @@ import { jsonError } from "@/app/lib/api-response";
 
 export async function GET(req, { params }) {
   try {
-    const auth = requireTenantSession(req, "patients.view");
+    const auth = requireTenantSession(req);
     if (auth.error) return auth.error;
     if (!auth.session.doctorId) return Response.json({ error: "Doctor portal account required" }, { status: 403 });
     const { id } = await params;

@@ -5,7 +5,7 @@ import { formatDoctorValidationErrors, validateDoctorPayload } from "@/app/utils
 
 export async function GET(req) {
   try {
-    const auth = requireTenantSession(req, "doctors.view");
+    const auth = requireTenantSession(req);
     if (auth.error) return auth.error;
 
     if (!auth.session.doctorId) {
@@ -28,7 +28,7 @@ export async function GET(req) {
 
 export async function PUT(req) {
   try {
-    const auth = requireTenantSession(req, "doctors.edit");
+    const auth = requireTenantSession(req);
     if (auth.error) return auth.error;
 
     if (!auth.session.doctorId) {

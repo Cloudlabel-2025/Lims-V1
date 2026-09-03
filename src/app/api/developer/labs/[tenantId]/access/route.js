@@ -9,7 +9,7 @@ import { getRoleModel } from "@/app/models/tenant/Role";
 import { clearTenantConfigCache } from "@/app/lib/tenant-cache";
 import { normalizeEnabledModules } from "@/app/lib/modules";
 import rbacConfig from "@/app/lib/rbac-config.json";
-import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import { assignLabSubscription, getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
 
 const labPermissions = rbacConfig.permissions.filter((permission) => permission.scope !== "developer");
 
