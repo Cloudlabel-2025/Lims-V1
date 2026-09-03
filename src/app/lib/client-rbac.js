@@ -18,7 +18,10 @@ export function getEnabledModules(theme) {
 
 export function getAllowedNavItems(user) {
   return availableLabModules.filter(
-    (module) => hasPermission(user, module.permission)
+    (module) =>
+      module.id !== "doctor-portal" &&
+      module.id !== "patient-portal" &&
+      hasPermission(user, module.permission)
   );
 }
 

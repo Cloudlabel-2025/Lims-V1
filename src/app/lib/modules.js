@@ -84,8 +84,6 @@ export const defaultLabModules = [
   "analytics",
   "accounts",
   "inventory",
-  "doctor-portal",
-  "patient-portal",
 ];
 
 export const tenantModuleGroups = [
@@ -98,11 +96,6 @@ export const tenantModuleGroups = [
     id: "finance",
     label: "Finance",
     items: ["billing", "accounts", "inventory", "analytics"],
-  },
-  {
-    id: "portals",
-    label: "Portals",
-    items: ["doctor-portal", "patient-portal"],
   },
 ];
 
