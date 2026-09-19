@@ -8,11 +8,39 @@ import { applyTheme } from "@/app/components/ThemeProvider";
 import { TenantShellProvider } from "@/app/lib/use-current-user";
 import { availableLabModules, defaultLabModules } from "@/app/lib/modules";
 
+const DISABLED_MODULE_PREVIEW_SECONDS = 12;
+const disabledModulePreviewStoragePrefix = "lims.disabled-module-preview.seen";
+
 function isCurrentTenantHost(tenantId) {
   if (typeof window === "undefined" || !tenantId) return false;
 
   const hostname = window.location.hostname.toLowerCase();
   return hostname === `${tenantId}.localhost` || hostname.startsWith(`${tenantId}.`);
+}
+
+function getDisabledModulePreviewKey(tenantId, moduleId) {
+  if (!tenantId || !moduleId) return "";
+  return `${disabledModulePreviewStoragePrefix}:${tenantId}:${moduleId}`;
+}
+
+function hasSeenDisabledModulePreview(storageKey) {
+  if (typeof window === "undefined" || !storageKey) return false;
+
+  try {
+    return window.localStorage.getItem(storageKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markDisabledModulePreviewSeen(storageKey) {
+  if (typeof window === "undefined" || !storageKey) return;
+
+  try {
+    window.localStorage.setItem(storageKey, "1");
+  } catch {
+    // If storage is unavailable, keep the in-memory timer behavior for this visit.
+  }
 }
 
 function buildTenantQueryPath(pathname, tenantId) {
@@ -110,34 +138,46 @@ export default function MainLayout({ children }) {
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(12);
+  const [timeLeft, setTimeLeft] = useState(DISABLED_MODULE_PREVIEW_SECONDS);
   const [isLocked, setIsLocked] = useState(false);
 
-  const isPreviewMode = useMemo(() => {
-    if (loading || !theme) return false;
-    const enabledModules = new Set(theme.enabledModules || defaultLabModules);
-    const currentModule = availableLabModules.find(
-      (m) => m.href !== "/dashboard" && (pathname === m.href || pathname.startsWith(`${m.href}/`))
-    );
-    return currentModule && !enabledModules.has(currentModule.id);
-  }, [loading, theme, pathname]);
+  const currentModule = useMemo(
+    () =>
+      availableLabModules.find(
+        (m) => m.href !== "/dashboard" && (pathname === m.href || pathname.startsWith(`${m.href}/`))
+      ),
+    [pathname]
+  );
 
-  const currentModuleName = useMemo(() => {
-    const currentModule = availableLabModules.find(
-      (m) => m.href !== "/dashboard" && (pathname === m.href || pathname.startsWith(`${m.href}/`))
-    );
-    return currentModule?.label || "this";
-  }, [pathname]);
+  const isPreviewMode = useMemo(() => {
+    if (loading || !theme || !currentModule) return false;
+    const enabledModules = new Set(theme.enabledModules || defaultLabModules);
+    return !enabledModules.has(currentModule.id);
+  }, [currentModule, loading, theme]);
+
+  const previewStorageKey = useMemo(() => {
+    const tenantId = user?.tenantId || theme?.tenantId;
+    return getDisabledModulePreviewKey(tenantId, currentModule?.id);
+  }, [currentModule, theme, user]);
+
+  const currentModuleName = useMemo(() => currentModule?.label || "this", [currentModule]);
 
   useEffect(() => {
     if (!isPreviewMode) {
       setIsLocked(false);
-      setTimeLeft(12);
+      setTimeLeft(DISABLED_MODULE_PREVIEW_SECONDS);
       return;
     }
 
+    if (hasSeenDisabledModulePreview(previewStorageKey)) {
+      setIsLocked(true);
+      setTimeLeft(0);
+      return;
+    }
+
+    markDisabledModulePreviewSeen(previewStorageKey);
     setIsLocked(false);
-    setTimeLeft(12);
+    setTimeLeft(DISABLED_MODULE_PREVIEW_SECONDS);
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -153,7 +193,7 @@ export default function MainLayout({ children }) {
     return () => {
       clearInterval(timer);
     };
-  }, [isPreviewMode, pathname]);
+  }, [isPreviewMode, pathname, previewStorageKey]);
 
   useEffect(() => {
     let cancelled = false;
