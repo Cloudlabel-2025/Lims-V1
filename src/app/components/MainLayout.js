@@ -160,6 +160,11 @@ export default function MainLayout({ children }) {
     return getDisabledModulePreviewKey(tenantId, currentModule?.id);
   }, [currentModule, theme, user]);
 
+  const previewAlreadySeen = useMemo(
+    () => isPreviewMode && hasSeenDisabledModulePreview(previewStorageKey),
+    [isPreviewMode, previewStorageKey]
+  );
+
   const currentModuleName = useMemo(() => currentModule?.label || "this", [currentModule]);
 
   useEffect(() => {
@@ -175,7 +180,6 @@ export default function MainLayout({ children }) {
       return;
     }
 
-    markDisabledModulePreviewSeen(previewStorageKey);
     setIsLocked(false);
     setTimeLeft(DISABLED_MODULE_PREVIEW_SECONDS);
 
@@ -183,6 +187,7 @@ export default function MainLayout({ children }) {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          markDisabledModulePreviewSeen(previewStorageKey);
           setIsLocked(true);
           return 0;
         }
@@ -265,6 +270,7 @@ export default function MainLayout({ children }) {
   if (loading) return <div style={{ minHeight: "100vh", background: "#f1f5f9" }} />;
 
   const hasPageAccess = canAccessPath(user, theme, pathname);
+  const effectiveIsLocked = isPreviewMode && (isLocked || previewAlreadySeen);
 
   return (
     <TenantShellProvider value={shellContext}>
@@ -278,7 +284,7 @@ export default function MainLayout({ children }) {
           user={user}
         />
         <div className="dash-main">
-          {isPreviewMode && !isLocked && (
+          {isPreviewMode && !effectiveIsLocked && (
             <div className="preview-topbar">
               <span>
                 ⚡ <strong>Preview Mode:</strong> You are exploring the <strong>{currentModuleName}</strong> module. 
@@ -298,8 +304,11 @@ export default function MainLayout({ children }) {
             theme={theme}
           />
           <div className="dash-content">
-            <main className="tenant-page-viewport" style={{ position: "relative" }}>
-              <div className={isLocked ? "preview-locked-blur" : ""} style={{ transition: "filter 0.3s ease-in-out" }}>
+            <main
+              className={`tenant-page-viewport${effectiveIsLocked ? " preview-locked-viewport" : ""}`}
+              style={{ position: "relative" }}
+            >
+              <div className={effectiveIsLocked ? "preview-locked-blur" : ""} style={{ transition: "filter 0.3s ease-in-out" }}>
                 {hasPageAccess ? (
                   children
                 ) : (
@@ -312,7 +321,7 @@ export default function MainLayout({ children }) {
                 )}
               </div>
 
-              {isLocked && (
+              {effectiveIsLocked && (
                 <div className="preview-locked-overlay">
                   <div className="preview-locked-card">
                     <div className="preview-locked-icon">🔒</div>
