@@ -1,6 +1,7 @@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { reserveSampleInventory } from "@/app/lib/sample-inventory";
 
 export async function GET(req) {
   try {
@@ -131,33 +132,8 @@ export async function POST(req) {
 
     const { reservedInventory } = body;
     if (reservedInventory && Array.isArray(reservedInventory) && reservedInventory.length > 0) {
-      const { InventoryItem, InventoryUom } = await getTenantModels(auth.tenantId);
-      const reservations = [];
-
-      for (const reqItem of reservedInventory) {
-        const itemId = reqItem.item;
-        const uomId = reqItem.uom;
-        const qty = Number(reqItem.quantity);
-        if (!itemId || !uomId || isNaN(qty) || qty <= 0) continue;
-
-        const [item, uom] = await Promise.all([
-          InventoryItem.findById(itemId),
-          InventoryUom.findById(uomId)
-        ]);
-
-        if (!item || !uom) continue;
-
-        const quantityInBase = qty * (uom.conversionToBase || 1);
-        const available = (item.stockOnHandBase || 0) - (item.reservedBase || 0);
-
-        if (available >= quantityInBase) {
-          await InventoryItem.findOneAndUpdate(
-            { _id: item._id },
-            { $inc: { reservedBase: quantityInBase } }
-          );
-          reservations.push({ item: item._id, quantityBase: quantityInBase, uom: uom._id });
-        }
-      }
+      const { reservations, error } = await reserveSampleInventory(auth.tenantId, reservedInventory);
+      if (error) return Response.json({ error: error.message, details: error.details }, { status: error.status });
 
       if (reservations.length > 0) {
         sample.reservedInventory = reservations;

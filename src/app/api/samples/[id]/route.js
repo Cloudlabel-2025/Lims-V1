@@ -2,6 +2,7 @@ import { jsonError } from "@/app/lib/api-response";
 import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { reserveSampleInventory } from "@/app/lib/sample-inventory";
 
 function clean(value) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -193,32 +194,8 @@ export async function PUT(req, { params }) {
       // Handle inventory consumption submitted from the wizard
       const { reservedInventory: wizardInventory } = body;
       if (wizardInventory && Array.isArray(wizardInventory) && wizardInventory.length > 0 && !sample.reservedInventory?.length) {
-        const { InventoryItem: InvItem, InventoryUom: InvUom } = await getTenantModels(auth.tenantId);
-        const reservations = [];
-
-        for (const reqItem of wizardInventory) {
-          const itemId = reqItem.item;
-          const uomId = reqItem.uom;
-          const qty = Number(reqItem.quantity);
-          if (!itemId || !uomId || isNaN(qty) || qty <= 0) continue;
-
-          const [item, uom] = await Promise.all([
-            InvItem.findById(itemId),
-            InvUom.findById(uomId)
-          ]);
-          if (!item || !uom) continue;
-
-          const quantityInBase = qty * (uom.conversionToBase || 1);
-          const available = (item.stockOnHandBase || 0) - (item.reservedBase || 0);
-
-          if (available >= quantityInBase) {
-            await InvItem.findOneAndUpdate(
-              { _id: item._id },
-              { $inc: { reservedBase: quantityInBase } }
-            );
-            reservations.push({ item: item._id, quantityBase: quantityInBase, uom: uom._id });
-          }
-        }
+        const { reservations, error } = await reserveSampleInventory(auth.tenantId, wizardInventory);
+        if (error) return Response.json({ error: error.message, details: error.details }, { status: error.status });
 
         if (reservations.length > 0) {
           sample.reservedInventory = reservations;

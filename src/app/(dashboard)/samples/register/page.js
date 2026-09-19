@@ -89,6 +89,62 @@ export default function SampleRegistration() {
     setReservedInventory(reservedInventory.filter((_, i) => i !== index));
   };
 
+  const formatStock = (value, symbol = "") => {
+    const amount = Number(value) || 0;
+    const display = Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+    return `${display}${symbol ? ` ${symbol}` : ""}`;
+  };
+
+  const getInventoryRowStatus = (entry) => {
+    const item = inventoryItems.find((inv) => inv._id === entry.item);
+    const uom = uoms.find((unit) => unit._id === entry.uom);
+    if (!item) return null;
+
+    const symbol = item.baseUom?.symbol || uom?.symbol || "";
+    const available = Math.max(0, Number(item.stockOnHandBase || 0) - Number(item.reservedBase || 0));
+    const reorderLevel = Number(item.reorderLevelBase || 0);
+    const requested = Math.max(0, Number(entry.quantity || 0) * (Number(uom?.conversionToBase) || 1));
+    const balanceAfterSample = available - requested;
+
+    if (available <= 0) {
+      return {
+        tone: "danger",
+        blocked: true,
+        message: `${item.name} stock finished. Reorder stock before using this item in samples.`,
+      };
+    }
+
+    if (requested > available) {
+      return {
+        tone: "danger",
+        blocked: true,
+        message: `Only ${formatStock(available, symbol)} available. Reduce quantity or reorder stock.`,
+      };
+    }
+
+    if (requested > 0 && balanceAfterSample <= 0) {
+      return {
+        tone: "warning",
+        blocked: false,
+        message: `This sample will finish the stock. Reorder ${item.name}.`,
+      };
+    }
+
+    if (requested > 0 && balanceAfterSample <= reorderLevel) {
+      return {
+        tone: "warning",
+        blocked: false,
+        message: `Balance after sample: ${formatStock(balanceAfterSample, symbol)}. Reorder level reached.`,
+      };
+    }
+
+    return {
+      tone: "success",
+      blocked: false,
+      message: `Available: ${formatStock(available, symbol)}${requested > 0 ? `, after sample: ${formatStock(balanceAfterSample, symbol)}` : ""}.`,
+    };
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -115,6 +171,14 @@ export default function SampleRegistration() {
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       setError("Please correct the highlighted errors.");
+      return;
+    }
+
+    const blockedInventory = reservedInventory
+      .map((entry) => getInventoryRowStatus(entry))
+      .find((status) => status?.blocked);
+    if (blockedInventory) {
+      setError(blockedInventory.message);
       return;
     }
 
@@ -236,8 +300,10 @@ export default function SampleRegistration() {
           <div className="form-card-body">
             {reservedInventory.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {reservedInventory.map((entry, index) => (
-                  <div key={index} style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+                {reservedInventory.map((entry, index) => {
+                  const stockStatus = getInventoryRowStatus(entry);
+                  return (
+                  <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(220px, 2fr) minmax(110px, 1fr) minmax(130px, 1fr) auto", gap: 12, alignItems: "end" }}>
                     <div style={{ flex: 2, position: "relative" }}>
                       <label className="lims-label" style={{ fontSize: 11 }}>Inventory Item</label>
                       <input
@@ -296,7 +362,8 @@ export default function SampleRegistration() {
                               >
                                 <strong>{item.itemCode}</strong> - {item.name}
                                 <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                                  Stock: {item.stockOnHandBase} {item.baseUom?.symbol}
+                                  Stock: {item.stockOnHandBase} {item.baseUom?.symbol} | Available: {Math.max(0, Number(item.stockOnHandBase || 0) - Number(item.reservedBase || 0))} {item.baseUom?.symbol}
+                                  {Number(item.stockOnHandBase || 0) <= Number(item.reorderLevelBase || 0) ? " | Reorder needed" : ""}
                                 </div>
                               </div>
                             ))
@@ -316,6 +383,19 @@ export default function SampleRegistration() {
                         placeholder="0"
                         required
                       />
+                      {stockStatus && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            color: stockStatus.tone === "danger" ? "#dc2626" : stockStatus.tone === "warning" ? "#b45309" : "#047857",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {stockStatus.message}
+                        </div>
+                      )}
                     </div>
                     <div style={{ flex: 1 }}>
                       <label className="lims-label" style={{ fontSize: 11 }}>Unit of Measure</label>
@@ -344,7 +424,8 @@ export default function SampleRegistration() {
                       Delete
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p style={{ color: "#64748b", margin: 0, fontSize: 13 }}>
