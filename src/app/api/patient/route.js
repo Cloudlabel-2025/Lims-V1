@@ -220,6 +220,7 @@ export async function GET(req) {
     const ageMax = clean(searchParams.get("ageMax"));
     const refDoctorOnly = searchParams.get("refDoctorOnly") === "true";
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
     const statusParam = clean(searchParams.get("status"));
     const includeDeleted = searchParams.get("includeDeleted") === "true";
 
