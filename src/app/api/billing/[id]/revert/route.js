@@ -26,6 +26,9 @@ export async function POST(req, { params }) {
     const { id } = await params;
     const body = await req.json();
     const reason = String(body.reason || "").trim().slice(0, 150);
+    if (!reason) {
+      return Response.json({ error: "Revert reason is required" }, { status: 400 });
+    }
 
     const { connection, BillingRecord, Doctor, JournalEntry, PaymentReceipt, Sample } =
       await getTenantModels(auth.tenantId);

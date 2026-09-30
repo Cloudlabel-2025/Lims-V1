@@ -97,8 +97,9 @@ export default function Topbar({ onToggleSidebar, user, theme }) {
         credentials: "include",
         body: JSON.stringify({ all: true }),
       });
+      setNotifications((current) => current.map((n) => ({ ...n, unread: false })));
+      setUnreadCount(0);
     } catch { /* noop */ }
-    setUnreadCount(0);
   }, []);
 
   useEffect(() => {
@@ -195,19 +196,42 @@ export default function Topbar({ onToggleSidebar, user, theme }) {
         <div className="dash-action-wrap">
           <button className="dash-topbar-btn" id="notification-btn" type="button" aria-label="Notifications"
             aria-expanded={notificationsOpen}
-            onClick={() => { const opening = !notificationsOpen; setNotificationsOpen((o) => !o); setAccountOpen(false); if (opening && unreadCount > 0) markNotificationsRead(); }}
+            onClick={() => { setNotificationsOpen((o) => !o); setAccountOpen(false); }}
           >
             {Icons.bell}
             {unreadCount > 0 && notifications.length > 0 && <span className="dash-notif-dot" />}
           </button>
           {notificationsOpen && (
             <div className="dash-menu-dropdown notifications">
-              <div className="dash-dropdown-header">Notifications{unreadCount > 0 ? ` · ${unreadCount} unread` : ""}</div>
+              <div className="dash-dropdown-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>Notifications{unreadCount > 0 ? ` · ${unreadCount} unread` : ""}</span>
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    className="dash-link-btn"
+                    style={{ fontSize: "11px", background: "none", border: "none", color: "#0284c7", cursor: "pointer", padding: "0 4px", fontWeight: "600" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markNotificationsRead();
+                    }}
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
               {notifications.length > 0 ? (
                 notifications.map((item) => (
                   <button type="button" className="dash-notification-item" key={item.id}
-                    style={item.unread ? undefined : { opacity: 0.7 }}
-                    onClick={() => { if (item.unread) { setUnreadCount((c) => Math.max(0, (c || 0) - 1)); fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ types: [item.id] }) }).catch(() => {}); } setNotificationsOpen(false); router.push(item.href); }}
+                    style={item.unread ? { fontWeight: "600" } : { opacity: 0.7 }}
+                    onClick={() => {
+                      if (item.unread) {
+                        setNotifications((current) => current.map((n) => n.id === item.id ? { ...n, unread: false } : n));
+                        setUnreadCount((c) => Math.max(0, (c || 0) - 1));
+                        fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ types: [item.id] }) }).catch(() => {});
+                      }
+                      setNotificationsOpen(false);
+                      router.push(item.href);
+                    }}
                   >
                     <span className={`dash-priority-dot ${item.priority}`} />
                     <span>

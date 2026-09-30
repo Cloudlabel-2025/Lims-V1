@@ -47,8 +47,13 @@ function PaymentHistoryModal({ billId, isOpen, onClose, onRevert, canRefundBilli
 
   const bill = data?.billSummary;
   const receipts = data?.receipts || [];
-  const totalPaid = receipts.length > 0 ? receipts[0].runningTotal : 0;
-  const remaining = bill?.totalAmount ? Math.max(0, bill.totalAmount - totalPaid) : 0;
+  const isPaid = bill?.billingStatus === "paid";
+  const totalPaid = bill?.totalPaid !== undefined
+    ? bill.totalPaid
+    : (isPaid ? Number(bill?.totalAmount || 0) : receipts.filter((r) => !r.isRefunded).reduce((sum, r) => sum + Number(r.amount || 0), 0));
+  const remaining = isPaid
+    ? 0
+    : (bill?.balanceDue !== undefined ? bill.balanceDue : (bill?.totalAmount ? Math.max(0, Number(bill.totalAmount) - totalPaid) : 0));
   const canRevert =
     canRefundBilling &&
     ["paid", "partial"].includes(bill?.billingStatus) &&

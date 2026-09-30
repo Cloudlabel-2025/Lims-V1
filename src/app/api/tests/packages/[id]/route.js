@@ -14,7 +14,7 @@ export async function GET(req, { params }) {
     const { id } = await params;
     const { TestPackage } = await getTenantModels(auth.tenantId);
     const pkg = await TestPackage.findById(id)
-      .populate("tests", "name code price")
+      .populate("tests", "name code price status")
       .select("packageId name code description price tests status createdAt updatedAt");
 
     if (!pkg) return Response.json({ error: "Package not found" }, { status: 404 });
@@ -61,9 +61,25 @@ export async function PUT(req, { params }) {
 
     if (tests.length === 0) return Response.json({ error: "At least one test must be included" }, { status: 400 });
 
-    const { TestPackage } = await getTenantModels(auth.tenantId);
+    const uniqueTests = [...new Set(tests.map(String))];
+    if (uniqueTests.length !== tests.length) {
+      return Response.json({ error: "Duplicate tests cannot be added to a package" }, { status: 400 });
+    }
+
+    const { TestPackage, TestDefinition } = await getTenantModels(auth.tenantId);
     const existing = await TestPackage.findById(id);
     if (!existing) return Response.json({ error: "Package not found" }, { status: 404 });
+
+    const testRecords = await TestDefinition.find({ _id: { $in: uniqueTests } }).select("_id name status").lean();
+    if (testRecords.length !== uniqueTests.length) {
+      return Response.json({ error: "One or more selected tests do not exist" }, { status: 400 });
+    }
+
+    const inactiveTests = testRecords.filter((t) => t.status === "inactive" || t.status === "Inactive");
+    if (inactiveTests.length > 0) {
+      const names = inactiveTests.map((t) => t.name).join(", ");
+      return Response.json({ error: `Cannot add inactive test(s) to package: ${names}` }, { status: 400 });
+    }
 
     const rawPrice = body.price === "" || body.price === null || body.price === undefined ? undefined : Number(body.price);
     if (rawPrice === undefined || isNaN(rawPrice)) {
@@ -86,12 +102,12 @@ export async function PUT(req, { params }) {
           code: code.toUpperCase() || undefined,
           description: clean(body.description),
           price: nextPrice,
-          tests,
+          tests: uniqueTests,
           status: body.status === "inactive" ? "inactive" : "active",
         },
       },
       { returnDocument: "after", runValidators: true }
-    ).populate("tests", "name code price");
+    ).populate("tests", "name code price status");
 
     if (!pkg) return Response.json({ error: "Package not found" }, { status: 404 });
 

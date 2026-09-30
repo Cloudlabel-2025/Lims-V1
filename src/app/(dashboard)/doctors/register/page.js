@@ -22,6 +22,7 @@ const EMPTY_FORM = {
   genderIdentity: "",
   doctorType: "Non-Investor",
   status: "Active",
+  password: "",
 };
 
 export default function DoctorRegistration() {
@@ -438,6 +439,18 @@ export default function DoctorRegistration() {
                   <option value="On Leave">On Leave</option>
                   <option value="Inactive">Inactive</option>
                 </select>
+              </div>
+              <div className="col-md-4">
+                <label className="lims-label">Portal Password <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: "normal" }}>(Optional - for immediate login)</span></label>
+                <input
+                  name="password"
+                  type="password"
+                  className="lims-input"
+                  placeholder="Set initial portal password"
+                  value={form.password || ""}
+                  onChange={handleChange}
+                  autoComplete="new-password"
+                />
               </div>
             </div>
           </div>

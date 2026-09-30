@@ -56,10 +56,34 @@ export default function ManualPage() {
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
   function updateLine(index, patch) {
-    setForm((current) => ({
-      ...current,
-      lines: current.lines.map((line, i) => (i === index ? { ...line, ...patch } : line)),
-    }));
+    setForm((current) => {
+      const nextLines = current.lines.map((line, i) => {
+        if (i !== index) return line;
+        const updated = { ...line, ...patch };
+        if (patch.debit !== undefined && patch.debit !== "") {
+          updated.credit = "";
+        } else if (patch.credit !== undefined && patch.credit !== "") {
+          updated.debit = "";
+        }
+        return updated;
+      });
+
+      // Convenience: Auto-balance for standard 2-line entries if the opposite line is untouched
+      if (nextLines.length === 2) {
+        const otherIndex = index === 0 ? 1 : 0;
+        const currentLine = nextLines[index];
+        const otherLine = nextLines[otherIndex];
+        if (currentLine.debit && !otherLine.debit && (!otherLine.credit || otherLine.credit === currentLine.debit)) {
+          otherLine.credit = currentLine.debit;
+          otherLine.debit = "";
+        } else if (currentLine.credit && !otherLine.credit && (!otherLine.debit || otherLine.debit === currentLine.credit)) {
+          otherLine.debit = currentLine.credit;
+          otherLine.credit = "";
+        }
+      }
+
+      return { ...current, lines: nextLines };
+    });
   }
 
   function removeLine(index) {
@@ -133,7 +157,22 @@ export default function ManualPage() {
               <div key={index} className="journal-line-grid">
                 <select required className="lims-input" value={line.accountId} onChange={(e) => updateLine(index, { accountId: e.target.value })} style={inputStyle()}>
                   <option value="">Select account</option>
-                  {accounts.map((a) => <option key={a._id} value={a._id}>{a.code} - {a.name}</option>)}
+                  {["asset", "liability", "equity", "revenue", "expense"].map((type) => {
+                    const group = accounts.filter((a) => a.type === type);
+                    if (group.length === 0) return null;
+                    return (
+                      <optgroup key={type} label={type.toUpperCase()}>
+                        {group.map((a) => (
+                          <option key={a._id} value={a._id}>
+                            {a.code} - {a.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                  {accounts.filter((a) => !["asset", "liability", "equity", "revenue", "expense"].includes(a.type)).map((a) => (
+                    <option key={a._id} value={a._id}>{a.code} - {a.name}</option>
+                  ))}
                 </select>
                 <input className="lims-input" type="text" inputMode="numeric" maxLength={7} placeholder="Debit" value={line.debit} onChange={(e) => updateLine(index, { debit: sanitizeAmountInput(e.target.value) })} onBlur={(e) => updateLine(index, { debit: sanitizeAmountInput(e.target.value) })} style={inputStyle()} />
                 <input className="lims-input" type="text" inputMode="numeric" maxLength={7} placeholder="Credit" value={line.credit} onChange={(e) => updateLine(index, { credit: sanitizeAmountInput(e.target.value) })} onBlur={(e) => updateLine(index, { credit: sanitizeAmountInput(e.target.value) })} style={inputStyle()} />

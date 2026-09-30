@@ -30,6 +30,8 @@ const blankParameter = {
   maleMax: "",
   femaleMin: "",
   femaleMax: "",
+  ageMin: "",
+  ageMax: "",
   required: true,
 };
 
@@ -100,7 +102,10 @@ export default function TestsPage() {
     }, 0);
   }, [packageForm.tests, tests]);
   const packageTestOptions = useMemo(
-    () => tests.map((test) => ({ value: test._id, label: test.name, sublabel: test.category?.name || "No Category" })),
+    () =>
+      tests
+        .filter((test) => test.status === "active" || test.status === "Active" || !test.status)
+        .map((test) => ({ value: test._id, label: test.name, sublabel: test.category?.name || "No Category" })),
     [tests]
   );
   const categoryUsageCounts = useMemo(() => {

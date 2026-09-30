@@ -20,7 +20,7 @@ function getGradientForName(name) {
   return PREMIUM_GRADIENTS[code % PREMIUM_GRADIENTS.length];
 }
 
-function PatientSidebar({ patient, onClose }) {
+function PatientSidebar({ patient, onClose, onRestorePatient }) {
   const router = useRouter();
   const { theme } = useTenantShell() || {};
   const allowPatientPortal = hasPatientPortalEntitlement(theme);
@@ -225,6 +225,21 @@ function PatientSidebar({ patient, onClose }) {
         >
           {Icons.plus} New visit
         </button>
+        {patient.isDeleted && onRestorePatient && (
+          <button
+            type="button"
+            className="btn-lims-primary"
+            onClick={() => {
+              if (window.confirm(`Restore patient ${patient.patientId} (${patient.name})?`)) {
+                onRestorePatient(patient._id);
+                onClose();
+              }
+            }}
+            style={{ width: "100%", height: "42px", borderRadius: "10px", fontWeight: "700", background: "#059669", color: "#fff" }}
+          >
+            ↺ Restore Patient Record
+          </button>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
           <button
             type="button"
@@ -234,16 +249,15 @@ function PatientSidebar({ patient, onClose }) {
           >
             {Icons.list} History{Number.isFinite(visitCount) ? ` (${visitCount})` : ""}
           </button>
-          {allowPatientPortal && (
-            <button
-              type="button"
-              className="btn-lims-secondary"
-              onClick={() => router.push(`/patients/${patient._id}/portal-access`)}
-              style={{ height: "38px", borderRadius: "10px", fontWeight: "700", border: "1.5px solid #e2e8f0" }}
-            >
-              {Icons.shield} Portal access
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn-lims-secondary"
+            onClick={() => router.push(`/patients/${patient._id}/portal-access`)}
+            style={{ height: "38px", borderRadius: "10px", fontWeight: "700", border: "1.5px solid #e2e8f0" }}
+            title="Reissue Portal Access Slip (Invalidates old credentials and sessions)"
+          >
+            {Icons.shield} Reissue slip
+          </button>
         </div>
       </footer>
     </div>

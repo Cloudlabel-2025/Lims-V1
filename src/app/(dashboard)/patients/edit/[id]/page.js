@@ -16,6 +16,7 @@ export default function EditPatient({ params }) {
   const minDobStr = minDob.toISOString().split("T")[0];
   
   const [errors, setErrors] = useState({});
+  const [showErrors, setShowErrors] = useState(false);
   const [form, setForm] = useState(null);
   const [hasRefDoctor, setHasRefDoctor] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });

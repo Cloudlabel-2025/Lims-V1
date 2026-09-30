@@ -66,6 +66,8 @@ export async function verifyPassword(password, passwordHash) {
   return crypto.timingSafeEqual(storedBuffer, derivedKey);
 }
 
+export const comparePassword = verifyPassword;
+
 export function hashResetToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }

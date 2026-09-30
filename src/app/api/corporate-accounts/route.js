@@ -27,10 +27,19 @@ function isValidName(value) {
 
 export async function GET(req) {
   try {
-    const auth = requireTenantSession(req, "accounts.view");
+    let auth = requireTenantSession(req, "accounts.view");
+    let modulePerm = "accounts.view";
+    if (auth.error) {
+      auth = requireTenantSession(req, "billing.collect");
+      modulePerm = "billing.create";
+    }
+    if (auth.error) {
+      auth = requireTenantSession(req, "billing.create");
+      modulePerm = "billing.create";
+    }
     if (auth.error) return auth.error;
 
-    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "accounts.view");
+    const moduleAuth = await requireEnabledTenantModule(auth.tenantId, modulePerm);
     if (moduleAuth.error) return moduleAuth.error;
 
     const { searchParams } = new URL(req.url);

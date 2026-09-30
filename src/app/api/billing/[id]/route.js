@@ -48,11 +48,36 @@ export async function PATCH(req, { params }) {
       }
 
       if (body.discountAmount !== undefined) {
-        if (!hasPermission(auth.session, "billing.discount")) {
+        const attemptedDiscount = Number(body.discountAmount) || 0;
+        if (attemptedDiscount > 0 && !hasPermission(auth.session, "billing.discount")) {
+          await writeAuditLog(req, auth, {
+            action: "billing.discount_denied",
+            resourceType: "BillingRecord",
+            resourceId: billingRecord._id,
+            metadata: {
+              attemptedDiscount,
+              reason: "Unauthorized discount: billing.discount permission required",
+              actor: auth.session.email || auth.session.userId,
+            },
+          });
           return Response.json({ error: "No permission to apply discounts" }, { status: 403 });
         }
         const subtotal = billingRecord.subtotalAmount || 0;
-        billingRecord.discountAmount = Math.min(Math.max(0, Number(body.discountAmount) || 0), subtotal);
+        if (attemptedDiscount > subtotal) {
+          await writeAuditLog(req, auth, {
+            action: "billing.excessive_discount_blocked",
+            resourceType: "BillingRecord",
+            resourceId: billingRecord._id,
+            metadata: {
+              attemptedDiscount,
+              subtotal,
+              reason: "Excessive discount: cannot exceed bill subtotal",
+              actor: auth.session.email || auth.session.userId,
+            },
+          });
+          return Response.json({ error: "Discount amount cannot exceed bill subtotal" }, { status: 400 });
+        }
+        billingRecord.discountAmount = Math.max(0, attemptedDiscount);
       }
       if (body.taxAmount !== undefined) {
         const subtotal = billingRecord.subtotalAmount || 0;
@@ -102,12 +127,17 @@ export async function PATCH(req, { params }) {
       return Response.json({ error: "Cannot cancel a paid bill. Issue a refund instead." }, { status: 400 });
     }
 
+    const reason = String(body.reason || "").trim().slice(0, 150);
+    if (!reason) {
+      return Response.json({ error: "Cancellation reason is required" }, { status: 400 });
+    }
+
     billingRecord.billingStatus = "cancelled";
     billingRecord.invoiceStatus = "cancelled";
     billingRecord.status = "cancelled";
     billingRecord.cancelledAt = new Date();
     billingRecord.cancelledBy = auth.session.userId;
-    billingRecord.cancellationReason = body.reason || "";
+    billingRecord.cancellationReason = reason;
     await billingRecord.save();
 
     await writeAuditLog(req, auth, {

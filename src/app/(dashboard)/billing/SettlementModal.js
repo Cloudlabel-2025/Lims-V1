@@ -9,6 +9,7 @@ const paymentMethods = [
   { key: "cash", label: "Cash" },
   { key: "card", label: "Card" },
   { key: "upi", label: "UPI" },
+  { key: "cheque", label: "Cheque" },
   { key: "corporate-credit", label: "Corporate Credit" },
 ];
 
@@ -28,6 +29,40 @@ function SettlementModal({
   const [qrError, setQrError] = useState("");
   const [qrCode, setQrCode] = useState(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [corporateAccounts, setCorporateAccounts] = useState([]);
+  const [loadingCorp, setLoadingCorp] = useState(false);
+  const [corpError, setCorpError] = useState("");
+
+  useEffect(() => {
+    if (payment.method === "corporate-credit") {
+      setLoadingCorp(true);
+      fetch("/api/corporate-accounts", { credentials: "include" })
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to load corporate accounts");
+          return res.json();
+        })
+        .then((data) => {
+          const list = Array.isArray(data) ? data : data?.accounts || [];
+          setCorporateAccounts(list.filter((a) => a.status === "active" || !a.status));
+        })
+        .catch((err) => {
+          setCorpError(err.message || "Failed to load corporate accounts");
+        })
+        .finally(() => setLoadingCorp(false));
+    }
+  }, [payment.method]);
+
+  useEffect(() => {
+    if (payment.method === "corporate-credit" && !payment.corporateAccountId) {
+      const defaultId =
+        billingRecord?.corporateAccount?._id ||
+        billingRecord?.corporateAccount ||
+        (corporateAccounts.length > 0 ? corporateAccounts[0]._id : "");
+      if (defaultId) {
+        onPaymentChange("corporateAccountId", defaultId);
+      }
+    }
+  }, [payment.method, payment.corporateAccountId, billingRecord, corporateAccounts, onPaymentChange]);
 
   useEffect(() => {
     if (upiSubMode === "direct" && theme?.upiId && payment.amount > 0) {
@@ -105,10 +140,20 @@ function SettlementModal({
     Number(billingRecord?.paymentBreakdown?.cash || 0) +
     Number(billingRecord?.paymentBreakdown?.card || 0) +
     Number(billingRecord?.paymentBreakdown?.online || 0) +
+    Number(billingRecord?.paymentBreakdown?.cheque || 0) +
     Number(billingRecord?.paymentBreakdown?.corporate || 0);
   const remainingDue = Math.max(0, netPayable - alreadyPaid);
   const totalPaid = Number(payment.amount);
   const remaining = remainingDue - totalPaid;
+
+  const selectedCorp = corporateAccounts.find((c) => String(c._id) === String(payment.corporateAccountId));
+  const corpCreditLimit = selectedCorp ? Number(selectedCorp.creditLimit || 0) : 0;
+  const corpOutstanding = selectedCorp ? Number(selectedCorp.outstandingBalance || 0) : 0;
+  const corpAvailable = Math.max(0, corpCreditLimit - corpOutstanding);
+  const isCorporateOverLimit =
+    payment.method === "corporate-credit" &&
+    selectedCorp &&
+    corpOutstanding + Number(payment.amount) > corpCreditLimit;
 
   const handleAmountChange = useCallback(
     (e) => {
@@ -389,6 +434,78 @@ function SettlementModal({
                   )}
                 </div>
               )}
+
+              {payment.method === "cheque" && (
+                <div style={{ marginTop: "6px", padding: "12px", border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", background: "var(--surface)" }}>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "4px" }}>
+                    Cheque / Reference Number (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. CHQ-981240"
+                    value={payment.reference || ""}
+                    onChange={(e) => onPaymentChange("reference", e.target.value)}
+                    disabled={closing}
+                    className="lims-input"
+                    style={{ height: "36px", fontSize: "13px" }}
+                  />
+                </div>
+              )}
+
+              {payment.method === "corporate-credit" && (
+                <div style={{ marginTop: "6px", padding: "14px", border: "1.5px dashed var(--border)", borderRadius: "var(--radius-md)", background: "var(--surface)" }}>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                    Corporate Client Account <span style={{ color: "var(--error)" }}>*</span>
+                  </label>
+                  {loadingCorp ? (
+                    <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Loading corporate accounts...</div>
+                  ) : corpError ? (
+                    <div style={{ fontSize: "13px", color: "var(--error)" }}>{corpError}</div>
+                  ) : corporateAccounts.length === 0 ? (
+                    <div style={{ fontSize: "13px", color: "var(--error)" }}>No active corporate accounts found.</div>
+                  ) : (
+                    <>
+                      <select
+                        value={payment.corporateAccountId || ""}
+                        onChange={(e) => onPaymentChange("corporateAccountId", e.target.value)}
+                        disabled={closing}
+                        className="lims-select"
+                        style={{ height: "42px", fontSize: "14px", width: "100%", marginBottom: "10px" }}
+                      >
+                        <option value="">-- Select Corporate Account --</option>
+                        {corporateAccounts.map((corp) => (
+                          <option key={corp._id} value={corp._id}>
+                            {corp.name} ({corp.code || "No code"}) — Avail: ₹{Math.max(0, (corp.creditLimit || 0) - (corp.outstandingBalance || 0)).toLocaleString("en-IN")}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedCorp && (
+                        <div style={{ background: isCorporateOverLimit ? "var(--error-50, #fef2f2)" : "var(--primary-50, #f0f9ff)", border: `1px solid ${isCorporateOverLimit ? "var(--error-200, #fecaca)" : "var(--primary-200, #bae6fd)"}`, borderRadius: "6px", padding: "10px", fontSize: "12px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                            <span>Total Credit Limit:</span>
+                            <strong>₹{corpCreditLimit.toLocaleString("en-IN")}</strong>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                            <span>Current Outstanding:</span>
+                            <strong style={{ color: "var(--warning-700, #b45309)" }}>₹{corpOutstanding.toLocaleString("en-IN")}</strong>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed var(--border)", paddingTop: "4px" }}>
+                            <span>Available Credit:</span>
+                            <strong style={{ color: corpAvailable >= Number(payment.amount) ? "var(--success, #16a34a)" : "var(--error, #dc2626)" }}>
+                              ₹{corpAvailable.toLocaleString("en-IN")}
+                            </strong>
+                          </div>
+                          {isCorporateOverLimit && (
+                            <div style={{ marginTop: "8px", color: "var(--error, #dc2626)", fontWeight: "600" }}>
+                              ⚠️ Payment exceeds available credit limit by ₹{(corpOutstanding + Number(payment.amount) - corpCreditLimit).toLocaleString("en-IN")}. Settlement will be blocked.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div
@@ -470,7 +587,12 @@ function SettlementModal({
             <button
               type="button"
               onClick={onSubmit}
-              disabled={closing || totalPaid <= 0 || totalPaid > remainingDue}
+              disabled={
+                closing ||
+                totalPaid <= 0 ||
+                totalPaid > remainingDue ||
+                (payment.method === "corporate-credit" && (!payment.corporateAccountId || isCorporateOverLimit))
+              }
               className="btn-lims-primary"
               style={{ height: "40px", padding: "0 24px" }}
             >

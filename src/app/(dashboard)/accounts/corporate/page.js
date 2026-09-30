@@ -10,10 +10,10 @@ import BackToDashboard from "../_components/BackToDashboard";
 
 const emptyCorporate = { name: "", contactPerson: "", creditLimit: "", statementCycle: "monthly" };
 
-function CorporateTable({ corporates, onEdit, onDelete }) {
+function CorporateTable({ corporates, onEdit, onDelete, onStatement }) {
   return (
     <Table
-      minWidth={780}
+      minWidth={850}
       headings={["Name", "Contact", "Credit Limit", "Outstanding", "Cycle", "Action"]}
       empty="No corporate accounts found."
       rows={corporates.map((corp) => [
@@ -23,6 +23,7 @@ function CorporateTable({ corporates, onEdit, onDelete }) {
         `Rs ${money(corp.outstandingBalance)}`,
         corp.statementCycle,
         <div key="actions" style={{ display: "flex", gap: 4 }}>
+          <button type="button" className="btn-lims-secondary" onClick={() => onStatement(corp)} style={{ height: 36, padding: "0 10px", fontSize: 12 }}>Statement</button>
           <button type="button" className="btn-lims-secondary" onClick={() => onEdit(corp)} style={{ height: 36, padding: "0 10px", fontSize: 12 }}>{Icons.edit}</button>
           <button type="button" className="btn-icon-delete" onClick={() => onDelete(corp._id, corp.name)}>{Icons.trash}</button>
         </div>,
@@ -45,6 +46,11 @@ export default function CorporatePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cycleFilter, setCycleFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [statementAccount, setStatementAccount] = useState(null);
+  const [statementData, setStatementData] = useState(null);
+  const [statementFrom, setStatementFrom] = useState("");
+  const [statementTo, setStatementTo] = useState("");
+  const [statementLoading, setStatementLoading] = useState(false);
 
   async function fetchJson(url, options) {
     const response = await fetch(url, { cache: "no-store", ...options });
@@ -52,6 +58,24 @@ export default function CorporatePage() {
     if (!response.ok) throw new Error(data.error || "Request failed");
     return data;
   }
+
+  const openStatement = async (corp, from = "", to = "") => {
+    setStatementAccount(corp);
+    setStatementFrom(from);
+    setStatementTo(to);
+    setStatementLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const data = await fetchJson(`/api/corporate-accounts/${corp._id}/statement?${params.toString()}`);
+      setStatementData(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setStatementLoading(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -225,6 +249,7 @@ export default function CorporatePage() {
               })}
               onEdit={(corp) => { setEditForm(corp); setEditingId(corp._id); }}
               onDelete={(id, name) => setDeleteTarget({ _id: id, name })}
+              onStatement={openStatement}
             />
           </>
         )
@@ -288,6 +313,114 @@ export default function CorporatePage() {
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" className="btn-lims-secondary" onClick={() => setDeleteTarget(null)} disabled={saving} style={{ flex: 1, height: 38 }}>Cancel</button>
               <button type="button" className="btn-lims-primary" style={{ flex: 1, height: 38, background: "var(--error, #b91c1c)", borderColor: "var(--error, #b91c1c)" }} disabled={saving} onClick={() => deleteCorporate(deleteTarget._id, deleteTarget.name)}>{saving ? "Deleting..." : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {statementAccount && (
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", zIndex: 1000, padding: 16 }} onClick={() => setStatementAccount(null)}>
+          <div className="form-card" style={{ padding: 24, borderRadius: 12, maxWidth: 900, width: "100%", maxHeight: "90vh", overflowY: "auto", display: "grid", gap: 16 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: 18, color: "var(--text-main)" }}>Corporate Statement: {statementAccount.name}</h4>
+                <small style={{ color: "var(--text-muted)" }}>Credit Limit: Rs {money(statementAccount.creditLimit)} | Outstanding: Rs {money(statementAccount.outstandingBalance)}</small>
+              </div>
+              <button type="button" className="btn-lims-secondary" onClick={() => setStatementAccount(null)} style={{ height: 32, padding: "0 10px" }}>✕ Close</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", background: "#f8fafc", padding: 12, borderRadius: 8 }}>
+              <div style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>From Date:</span>
+                <input type="date" className="lims-input" value={statementFrom} onChange={(e) => setStatementFrom(e.target.value)} style={{ ...inputStyle(), height: 34 }} />
+              </div>
+              <div style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>To Date:</span>
+                <input type="date" className="lims-input" value={statementTo} onChange={(e) => setStatementTo(e.target.value)} style={{ ...inputStyle(), height: 34 }} />
+              </div>
+              <button
+                type="button"
+                className="btn-lims-primary"
+                disabled={statementLoading}
+                onClick={() => openStatement(statementAccount, statementFrom, statementTo)}
+                style={{ height: 34 }}
+              >
+                {statementLoading ? "Loading..." : "Filter Statement"}
+              </button>
+              <button
+                type="button"
+                className="btn-lims-secondary"
+                disabled={statementLoading || !statementData}
+                onClick={() => {
+                  const params = new URLSearchParams({ export: "csv" });
+                  if (statementFrom) params.set("from", statementFrom);
+                  if (statementTo) params.set("to", statementTo);
+                  window.open(`/api/corporate-accounts/${statementAccount._id}/statement?${params.toString()}`);
+                }}
+                style={{ height: 34, marginLeft: "auto" }}
+              >
+                Download Statement CSV
+              </button>
+            </div>
+
+            {statementData?.summary && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                <div style={{ padding: 12, background: "#f1f5f9", borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>OPENING BALANCE</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4 }}>Rs {money(statementData.summary.openingBalance)}</div>
+                </div>
+                <div style={{ padding: 12, background: "#eff6ff", borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: "#2563eb", fontWeight: 700 }}>PERIOD BILLED (+)</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4, color: "#1d4ed8" }}>Rs {money(statementData.summary.periodBilled)}</div>
+                </div>
+                <div style={{ padding: 12, background: "#ecfdf5", borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: "#059669", fontWeight: 700 }}>PERIOD PAID (-)</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4, color: "#047857" }}>Rs {money(statementData.summary.periodPaid)}</div>
+                </div>
+                <div style={{ padding: 12, background: "#fef2f2", borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: "#b91c1c", fontWeight: 700 }}>CLOSING BALANCE</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4, color: "#b91c1c" }}>Rs {money(statementData.summary.closingBalance)}</div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc", textAlign: "left" }}>
+                    <th style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0" }}>Date</th>
+                    <th style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0" }}>Bill ID</th>
+                    <th style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0" }}>Billed</th>
+                    <th style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0" }}>Paid</th>
+                    <th style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0" }}>Balance</th>
+                    <th style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0" }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statementData?.transactions?.length > 0 ? (
+                    statementData.transactions.map((t) => (
+                      <tr key={t.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ padding: "8px 12px" }}>{new Date(t.date).toLocaleDateString("en-IN")}</td>
+                        <td style={{ padding: "8px 12px", fontWeight: 600 }}>{t.billId}</td>
+                        <td style={{ padding: "8px 12px" }}>Rs {money(t.amount)}</td>
+                        <td style={{ padding: "8px 12px", color: "#047857" }}>Rs {money(t.paid)}</td>
+                        <td style={{ padding: "8px 12px", fontWeight: 700 }}>Rs {money(t.balance)}</td>
+                        <td style={{ padding: "8px 12px" }}>
+                          <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: t.status === "paid" ? "#dcfce7" : "#fee2e2", color: t.status === "paid" ? "#166534" : "#991b1b" }}>
+                            {t.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "var(--text-muted)" }}>
+                        {statementLoading ? "Loading statement transactions..." : "No transactions found in this period."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

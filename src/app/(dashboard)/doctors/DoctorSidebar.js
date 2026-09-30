@@ -105,7 +105,7 @@ function DoctorSidebar({
           <div className="vitals-grid-mini" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
             <div className="vital-mini-box">
               <div className="vital-mini-label" style={{ fontSize: "10px", opacity: 1, fontWeight: "600" }}>COMMISSION</div>
-              <div className="vital-mini-value" style={{ fontSize: "15px", fontWeight: "700" }}>{doctor.commission || 0}%</div>
+              <div className="vital-mini-value" style={{ fontSize: "15px", fontWeight: "700" }}>{doctor.commission ?? 0}%</div>
             </div>
             <div className="vital-mini-box" style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)" }}>
               <div className="vital-mini-label" style={{ fontSize: "10px", opacity: 1, fontWeight: "600" }}>PENDING</div>

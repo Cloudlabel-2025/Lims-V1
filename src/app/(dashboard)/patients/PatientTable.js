@@ -18,7 +18,7 @@ function getGradientForName(name) {
   return PREMIUM_GRADIENTS[code % PREMIUM_GRADIENTS.length];
 }
 
-function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPatient, onDeletePatient, onProcessBill, subscription }) {
+function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPatient, onDeletePatient, onRestorePatient, onProcessBill, subscription }) {
   return (
     <div className="patient-directory-table-wrap">
       <table className="patient-directory-table">
@@ -178,6 +178,32 @@ function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPati
                     )}
                     <button
                       type="button"
+                      style={{
+                        height: "32px",
+                        padding: "0 10px",
+                        borderRadius: "8px",
+                        border: "1.5px solid #cbd5e1",
+                        background: "#fff",
+                        color: "#334155",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        whiteSpace: "nowrap"
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.href = `/patients/${patient._id}/portal-access`;
+                      }}
+                      title="Reissue Portal Access Slip (Invalidates old credentials and sessions)"
+                    >
+                      <span>🔑</span>
+                      <span>Reissue Slip</span>
+                    </button>
+                    <button
+                      type="button"
                       className="patient-directory-edit"
                       onClick={(event) => {
                         event.stopPropagation();
@@ -222,6 +248,39 @@ function PatientTable({ patients, selectedPatientId, onSelectPatient, onEditPati
                         }}
                       >
                         {Icons.trash}
+                      </button>
+                    )}
+                    {patient.isDeleted && onRestorePatient && (
+                      <button
+                        type="button"
+                        className="btn-lims-secondary"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (window.confirm(`Restore patient ${patient.patientId} (${patient.name})?`)) {
+                            onRestorePatient(patient._id);
+                          }
+                        }}
+                        aria-label={`Restore ${patient.name}`}
+                        title="Restore patient"
+                        style={{
+                          height: "32px",
+                          minHeight: "32px",
+                          borderRadius: "8px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px",
+                          padding: "0 8px",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          color: "#059669",
+                          borderColor: "#a7f3d0",
+                          background: "#ecfdf5",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <span>↺</span>
+                        <span>Restore</span>
                       </button>
                     )}
                   </div>

@@ -1,23 +1,16 @@
 import { jsonError } from "@/app/lib/api-response";
 import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { reserveSampleInventory } from "@/app/lib/sample-inventory";
+
+import { resolveReferenceRange, getFlag } from "@/app/lib/reference-ranges";
 
 function clean(value) {
   return value === null || value === undefined ? "" : String(value).trim();
 }
 
-function getFlag(parameter, rawValue) {
-  if (rawValue === "" || rawValue === null || rawValue === undefined) return "not-entered";
-  const value = Number(rawValue);
-  if (!Number.isFinite(value)) return "normal";
-  if (Number.isFinite(parameter.normalMin) && value < parameter.normalMin) return "low";
-  if (Number.isFinite(parameter.normalMax) && value > parameter.normalMax) return "high";
-  return "normal";
-}
-
-function buildInvestigationResults(test, rawValues = {}) {
+function buildInvestigationResults(test, rawValues = {}, patient = {}) {
   const missingRequired = [];
   const invalidValues = [];
   const results = test.parameters
@@ -30,16 +23,22 @@ function buildInvestigationResults(test, rawValues = {}) {
       if (parameter.required && textValue === "") missingRequired.push(parameter.name);
       if (textValue !== "" && !Number.isFinite(numericValue)) invalidValues.push(parameter.name);
 
+      const resolved = resolveReferenceRange(parameter, patient);
+
       return {
         key: parameter.key,
         name: parameter.name,
         unit: parameter.unit,
-        normalMin: parameter.normalMin,
-        normalMax: parameter.normalMax,
+        normalMin: Number.isFinite(resolved.min) ? resolved.min : parameter.normalMin,
+        normalMax: Number.isFinite(resolved.max) ? resolved.max : parameter.normalMax,
+        ageMin: parameter.ageMin,
+        ageMax: parameter.ageMax,
+        outOfAgeRange: resolved.outOfAgeRange || false,
+        ageGap: resolved.ageGap || undefined,
         required: parameter.required,
         value: Number.isFinite(numericValue) ? numericValue : undefined,
         textValue,
-        flag: getFlag(parameter, textValue),
+        flag: getFlag(parameter, textValue, patient),
       };
     });
 
@@ -58,8 +57,22 @@ export async function GET(req, { params }) {
     const { Sample } = await getTenantModels(auth.tenantId);
     const sample = await Sample.findById(id)
       .populate("patient", "name patientId age gender phone")
-      .populate("testDefinition")
-      .populate("investigations.testDefinition");
+      .populate({
+        path: "testDefinition",
+        populate: [
+          { path: "requiredInventoryItems.item" },
+          { path: "requiredInventoryItems.uom" },
+        ],
+      })
+      .populate({
+        path: "investigations.testDefinition",
+        populate: [
+          { path: "requiredInventoryItems.item" },
+          { path: "requiredInventoryItems.uom" },
+        ],
+      })
+      .populate("reservedInventory.item")
+      .populate("reservedInventory.uom");
     if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
 
     return Response.json({ sample });
@@ -76,7 +89,9 @@ export async function PUT(req, { params }) {
     const notes = clean(body.notes || "");
 
     const actionPermissionMap = {
+      "collect": "samples.collect",
       "record-results": "samples.update",
+      "start-processing": "samples.update",
     };
 
     const requiredPermission = actionPermissionMap[action] || "samples.update";
@@ -91,7 +106,44 @@ export async function PUT(req, { params }) {
     if (!sample) return Response.json({ error: "Sample not found" }, { status: 404 });
 
     const handledBy = auth.session.email;
-    if (action === "reject") {
+    if (action === "collect") {
+      if (!hasPermission(auth.session, "samples.collect")) {
+        return Response.json(
+          { error: "Permission denied: 'samples.collect' permission is required to collect samples" },
+          { status: 403 }
+        );
+      }
+      if (sample.status !== "registered") {
+        return Response.json({ error: `Cannot collect sample in ${sample.status} status` }, { status: 400 });
+      }
+
+      const collectionDate = body.collectionTime ? new Date(body.collectionTime) : new Date();
+      if (Number.isNaN(collectionDate.getTime())) {
+        return Response.json({ error: "Invalid collection time" }, { status: 400 });
+      }
+      if (collectionDate > new Date()) {
+        return Response.json({ error: "Collection time cannot be in the future" }, { status: 400 });
+      }
+      if (sample.patient?.dob && collectionDate < new Date(sample.patient.dob)) {
+        return Response.json({ error: "Collection time cannot be before date of birth" }, { status: 400 });
+      }
+
+      sample.transitionStatus("collected", handledBy, notes || "Sample collected");
+      sample.collectionTime = collectionDate;
+      if (body.barcode) sample.barcode = String(body.barcode).trim();
+
+      await sample.save();
+
+      await writeAuditLog(req, auth, {
+        action: "samples.collected",
+        resourceType: "Sample",
+        resourceId: sample._id,
+        metadata: { sampleId: sample.sampleId, status: sample.status },
+      });
+
+      await sample.populate("billingRecord", "billId priority status");
+      return Response.json({ sample });
+    } else if (action === "reject") {
       const reason = clean(body.reason || "");
       if (!reason) {
         return Response.json({ error: "Rejection reason is required" }, { status: 400 });
@@ -112,6 +164,107 @@ export async function PUT(req, { params }) {
 
       sample.transitionStatus("rejected", handledBy, reason);
       sample.rejectionReason = reason;
+    } else if (action === "start-processing") {
+      if (sample.status === "registered" && !hasPermission(auth.session, "samples.collect")) {
+        return Response.json(
+          { error: "Permission denied: 'samples.collect' permission is required to collect registered samples" },
+          { status: 403 }
+        );
+      }
+      if (sample.status === "processing") {
+        return Response.json({ sample });
+      }
+      if (!["registered", "collected"].includes(sample.status)) {
+        return Response.json({ error: `Cannot start processing sample in ${sample.status} status` }, { status: 400 });
+      }
+
+      // Handle inventory validation and reservation before sample starts processing
+      const submittedInventory = Array.isArray(body.reservedInventory)
+        ? body.reservedInventory.filter((r) => r.item || r.quantity || r.uom)
+        : [];
+      let inventoryToReserve = submittedInventory;
+
+      if (!inventoryToReserve.length && !sample.reservedInventory?.length) {
+        // Fall back to required inventory items configured on the test definitions
+        const groupedInvestigations = sample.investigations?.length
+          ? sample.investigations
+          : [{ testDefinition: sample.testDefinition }];
+        const testIds = groupedInvestigations
+          .map((inv) => inv.testDefinition?._id || inv.testDefinition)
+          .filter(Boolean);
+        const testDocs = await TestDefinition.find({ _id: { $in: testIds } });
+
+        const autoRequired = [];
+        for (const td of testDocs) {
+          if (Array.isArray(td.requiredInventoryItems)) {
+            for (const ri of td.requiredInventoryItems) {
+              const rItemId = ri.item?._id || ri.item;
+              const rUomId = ri.uom?._id || ri.uom;
+              const rQty = Number(ri.quantityPerTest);
+              if (rItemId && rUomId && rQty > 0) {
+                autoRequired.push({
+                  item: rItemId,
+                  quantity: rQty,
+                  uom: rUomId,
+                });
+              }
+            }
+          }
+        }
+        if (autoRequired.length > 0) {
+          inventoryToReserve = autoRequired;
+        }
+      }
+
+      if (inventoryToReserve.length > 0 && !sample.reservedInventory?.length) {
+        const { reservations, error } = await reserveSampleInventory(auth.tenantId, inventoryToReserve);
+        if (error) {
+          return Response.json({ error: error.message, details: error.details }, { status: error.status });
+        }
+        if (reservations.length > 0) {
+          sample.reservedInventory = reservations;
+        }
+      }
+
+      if (sample.status === "registered") {
+        sample.transitionStatus("collected", handledBy, "Auto-collected on processing start");
+      }
+      sample.transitionStatus("processing", handledBy, notes || "Processing started");
+
+      if (sample.billingRecord) {
+        const billingRecord = await BillingRecord.findById(sample.billingRecord);
+        if (billingRecord) {
+          const sampleItemIds = new Set(
+            (sample.investigations?.length ? sample.investigations : [{ billingItemId: sample.billingItemId }])
+              .map((inv) => String(inv.billingItemId))
+              .filter(Boolean)
+          );
+          for (const item of billingRecord.items) {
+            if (sampleItemIds.has(String(item._id))) {
+              item.status = "processing";
+            }
+          }
+          if (billingRecord.status === "open") {
+            billingRecord.status = "in-progress";
+          }
+          await billingRecord.save();
+        }
+      }
+
+      await sample.save();
+
+      await writeAuditLog(req, auth, {
+        action: "samples.processing_started",
+        resourceType: "Sample",
+        resourceId: sample._id,
+        metadata: { status: sample.status, action },
+      });
+
+      await sample.populate("billingRecord", "billId priority status");
+      await sample.populate("reservedInventory.item");
+      await sample.populate("reservedInventory.uom");
+
+      return Response.json({ sample });
     } else if (action === "record-results") {
       const rawValues = body.results || {};
       const submittedInvestigations = Array.isArray(body.investigationResults)
@@ -147,7 +300,7 @@ export async function PUT(req, { params }) {
         const investigationValues = submittedInvestigation?.values
           || rawValues[investigationKey]
           || (sample.investigations?.length ? {} : rawValues);
-        const built = buildInvestigationResults(activeTest, investigationValues);
+        const built = buildInvestigationResults(activeTest, investigationValues, sample.patient);
         missingRequired.push(...built.missingRequired.map((name) => `${activeTest.name}: ${name}`));
         invalidValues.push(...built.invalidValues.map((name) => `${activeTest.name}: ${name}`));
         completedInvestigations.push({ investigation, test: activeTest, results: built.results });
@@ -160,17 +313,18 @@ export async function PUT(req, { params }) {
         );
       }
 
-      if (sample.investigations?.length) {
-        for (const completed of completedInvestigations) {
-          completed.investigation.results = completed.results;
-          completed.investigation.status = "completed";
-        }
-      }
       if (invalidValues.length > 0) {
         return Response.json(
           { error: `Invalid numeric results: ${invalidValues.join(", ")}` },
           { status: 400 }
         );
+      }
+
+      if (sample.investigations?.length) {
+        for (const completed of completedInvestigations) {
+          completed.investigation.results = completed.results;
+          completed.investigation.status = "completed";
+        }
       }
       sample.results = completedInvestigations.flatMap(({ test: activeTest, results }) =>
         results.map((result) => ({

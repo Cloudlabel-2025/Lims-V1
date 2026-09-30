@@ -71,6 +71,7 @@ export default function BillingPage() {
   const [partialConfirmData, setPartialConfirmData] = useState(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
   const [revertConfirmId, setRevertConfirmId] = useState(null);
   const [revertReason, setRevertReason] = useState("");
@@ -115,8 +116,12 @@ export default function BillingPage() {
   }, [tests, packages, selectedTests]);
   const investigationOptions = useMemo(
     () => [
-      ...packages.map((pkg) => ({ value: `pkg_${pkg._id}`, label: pkg.name, sublabel: `Package · ₹${pkg.price}` })),
-      ...tests.map((test) => ({ value: `test_${test._id}`, label: test.name, sublabel: `${test.category?.name} · ₹${test.price}` })),
+      ...packages
+        .filter((pkg) => (pkg.status === "active" || pkg.status === "Active" || !pkg.status) && !pkg.tests?.some((t) => t.status === "inactive" || t.status === "Inactive"))
+        .map((pkg) => ({ value: `pkg_${pkg._id}`, label: pkg.name, sublabel: `Package · ₹${pkg.price}` })),
+      ...tests
+        .filter((test) => test.status === "active" || test.status === "Active" || !test.status)
+        .map((test) => ({ value: `test_${test._id}`, label: test.name, sublabel: `${test.category?.name || "Test"} · ₹${test.price}` })),
     ],
     [packages, tests]
   );
@@ -136,7 +141,7 @@ export default function BillingPage() {
       const [patientRes, testRes, pkgRes, billingRes] = await Promise.all([
         cachedJsonFetch("/api/patient", { ttl: 15_000, ...opts }),
         cachedJsonFetch("/api/tests/definitions?status=active", { ttl: 30_000, ...opts }),
-        cachedJsonFetch("/api/tests/packages", { ttl: 30_000, ...opts }),
+        cachedJsonFetch("/api/tests/packages?status=active", { ttl: 30_000, ...opts }),
         cachedJsonFetch(`/api/billing?page=${billingPage}&limit=20`, { ttl: 10_000, ...opts }),
       ]);
 
@@ -343,9 +348,13 @@ export default function BillingPage() {
       Number(billingRecord.paymentBreakdown?.cash || 0) +
       Number(billingRecord.paymentBreakdown?.card || 0) +
       Number(billingRecord.paymentBreakdown?.online || 0) +
+      Number(billingRecord.paymentBreakdown?.cheque || 0) +
       Number(billingRecord.paymentBreakdown?.corporate || 0);
-    const remainingAmount = Math.max(0, Number(billingRecord.totalAmount || 0) - paidAmount);
-    setPayment({ amount: remainingAmount, method: "cash" });
+    setPayment({
+      amount: remainingAmount,
+      method: "cash",
+      corporateAccountId: billingRecord.corporateAccount?._id || billingRecord.corporateAccount || "",
+    });
     setShowCloseModal(true);
   };
 
@@ -354,12 +363,15 @@ export default function BillingPage() {
     setError("");
     setSuccess("");
     try {
-      // Convert new format { amount, method } to old format { cash, card, online, corporate }
       const paymentPayload = {
-        cash: payment.method === "cash" ? payment.amount : 0,
-        card: payment.method === "card" ? payment.amount : 0,
-        online: payment.method === "upi" ? payment.amount : 0,
-        corporate: payment.method === "corporate-credit" ? payment.amount : 0,
+        amount: payment.amount,
+        method: payment.method,
+        cash: payment.method === "cash" ? payment.amount : (payment.cash || 0),
+        card: payment.method === "card" ? payment.amount : (payment.card || 0),
+        online: payment.method === "upi" ? payment.amount : (payment.online || 0),
+        cheque: payment.method === "cheque" ? payment.amount : (payment.cheque || 0),
+        corporate: payment.method === "corporate-credit" ? payment.amount : (payment.corporate || 0),
+        modes: payment.modes || undefined,
       };
       const res = await fetch("/api/billing/settle", {
         method: "POST",
@@ -368,6 +380,7 @@ export default function BillingPage() {
         body: JSON.stringify({ 
           billingRecordId: selectedBillingRecord._id,
           payment: paymentPayload,
+          corporateAccountId: payment.corporateAccountId || selectedBillingRecord.corporateAccount,
         })
       });
       const data = await res.json();
@@ -415,6 +428,7 @@ export default function BillingPage() {
       Number(selectedBillingRecord.paymentBreakdown?.cash || 0) +
       Number(selectedBillingRecord.paymentBreakdown?.card || 0) +
       Number(selectedBillingRecord.paymentBreakdown?.online || 0) +
+      Number(selectedBillingRecord.paymentBreakdown?.cheque || 0) +
       Number(selectedBillingRecord.paymentBreakdown?.corporate || 0);
     const remainingAmount = Math.max(0, Number(selectedBillingRecord.totalAmount || 0) - alreadyPaid);
     if (totalPaid > remainingAmount) {
@@ -496,11 +510,17 @@ export default function BillingPage() {
 
   async function cancelBill(billingRecordId) {
     setCancelConfirmId(billingRecordId);
+    setCancelReason("");
     setShowCancelConfirm(true);
   }
 
   async function confirmCancelBill() {
     if (!cancelConfirmId) return;
+    const trimmedReason = (cancelReason || "").trim();
+    if (!trimmedReason) {
+      setError("Cancellation reason is required.");
+      return;
+    }
     setShowCancelConfirm(false);
     setClosing(true);
     setError("");
@@ -510,7 +530,7 @@ export default function BillingPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action: "cancel" }),
+        body: JSON.stringify({ action: "cancel", reason: trimmedReason }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to cancel bill");
@@ -528,6 +548,7 @@ export default function BillingPage() {
     } finally {
       setClosing(false);
       setCancelConfirmId(null);
+      setCancelReason("");
     }
   }
 
@@ -538,6 +559,11 @@ export default function BillingPage() {
 
   async function confirmRevertBill() {
     if (!revertConfirmId) return;
+    const trimmedReason = (revertReason || "").trim();
+    if (!trimmedReason) {
+      setError("Revert reason is required.");
+      return;
+    }
     setShowRevertConfirm(false);
     setClosing(true);
     setError("");
@@ -547,7 +573,7 @@ export default function BillingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ reason: (revertReason || "").trim() }),
+        body: JSON.stringify({ reason: trimmedReason }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to revert bill");
@@ -908,11 +934,11 @@ export default function BillingPage() {
       )}
 
       {showCancelConfirm && (
-        <div className="modal-overlay" onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); }}>
+        <div className="modal-overlay" onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); setCancelReason(""); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "420px", width: "95%", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
             <div style={{ padding: "20px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h4 style={{ margin: 0, fontSize: "18px" }}>Cancel Bill</h4>
-              <button onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); }} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{Icons.close}</button>
+              <button onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); setCancelReason(""); }} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{Icons.close}</button>
             </div>
             <div style={{ padding: "20px" }}>
               <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-md)", padding: "14px", marginBottom: "16px" }}>
@@ -924,14 +950,26 @@ export default function BillingPage() {
                   This action cannot be undone. The bill will be permanently cancelled and all associated records will be voided.
                 </div>
               </div>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Cancellation Reason <span style={{ color: "var(--danger, #dc2626)" }}>*</span></span>
+                <textarea
+                  className="lims-input"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={3}
+                  maxLength={150}
+                  placeholder="Enter reason for cancelling this bill (required)"
+                  required
+                />
+              </label>
             </div>
             <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-              <button className="btn-modal-cancel" onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); }}>Go Back</button>
+              <button className="btn-modal-cancel" onClick={() => { setShowCancelConfirm(false); setCancelConfirmId(null); setCancelReason(""); }}>Go Back</button>
               <button
                 className="btn-modal-confirm"
                 onClick={confirmCancelBill}
-                disabled={closing}
-                style={closing ? { opacity: 0.6, cursor: "not-allowed", background: "var(--danger, #dc2626)" } : { background: "var(--danger, #dc2626)" }}
+                disabled={closing || !cancelReason.trim()}
+                style={closing || !cancelReason.trim() ? { opacity: 0.6, cursor: "not-allowed", background: "var(--danger, #dc2626)" } : { background: "var(--danger, #dc2626)" }}
               >
                 {closing ? "Processing..." : "Yes, Cancel Bill"}
               </button>
@@ -941,11 +979,11 @@ export default function BillingPage() {
       )}
 
       {showRevertConfirm && (
-        <div className="modal-overlay" onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); }}>
+        <div className="modal-overlay" onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); setRevertReason(""); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "460px", width: "95%", padding: 0, overflow: "hidden", animation: "modalSlideUp 0.3s var(--ease-spring)" }}>
             <div style={{ padding: "20px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h4 style={{ margin: 0, fontSize: "18px" }}>Revert Bill</h4>
-              <button onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); }} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{Icons.close}</button>
+              <button onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); setRevertReason(""); }} style={{ width: "32px", height: "32px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{Icons.close}</button>
             </div>
             <div style={{ padding: "20px" }}>
               <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-md)", padding: "14px", marginBottom: "16px" }}>
@@ -958,24 +996,25 @@ export default function BillingPage() {
                 </div>
               </div>
               <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Reason (optional)</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Revert Reason <span style={{ color: "var(--danger, #dc2626)" }}>*</span></span>
                 <textarea
                   className="lims-input"
                   value={revertReason}
                   onChange={(e) => setRevertReason(e.target.value)}
                   rows={3}
                   maxLength={150}
-                  placeholder="Why is this bill being reverted?"
+                  placeholder="Why is this bill being reverted? (required)"
+                  required
                 />
               </label>
             </div>
             <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-              <button className="btn-modal-cancel" onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); }}>Go Back</button>
+              <button className="btn-modal-cancel" onClick={() => { setShowRevertConfirm(false); setRevertConfirmId(null); setRevertReason(""); }}>Go Back</button>
               <button
                 className="btn-modal-confirm"
                 onClick={confirmRevertBill}
-                disabled={closing}
-                style={closing ? { opacity: 0.6, cursor: "not-allowed", background: "var(--danger, #dc2626)" } : { background: "var(--danger, #dc2626)" }}
+                disabled={closing || !revertReason.trim()}
+                style={closing || !revertReason.trim() ? { opacity: 0.6, cursor: "not-allowed", background: "var(--danger, #dc2626)" } : { background: "var(--danger, #dc2626)" }}
               >
                 {closing ? "Processing..." : "Yes, Revert Bill"}
               </button>

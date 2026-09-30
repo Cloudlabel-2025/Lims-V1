@@ -88,6 +88,23 @@ const patientSchema = new mongoose.Schema({
         enum: ["Hand", "Digital"],
         default: "Hand"
     },
+    status: {
+        type: String,
+        enum: ["active", "inactive"],
+        default: "active"
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+    deletedBy: {
+        type: String,
+        default: null
+    },
 }, { timestamps: true });
 
 patientSchema.index({ name: "text", patientId: 1, phone: 1 });

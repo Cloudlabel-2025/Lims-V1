@@ -1,7 +1,7 @@
 import { nextJsonError } from "@/app/lib/api-response";
 import { NextResponse } from "next/server";
 import { requireAnySession } from "@/app/lib/auth";
-import { clearSessionCookie } from "@/app/lib/session";
+import { clearSessionCookie, createSessionToken, setSessionCookie } from "@/app/lib/session";
 import connectMasterDB from "@/app/lib/master-db";
 import { connectTenantDB } from "@/app/lib/tenant-db";
 import { getRoleModel } from "@/app/models/tenant/Role";
@@ -30,15 +30,17 @@ export async function GET(req) {
 
     const { session } = auth;
     let persistedUser = null;
+    let livePermissions = session.permissions || [];
+    let liveRoleName = session.roleName;
 
     if (session.userType === "tenant") {
       const tenantConnection = await connectTenantDB(session.tenantId);
       const Role = getRoleModel(tenantConnection);
-      const roleExists = session.roleId
-        ? await Role.exists({ _id: session.roleId, status: "active" })
+      const activeRole = session.roleId
+        ? await Role.findOne({ _id: session.roleId, status: "active" }).select("permissions name").lean()
         : null;
 
-      if (!roleExists) {
+      if (!activeRole) {
         debugRequestLog("role-missing", {
           tenantId: session.tenantId,
           roleId: session.roleId,
@@ -50,6 +52,9 @@ export async function GET(req) {
         clearSessionCookie(response, req);
         return response;
       }
+
+      livePermissions = activeRole.permissions || [];
+      liveRoleName = activeRole.name || session.roleName;
 
       const User = getUserModel(tenantConnection);
       const currentUser = await User.findById(session.userId)
@@ -119,8 +124,16 @@ export async function GET(req) {
     const lastName = persistedUser?.lastName || null;
     const persistedFullName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
-    return NextResponse.json({
-      session,
+    const permissionsChanged =
+      session.userType === "tenant" &&
+      JSON.stringify(session.permissions || []) !== JSON.stringify(livePermissions);
+
+    const response = NextResponse.json({
+      session: {
+        ...session,
+        permissions: livePermissions,
+        roleName: liveRoleName,
+      },
       user: {
         id: session.userId,
         userType: session.userType,
@@ -131,11 +144,22 @@ export async function GET(req) {
         name: persistedFullName || session.name || null,
         email: session.email,
         roleId: session.roleId || null,
-        roleName: session.roleName || (session.isSystemOwner ? "System Owner" : null),
-        permissions: session.permissions || [],
+        roleName: liveRoleName || (session.isSystemOwner ? "System Owner" : null),
+        permissions: livePermissions,
         doctorId: session.doctorId || null,
       },
     });
+
+    if (permissionsChanged) {
+      const newToken = createSessionToken({
+        ...session,
+        permissions: livePermissions,
+        roleName: liveRoleName,
+      });
+      setSessionCookie(response, newToken, false, req);
+    }
+
+    return response;
   } catch (error) {
     return nextJsonError("Unable to read session", error, 500);
   }

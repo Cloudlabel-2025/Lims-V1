@@ -13,15 +13,28 @@ export async function reserveSampleInventory(tenantId, reservedInventory = []) {
 
   const { InventoryItem, InventoryUom } = await getTenantModels(tenantId);
   const reservations = [];
+  const itemsToReserve = [];
 
   for (const reqItem of reservedInventory) {
-    const itemId = reqItem.item;
-    const uomId = reqItem.uom;
-    const qty = Number(reqItem.quantity);
-    if (!itemId || !uomId || !Number.isFinite(qty) || qty <= 0) continue;
+    const itemId = reqItem.item?._id || reqItem.item;
+    const uomId = reqItem.uom?._id || reqItem.uom;
+    const qty = Number(reqItem.quantity ?? reqItem.quantityBase);
+
+    if (!itemId && !uomId && (reqItem.quantity === undefined || reqItem.quantity === "")) {
+      continue;
+    }
+
+    if (!itemId || !uomId || !Number.isFinite(qty) || qty <= 0) {
+      return {
+        error: {
+          message: "A valid positive quantity and unit of measure are required for all selected inventory items.",
+          status: 400,
+        },
+      };
+    }
 
     const [item, uom] = await Promise.all([
-      InventoryItem.findById(itemId),
+      InventoryItem.findById(itemId).populate("baseUom"),
       InventoryUom.findById(uomId),
     ]);
 
@@ -61,6 +74,10 @@ export async function reserveSampleInventory(tenantId, reservedInventory = []) {
       };
     }
 
+    itemsToReserve.push({ item, quantityInBase, uom });
+  }
+
+  for (const { item, quantityInBase, uom } of itemsToReserve) {
     await InventoryItem.findOneAndUpdate(
       { _id: item._id },
       { $inc: { reservedBase: quantityInBase } }

@@ -32,10 +32,6 @@ export async function POST(req, { params }) {
     let user = await User.findOne({ doctorId: doctor._id })
       .select("userId email status +passwordResetTokenHash +passwordResetExpiresAt");
 
-    if (user && user.status === "active") {
-      return Response.json({ error: "This portal account is already active" }, { status: 409 });
-    }
-
     const { getLabSubscriptionEntitlements } = await import("@/app/lib/subscription-service");
     const subscription = await getLabSubscriptionEntitlements(auth.tenantId);
     const limit = subscription.entitlements?.quotas?.staffUsers ?? null;
@@ -102,10 +98,6 @@ export async function POST(req, { params }) {
       if (doctor.email && user.email !== doctor.email) {
         user.email = doctor.email;
       }
-
-      if (user.status === "active") {
-        return Response.json({ error: "This portal account is already active" }, { status: 409 });
-      }
     }
 
     if (doctor.status !== "Active") {
@@ -115,7 +107,9 @@ export async function POST(req, { params }) {
     console.log("[resend-invitation] Step 8: Creating invitation OTP...");
     user.passwordResetTokenHash = invitation.otpHash;
     user.passwordResetExpiresAt = invitation.expiresAt;
-    user.status = "invited";
+    if (user.status !== "active") {
+      user.status = "invited";
+    }
 
     console.log("[resend-invitation] Step 9: Saving user...");
     await user.save();

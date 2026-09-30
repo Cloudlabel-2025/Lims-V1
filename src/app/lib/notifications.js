@@ -4,16 +4,37 @@ import { ensureQuotaPeriod, serializeQuotaPeriod } from "@/app/lib/quota-meter";
 import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
 
 export async function buildNotifications(tenantId, session) {
-  const { connection, Doctor, InventoryItem, QuotaPeriod, Sample, TestRequest, User } = await getTenantModels(tenantId);
+  const { connection, Doctor, InventoryItem, QuotaPeriod, Sample, TestReport, TestRequest, User, NotificationPreference } = await getTenantModels(tenantId);
   const canViewDoctors = hasPermission(session, "doctors.view");
   const canViewInventory = hasPermission(session, "inventory.view");
   const canViewSamples = hasPermission(session, "samples.view");
   const canManageSettings = hasPermission(session, "settings.manage");
+  const canViewReports = hasPermission(session, "reports.view") || hasPermission(session, "reports.release");
+
+  let enabledCategories = {
+    reports: true,
+    inventory: true,
+    samples: true,
+    doctors: true,
+    billing: true,
+    subscription: true,
+  };
+
+  if (NotificationPreference) {
+    const prefDoc = await NotificationPreference.findOne({
+      tenantId,
+      $or: [{ userId: session?.userId }, { userId: null }],
+    }).sort({ userId: -1 }).lean();
+
+    if (prefDoc?.categories) {
+      enabledCategories = { ...enabledCategories, ...prefDoc.categories };
+    }
+  }
 
   const notifications = [];
   const activeTypes = [];
 
-  if (canManageSettings) {
+  if (canManageSettings && enabledCategories.subscription !== false) {
     const subscription = await getLabSubscriptionEntitlements(tenantId);
     let quotaPeriod = await ensureQuotaPeriod(connection, tenantId, subscription);
     const activeStaffUsers = await User.countDocuments({ status: "active" });
@@ -34,6 +55,7 @@ export async function buildNotifications(tenantId, session) {
       activeTypes.push(id);
       notifications.push({
         id,
+        category: "subscription",
         title: "Subscription needs attention",
         detail: `${subscription.packageName} is ${String(subscription.status).replace("_", " ")}. Review the subscription to avoid service interruption.`,
         href: "/subscription",
@@ -49,6 +71,7 @@ export async function buildNotifications(tenantId, session) {
       activeTypes.push(id);
       notifications.push({
         id,
+        category: "subscription",
         title: "Subscription period ending soon",
         detail: `${subscription.packageName} renews or resets in ${daysUntilPeriodEnd === 0 ? "less than one day" : `${daysUntilPeriodEnd} day(s)`}.`,
         href: "/subscription",
@@ -61,6 +84,7 @@ export async function buildNotifications(tenantId, session) {
       activeTypes.push(id);
       notifications.push({
         id,
+        category: "subscription",
         title: `${subscription.packageName} package assigned`,
         detail: "Review your included modules and monthly usage allowances.",
         href: "/subscription",
@@ -76,6 +100,7 @@ export async function buildNotifications(tenantId, session) {
       activeTypes.push(id);
       notifications.push({
         id,
+        category: "subscription",
         title: atLimit ? `${label} allowance reached` : `${label} usage is high`,
         detail: `${quota.consumed} of ${quota.effectiveLimit} used this period${atLimit ? ". Contact support to upgrade or add capacity." : `; ${quota.remaining} remaining.`}`,
         href: "/subscription",
@@ -84,7 +109,7 @@ export async function buildNotifications(tenantId, session) {
     });
   }
 
-  if (canViewDoctors) {
+  if (canViewDoctors && enabledCategories.doctors !== false) {
     const unavailableDoctors = await Doctor.countDocuments({
       status: { $in: ["Inactive", "On Leave"] },
     });
@@ -92,6 +117,7 @@ export async function buildNotifications(tenantId, session) {
       activeTypes.push("doctor-availability");
       notifications.push({
         id: "doctor-availability",
+        category: "doctors",
         title: "Doctor availability needs review",
         detail: `${unavailableDoctors} doctor(s) are inactive or marked on leave.`,
         href: "/doctors",
@@ -100,7 +126,7 @@ export async function buildNotifications(tenantId, session) {
     }
   }
 
-  if (canViewInventory) {
+  if (canViewInventory && enabledCategories.inventory !== false) {
     const lowStockItems = await InventoryItem.countDocuments({
       status: "active",
       $expr: { $lte: ["$stockOnHandBase", "$reorderLevelBase"] },
@@ -109,6 +135,7 @@ export async function buildNotifications(tenantId, session) {
       activeTypes.push("inventory-low-stock");
       notifications.push({
         id: "inventory-low-stock",
+        category: "inventory",
         title: "Inventory items below reorder level",
         detail: `${lowStockItems} item(s) need restocking.`,
         href: "/inventory",
@@ -117,7 +144,7 @@ export async function buildNotifications(tenantId, session) {
     }
   }
 
-  if (canViewSamples) {
+  if (canViewSamples && enabledCategories.samples !== false) {
     const staleSamples = await Sample.countDocuments({
       status: { $in: ["collected", "processing"] },
       createdAt: { $lte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
@@ -126,6 +153,7 @@ export async function buildNotifications(tenantId, session) {
       activeTypes.push("stale-samples");
       notifications.push({
         id: "stale-samples",
+        category: "samples",
         title: "Stale testing samples",
         detail: `${staleSamples} sample(s) in testing for over 24 hours.`,
         href: "/samples",
@@ -135,16 +163,48 @@ export async function buildNotifications(tenantId, session) {
   }
 
   const canViewBilling = hasPermission(session, "billing.view") || hasPermission(session, "billing.create");
-  if (canViewBilling && TestRequest) {
+  if (canViewBilling && TestRequest && enabledCategories.billing !== false) {
     const pendingDoctorRequests = await TestRequest.countDocuments({ status: "pending" });
     if (pendingDoctorRequests > 0) {
       activeTypes.push("doctor-test-requests");
       notifications.push({
         id: "doctor-test-requests",
+        category: "billing",
         title: "New Doctor Test Requests",
         detail: `${pendingDoctorRequests} test request(s) received from Doctor Portal pending lab billing.`,
         href: "/billing",
         priority: "high",
+      });
+    }
+  }
+
+  if (canViewReports && TestReport && enabledCategories.reports !== false) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentReleasedReports = await TestReport.find({
+      status: "released",
+      $or: [
+        { releasedAt: { $gte: sevenDaysAgo } },
+        { releasedAt: { $exists: false }, updatedAt: { $gte: sevenDaysAgo } },
+        { releasedAt: null, updatedAt: { $gte: sevenDaysAgo } },
+      ],
+    })
+      .populate("patient", "name patientId")
+      .sort({ releasedAt: -1, updatedAt: -1 })
+      .limit(10)
+      .lean();
+
+    for (const report of recentReleasedReports) {
+      const notifId = `report-released-${report._id}`;
+      activeTypes.push(notifId);
+      const patientName = report.patient?.name || "Patient";
+      const testName = report.testSnapshot?.name || "Diagnostic test";
+      notifications.push({
+        id: notifId,
+        category: "reports",
+        title: `Report Released: ${report.reportId || "Report"}`,
+        detail: `Diagnostic report for ${patientName} (${testName}) released by ${report.releasedBy || "authorized staff"}.`,
+        href: `/reports/${report._id}`,
+        priority: "normal",
       });
     }
   }

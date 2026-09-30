@@ -63,6 +63,14 @@ export default function ReportViewPage() {
   const canVerifyReports = hasPermission(user, "reports.verify");
   const canReleaseReports = hasPermission(user, "reports.release");
   const canDeleteReports = hasPermission(user, "reports.delete");
+  const canEditReports = hasPermission(user, "reports.edit");
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedResults, setEditedResults] = useState({});
+  const [editedRemarks, setEditedRemarks] = useState("");
+  const [editedTemplate, setEditedTemplate] = useState("test-report");
+  const [saveSuccess, setSaveSuccess] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   const loadReport = useCallback(async () => {
     setLoading(true);
@@ -100,6 +108,10 @@ export default function ReportViewPage() {
   const reportInvestigationNames = reportInvestigations.map((item) => item.testSnapshot?.name).filter(Boolean);
 
   const performAction = useCallback(async (action) => {
+    if (action === "release" && !canReleaseReports) {
+      setError("Permission denied: You do not have permission to release reports.");
+      return;
+    }
     setUpdating(true);
     setError("");
     try {
@@ -117,7 +129,95 @@ export default function ReportViewPage() {
     } finally {
       setUpdating(false);
     }
-  }, [id]);
+  }, [id, canReleaseReports]);
+
+  const handleStartEdit = useCallback(() => {
+    const currentResults = {};
+    reportInvestigations.forEach((inv) => {
+      (inv.results || []).forEach((r) => {
+        currentResults[r.key] = r.textValue ?? (r.value !== undefined ? String(r.value) : "");
+      });
+    });
+    (report?.results || []).forEach((r) => {
+      currentResults[r.key] = r.textValue ?? (r.value !== undefined ? String(r.value) : "");
+    });
+    setEditedResults(currentResults);
+    setEditedRemarks(report?.remarks || "");
+    setEditedTemplate(report?.template || "test-report");
+    setValidationErrors({});
+    setError("");
+    setSaveSuccess("");
+    setIsEditing(true);
+  }, [report, reportInvestigations]);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setValidationErrors({});
+    setError("");
+  }, []);
+
+  const handleResultValueChange = useCallback((key, val) => {
+    if (typeof val === "string" && /[eE]/.test(val)) {
+      setValidationErrors((prev) => ({ ...prev, [key]: "Exponential notation is not allowed" }));
+      return;
+    }
+    if (val !== "" && val !== "-" && val !== "." && !Number.isFinite(Number(val))) {
+      setValidationErrors((prev) => ({ ...prev, [key]: "Invalid numeric value" }));
+      return;
+    }
+    setValidationErrors((prev) => ({ ...prev, [key]: "" }));
+    setEditedResults((prev) => ({ ...prev, [key]: val }));
+  }, []);
+
+  const getObservedFlag = useCallback((result, val) => {
+    if (val === "" || val === undefined || val === null) return "not-entered";
+    const num = Number(val);
+    if (!Number.isFinite(num)) return "normal";
+    if (Number.isFinite(result.normalMin) && num < result.normalMin) return "low";
+    if (Number.isFinite(result.normalMax) && num > result.normalMax) return "high";
+    return "normal";
+  }, []);
+
+  const handleSaveDraft = useCallback(
+    async (submitForReview = false) => {
+      const hasErrors = Object.values(validationErrors).some((err) => !!err);
+      if (hasErrors) {
+        setError("Please fix validation errors before saving.");
+        return;
+      }
+      setUpdating(true);
+      setError("");
+      setSaveSuccess("");
+      try {
+        const res = await fetch(`/api/reports/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            action: "save",
+            results: editedResults,
+            remarks: editedRemarks,
+            template: editedTemplate,
+            submitForReview,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to save report");
+        setReport(data.report);
+        setIsEditing(false);
+        setSaveSuccess(
+          submitForReview
+            ? "Report saved and submitted for review successfully."
+            : "Draft report saved successfully."
+        );
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setUpdating(false);
+      }
+    },
+    [id, editedResults, editedRemarks, editedTemplate, validationErrors]
+  );
 
   async function downloadPdf() {
     const element = printRef.current;
@@ -202,11 +302,98 @@ export default function ReportViewPage() {
         </div>
         <div className="report-detail-actions">
           <span className={`report-detail-status ${report.status}`}>{formatStatus(report.status)}</span>
-          {canPrintReports && <button type="button" className="dash-btn-secondary" onClick={() => window.print()}>{Icons.report} Print</button>}
-          {canPrintReports && <button type="button" className="dash-btn-secondary" onClick={downloadPdf} disabled={downloading}>{Icons.download} {downloading ? "Preparing PDF…" : "Download PDF"}</button>}
-          {canAct && flow && <button type="button" className="dash-btn-primary" disabled={updating} onClick={() => { setError(""); setConfirmAction(flow.next); }}>{updating ? "Updating…" : flow.label}</button>}
+          {!isEditing && canPrintReports && (
+            <button type="button" className="dash-btn-secondary" onClick={() => window.print()}>
+              {Icons.report} Print
+            </button>
+          )}
+          {!isEditing && canPrintReports && (
+            <button type="button" className="dash-btn-secondary" onClick={downloadPdf} disabled={downloading}>
+              {Icons.download} {downloading ? "Preparing PDF…" : "Download PDF"}
+            </button>
+          )}
+          {!isEditing && canEditReports && report.status === "draft" && (
+            <button
+              type="button"
+              className="dash-btn-secondary"
+              onClick={handleStartEdit}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            >
+              {Icons.edit} Edit Draft
+            </button>
+          )}
+          {isEditing && (
+            <>
+              <button
+                type="button"
+                className="dash-btn-secondary"
+                onClick={handleCancelEdit}
+                disabled={updating}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="dash-btn-primary"
+                onClick={() => handleSaveDraft(false)}
+                disabled={updating}
+              >
+                {updating ? "Saving…" : "Save Draft"}
+              </button>
+              {canVerifyReports && (
+                <button
+                  type="button"
+                  className="dash-btn-primary"
+                  style={{ background: "var(--success, #16a34a)" }}
+                  onClick={() => handleSaveDraft(true)}
+                  disabled={updating}
+                >
+                  {updating ? "Saving…" : "Save & Submit Review"}
+                </button>
+              )}
+            </>
+          )}
+          {!isEditing && canAct && flow && (
+            <button
+              type="button"
+              className="dash-btn-primary"
+              disabled={updating}
+              onClick={() => {
+                setError("");
+                setConfirmAction(flow.next);
+              }}
+            >
+              {updating ? "Updating…" : flow.label}
+            </button>
+          )}
+          {!canReleaseReports && flow?.next === "release" && (
+            <span
+              className="badge badge-warning"
+              title="Release permission required to release this report"
+              style={{ fontSize: 11, padding: "6px 10px", background: "#fef3c7", color: "#92400e", borderRadius: 4, fontWeight: 500 }}
+            >
+              Release permission required
+            </span>
+          )}
         </div>
       </header>
+
+      {saveSuccess && (
+        <div
+          className="report-detail-alert"
+          style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46" }}
+          role="status"
+        >
+          <span>✓</span>
+          <div>
+            <strong>Success</strong>
+            <p>{saveSuccess}</p>
+          </div>
+          <button type="button" onClick={() => setSaveSuccess("")} aria-label="Dismiss">
+            {Icons.close}
+          </button>
+        </div>
+      )}
 
       {error && <div className="report-detail-alert" role="alert"><span>{Icons.alertCircle}</span><div><strong>Unable to complete the request</strong><p>{error}</p></div><button type="button" onClick={() => setError("")} aria-label="Dismiss error">{Icons.close}</button></div>}
 
@@ -219,7 +406,24 @@ export default function ReportViewPage() {
                 <span className="clinical-letterhead-logo">{labLogo ? <Image src={labLogo} alt={labName} width={120} height={52} unoptimized /> : Icons.logo}</span>
                 <div><strong>{labName}</strong><span>Diagnostic Laboratory Services</span><small>Accurate results · Responsible care</small></div>
               </div>
-              <div className="clinical-document-title"><small>Confidential medical record</small><h2>{templateLabel}</h2><span className={`clinical-document-status ${report.status}`}>{formatStatus(report.status)}</span></div>
+              <div className="clinical-document-title">
+                <small>Confidential medical record</small>
+                {isEditing ? (
+                  <select
+                    value={editedTemplate}
+                    onChange={(e) => setEditedTemplate(e.target.value)}
+                    className="lims-select"
+                    style={{ fontSize: "14px", fontWeight: "600", margin: "4px 0", maxWidth: "240px", height: "34px" }}
+                  >
+                    <option value="test-report">Diagnostic Test Report</option>
+                    <option value="coa">Certificate of Analysis</option>
+                    <option value="summary">Summary Report</option>
+                  </select>
+                ) : (
+                  <h2>{templateLabel}</h2>
+                )}
+                <span className={`clinical-document-status ${report.status}`}>{formatStatus(report.status)}</span>
+              </div>
             </header>
 
             <section className="clinical-report-identifiers corporate-report-section">
@@ -253,18 +457,79 @@ export default function ReportViewPage() {
                   <h3 style={{ fontSize: 15, margin: "0 0 8px", color: "#0f172a" }}>{investigation.testSnapshot?.name || `Investigation ${investigationIndex + 1}`}</h3>
                   <div className="corporate-results-table clinical-results-table" role="table" aria-label={`${investigation.testSnapshot?.name || "Investigation"} results`}>
                     <div className="corporate-result-head" role="row"><span>Parameter</span><span>Observed value</span><span>Unit</span><span>Biological reference interval</span><span>Flag</span></div>
-                    {(investigation.results || []).map((result) => (
-                      <div key={result.key} className={`corporate-result-row ${result.flag || "normal"}`} role="row">
-                        <span data-label="Parameter">{result.name}</span><strong data-label="Observed value">{result.textValue || result.value || "—"}</strong><span data-label="Unit">{result.unit || "—"}</span><span data-label="Reference interval">{rangeText(result)}</span><span data-label="Flag" className="corporate-result-flag">{result.flag === "normal" ? "Normal" : `${result.flag === "high" ? "↑" : "↓"} ${formatStatus(result.flag)}`}</span>
-                      </div>
-                    ))}
+                    {(investigation.results || []).map((result) => {
+                      const curVal = isEditing
+                        ? (editedResults[result.key] ?? (result.textValue || (result.value !== undefined ? String(result.value) : "")))
+                        : (result.textValue || (result.value !== undefined ? String(result.value) : "") || "—");
+                      const currentFlag = isEditing ? getObservedFlag(result, curVal) : (result.flag || "normal");
+                      const err = validationErrors[result.key];
+                      return (
+                        <div key={result.key} className={`corporate-result-row ${currentFlag}`} role="row">
+                          <span data-label="Parameter">
+                            {result.name}
+                            {result.required && isEditing && <span style={{ color: "var(--error, #ef4444)", marginLeft: "4px" }}>*</span>}
+                          </span>
+                          <strong data-label="Observed value">
+                            {isEditing ? (
+                              <div style={{ display: "inline-block", verticalAlign: "middle" }}>
+                                <input
+                                  type="text"
+                                  className="lims-input"
+                                  value={curVal}
+                                  onChange={(e) => handleResultValueChange(result.key, e.target.value)}
+                                  placeholder="Enter value"
+                                  style={{
+                                    height: "30px",
+                                    fontSize: "13px",
+                                    padding: "2px 8px",
+                                    width: "110px",
+                                    borderColor: err ? "var(--error, #ef4444)" : undefined,
+                                  }}
+                                />
+                                {err && <small style={{ display: "block", color: "var(--error, #ef4444)", fontSize: "11px", fontWeight: "400" }}>{err}</small>}
+                              </div>
+                            ) : (
+                              curVal
+                            )}
+                          </strong>
+                          <span data-label="Unit">{result.unit || "—"}</span>
+                          <span data-label="Reference interval">{rangeText(result)}</span>
+                          <span data-label="Flag" className="corporate-result-flag">
+                            {currentFlag === "normal"
+                              ? "Normal"
+                              : currentFlag === "not-entered"
+                              ? "Not Entered"
+                              : `${currentFlag === "high" ? "↑" : "↓"} ${formatStatus(currentFlag)}`}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
               <p className="clinical-reference-note">Reference intervals may vary with age, gender, clinical condition, and analytical method. Please correlate results clinically.</p>
             </section>
 
-            {report.remarks && <section className="clinical-report-remarks corporate-report-section"><header><small>Laboratory comment</small><h2>Interpretation / Remarks</h2></header><p>{report.remarks}</p></section>}
+            {(report.remarks || isEditing) && (
+              <section className="clinical-report-remarks corporate-report-section">
+                <header>
+                  <small>Laboratory comment</small>
+                  <h2>Interpretation / Remarks</h2>
+                </header>
+                {isEditing ? (
+                  <textarea
+                    rows={3}
+                    className="lims-input"
+                    value={editedRemarks}
+                    onChange={(e) => setEditedRemarks(e.target.value)}
+                    placeholder="Enter clinical interpretation, pathologist comments, or remarks..."
+                    style={{ width: "100%", fontSize: "13px", padding: "8px", resize: "vertical", marginTop: "6px" }}
+                  />
+                ) : (
+                  <p>{report.remarks}</p>
+                )}
+              </section>
+            )}
 
             <section className="clinical-authorization corporate-report-section">
               <div className="clinical-auth-note"><span>{Icons.shield}</span><div><strong>Electronically generated report</strong><p>Validation and release events are recorded in the laboratory audit trail.</p></div></div>
@@ -298,7 +563,33 @@ export default function ReportViewPage() {
             {report.version > 1 && <div><span>Document version</span><strong>Version {report.version}</strong><small>{report.previousVersions?.length || 0} previous revision{(report.previousVersions?.length || 0) === 1 ? "" : "s"}</small></div>}
           </section>
 
-          {canDeleteReports && report.status === "draft" && <button type="button" className="report-delete-action" onClick={() => { setError(""); setConfirmDelete(true); }}>{Icons.trash} Delete draft report</button>}
+          {report.status === "draft" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+              {canEditReports && !isEditing && (
+                <button
+                  type="button"
+                  className="dash-btn-primary"
+                  onClick={handleStartEdit}
+                  style={{ width: "100%", justifyContent: "center", height: "36px" }}
+                >
+                  {Icons.edit} Edit Draft Report
+                </button>
+              )}
+              {canDeleteReports && (
+                <button
+                  type="button"
+                  className="report-delete-action"
+                  onClick={() => {
+                    setError("");
+                    setConfirmDelete(true);
+                  }}
+                  style={{ margin: 0 }}
+                >
+                  {Icons.trash} Delete draft report
+                </button>
+              )}
+            </div>
+          )}
         </aside>
       </div>
 

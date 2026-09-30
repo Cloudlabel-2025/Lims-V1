@@ -92,10 +92,13 @@ function normalizeParameters(parameters, errors) {
       const femaleMax = parameter.femaleMax === "" || parameter.femaleMax === null ? undefined : Number(parameter.femaleMax);
       const normalMin = parameter.normalMin === "" || parameter.normalMin === null ? undefined : Number(parameter.normalMin);
       const normalMax = parameter.normalMax === "" || parameter.normalMax === null ? undefined : Number(parameter.normalMax);
+      const ageMin = parameter.ageMin === "" || parameter.ageMin === null ? undefined : Number(parameter.ageMin);
+      const ageMax = parameter.ageMax === "" || parameter.ageMax === null ? undefined : Number(parameter.ageMax);
 
       if (isExponentialNotation(parameter.maleMin) || isExponentialNotation(parameter.maleMax) ||
           isExponentialNotation(parameter.femaleMin) || isExponentialNotation(parameter.femaleMax) ||
-          isExponentialNotation(parameter.normalMin) || isExponentialNotation(parameter.normalMax)) {
+          isExponentialNotation(parameter.normalMin) || isExponentialNotation(parameter.normalMax) ||
+          isExponentialNotation(parameter.ageMin) || isExponentialNotation(parameter.ageMax)) {
         errors.push(`Parameter ${index + 1} range contains an invalid value`);
         return null;
       }
@@ -112,6 +115,10 @@ function normalizeParameters(parameters, errors) {
         errors.push(`Parameter ${index + 1} female range min must be less than max`);
         return null;
       }
+      if (Number.isFinite(ageMin) && Number.isFinite(ageMax) && ageMin >= ageMax) {
+        errors.push(`Parameter ${index + 1} age range min must be less than max`);
+        return null;
+      }
 
       return {
         key: slug(parameter.key || name, `parameter-${index + 1}`),
@@ -123,6 +130,9 @@ function normalizeParameters(parameters, errors) {
         femaleMax: Number.isFinite(femaleMax) ? femaleMax : undefined,
         normalMin: Number.isFinite(normalMin) ? normalMin : undefined,
         normalMax: Number.isFinite(normalMax) ? normalMax : undefined,
+        ageMin: Number.isFinite(ageMin) ? ageMin : 0,
+        ageMax: Number.isFinite(ageMax) ? ageMax : 120,
+        ageRanges: Array.isArray(parameter.ageRanges) ? parameter.ageRanges : [],
         required: parameter.required !== false,
         sortOrder: index,
       };

@@ -1,7 +1,8 @@
 import { jsonError } from "@/app/lib/api-response";
 import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
-import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { resolveReferenceRange, getFlag } from "@/app/lib/reference-ranges";
 
 function clean(value) {
   return String(value || "").trim();
@@ -57,14 +58,31 @@ export async function GET(req, { params }) {
     report.releasedBy = await resolveNameAndRole(report.releasedBy);
 
     if (auth.session.doctorId) {
-      const ownsReferral = report.status === "released" && report.billingRecord
+      if (report.status !== "released") {
+        return Response.json({ error: "Report not found" }, { status: 404 });
+      }
+
+      const { Doctor, Patient } = await getTenantModels(auth.tenantId);
+      const doctor = await Doctor.findById(auth.session.doctorId).select("name").lean();
+
+      const ownsBillingReferral = report.billingRecord
         ? await BillingRecord.exists({
             _id: report.billingRecord?._id || report.billingRecord,
             tenantId: auth.tenantId,
             referralDoctor: auth.session.doctorId,
           })
-        : null;
-      if (!ownsReferral) return Response.json({ error: "Report not found" }, { status: 404 });
+        : false;
+
+      const ownsPatientReferral = (doctor && report.patient)
+        ? await Patient.exists({
+            _id: report.patient?._id || report.patient,
+            refDoctorName: doctor.name,
+          })
+        : false;
+
+      if (!ownsBillingReferral && !ownsPatientReferral) {
+        return Response.json({ error: "Report not found" }, { status: 404 });
+      }
     }
 
     await writeAuditLog(req, auth, {
@@ -91,6 +109,7 @@ export async function PATCH(req, { params }) {
       review: "reports.verify",
       approve: "reports.verify",
       release: "reports.release",
+      amend: "reports.verify",
     };
     const permission = permissionMap[action];
     if (!permission) return Response.json({ error: "Invalid action" }, { status: 400 });
@@ -109,11 +128,22 @@ export async function PATCH(req, { params }) {
       if (report.status !== "draft") {
         return Response.json({ error: "Only draft reports can be edited" }, { status: 400 });
       }
+
+      const { Patient } = await getTenantModels(auth.tenantId);
+      const patientDoc = report.patient
+        ? await Patient.findById(report.patient?._id || report.patient).lean()
+        : null;
+
       if (body.results) {
-        if (typeof body.results !== "object" || Array.isArray(body.results)) {
+        if (typeof body.results !== "object") {
           return Response.json({ error: "Results must be an object" }, { status: 400 });
         }
-        for (const rawValue of Object.values(body.results)) {
+
+        const rawEntries = Array.isArray(body.results)
+          ? body.results.map((r) => [r.key, r.textValue ?? r.value])
+          : Object.entries(body.results);
+
+        for (const [key, rawValue] of rawEntries) {
           const textValue = clean(rawValue);
           if (textValue === "") continue;
           if (isExponentialNotation(textValue)) {
@@ -123,11 +153,111 @@ export async function PATCH(req, { params }) {
             return Response.json({ error: `Invalid numeric value "${textValue}" for result field` }, { status: 400 });
           }
         }
+
+        const resultMap = new Map(rawEntries);
+
+        if (Array.isArray(report.results) && report.results.length > 0) {
+          for (const param of report.results) {
+            if (resultMap.has(param.key)) {
+              const textVal = clean(resultMap.get(param.key));
+              param.textValue = textVal;
+              param.value = textVal !== "" && Number.isFinite(Number(textVal)) ? Number(textVal) : undefined;
+              if (patientDoc) {
+                const resolved = resolveReferenceRange(param, patientDoc);
+                if (Number.isFinite(resolved.min)) param.normalMin = resolved.min;
+                if (Number.isFinite(resolved.max)) param.normalMax = resolved.max;
+                param.outOfAgeRange = resolved.outOfAgeRange || false;
+                param.ageGap = resolved.ageGap || undefined;
+                param.flag = getFlag(param, textVal, patientDoc);
+              }
+            }
+          }
+        }
+
+        if (Array.isArray(report.investigations) && report.investigations.length > 0) {
+          for (const inv of report.investigations) {
+            if (Array.isArray(inv.results)) {
+              for (const param of inv.results) {
+                if (resultMap.has(param.key)) {
+                  const textVal = clean(resultMap.get(param.key));
+                  param.textValue = textVal;
+                  param.value = textVal !== "" && Number.isFinite(Number(textVal)) ? Number(textVal) : undefined;
+                  if (patientDoc) {
+                    const resolved = resolveReferenceRange(param, patientDoc);
+                    if (Number.isFinite(resolved.min)) param.normalMin = resolved.min;
+                    if (Number.isFinite(resolved.max)) param.normalMax = resolved.max;
+                    param.outOfAgeRange = resolved.outOfAgeRange || false;
+                    param.ageGap = resolved.ageGap || undefined;
+                    param.flag = getFlag(param, textVal, patientDoc);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (body.remarks !== undefined) report.remarks = clean(body.remarks);
+      if (body.template !== undefined) report.template = clean(body.template);
+
+      if (body.submitForReview) {
+        const allParams = [
+          ...(report.results || []),
+          ...(report.investigations || []).flatMap((inv) => inv.results || []),
+        ];
+        if (allParams.length === 0) {
+          return Response.json({ error: "Results are required before review" }, { status: 400 });
+        }
+        const emptyRequired = allParams.find(
+          (p) => p.required !== false && (p.textValue === undefined || p.textValue === "" || p.textValue === null)
+        );
+        if (emptyRequired) {
+          return Response.json(
+            { error: `Parameter "${emptyRequired.name || emptyRequired.key}" is required before review` },
+            { status: 400 }
+          );
+        }
+
+        report.createNewVersion();
+        report.status = "reviewed";
+        const now = new Date();
+        let displayName = "Unknown";
+        if (auth.session.name) {
+          displayName = auth.session.roleName
+            ? `${auth.session.name} (${auth.session.roleName})`
+            : auth.session.name;
+        } else if (auth.session.email) {
+          displayName = auth.session.email;
+        }
+        report.reviewedAt = now;
+        report.reviewedBy = displayName;
+      }
+    } else if (action === "amend") {
+      if (report.status !== "released") {
+        return Response.json({ error: "Only released reports can be amended" }, { status: 400 });
+      }
+      const amendmentReason = clean(body.amendmentReason || body.reason);
+      if (!amendmentReason) {
+        return Response.json({ error: "Amendment reason is required" }, { status: 400 });
+      }
+      report.createNewVersion();
+      if (body.results && typeof body.results === "object") {
         report.results = body.results;
       }
-      if (body.remarks !== undefined) report.remarks = body.remarks;
-      if (body.template !== undefined) report.template = body.template;
+      if (body.remarks !== undefined) {
+        report.remarks = `[AMENDED: ${amendmentReason}] ${clean(body.remarks)}`;
+      }
+      report.status = "approved";
     } else {
+      if (action === "release") {
+        const allowedRoles = ["pathologist", "admin", "lab admin", "lab manager", "super admin", "developer admin"];
+        const callerRole = (auth.session.roleName || "").toLowerCase();
+        const hasExplicitRelease = hasPermission(auth.session, "reports.release");
+        if (!hasExplicitRelease || (callerRole && !allowedRoles.some((r) => callerRole.includes(r)) && !hasExplicitRelease)) {
+          return Response.json({ error: "Only Pathologist or Lab Manager can release reports" }, { status: 403 });
+        }
+      }
+
       const transitions = {
         review: { from: "draft", to: "reviewed" },
         approve: { from: "reviewed", to: "approved" },
@@ -143,8 +273,23 @@ export async function PATCH(req, { params }) {
         }, { status: 400 });
       }
 
-      if (action === "review" && (!report.results || report.results.length === 0)) {
-        return Response.json({ error: "Results are required before review" }, { status: 400 });
+      if (action === "review") {
+        const allParams = [
+          ...(report.results || []),
+          ...(report.investigations || []).flatMap((inv) => inv.results || []),
+        ];
+        if (allParams.length === 0) {
+          return Response.json({ error: "Results are required before review" }, { status: 400 });
+        }
+        const emptyRequired = allParams.find(
+          (p) => p.required !== false && (p.textValue === undefined || p.textValue === "" || p.textValue === null)
+        );
+        if (emptyRequired) {
+          return Response.json(
+            { error: `Parameter "${emptyRequired.name || emptyRequired.key}" is required before review` },
+            { status: 400 }
+          );
+        }
       }
 
       // Create a version snapshot before status transition (except initial save)
@@ -218,6 +363,7 @@ export async function PATCH(req, { params }) {
       review: "reports.reviewed",
       approve: "reports.approved",
       release: "reports.released",
+      amend: "reports.amended",
     };
 
     await writeAuditLog(req, auth, {

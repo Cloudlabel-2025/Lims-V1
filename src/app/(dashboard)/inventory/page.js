@@ -382,7 +382,7 @@ export default function InventoryPage() {
     else if (itemForm.itemCode && !isValidItemCode(itemForm.itemCode)) errors.itemCode = "Item code must contain only capital letters, numbers, and hyphens";
     if (itemForm.itemCode && itemForm.itemCode.length > 15) errors.itemCode = "Item code must not exceed 15 characters";
     if (!itemForm.name) errors.name = "Item name is required";
-    else if (itemForm.name.length > 60) errors.name = "Name must not exceed 60 characters";
+    else if (itemForm.name.length > 120) errors.name = "Name must not exceed 120 characters";
     else if (!/^[A-Za-z0-9 -]*$/.test(itemForm.name)) errors.name = "Name must contain only letters, numbers, spaces, and hyphens";
     if (!itemForm.genericName) errors.genericName = "Generic name is required";
     else if (!/^[A-Za-z0-9]*$/.test(itemForm.genericName)) errors.genericName = "Generic name must contain only letters and numbers";
@@ -690,7 +690,7 @@ export default function InventoryPage() {
                 </div>
                 <div className="col-md-6">
                   <Field label="Item Name">
-                    <input className="lims-input" required minLength={2} maxLength={60} value={itemForm.name} onChange={(e) => { const v = e.target.value; if (v.length > 60) return; if (v && !/^[A-Za-z0-9 -]*$/.test(v)) return; setItemFormErrors((p) => ({ ...p, name: "" })); setItemForm({ ...itemForm, name: v }); }} style={inputStyle()} />
+                    <input className="lims-input" required minLength={2} maxLength={120} value={itemForm.name} onChange={(e) => { const v = e.target.value; if (v.length > 120) return; if (v && !/^[A-Za-z0-9 -]*$/.test(v)) return; setItemFormErrors((p) => ({ ...p, name: "" })); setItemForm({ ...itemForm, name: v }); }} style={inputStyle()} />
                     <ErrorMsg message={itemFormErrors.name} />
                   </Field>
                 </div>

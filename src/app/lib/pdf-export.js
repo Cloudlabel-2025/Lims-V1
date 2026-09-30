@@ -52,13 +52,15 @@ function drawTable(doc, headers, rows, colWidths) {
     y += rowH;
   }
   doc.y = y + 6;
+  doc.x = startX;
 }
 
 function toBuffer(doc) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const chunks = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", (err) => reject(err));
     doc.end();
   });
 }
@@ -186,13 +188,17 @@ export async function exportLedgerPdf(journalEntries) {
   const headers = ["Entry", "Date", "Account", "Debit", "Credit", "Source", "Description"];
   const colWidths = [80, 80, 160, 80, 80, 80, 160];
   const rows = [];
+  let totalDebit = 0;
+  let totalCredit = 0;
   for (const entry of journalEntries) {
     for (let i = 0; i < (entry.lines || []).length; i++) {
       const line = entry.lines[i];
+      if (line.debit) totalDebit += Number(line.debit);
+      if (line.credit) totalCredit += Number(line.credit);
       rows.push([
         i === 0 ? entry.entryNumber : "",
         i === 0 ? new Date(entry.date).toLocaleDateString("en-IN") : "",
-        line.accountId ? `${line.accountId.code} - ${line.accountId.name}` : "-",
+        line.accountId ? `${line.accountId.code || ""} - ${line.accountId.name || ""}` : "-",
         line.debit ? money(line.debit) : "-",
         line.credit ? money(line.credit) : "-",
         i === 0 ? entry.sourceType : "",
@@ -200,7 +206,11 @@ export async function exportLedgerPdf(journalEntries) {
       ]);
     }
   }
+  rows.push(["Total", "", "", money(totalDebit), money(totalCredit), "", ""]);
   drawTable(doc, headers, rows, colWidths);
+  doc.moveDown(0.5);
+  doc.fontSize(9).font("Helvetica-Bold");
+  doc.text(`Total Debit: Rs ${money(totalDebit)}  |  Total Credit: Rs ${money(totalCredit)}`);
   return toBuffer(doc);
 }
 

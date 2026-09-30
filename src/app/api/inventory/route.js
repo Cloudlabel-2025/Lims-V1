@@ -362,7 +362,7 @@ export async function POST(req) {
 
       if (!name) errors.push("Item name is required");
       else {
-        if (name.length > 60) errors.push("Item name must not exceed 60 characters");
+        if (name.length > 120) errors.push("Item name must not exceed 120 characters");
         else if (!/^[A-Za-z0-9 -]*$/.test(name)) errors.push("Item name must contain only letters, numbers, spaces, and hyphens");
       }
 

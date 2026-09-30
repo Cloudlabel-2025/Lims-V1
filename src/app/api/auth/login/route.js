@@ -55,7 +55,7 @@ export async function POST(req) {
       return loginDeveloper({ req, email, password, rememberMe: Boolean(body.rememberMe) });
     }
 
-    const tenantId = resolveTenantId(req, body.tenantId);
+    const tenantId = resolveTenantId(req, body.tenantId || body.subdomain);
     if (!tenantId) {
       return NextResponse.json({ error: "Tenant is required" }, { status: 400 });
     }
@@ -176,9 +176,18 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
   const User = getUserModel(tenantConnection);
   const Role = getRoleModel(tenantConnection);
   const normalizedLoginId = String(loginId || "").trim();
-  const userQuery = normalizedLoginId.includes("@")
-    ? { email: normalizedLoginId.toLowerCase(), status: { $in: ["active", "locked"] } }
-    : { userId: normalizedLoginId.toUpperCase(), status: { $in: ["active", "locked"] } };
+  let userQuery;
+  if (normalizedLoginId.includes("@")) {
+    userQuery = { email: normalizedLoginId.toLowerCase(), status: { $in: ["active", "locked"] } };
+  } else {
+    const Doctor = getDoctorModel(tenantConnection);
+    const doctorByCode = await Doctor.findOne({ doctorId: normalizedLoginId.toUpperCase() }).select("_id").lean();
+    if (doctorByCode) {
+      userQuery = { doctorId: doctorByCode._id, status: { $in: ["active", "locked"] } };
+    } else {
+      userQuery = { userId: normalizedLoginId.toUpperCase(), status: { $in: ["active", "locked"] } };
+    }
+  }
   const user = await User.findOne(userQuery)
     .select("_id userId firstName lastName email role doctorId +passwordHash failedLoginAttempts lockedUntil")
     .lean();
@@ -235,7 +244,7 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
         .lean()
     : null;
 
-  if (!role) {
+  if (!role && !user.doctorId) {
     return NextResponse.json(
       { error: "Your assigned role is no longer available. Contact your lab admin." },
       { status: 403 }
@@ -249,10 +258,12 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
 
   await resetRateLimit(`login:tenant:${tenantId}`, `${loginId}:${ip}`);
 
-  const permissions = role?.permissions || [];
+  const doctorId = user.doctorId ? String(user.doctorId) : null;
+  const permissions = doctorId
+    ? Array.from(new Set(["doctor-portal.access", "reports.view", ...(role?.permissions || [])]))
+    : (role?.permissions || []);
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
 
-  const doctorId = user.doctorId ? String(user.doctorId) : null;
   if (doctorId) {
     const Doctor = getDoctorModel(tenantConnection);
     const doctorRecord = await Doctor.findById(doctorId).select("status").lean();
@@ -272,7 +283,7 @@ async function loginTenant({ req, tenantId, loginId, password, rememberMe }) {
     email: user.email,
     name: fullName,
     roleId: role ? String(role._id) : null,
-    roleName: role?.name || null,
+    roleName: role?.name || (doctorId ? "Doctor" : null),
     permissions,
     doctorId,
   });

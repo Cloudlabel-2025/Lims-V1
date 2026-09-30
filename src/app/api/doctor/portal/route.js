@@ -65,11 +65,17 @@ export async function GET(req) {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Payment-Gated Report Visibility: Reports visible ONLY if patient completed payment (paid/settled)
-    const paidBills = bills.filter((bill) => bill.billingStatus === "paid" || bill.billingStatus === "settled");
-    const paidBillIds = paidBills.map((bill) => bill._id);
-    const reports = paidBillIds.length
-      ? await TestReport.find({ billingRecord: { $in: paidBillIds }, status: "released" })
+    // Scope reports strictly to doctor's own referred patients/bills and released status
+    const referredPatientIds = registeredPatients.map((p) => p._id).filter(Boolean);
+    const billIds = bills.map((b) => b._id).filter(Boolean);
+    const reports = (billIds.length || referredPatientIds.length)
+      ? await TestReport.find({
+          status: "released",
+          $or: [
+            { billingRecord: { $in: billIds } },
+            { patient: { $in: referredPatientIds } },
+          ],
+        })
           .populate("patient", "name patientId age gender")
           .select("reportId billingRecord patient testSnapshot results remarks status releasedAt createdAt")
           .sort({ releasedAt: -1, createdAt: -1 })

@@ -122,6 +122,10 @@ export default function TestDefinitionEditor({
                     <legend>Female reference range</legend>
                     <div><input type="number" step="any" value={parameter.femaleMin ?? ""} onChange={(e) => updateParameter(index, "femaleMin", e.target.value)} placeholder="Minimum" /><span>to</span><input type="number" step="any" value={parameter.femaleMax ?? ""} onChange={(e) => updateParameter(index, "femaleMax", e.target.value)} placeholder="Maximum" /></div>
                   </fieldset>
+                  <fieldset>
+                    <legend>Applicable test age range (Years)</legend>
+                    <div><input type="number" step="any" min="0" max="150" value={parameter.ageMin ?? ""} onChange={(e) => updateParameter(index, "ageMin", e.target.value)} placeholder="Min Age (0)" /><span>to</span><input type="number" step="any" min="0" max="150" value={parameter.ageMax ?? ""} onChange={(e) => updateParameter(index, "ageMax", e.target.value)} placeholder="Max Age (120)" /></div>
+                  </fieldset>
                 </div>
               </article>
             ))}

@@ -180,6 +180,13 @@ export const notificationRules = [
     priority: "normal",
     permissionAny: ["reports.view"],
   },
+  {
+    id: "report-released",
+    label: "Report released",
+    href: "/reports",
+    priority: "normal",
+    permissionAny: ["reports.view", "reports.release"],
+  },
 ];
 
 export const tenantActionPermissions = {

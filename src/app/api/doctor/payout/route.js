@@ -2,6 +2,7 @@ import { getAccountByCode, postJournalEntry, seedSystemChartOfAccounts } from "@
 import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { writeAuditLog } from "@/app/lib/audit";
 
 export async function GET(req) {
   try {
@@ -61,7 +62,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const auth = requireTenantSession(req, "billing.collect");
+    const auth = requireTenantSession(req, "accounts.manage");
     if (auth.error) return auth.error;
 
     const moduleAuth = await requireEnabledTenantModule(auth.tenantId, "doctors.view");
@@ -111,10 +112,27 @@ export async function POST(req) {
 
     await Doctor.updateOne({ _id: doctor._id }, { $set: { pendingPayout: 0 } });
 
+    await writeAuditLog(req, auth, {
+      action: "doctor_payout.approved",
+      resourceType: "Doctor",
+      resourceId: doctor._id,
+      metadata: {
+        doctorId: doctor.doctorId,
+        doctorName: doctor.name,
+        amountCleared,
+        paymentMethod: paymentMethod || "cash",
+        journalEntryId: journalEntry._id,
+        approvedBy: auth.session.email || auth.session.userId,
+        actor: auth.session.email || auth.session.userId,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
     return Response.json({
       message: "Payout released successfully",
       amountCleared,
       journalEntryId: journalEntry._id,
+      approvedBy: auth.session.email || auth.session.userId,
       currentBalance: 0,
     });
   } catch (error) {

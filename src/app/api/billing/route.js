@@ -129,17 +129,17 @@ export async function POST(req) {
       testObjectIds.length
         ? TestDefinition.find({ _id: { $in: testObjectIds } })
             .populate("category", "name")
-            .select("testId name code category sampleType price")
+            .select("testId name code category sampleType price status")
             .lean()
         : Promise.resolve([]),
       packageObjectIds.length
         ? TestPackage.find({ _id: { $in: packageObjectIds } })
             .populate({
               path: "tests",
-              select: "testId name code category sampleType price",
+              select: "testId name code category sampleType price status",
               populate: { path: "category", select: "name" },
             })
-            .select("price tests")
+            .select("name code price tests status")
             .lean()
         : Promise.resolve([]),
     ]);
@@ -151,32 +151,50 @@ export async function POST(req) {
       if (itemKey.startsWith("test_")) {
         const testId = itemKey.replace("test_", "");
         const test = selectedTestMap.get(testId);
-        if (test) {
-          const price = Number(test.price) || 0;
-          totalAmount += price;
-          addedTestIds.add(String(test._id));
-          billingItems.push({
-            testDefinition: test._id,
-            testSnapshot: {
-              testId: test.testId,
-              name: test.name,
-              code: test.code,
-              categoryName: test.category?.name,
-              sampleType: test.sampleType,
-              price: price
-            },
-            status: "sample-pending"
-          });
+        if (!test) {
+          return Response.json({ error: "Selected test not found" }, { status: 404 });
         }
+        if (test.status === "inactive" || test.status === "Inactive") {
+          return Response.json({ error: `Test "${test.name}" is inactive and cannot be billed` }, { status: 400 });
+        }
+        const price = Number(test.price) || 0;
+        totalAmount += price;
+        addedTestIds.add(String(test._id));
+        billingItems.push({
+          testDefinition: test._id,
+          testSnapshot: {
+            testId: test.testId,
+            name: test.name,
+            code: test.code,
+            categoryName: test.category?.name,
+            sampleType: test.sampleType,
+            price: price
+          },
+          status: "sample-pending"
+        });
       } else if (itemKey.startsWith("pkg_")) {
         const pkgId = itemKey.replace("pkg_", "");
         const pkg = selectedPackageMap.get(pkgId);
+        if (!pkg) {
+          return Response.json({ error: "Selected package not found" }, { status: 404 });
+        }
+        if (pkg.status === "inactive" || pkg.status === "Inactive") {
+          return Response.json({ error: `Package "${pkg.name || "Test Package"}" is inactive and cannot be billed` }, { status: 400 });
+        }
+        if (pkg.tests && Array.isArray(pkg.tests)) {
+          const inactiveTest = pkg.tests.find((t) => t.status === "inactive" || t.status === "Inactive");
+          if (inactiveTest) {
+            return Response.json(
+              { error: `Package "${pkg.name || "Test Package"}" contains inactive test "${inactiveTest.name}" and cannot be billed` },
+              { status: 400 }
+            );
+          }
+        }
         
-        if (pkg) {
-          const price = Number(pkg.price) || 0;
-          totalAmount += price;
-          if (pkg.tests) {
-            for (const test of pkg.tests) {
+        const price = Number(pkg.price) || 0;
+        totalAmount += price;
+        if (pkg.tests) {
+          for (const test of pkg.tests) {
               const testId = String(test._id);
               if (!addedTestIds.has(testId)) {
                 addedTestIds.add(testId);
@@ -195,7 +213,6 @@ export async function POST(req) {
               }
             }
           }
-        }
       }
     }
 
@@ -211,10 +228,35 @@ export async function POST(req) {
     const subtotalAmount = money(totalAmount);
 
     const rawDiscount = money(body.discountAmount);
-    if (rawDiscount > 0 && !hasPermission(auth.session, "billing.discount")) {
-      return Response.json({ error: "No permission to apply discounts" }, { status: 403 });
+    if (rawDiscount > 0) {
+      if (!hasPermission(auth.session, "billing.discount")) {
+        await writeAuditLog(req, auth, {
+          action: "billing.discount_denied",
+          resourceType: "Billing",
+          metadata: {
+            attemptedDiscount: rawDiscount,
+            subtotalAmount,
+            reason: "User lacks billing.discount permission",
+            actor: auth.session.email || auth.session.userId,
+          },
+        });
+        return Response.json({ error: "No permission to apply discounts" }, { status: 403 });
+      }
+      if (rawDiscount > subtotalAmount) {
+        await writeAuditLog(req, auth, {
+          action: "billing.excessive_discount_blocked",
+          resourceType: "Billing",
+          metadata: {
+            attemptedDiscount: rawDiscount,
+            subtotalAmount,
+            reason: "Discount cannot exceed bill subtotal",
+            actor: auth.session.email || auth.session.userId,
+          },
+        });
+        return Response.json({ error: "Discount amount cannot exceed bill subtotal" }, { status: 400 });
+      }
     }
-    const discountAmount = Math.min(rawDiscount, subtotalAmount);
+    const discountAmount = rawDiscount;
 
     const taxAmount = Math.min(money(body.taxAmount), subtotalAmount);
     const invoiceAmount = money(subtotalAmount - discountAmount + taxAmount);

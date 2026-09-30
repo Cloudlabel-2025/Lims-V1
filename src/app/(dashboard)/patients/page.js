@@ -50,6 +50,7 @@ export default function PatientList() {
     if (ageMinFilter) params.set("ageMin", ageMinFilter);
     if (ageMaxFilter) params.set("ageMax", ageMaxFilter);
     if (tabFilter === "referrals") params.set("refDoctorOnly", "true");
+    if (tabFilter === "deleted") params.set("status", "deleted");
     return params.toString();
   }, [searchQuery, genderFilter, ageMinFilter, ageMaxFilter, tabFilter]);
 
@@ -114,11 +115,31 @@ export default function PatientList() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unable to delete patient");
+      clearCachedApi("/api/patient");
+      clearCachedApi(`/api/patient/${patientId}`);
       setAllPatients((prev) => prev.filter((p) => p._id !== patientId));
+      setStatus("Patient deleted successfully (soft-deleted, can be restored).");
     } catch (err) {
       setStatus(err.message);
     }
   }, []);
+
+  const restorePatient = useCallback(async (patientId) => {
+    try {
+      const res = await fetch(`/api/patient/${patientId}/restore`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to restore patient");
+      clearCachedApi("/api/patient");
+      clearCachedApi(`/api/patient/${patientId}`);
+      fetchPatients(currentPage);
+      setStatus("Patient restored successfully.");
+    } catch (err) {
+      setStatus(err.message);
+    }
+  }, [currentPage, fetchPatients]);
 
   const hasActiveFilters = Boolean(searchQuery.trim() || genderFilter || ageMinFilter || ageMaxFilter || tabFilter !== "all");
 
@@ -129,7 +150,7 @@ export default function PatientList() {
       <div className={`sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={closeSidebar} />
 
       <aside className={`sidebar patient-detail-shell ${sidebarOpen ? "open" : ""}`} aria-label="Patient details">
-        <PatientSidebar patient={selectedPatient} onClose={closeSidebar} />
+        <PatientSidebar patient={selectedPatient} onClose={closeSidebar} onRestorePatient={restorePatient} />
       </aside>
 
       {status && (
@@ -192,6 +213,28 @@ export default function PatientList() {
           }}
         >
           👨‍⚕️ Doctor Referrals
+        </button>
+        <button
+          type="button"
+          onClick={() => { setTabFilter("deleted"); setCurrentPage(1); }}
+          style={{
+            fontSize: "13px",
+            height: "36px",
+            padding: "0 16px",
+            borderRadius: "10px",
+            border: "none",
+            background: tabFilter === "deleted" ? "#fff" : "transparent",
+            color: tabFilter === "deleted" ? "var(--primary-dark)" : "#64748b",
+            fontWeight: "700",
+            cursor: "pointer",
+            boxShadow: tabFilter === "deleted" ? "0 2px 8px rgba(15, 23, 42, 0.05)" : "none",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
+        >
+          🗑️ Deleted / Inactive
         </button>
       </div>
 
@@ -378,6 +421,7 @@ export default function PatientList() {
             onSelectPatient={handleSelectPatient}
             onEditPatient={goToEditPatient}
             onDeletePatient={canDeletePatient ? deletePatient : null}
+            onRestorePatient={restorePatient}
             onProcessBill={handleProcessBill}
             subscription={theme}
           />
@@ -388,6 +432,7 @@ export default function PatientList() {
             onSelectPatient={handleSelectPatient}
             onEditPatient={goToEditPatient}
             onDeletePatient={canDeletePatient ? deletePatient : null}
+            onRestorePatient={restorePatient}
             onProcessBill={handleProcessBill}
             subscription={theme}
           />

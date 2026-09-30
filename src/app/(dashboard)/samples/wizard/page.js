@@ -4,6 +4,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { Icons } from "@/app/components/Icons";
 import SuccessDialog from "@/app/components/SuccessDialog";
+import { useCurrentUser } from "@/app/lib/use-current-user";
+import { hasPermission } from "@/app/lib/client-rbac";
 import StepDetails from "./steps/StepDetails";
 import StepResults from "./steps/StepResults";
 import StepReview from "./steps/StepReview";
@@ -17,6 +19,8 @@ const STEPS = [
 function WizardInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const user = useCurrentUser();
+  const canCollectSamples = hasPermission(user, "samples.collect");
   const sampleId = searchParams.get("sampleId");
   const [currentStep, setCurrentStep] = useState(0);
   const [sample, setSample] = useState(null);
@@ -55,6 +59,56 @@ function WizardInner() {
         } else {
           throw new Error("No test definitions are linked to this sample.");
         }
+
+        if (loadedSample.reservedInventory?.length) {
+          setReservedInventory(
+            loadedSample.reservedInventory.map((r) => {
+              const itemDoc = r.item && typeof r.item === "object" ? r.item : null;
+              const uomDoc = r.uom && typeof r.uom === "object" ? r.uom : null;
+              const itemId = itemDoc?._id || r.item || "";
+              const uomId = uomDoc?._id || r.uom || "";
+              return {
+                item: String(itemId),
+                quantity: r.quantityBase ?? r.quantity ?? "",
+                uom: String(uomId),
+                searchQuery: itemDoc ? `${itemDoc.itemCode} - ${itemDoc.name}` : "",
+                isOpen: false,
+                isReserved: true,
+              };
+            })
+          );
+        } else {
+          const testList = loadedSample.investigations?.length
+            ? loadedSample.investigations.map((inv) => inv.testDefinition).filter(Boolean)
+            : loadedSample.testDefinition && typeof loadedSample.testDefinition === "object"
+            ? [loadedSample.testDefinition]
+            : [];
+
+          const initialConfigured = [];
+          for (const testDef of testList) {
+            if (Array.isArray(testDef.requiredInventoryItems)) {
+              for (const reqItem of testDef.requiredInventoryItems) {
+                const itemDoc = reqItem.item && typeof reqItem.item === "object" ? reqItem.item : null;
+                const uomDoc = reqItem.uom && typeof reqItem.uom === "object" ? reqItem.uom : null;
+                const itemId = itemDoc?._id || reqItem.item || "";
+                const uomId = uomDoc?._id || reqItem.uom || "";
+                if (itemId) {
+                  initialConfigured.push({
+                    item: String(itemId),
+                    quantity: reqItem.quantityPerTest ?? "",
+                    uom: String(uomId),
+                    searchQuery: itemDoc ? `${itemDoc.itemCode} - ${itemDoc.name}` : "",
+                    isOpen: false,
+                    requiredByTest: true,
+                  });
+                }
+              }
+            }
+          }
+          if (initialConfigured.length > 0) {
+            setReservedInventory(initialConfigured);
+          }
+        }
       } catch (loadError) {
         setError(loadError.message);
       } finally {
@@ -68,8 +122,24 @@ function WizardInner() {
     fetch("/api/inventory?limit=100", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
-        setInventoryItems(data.items || []);
-        setUoms(data.uoms || []);
+        const items = data.items || [];
+        const uomList = data.uoms || [];
+        setInventoryItems(items);
+        setUoms(uomList);
+        setReservedInventory((prev) =>
+          prev.map((row) => {
+            if (row.item && (!row.searchQuery || !row.uom)) {
+              const matched = items.find((it) => String(it._id) === String(row.item));
+              const matchedUom = matched?.baseUom?._id || matched?.baseUom || row.uom;
+              return {
+                ...row,
+                searchQuery: matched ? `${matched.itemCode} - ${matched.name}` : row.searchQuery,
+                uom: row.uom || String(matchedUom || ""),
+              };
+            }
+            return row;
+          })
+        );
       })
       .catch(() => {});
   }, [sampleId]);
@@ -92,7 +162,7 @@ function WizardInner() {
           })),
           notes: finalNotes,
           reservedInventory: reservedInventory
-            .filter((r) => r.item && r.uom && Number(r.quantity) > 0)
+            .filter((r) => r.item)
             .map((r) => ({ item: r.item, uom: r.uom, quantity: r.quantity }))
         }),
       });
@@ -121,6 +191,77 @@ function WizardInner() {
     );
   }
 
+  if (sample && sample.status === "registered" && !canCollectSamples) {
+    return (
+      <div className="module-page" style={{ padding: 40, textAlign: "center" }}>
+        <div className="module-alert" style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }}>
+          <strong>Access Denied:</strong> Your role does not have permission to collect samples. Please contact your lab administrator to assign the &quot;Collect Samples&quot; permission.
+        </div>
+        <button className="dash-btn-secondary" style={{ marginTop: 16 }} onClick={() => router.push("/samples")}>
+          {Icons.arrowLeft} Back to Samples
+        </button>
+      </div>
+    );
+  }
+
+  async function handleStartProcessing() {
+    if (!sample || sample.status === "processing") {
+      setCurrentStep(1);
+      return;
+    }
+    if (sample.status === "registered" && !canCollectSamples) {
+      setError("Permission denied: You do not have permission to collect samples.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const payloadInventory = reservedInventory
+        .filter((r) => r.item)
+        .map((r) => ({
+          item: r.item,
+          quantity: r.quantity,
+          uom: r.uom,
+        }));
+
+      const res = await fetch(`/api/samples/${sampleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "start-processing",
+          reservedInventory: payloadInventory,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start processing");
+      setSample(data.sample);
+      if (data.sample?.reservedInventory?.length) {
+        setReservedInventory(
+          data.sample.reservedInventory.map((r) => {
+            const itemDoc = r.item && typeof r.item === "object" ? r.item : null;
+            const uomDoc = r.uom && typeof r.uom === "object" ? r.uom : null;
+            const itemId = itemDoc?._id || r.item || "";
+            const uomId = uomDoc?._id || r.uom || "";
+            return {
+              item: String(itemId),
+              quantity: r.quantityBase ?? r.quantity ?? "",
+              uom: String(uomId),
+              searchQuery: itemDoc ? `${itemDoc.itemCode} - ${itemDoc.name}` : "",
+              isOpen: false,
+              isReserved: true,
+            };
+          })
+        );
+      }
+      setCurrentStep(1);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function renderStep() {
     switch (currentStep) {
       case 0:
@@ -128,6 +269,8 @@ function WizardInner() {
           <StepDetails
             sample={sample}
             onNext={() => setCurrentStep(1)}
+            onStartProcessing={handleStartProcessing}
+            submitting={submitting}
             inventoryItems={inventoryItems}
             uoms={uoms}
             reservedInventory={reservedInventory}

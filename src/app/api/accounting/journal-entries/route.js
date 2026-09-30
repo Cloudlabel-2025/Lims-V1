@@ -191,6 +191,9 @@ export async function POST(req) {
 
     return Response.json({ journalEntry }, { status: 201 });
   } catch (error) {
+    if (error.message?.includes("Journal entry contains an account outside this tenant") || error.message?.includes("Account") && error.message?.includes("not seeded")) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     return jsonError("Unable to post journal entry", error, 500);
   }
 }

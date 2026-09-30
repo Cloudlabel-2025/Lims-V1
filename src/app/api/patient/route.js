@@ -220,9 +220,15 @@ export async function GET(req) {
     const ageMax = clean(searchParams.get("ageMax"));
     const refDoctorOnly = searchParams.get("refDoctorOnly") === "true";
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, Number.parseInt(searchParams.get("limit") || "50", 10)));
+    const statusParam = clean(searchParams.get("status"));
+    const includeDeleted = searchParams.get("includeDeleted") === "true";
 
     let query = {};
+    if (statusParam === "deleted" || statusParam === "inactive") {
+      query.isDeleted = true;
+    } else if (!includeDeleted) {
+      query.isDeleted = { $ne: true };
+    }
     if (auth.session.doctorId) {
       const referredPatientIds = await BillingRecord.distinct("patient", {
         tenantId,

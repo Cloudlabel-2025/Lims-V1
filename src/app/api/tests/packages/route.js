@@ -32,7 +32,7 @@ export async function GET(req) {
 
     const { TestPackage } = await getTenantModels(auth.tenantId);
     const packages = await TestPackage.find(query)
-      .populate("tests", "name code price")
+      .populate("tests", "name code price status")
       .select("packageId name code description price tests status createdAt updatedAt")
       .sort({ name: 1 })
       .limit(50)
@@ -91,17 +91,33 @@ export async function POST(req) {
 
     if (tests.length === 0) return Response.json({ error: "At least one test must be included" }, { status: 400 });
 
-    const { TestPackage } = await getTenantModels(auth.tenantId);
+    const uniqueTests = [...new Set(tests.map(String))];
+    if (uniqueTests.length !== tests.length) {
+      return Response.json({ error: "Duplicate tests cannot be added to a package" }, { status: 400 });
+    }
+
+    const { TestPackage, TestDefinition } = await getTenantModels(auth.tenantId);
+    const testRecords = await TestDefinition.find({ _id: { $in: uniqueTests } }).select("_id name status").lean();
+    if (testRecords.length !== uniqueTests.length) {
+      return Response.json({ error: "One or more selected tests do not exist" }, { status: 400 });
+    }
+
+    const inactiveTests = testRecords.filter((t) => t.status === "inactive" || t.status === "Inactive");
+    if (inactiveTests.length > 0) {
+      const names = inactiveTests.map((t) => t.name).join(", ");
+      return Response.json({ error: `Cannot add inactive test(s) to package: ${names}` }, { status: 400 });
+    }
+
     const pkg = await TestPackage.create({
       name,
       code: code.toUpperCase() || undefined,
       description: clean(body.description),
       price,
-      tests,
+      tests: uniqueTests,
       status: body.status === "inactive" ? "inactive" : "active",
     });
 
-    await pkg.populate("tests", "name code price");
+    await pkg.populate("tests", "name code price status");
 
     return Response.json({ package: pkg }, { status: 201 });
   } catch (error) {

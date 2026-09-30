@@ -259,6 +259,37 @@ export async function PATCH(req, context) {
     } catch (packageError) {
       return NextResponse.json({ error: packageError.message }, { status: 400 });
     }
+
+    const staffLimit = selectedPackage.quotas?.staffUsers;
+    if (typeof staffLimit === "number" && staffLimit > 0) {
+      let quotaConnection = null;
+      try {
+        quotaConnection = await mongoose
+          .createConnection(lab.dbConnectionString, {
+            ...connectionOptions,
+            dbName: lab.dbName,
+          })
+          .asPromise();
+
+        const TenantUser = getUserModel(quotaConnection);
+        const activeStaffCount = await TenantUser.countDocuments({ status: "active" });
+        if (activeStaffCount > staffLimit) {
+          return NextResponse.json(
+            {
+              error: `Cannot switch to ${selectedPackage.name}: Current active staff count (${activeStaffCount}) exceeds package limit of ${staffLimit}. Please deactivate excess staff first.`,
+            },
+            { status: 400 }
+          );
+        }
+      } catch (quotaError) {
+        // In case of tenant connection error, fail gracefully or bubble if error
+      } finally {
+        if (quotaConnection) {
+          await quotaConnection.close();
+        }
+      }
+    }
+
     const subscriptionPlan = legacyPlanForPackage(selectedPackage);
     const adminEmailChanged = Boolean(rawAdminEmail && rawAdminEmail !== existingAdminEmail);
     const adminPasswordChanged = Boolean(adminPassword);

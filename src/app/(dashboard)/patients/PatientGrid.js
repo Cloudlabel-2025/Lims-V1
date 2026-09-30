@@ -18,7 +18,7 @@ function getGradientForName(name) {
   return PREMIUM_GRADIENTS[code % PREMIUM_GRADIENTS.length];
 }
 
-function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatient, onDeletePatient, onProcessBill, subscription }) {
+function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatient, onDeletePatient, onRestorePatient, onProcessBill, subscription }) {
   return (
     <div className="patient-directory-grid">
       {patients.map((patient) => {
@@ -252,6 +252,39 @@ function PatientGrid({ patients, selectedPatientId, onSelectPatient, onEditPatie
                     }}
                   >
                     {Icons.trash}
+                  </button>
+                )}
+                {patient.isDeleted && onRestorePatient && (
+                  <button
+                    type="button"
+                    className="btn-lims-secondary"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (window.confirm(`Restore patient ${patient.patientId} (${patient.name})?`)) {
+                        onRestorePatient(patient._id);
+                      }
+                    }}
+                    aria-label={`Restore ${patient.name}`}
+                    title="Restore patient"
+                    style={{
+                      height: "32px",
+                      minHeight: "32px",
+                      borderRadius: "8px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
+                      padding: "0 8px",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      color: "#059669",
+                      borderColor: "#a7f3d0",
+                      background: "#ecfdf5",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <span>↺</span>
+                    <span>Restore</span>
                   </button>
                 )}
               </div>

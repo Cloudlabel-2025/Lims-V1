@@ -63,7 +63,7 @@ export const InventoryItemSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 60,
+      maxlength: 120,
       index: true,
     },
     genericName: {

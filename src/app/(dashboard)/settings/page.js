@@ -110,6 +110,59 @@ export default function LabAdminSettingsPage() {
   const [savingBranding, setSavingBranding] = useState(false);
   const [savingNumbering, setSavingNumbering] = useState(false);
 
+  // Notification preferences states
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    reports: true,
+    inventory: true,
+    samples: true,
+    doctors: true,
+    billing: true,
+    subscription: true,
+  });
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const [savingNotifs, setSavingNotifs] = useState(false);
+
+  useEffect(() => {
+    async function loadNotifPrefs() {
+      try {
+        setLoadingNotifs(true);
+        const res = await fetch("/api/settings/notifications", { credentials: "include" });
+        const data = await res.json();
+        if (res.ok && data.preferences) {
+          setNotificationPrefs(data.preferences);
+        }
+      } catch {
+        /* noop */
+      } finally {
+        setLoadingNotifs(false);
+      }
+    }
+    loadNotifPrefs();
+  }, []);
+
+  const handleSaveNotificationPrefs = async (e) => {
+    e.preventDefault();
+    setSavingNotifs(true);
+    setSettingsError("");
+    setRoleMessage("");
+    try {
+      const res = await fetch("/api/settings/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ preferences: notificationPrefs }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save notification preferences");
+      setRoleMessage("Notification preferences saved successfully.");
+      if (data.preferences) setNotificationPrefs(data.preferences);
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setSavingNotifs(false);
+    }
+  };
+
   useEffect(() => {
     if (theme) {
       setLabName(theme.labName || "");
@@ -600,6 +653,12 @@ export default function LabAdminSettingsPage() {
             Numbering Formats
           </button>
         )}
+        <button
+          className={activeTab === "notifications" ? "active" : ""}
+          onClick={() => setActiveTab("notifications")}
+        >
+          Notification Preferences
+        </button>
       </div>
 
       {loadingSettings ? (
@@ -869,6 +928,58 @@ export default function LabAdminSettingsPage() {
           </form>
         </section>
         )
+      ) : activeTab === "notifications" ? (
+        <section className="settings-panel">
+          <div className="settings-panel-header">
+            <h2>Notification Preferences</h2>
+            <p>Choose which notification categories appear in your topbar alerts and workspace notifications.</p>
+          </div>
+
+          <form onSubmit={handleSaveNotificationPrefs} className="p-4">
+            {loadingNotifs ? (
+              <p className="developer-empty">Loading notification preferences...</p>
+            ) : (
+              <div className="settings-notif-categories-grid">
+                {[
+                  { key: "reports", title: "Diagnostic Reports", desc: "Alerts when patient diagnostic reports are released or need verification." },
+                  { key: "inventory", title: "Inventory & Stock Alerts", desc: "Warnings when reagents or consumables drop below reorder level." },
+                  { key: "samples", title: "Sample Processing", desc: "Notifications for stale samples pending in testing for over 24 hours." },
+                  { key: "doctors", title: "Doctor Availability", desc: "Alerts when referring doctors are inactive or marked on leave." },
+                  { key: "billing", title: "Doctor Test Requests & Billing", desc: "Notifications for new test requests submitted from Doctor Portal." },
+                  { key: "subscription", title: "Subscription & Usage Quotas", desc: "Renewal reminders, package updates, and 80%+ usage threshold alerts." },
+                ].map((cat) => (
+                  <div key={cat.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", border: "1px solid var(--color-border, #e2e8f0)", borderRadius: "8px", marginBottom: "12px", background: "var(--color-card, #ffffff)" }}>
+                    <div>
+                      <strong style={{ display: "block", fontSize: "14px", marginBottom: "4px" }}>{cat.title}</strong>
+                      <span style={{ fontSize: "13px", color: "var(--color-text-muted, #64748b)" }}>{cat.desc}</span>
+                    </div>
+                    <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer", marginLeft: "16px" }}>
+                      <input
+                        type="checkbox"
+                        checked={notificationPrefs[cat.key] !== false}
+                        onChange={(e) => setNotificationPrefs((prev) => ({ ...prev, [cat.key]: e.target.checked }))}
+                        style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                      />
+                      <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: "500" }}>
+                        {notificationPrefs[cat.key] !== false ? "Enabled" : "Disabled"}
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 border-top pt-3 d-flex justify-content-end">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={savingNotifs || loadingNotifs}
+              >
+                {savingNotifs ? "Saving preferences..." : "Save Preferences"}
+              </button>
+            </div>
+          </form>
+        </section>
       ) : (
         <section className="settings-panel">
           <div className="settings-panel-header">

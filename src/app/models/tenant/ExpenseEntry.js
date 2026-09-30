@@ -37,6 +37,13 @@ export const ExpenseEntrySchema = new mongoose.Schema(
     tenantId: { type: String, required: true, trim: true, lowercase: true, index: true },
     attachmentUrl: { type: String, trim: true },
     journalEntryId: { type: mongoose.Schema.Types.ObjectId, ref: "JournalEntry" },
+    isRecurring: { type: Boolean, default: false },
+    recurringInterval: {
+      type: String,
+      enum: ["daily", "weekly", "monthly", "yearly", null],
+      default: null,
+    },
+    nextDueDate: { type: Date },
   },
   { timestamps: true }
 );

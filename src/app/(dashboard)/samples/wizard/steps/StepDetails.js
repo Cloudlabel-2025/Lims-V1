@@ -2,7 +2,7 @@
 
 import { Icons } from "@/app/components/Icons";
 
-export default function StepDetails({ sample, onNext, inventoryItems = [], uoms = [], reservedInventory = [], setReservedInventory }) {
+export default function StepDetails({ sample, onNext, onStartProcessing, submitting = false, inventoryItems = [], uoms = [], reservedInventory = [], setReservedInventory }) {
   const investigations = sample.investigations?.length
     ? sample.investigations
     : [{ testSnapshot: sample.testSnapshot }];
@@ -48,15 +48,27 @@ export default function StepDetails({ sample, onNext, inventoryItems = [], uoms 
   };
 
   const getInventoryRowStatus = (entry) => {
-    const item = inventoryItems.find((inv) => inv._id === entry.item);
-    const uom = uoms.find((unit) => unit._id === entry.uom);
-    if (!item) return null;
+    if (!entry.item) {
+      return {
+        tone: "danger",
+        blocked: true,
+        message: "Please select an inventory item or remove this row.",
+      };
+    }
+    const item = inventoryItems.find((inv) => String(inv._id) === String(entry.item));
+    const uom = uoms.find((unit) => String(unit._id) === String(entry.uom));
+    if (!item) {
+      return {
+        tone: "danger",
+        blocked: true,
+        message: "Selected inventory item is not available in the inventory catalog.",
+      };
+    }
 
     const symbol = item.baseUom?.symbol || uom?.symbol || "";
     const available = Math.max(0, Number(item.stockOnHandBase || 0) - Number(item.reservedBase || 0));
     const reorderLevel = Number(item.reorderLevelBase || 0);
-    const requested = Math.max(0, Number(entry.quantity || 0) * (Number(uom?.conversionToBase) || 1));
-    const balanceAfterSample = available - requested;
+    const qty = Number(entry.quantity);
 
     if (available <= 0) {
       return {
@@ -66,6 +78,17 @@ export default function StepDetails({ sample, onNext, inventoryItems = [], uoms 
       };
     }
 
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return {
+        tone: "danger",
+        blocked: true,
+        message: `Please enter a valid quantity greater than 0. Available: ${formatStock(available, symbol)}.`,
+      };
+    }
+
+    const requested = Math.max(0, qty * (Number(uom?.conversionToBase) || 1));
+    const balanceAfterSample = available - requested;
+
     if (requested > available) {
       return {
         tone: "danger",
@@ -74,7 +97,7 @@ export default function StepDetails({ sample, onNext, inventoryItems = [], uoms 
       };
     }
 
-    if (requested > 0 && balanceAfterSample <= 0) {
+    if (balanceAfterSample <= 0) {
       return {
         tone: "warning",
         blocked: false,
@@ -82,7 +105,7 @@ export default function StepDetails({ sample, onNext, inventoryItems = [], uoms 
       };
     }
 
-    if (requested > 0 && balanceAfterSample <= reorderLevel) {
+    if (balanceAfterSample <= reorderLevel) {
       return {
         tone: "warning",
         blocked: false,
@@ -177,7 +200,19 @@ export default function StepDetails({ sample, onNext, inventoryItems = [], uoms 
                 return (
                 <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(220px, 2fr) minmax(110px, 1fr) minmax(130px, 1fr) auto", gap: 12, alignItems: "end" }}>
                   <div style={{ flex: 2, position: "relative" }}>
-                    <label className="lims-label" style={{ fontSize: 11 }}>Inventory Item</label>
+                    <label className="lims-label" style={{ fontSize: 11, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span>Inventory Item</span>
+                      {entry.requiredByTest && (
+                        <span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                          Configured for Test
+                        </span>
+                      )}
+                      {entry.isReserved && (
+                        <span style={{ fontSize: 10, background: "#dcfce7", color: "#15803d", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                          Reserved
+                        </span>
+                      )}
+                    </label>
                     <input
                       type="text"
                       className="lims-input"
@@ -304,10 +339,24 @@ export default function StepDetails({ sample, onNext, inventoryItems = [], uoms 
         </div>
       </div>
 
+      {inventoryBlocker && (
+        <div style={{ marginBottom: 16, padding: "10px 14px", background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 6, color: "#dc2626", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+          <span>{Icons.alertCircle}</span>
+          <div>
+            <strong>Cannot proceed with sample processing:</strong> {inventoryBlocker.message}
+          </div>
+        </div>
+      )}
+
       <div className="wizard-nav">
         <div />
-        <button className="dash-btn-primary" onClick={onNext} disabled={Boolean(inventoryBlocker)} title={inventoryBlocker?.message || ""}>
-          Next {Icons.arrowRight}
+        <button
+          className="dash-btn-primary"
+          onClick={sample.status === "processing" ? onNext : (onStartProcessing || onNext)}
+          disabled={Boolean(inventoryBlocker) || submitting}
+          title={inventoryBlocker?.message || ""}
+        >
+          {submitting ? "Starting..." : sample.status === "processing" ? <>Next {Icons.arrowRight}</> : <>Start Processing {Icons.arrowRight}</>}
         </button>
       </div>
     </div>

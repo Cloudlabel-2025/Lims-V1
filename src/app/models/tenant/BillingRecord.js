@@ -140,7 +140,16 @@ export const BillingRecordSchema = new mongoose.Schema(
       cash: { type: Number, default: 0 },
       card: { type: Number, default: 0 },
       online: { type: Number, default: 0 },
+      cheque: { type: Number, default: 0 },
       corporate: { type: Number, default: 0 },
+    },
+    corporateAccount: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CorporateAccount",
+      index: true,
+    },
+    paymentMeta: {
+      type: mongoose.Schema.Types.Mixed,
     },
     billingStatus: {
       type: String,

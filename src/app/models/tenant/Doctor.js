@@ -78,6 +78,7 @@ const doctorSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
+        unique: true,
         lowercase: true,
         trim: true,
         validate: {
@@ -151,8 +152,20 @@ const doctorSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["Active", "On Leave", "Inactive"],
+        enum: ["Active", "On Leave", "Inactive", "Archived"],
         default: "Active"
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+    deletedBy: {
+        type: String,
+        default: null
     },
     pendingPayout: {
         type: Number,

@@ -1,4 +1,5 @@
 import { jsonError } from "@/app/lib/api-response";
+import { writeAuditLog } from "@/app/lib/audit";
 import { hasPermission, requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { getTenantConfig } from "@/app/lib/tenant-cache";
 import { getTenantModels } from "@/app/lib/tenant-db";
@@ -7,6 +8,7 @@ import {
   getPermissionCatalogForEnabledModules,
   normalizeRolePermissions,
 } from "@/app/lib/rbac";
+import rbacConfig from "@/app/lib/rbac-config.json";
 
 const SAFE_NAME = /^[A-Za-z0-9 .&'\/,()@_-]+$/;
 const URL_RE = /https?:\/\//;
@@ -72,9 +74,11 @@ async function getAllowedPermissionsForTenant(auth) {
   };
 }
 
+function isDoctorRole(name) {
+  return /^doctor(\s|$)/i.test(clean(name));
+}
+
 const LEGACY_SEEDED_NAMES = [
-  "Doctor Regular",
-  "Lab Technician",
   "Receptionist",
   "Accountant",
   "Phlebotomist",
@@ -105,16 +109,32 @@ export async function GET(req) {
       ],
     });
     for (const extraRole of extraRoles) {
+      if (isDoctorRole(extraRole.name) || extraRole.name === "Lab Technician") continue;
       const isAssigned = await User.exists({ role: extraRole._id });
       if (!isAssigned) {
         await Role.deleteOne({ _id: extraRole._id });
       }
     }
 
+    // Ensure standard Lab Technician role exists if missing
+    let techRole = await Role.findOne({ name: "Lab Technician" });
+    if (!techRole) {
+      const template = rbacConfig.roleTemplates.find((t) => t.name === "Lab Technician");
+      if (template) {
+        await Role.create({
+          name: "Lab Technician",
+          description: template.description || "Handles tests and report preparation.",
+          permissions: normalizePermissions(template.permissions, allowedPermissionKeys, enabledModules),
+          status: "active",
+          isSystemRole: false,
+        });
+      }
+    }
+
     const roles = await Role.find({ status: "active" }).sort({
       name: 1,
     });
-    const uniqueRoles = dedupeRolesByName(roles);
+    const uniqueRoles = dedupeRolesByName(roles).filter((role) => !isDoctorRole(role.name));
 
     return Response.json({
       roles: uniqueRoles.map((role) => ({
@@ -141,12 +161,14 @@ export async function POST(req) {
     const roles = await Role.find({ status: "active" }).sort({ name: 1 });
 
     return Response.json({
-      roles: dedupeRolesByName(roles).map((role) => ({
-        ...serializeRole(role),
-        permissions: role.permissions?.includes("*")
-          ? [...allowedPermissionKeys]
-          : normalizePermissions(role.permissions, allowedPermissionKeys, enabledModules),
-      })),
+      roles: dedupeRolesByName(roles)
+        .filter((role) => !isDoctorRole(role.name))
+        .map((role) => ({
+          ...serializeRole(role),
+          permissions: role.permissions?.includes("*")
+            ? [...allowedPermissionKeys]
+            : normalizePermissions(role.permissions, allowedPermissionKeys, enabledModules),
+        })),
     });
   } catch (error) {
     return jsonError("Unable to fetch roles", error, 500);
@@ -168,7 +190,7 @@ export async function PATCH(req) {
 
     for (const item of incomingRoles) {
       const name = clean(item.name).slice(0, 80);
-      if (!name || name.length < 2) continue;
+      if (!name || name.length < 2 || isDoctorRole(name)) continue;
       if (URL_RE.test(name)) return Response.json({ error: "URLs are not allowed in role name" }, { status: 400 });
       if (!SAFE_NAME.test(name)) return Response.json({ error: "Role name contains invalid characters" }, { status: 400 });
 
@@ -181,6 +203,7 @@ export async function PATCH(req) {
         }));
 
       if (existingRole) {
+        const oldPermissions = [...(existingRole.permissions || [])];
         if (!existingRole.isDefaultAdmin) {
           existingRole.name = name;
         }
@@ -189,6 +212,17 @@ export async function PATCH(req) {
         existingRole.status = "active";
         await existingRole.save();
         savedRoles.push(existingRole);
+
+        await writeAuditLog(req, auth, {
+          action: "role.updated",
+          resourceType: "Role",
+          resourceId: existingRole._id,
+          metadata: {
+            roleName: existingRole.name,
+            oldPermissions,
+            newPermissions: permissions,
+          },
+        });
       } else {
         const role = await Role.create({
           name,
@@ -199,13 +233,24 @@ export async function PATCH(req) {
           createdBy: auth.session.userId,
         });
         savedRoles.push(role);
+
+        await writeAuditLog(req, auth, {
+          action: "role.created",
+          resourceType: "Role",
+          resourceId: role._id,
+          metadata: { roleName: role.name, permissions },
+        });
       }
     }
 
     const roles = await Role.find({ status: "active" }).sort({
       name: 1,
     });
-    return Response.json({ roles: dedupeRolesByName(roles).map(serializeRole) });
+    return Response.json({
+      roles: dedupeRolesByName(roles)
+        .filter((role) => !isDoctorRole(role.name))
+        .map(serializeRole),
+    });
   } catch (error) {
     if (error.code === 11000) {
       return Response.json({ error: duplicateRoleMessage(error) }, { status: 409 });
@@ -228,24 +273,43 @@ export async function DELETE(req) {
       return Response.json({ error: "Role ID is required" }, { status: 400 });
     }
 
-    const { Role } = await getTenantModels(auth.tenantId);
+    const { Role, User } = await getTenantModels(auth.tenantId);
     const role = await Role.findOne({ _id: roleId });
 
     if (!role) {
       return Response.json({ error: "Role not found" }, { status: 404 });
     }
 
-    if (role.isDefaultAdmin) {
-      return Response.json({ error: "Default admin role cannot be deleted" }, { status: 403 });
+    if (role.isDefaultAdmin || isDoctorRole(role.name)) {
+      return Response.json({ error: "System role cannot be deleted" }, { status: 403 });
+    }
+
+    const assignedUsersCount = await User.countDocuments({ role: role._id });
+    if (assignedUsersCount > 0) {
+      return Response.json(
+        { error: "Cannot delete role assigned to active staff users. Reassign users first." },
+        { status: 400 }
+      );
     }
 
     await role.deleteOne();
+
+    await writeAuditLog(req, auth, {
+      action: "role.deleted",
+      resourceType: "Role",
+      resourceId: roleId,
+      metadata: { roleName: role.name },
+    });
 
     const roles = await Role.find({ status: "active" }).sort({
       name: 1,
     });
 
-    return Response.json({ roles: dedupeRolesByName(roles).map(serializeRole) });
+    return Response.json({
+      roles: dedupeRolesByName(roles)
+        .filter((role) => !isDoctorRole(role.name))
+        .map(serializeRole),
+    });
   } catch (error) {
     return jsonError("Unable to delete role", error, 500);
   }

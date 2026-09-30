@@ -73,6 +73,27 @@ const TestParameterSchema = new mongoose.Schema(
     normalMax: {
       type: Number,
     },
+    ageMin: {
+      type: Number,
+      default: 0,
+    },
+    ageMax: {
+      type: Number,
+      default: 120,
+    },
+    ageRanges: [
+      {
+        label: { type: String, trim: true },
+        ageMin: { type: Number },
+        ageMax: { type: Number },
+        normalMin: { type: Number },
+        normalMax: { type: Number },
+        maleMin: { type: Number },
+        maleMax: { type: Number },
+        femaleMin: { type: Number },
+        femaleMax: { type: Number },
+      },
+    ],
     required: {
       type: Boolean,
       default: true,

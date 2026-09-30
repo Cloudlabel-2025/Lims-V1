@@ -10,7 +10,7 @@ import PaginationControls from "../_components/PaginationControls";
 import DownloadDropdown from "../_components/DownloadDropdown";
 import BackToDashboard from "../_components/BackToDashboard";
 
-const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxPercentage: "", paidFrom: "vendor-payable", attachmentUrl: "" };
+const emptyExpense = { category: "reagent", vendorName: "", amount: "", taxPercentage: "", paidFrom: "vendor-payable", attachmentUrl: "", isRecurring: false, recurringInterval: "monthly" };
 
 function ExpensesTable({ expenses, onEdit, onDelete }) {
   return (
@@ -387,6 +387,30 @@ export default function ExpensesPage() {
           <Field label="Receipt URL" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <input className="lims-input" type="url" maxLength={500} value={form.attachmentUrl} onChange={(e) => { const v = e.target.value; if (v && !isValidUrl(v)) { setFormErrors((p) => ({ ...p, attachmentUrl: "Enter a valid URL (http:// or https://)" })); } else { setFormErrors((p) => ({ ...p, attachmentUrl: "" })); } setForm({ ...form, attachmentUrl: v }); }} style={inputStyle()} placeholder="https://" />
             {formErrors.attachmentUrl && <small style={{ color: "var(--error)", fontSize: 10, display: "block", marginTop: 2 }}>{formErrors.attachmentUrl}</small>}
+          </Field>
+
+          <Field label="Recurring Expense" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", marginTop: 6 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.isRecurring)}
+                onChange={(e) => setForm({ ...form, isRecurring: e.target.checked })}
+              />
+              Mark as Recurring
+            </label>
+            {form.isRecurring && (
+              <select
+                className="lims-input"
+                value={form.recurringInterval || "monthly"}
+                onChange={(e) => setForm({ ...form, recurringInterval: e.target.value })}
+                style={{ ...inputStyle(), marginTop: 6 }}
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            )}
           </Field>
 
           <button className="btn-lims-primary" disabled={saving} style={{ height: 38, gridColumn: "1 / -1" }}>{saving ? "Posting..." : "Record Expense"}</button>

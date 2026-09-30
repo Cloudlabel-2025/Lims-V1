@@ -2,6 +2,9 @@ import { jsonError } from "@/app/lib/api-response";
 import { writeAuditLog } from "@/app/lib/audit";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
+import { resolveReferenceRange, getFlag } from "@/app/lib/reference-ranges";
+
+export { resolveReferenceRange, getFlag };
 
 function clean(value) {
   return String(value || "").trim();
@@ -10,16 +13,6 @@ function clean(value) {
 function isExponentialNotation(value) {
   if (typeof value === "string" && /[eE]/.test(value)) return true;
   return false;
-}
-
-function getFlag(parameter, rawValue) {
-  if (rawValue === "" || rawValue === null || rawValue === undefined) return "not-entered";
-
-  const value = Number(rawValue);
-  if (!Number.isFinite(value)) return "normal";
-  if (Number.isFinite(parameter.normalMin) && value < parameter.normalMin) return "low";
-  if (Number.isFinite(parameter.normalMax) && value > parameter.normalMax) return "high";
-  return "normal";
 }
 
 export async function GET(req) {
@@ -46,14 +39,19 @@ export async function GET(req) {
       }
     }
 
-    // Doctor Regular: scope reports to patients referred by this doctor only
+    // Doctor Portal / Regular: scope reports to patients referred by this doctor only and released status
     if (auth.session.userType === "tenant" && auth.session.doctorId) {
-      const { BillingRecord } = await getTenantModels(auth.tenantId);
-      const referredPatientIds = await BillingRecord.distinct("patient", {
-        referralDoctor: auth.session.doctorId,
-      });
+      const { BillingRecord, Doctor, Patient } = await getTenantModels(auth.tenantId);
+      const doctor = await Doctor.findById(auth.session.doctorId).select("name").lean();
+      const [referredByBill, referredByName] = await Promise.all([
+        BillingRecord.distinct("patient", {
+          referralDoctor: auth.session.doctorId,
+        }),
+        doctor ? Patient.distinct("_id", { refDoctorName: doctor.name }) : [],
+      ]);
+      const referredPatientIds = Array.from(new Set([...referredByBill.map(String), ...referredByName.map(String)]));
       query.patient = patientId
-        ? { $in: referredPatientIds.map(String).includes(patientId) ? [patientId] : [] }
+        ? { $in: referredPatientIds.includes(patientId) ? [patientId] : [] }
         : { $in: referredPatientIds };
       query.status = "released";
     }
@@ -139,16 +137,21 @@ export async function POST(req) {
           missingRequired.push(parameter.name);
         }
 
+        const resolved = resolveReferenceRange(parameter, patient);
         return {
           key: parameter.key,
           name: parameter.name,
           unit: parameter.unit,
-          normalMin: parameter.normalMin,
-          normalMax: parameter.normalMax,
+          normalMin: Number.isFinite(resolved.min) ? resolved.min : parameter.normalMin,
+          normalMax: Number.isFinite(resolved.max) ? resolved.max : parameter.normalMax,
+          ageMin: parameter.ageMin,
+          ageMax: parameter.ageMax,
+          outOfAgeRange: resolved.outOfAgeRange || false,
+          ageGap: resolved.ageGap || undefined,
           required: parameter.required,
           value: Number.isFinite(numericValue) ? numericValue : undefined,
           textValue,
-          flag: getFlag(parameter, textValue),
+          flag: getFlag(parameter, textValue, patient),
         };
       });
 

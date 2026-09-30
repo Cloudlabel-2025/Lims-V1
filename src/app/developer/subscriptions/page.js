@@ -510,6 +510,7 @@ export default function DeveloperSubscriptionsPage() {
   const [activeView, setActiveView] = useState("packages");
   const [packageQuery, setPackageQuery] = useState("");
   const [packageStatus, setPackageStatus] = useState("all");
+  const [upgradeFilter, setUpgradeFilter] = useState("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -609,6 +610,13 @@ export default function DeveloperSubscriptionsPage() {
     }
   }
 
+  const pendingUpgradesCount = useMemo(() => upgradeRequests.filter((r) => r.status === "pending").length, [upgradeRequests]);
+
+  const filteredUpgradeRequests = useMemo(() => {
+    if (upgradeFilter === "all") return upgradeRequests;
+    return upgradeRequests.filter((r) => r.status === upgradeFilter);
+  }, [upgradeRequests, upgradeFilter]);
+
   async function reviewUpgrade(requestId, action) {
     setReviewingRequestId(requestId);
     setError("");
@@ -622,7 +630,17 @@ export default function DeveloperSubscriptionsPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to review upgrade request");
-      setUpgradeRequests((current) => current.filter((item) => item.id !== requestId));
+      setUpgradeRequests((current) =>
+        current.map((item) =>
+          item.id === requestId
+            ? {
+                ...item,
+                status: payload.request?.status || (action === "approve" ? "approved" : "rejected"),
+                reviewedAt: payload.request?.reviewedAt || new Date().toISOString(),
+              }
+            : item
+        )
+      );
       setNotice(payload.message);
     } catch (reviewError) {
       setError(reviewError.message);
@@ -657,7 +675,7 @@ export default function DeveloperSubscriptionsPage() {
           Package catalog <span>{packages.length}</span>
         </button>
         <button type="button" className={activeView === "upgrades" ? "active" : ""} onClick={() => setActiveView("upgrades")}>
-          Upgrade requests <span className={upgradeRequests.length ? "attention" : ""}>{upgradeRequests.length}</span>
+          Upgrade requests <span className={pendingUpgradesCount ? "attention" : ""}>{pendingUpgradesCount}</span>
         </button>
         <button type="button" className={activeView === "labs" ? "active" : ""} onClick={() => setActiveView("labs")}>
           Lab usage <span>{labs.length}</span>
@@ -665,23 +683,64 @@ export default function DeveloperSubscriptionsPage() {
       </nav>
 
       {activeView === "upgrades" && <section className="subscription-upgrade-requests subscription-workspace-panel">
-        <div className="subscription-labs-heading">
-          <div><h2>Upgrade requests</h2><p>Approve a request to publish the selected Version 1 package to the lab.</p></div>
-          <span>{upgradeRequests.length} pending</span>
+        <div className="subscription-labs-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h2>Upgrade requests &amp; History</h2>
+            <p>Review upgrade requests and monitor subscription change history across tenant labs.</p>
+          </div>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <select
+              value={upgradeFilter}
+              onChange={(e) => setUpgradeFilter(e.target.value)}
+              aria-label="Filter upgrade request status"
+              style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid var(--color-border, #cbd5e1)", fontSize: "13px" }}
+            >
+              <option value="all">All requests ({upgradeRequests.length})</option>
+              <option value="pending">Pending ({pendingUpgradesCount})</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
         </div>
-        {upgradeRequests.length === 0 ? <p className="developer-empty">No upgrade requests are waiting for review.</p> : (
+        {filteredUpgradeRequests.length === 0 ? (
+          <p className="developer-empty">No upgrade requests matching current filter.</p>
+        ) : (
           <div className="subscription-upgrade-request-list">
-            {upgradeRequests.map((request) => (
+            {filteredUpgradeRequests.map((request) => (
               <article key={request.id}>
                 <div>
-                  <strong>{request.tenantId}</strong>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <strong>{request.tenantId}</strong>
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                        backgroundColor: request.status === "approved" ? "#dcfce7" : request.status === "rejected" ? "#fee2e2" : "#fef3c7",
+                        color: request.status === "approved" ? "#166534" : request.status === "rejected" ? "#991b1b" : "#92400e",
+                      }}
+                    >
+                      {request.status}
+                    </span>
+                  </div>
                   <span>{request.fromPackageName} → {request.toPackageName} · Version 1</span>
-                  <small>Requested by {request.requestedByEmail || "Lab administrator"} on {new Date(request.requestedAt).toLocaleDateString("en-IN")}</small>
+                  <small>
+                    Requested by {request.requestedByEmail || "Lab administrator"} on {new Date(request.requestedAt).toLocaleDateString("en-IN")}
+                    {request.reviewedAt && ` · Reviewed on ${new Date(request.reviewedAt).toLocaleDateString("en-IN")}`}
+                  </small>
                 </div>
-                <div className="subscription-upgrade-request-actions">
-                  <button type="button" className="reject" disabled={reviewingRequestId === request.id} onClick={() => reviewUpgrade(request.id, "reject")}>Reject</button>
-                  <button type="button" disabled={reviewingRequestId === request.id} onClick={() => reviewUpgrade(request.id, "approve")}>{reviewingRequestId === request.id ? "Processing..." : "Approve"}</button>
-                </div>
+                {request.status === "pending" ? (
+                  <div className="subscription-upgrade-request-actions">
+                    <button type="button" className="reject" disabled={reviewingRequestId === request.id} onClick={() => reviewUpgrade(request.id, "reject")}>Reject</button>
+                    <button type="button" disabled={reviewingRequestId === request.id} onClick={() => reviewUpgrade(request.id, "approve")}>{reviewingRequestId === request.id ? "Processing..." : "Approve"}</button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "12px", fontWeight: "600", color: request.status === "approved" ? "#166534" : "#991b1b" }}>
+                    {request.status === "approved" ? "Plan Changed" : "Request Rejected"}
+                  </div>
+                )}
               </article>
             ))}
           </div>

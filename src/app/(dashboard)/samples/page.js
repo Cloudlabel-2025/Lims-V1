@@ -52,6 +52,7 @@ export default function SamplesPage() {
   const [rejecting, setRejecting] = useState({ id: null, reason: "", saving: false });
   const canCreateSamples = hasPermission(user, "samples.create");
   const canViewSamples = hasPermission(user, "samples.view");
+  const canCollectSamples = hasPermission(user, "samples.collect");
 
   const filteredSamples = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -179,10 +180,18 @@ export default function SamplesPage() {
                 const investigationNames = investigations.map((item) => item.testSnapshot?.name).filter(Boolean);
                 const investigationCodes = investigations.map((item) => item.testSnapshot?.code).filter(Boolean);
                 const categories = [...new Set(investigations.map((item) => item.testSnapshot?.categoryName).filter(Boolean))];
-                const canProcess = ACTIVE_WORKFLOW_STATUSES.includes(sample.status);
+                const isRegistered = sample.status === "registered";
+                const canCollectThis = isRegistered ? canCollectSamples : true;
+                const canProcess = ACTIVE_WORKFLOW_STATUSES.includes(sample.status) && canCollectThis;
                 const canReject = !TERMINAL_STATUSES.includes(sample.status);
                 const lastCustody = sample.custodyLog?.[sample.custodyLog.length - 1];
-                const processLabel = sample.status === "registered" ? "Begin process" : sample.status === "processing" ? "Enter results" : "Continue";
+                const processLabel = isRegistered
+                  ? "Collect sample"
+                  : sample.status === "collected"
+                  ? "Start processing"
+                  : sample.status === "processing"
+                  ? "Enter results"
+                  : "Continue";
                 return (
                   <article key={sample._id} className={`samples-table-row status-${sample.status}`} role="row">
                     <div className="samples-specimen-cell" role="cell"><span>{Icons.vial}</span><div><strong>{sample.sampleId}</strong><code>{sample.barcode || "No barcode"}</code><small>Registered {formatDateTime(sample.createdAt)}</small></div></div>
@@ -191,9 +200,18 @@ export default function SamplesPage() {
                     <div className="samples-custody-cell" role="cell"><strong>{sample.collectionTime ? `Collected ${formatDateTime(sample.collectionTime)}` : "Collection pending"}</strong><small>Received: {formatDateTime(sample.receivedAt)}</small><small>{lastCustody ? `${lastCustody.handledBy} · ${formatDateTime(lastCustody.timestamp)}` : sample.receivedBy || "Custodian not recorded"}</small></div>
                     <div className="samples-status-cell" role="cell"><em className={sample.status}>{formatStatus(sample.status)}</em>{sample.billingRecord?.priority === "urgent" && <strong>Urgent</strong>}{sample.status === "rejected" && sample.rejectionReason && <p>{sample.rejectionReason}</p>}</div>
                     <div className="samples-row-actions" role="cell">
-                      {canProcess && canViewSamples && <button type="button" className="primary" onClick={() => router.push(`/samples/wizard?sampleId=${sample._id}`)}>{Icons.chevronRight} {processLabel}</button>}
+                      {canProcess && canViewSamples && (
+                        <button type="button" className="primary" onClick={() => router.push(`/samples/wizard?sampleId=${sample._id}`)}>
+                          {Icons.chevronRight} {processLabel}
+                        </button>
+                      )}
+                      {isRegistered && !canCollectSamples && canViewSamples && (
+                        <span className="text-muted" style={{ fontSize: 12, color: "#64748b" }} title="Requires Collect Samples permission">
+                          Collection permission required
+                        </span>
+                      )}
                       {canReject && canViewSamples && <button type="button" className="danger" onClick={() => setRejecting({ id: sample._id, reason: "", saving: false })}>{Icons.alertCircle} Reject</button>}
-                      {!canProcess && !canReject && <span>Workflow closed</span>}
+                      {!canProcess && !canReject && !isRegistered && <span>Workflow closed</span>}
                     </div>
                   </article>
                 );

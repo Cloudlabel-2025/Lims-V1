@@ -87,9 +87,9 @@ function isPhone(value) {
 function validateLabName(value) {
   const name = String(value || "").trim();
   if (name.length < 2) return "Lab name must be at least 2 characters.";
-  if (name.length > 25) return "Lab name must not exceed 25 characters.";
-  if (!/^[A-Za-z0-9][A-Za-z0-9 .&'-]*[A-Za-z0-9]$/.test(name)) {
-    return "Lab name can include letters, numbers, spaces, and . & ' - only.";
+  if (name.length > 80) return "Lab name must not exceed 80 characters.";
+  if (!/^[A-Za-z0-9][A-Za-z0-9\s.&'()\/,-]*[A-Za-z0-9.)]$/.test(name)) {
+    return "Lab name can include letters, numbers, spaces, and . & ' - / , ( ) only.";
   }
   return "";
 }

@@ -62,6 +62,9 @@ export function getRequiredPermissionsForPath(pathname) {
 }
 
 export function canAccessPath(user, theme, pathname) {
+  if (user?.doctorId && (pathname === "/dashboard" || pathname?.startsWith("/doctor/"))) {
+    return true;
+  }
   if (pathname?.startsWith("/doctor/")) {
     if (!user?.doctorId) return false;
     return true;

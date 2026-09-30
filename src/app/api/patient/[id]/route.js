@@ -2,6 +2,9 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireTenantSession } from "@/app/lib/auth";
 import { normalizeDob } from "@/app/lib/patient-portal";
+import { writeAuditLog } from "@/app/lib/audit";
+import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
+import { getDeleteRestrictionReason } from "@/app/lib/deletion-policy";
 
 function clean(value) {
   return String(value || "").trim();
@@ -134,6 +137,34 @@ export async function PUT(req, { params }) {
       }
     }
 
+    if (body.action === "restore" || body.restore === true) {
+      const restored = await Patient.findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            isDeleted: false,
+            deletedAt: null,
+            deletedBy: null,
+            status: "active",
+          },
+        },
+        { new: true }
+      );
+
+      await writeAuditLog(req, auth, {
+        action: "patients.restored",
+        resourceType: "Patient",
+        resourceId: id,
+        metadata: {
+          patientId: existingPatient.patientId,
+          actor: auth.session.email || auth.session.userId || "System",
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return Response.json(restored);
+    }
+
     const patient = await Patient.findByIdAndUpdate(
       id,
       { $set: body },
@@ -143,6 +174,31 @@ export async function PUT(req, { params }) {
     if (!patient) {
       return Response.json({ error: "Patient not found" }, { status: 404 });
     }
+
+    // Record old and new values for audit trail
+    const changes = {};
+    for (const key of Object.keys(body)) {
+      const oldVal = existingPatient[key];
+      const newVal = patient[key];
+      if (String(oldVal ?? "") !== String(newVal ?? "")) {
+        changes[key] = {
+          old: oldVal !== undefined ? oldVal : null,
+          new: newVal !== undefined ? newVal : null,
+        };
+      }
+    }
+
+    await writeAuditLog(req, auth, {
+      action: "patients.updated",
+      resourceType: "Patient",
+      resourceId: patient._id,
+      metadata: {
+        patientId: patient.patientId,
+        actor: auth.session.email || auth.session.userId || "System",
+        timestamp: new Date().toISOString(),
+        changes,
+      },
+    });
 
     return Response.json(patient);
   } catch (err) {
@@ -155,10 +211,7 @@ export async function PUT(req, { params }) {
   }
 }
 
-import { getLabSubscriptionEntitlements } from "@/app/lib/subscription-service";
-import { getDeleteRestrictionReason } from "@/app/lib/deletion-policy";
-
-// ── DELETE: Delete single patient by ID ──
+// ── DELETE: Soft-delete patient by ID preserving links and history ──
 export async function DELETE(req, { params }) {
   try {
     const auth = requireTenantSession(req, "patients.delete");
@@ -179,9 +232,25 @@ export async function DELETE(req, { params }) {
       return Response.json({ error: "Deletion window expired", details: restrictionReason }, { status: 403 });
     }
 
-    await Patient.findByIdAndDelete(id);
+    patient.isDeleted = true;
+    patient.deletedAt = new Date();
+    patient.deletedBy = auth.session.email || auth.session.userId || "System";
+    patient.status = "inactive";
+    await patient.save();
 
-    return Response.json({ success: true, deletedPatient: patient.patientId });
+    await writeAuditLog(req, auth, {
+      action: "patients.deleted",
+      resourceType: "Patient",
+      resourceId: patient._id,
+      metadata: {
+        patientId: patient.patientId,
+        softDelete: true,
+        actor: auth.session.email || auth.session.userId || "System",
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return Response.json({ success: true, deletedPatient: patient.patientId, isDeleted: true });
   } catch (err) {
     console.error("DELETE /api/patient/[id] error:", err);
     return jsonError("Delete failed", err, 500);

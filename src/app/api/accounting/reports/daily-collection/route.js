@@ -30,13 +30,12 @@ export async function GET(req) {
 
     const { JournalEntry, Account } = await getTenantModels(auth.tenantId);
 
-    const match = { tenantId: auth.tenantId, sourceType: "payment" };
+    const match = { tenantId: auth.tenantId, sourceType: { $in: ["payment", "refund"] } };
     if (Object.keys(dateFilter).length) match.date = dateFilter;
 
     const pipeline = [
       { $match: match },
       { $unwind: "$lines" },
-      { $match: { "lines.debit": { $gt: 0 } } },
       {
         $lookup: {
           from: Account.collection.name,
@@ -47,12 +46,32 @@ export async function GET(req) {
       },
       { $unwind: "$account" },
       {
+        $match: {
+          $or: [
+            { "account.code": { $in: ["1001", "1002", "1003"] } },
+            { "account.subtype": { $in: ["cash", "bank", "upi"] } },
+          ],
+        },
+      },
+      {
+        $project: {
+          date: "$date",
+          code: "$account.code",
+          amount: {
+            $subtract: [
+              { $ifNull: ["$lines.debit", 0] },
+              { $ifNull: ["$lines.credit", 0] },
+            ],
+          },
+        },
+      },
+      {
         $group: {
           _id: {
             date: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-            code: "$account.code",
+            code: "$code",
           },
-          amount: { $sum: "$lines.debit" },
+          amount: { $sum: "$amount" },
         },
       },
       { $sort: { "_id.date": -1 } },
@@ -65,21 +84,22 @@ export async function GET(req) {
       const date = g._id.date;
       const code = g._id.code;
       if (!dailyMap[date]) dailyMap[date] = { date, cash: 0, card: 0, upi: 0, other: 0, total: 0 };
-      if (code === "1001") dailyMap[date].cash += g.amount;
-      else if (code === "1002") dailyMap[date].card += g.amount;
-      else dailyMap[date].other += g.amount;
-      dailyMap[date].total += g.amount;
+      if (code === "1001") dailyMap[date].cash = Math.round((dailyMap[date].cash + g.amount) * 100) / 100;
+      else if (code === "1002") dailyMap[date].card = Math.round((dailyMap[date].card + g.amount) * 100) / 100;
+      else if (code === "1003") dailyMap[date].upi = Math.round((dailyMap[date].upi + g.amount) * 100) / 100;
+      else dailyMap[date].other = Math.round((dailyMap[date].other + g.amount) * 100) / 100;
+      dailyMap[date].total = Math.round((dailyMap[date].total + g.amount) * 100) / 100;
     }
 
     const daily = Object.values(dailyMap).sort((a, b) => b.date.localeCompare(a.date));
 
-    const totalCollection = daily.reduce((s, d) => s + d.total, 0);
+    const totalCollection = Math.round(daily.reduce((s, d) => s + d.total, 0) * 100) / 100;
     const breakdown = daily.reduce(
       (b, d) => ({
-        cash: b.cash + d.cash,
-        card: b.card + d.card,
-        upi: 0,
-        other: b.other + d.other,
+        cash: Math.round((b.cash + d.cash) * 100) / 100,
+        card: Math.round((b.card + d.card) * 100) / 100,
+        upi: Math.round((b.upi + d.upi) * 100) / 100,
+        other: Math.round((b.other + d.other) * 100) / 100,
       }),
       { cash: 0, card: 0, upi: 0, other: 0 }
     );

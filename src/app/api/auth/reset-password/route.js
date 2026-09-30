@@ -1,6 +1,6 @@
 import { jsonError } from "@/app/lib/api-response";
 import connectMasterDB from "@/app/lib/master-db";
-import { hashPassword, validatePasswordPolicy } from "@/app/lib/password";
+import { comparePassword, hashPassword, validatePasswordPolicy } from "@/app/lib/password";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { normalizeTenantId } from "@/app/lib/tenant-resolver";
 import { getDeveloperUserModel } from "@/app/models/master/DeveloperUser";
@@ -130,10 +130,22 @@ export async function POST(req) {
       }
     }
 
+    if (user.passwordHash) {
+      const isSamePassword = await comparePassword(password, user.passwordHash);
+      if (isSamePassword) {
+        return Response.json(
+          { error: "New password cannot be the same as your current password" },
+          { status: 400 }
+        );
+      }
+    }
+
     const now = new Date();
     user.passwordHash = await hashPassword(password);
-    user.passwordResetTokenHash = undefined;
-    user.passwordResetExpiresAt = undefined;
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    user.set("passwordResetTokenHash", undefined);
+    user.set("passwordResetExpiresAt", undefined);
     user.passwordChangedAt = now;
     user.failedLoginAttempts = 0;
     user.lockedUntil = undefined;

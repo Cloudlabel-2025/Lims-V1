@@ -27,9 +27,20 @@ export async function GET(req, { params }) {
       Sample.find({ billingRecord: id }).select("sampleId status").lean(),
     ]);
 
-    let runningTotal = 0;
+    // Compute chronological running totals (oldest to newest)
+    const chronological = [...receipts].reverse();
+    let running = 0;
+    const runningById = new Map();
+    for (const r of chronological) {
+      if (!r.isRefunded) running += Number(r.amount || 0);
+      runningById.set(r._id.toString(), {
+        runningTotal: running,
+        remaining: Math.max(0, Number(billingRecord.totalAmount || 0) - running),
+      });
+    }
+
     const receiptsWithTotals = receipts.map((receipt) => {
-      runningTotal += Number(receipt.amount || 0);
+      const stats = runningById.get(receipt._id.toString()) || { runningTotal: 0, remaining: 0 };
       return {
         _id: receipt._id.toString(),
         amount: Number(receipt.amount || 0),
@@ -37,10 +48,16 @@ export async function GET(req, { params }) {
         receivedAt: receipt.receivedAt,
         receivedBy: receipt.receivedBy?.name || "—",
         isRefunded: receipt.isRefunded || false,
-        runningTotal,
-        remaining: Math.max(0, Number(billingRecord.totalAmount || 0) - runningTotal),
+        runningTotal: stats.runningTotal,
+        remaining: stats.remaining,
       };
     });
+
+    const isPaid = billingRecord.billingStatus === "paid";
+    const totalPaid = receipts
+      .filter((r) => !r.isRefunded)
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const balanceDue = isPaid ? 0 : Math.max(0, Number(billingRecord.totalAmount || 0) - totalPaid);
 
     return Response.json({
       receipts: receiptsWithTotals,
@@ -50,6 +67,8 @@ export async function GET(req, { params }) {
         totalAmount: billingRecord.totalAmount,
         billingStatus: billingRecord.billingStatus,
         investigationCount: billingRecord.items?.length || 0,
+        totalPaid: isPaid ? Math.max(totalPaid, Number(billingRecord.totalAmount || 0)) : totalPaid,
+        balanceDue,
       },
       samples: samples.map((sample) => ({ sampleId: sample.sampleId, status: sample.status })),
     });

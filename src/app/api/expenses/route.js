@@ -147,6 +147,19 @@ export async function POST(req) {
     const rawAmount = body.amount;
     const rawTaxAmount = body.taxAmount;
 
+    if (!category) {
+      return Response.json({ error: "Category is required" }, { status: 400 });
+    }
+    if (category.length < 2 || category.length > 50) {
+      return Response.json({ error: "Category must be between 2 and 50 characters" }, { status: 400 });
+    }
+    if (hasUrl(category)) {
+      return Response.json({ error: "URLs are not allowed in category" }, { status: 400 });
+    }
+    if (!isValidName(category)) {
+      return Response.json({ error: "Category contains invalid characters" }, { status: 400 });
+    }
+
     if (!vendorName) {
       return Response.json({ error: "Vendor name is required" }, { status: 400 });
     }
@@ -162,15 +175,27 @@ export async function POST(req) {
     if (isExponentialNotation(String(rawAmount))) {
       return Response.json({ error: "Exponential notation is not allowed in amount" }, { status: 400 });
     }
+    const numAmount = Number(rawAmount);
+    if (Number.isNaN(numAmount) || numAmount <= 0) {
+      return Response.json({ error: "Amount must be greater than zero" }, { status: 400 });
+    }
+
     if (rawTaxAmount === undefined || rawTaxAmount === null || rawTaxAmount === "") {
       return Response.json({ error: "Tax amount is required" }, { status: 400 });
     }
     if (isExponentialNotation(String(rawTaxAmount))) {
       return Response.json({ error: "Exponential notation is not allowed in tax amount" }, { status: 400 });
     }
+    const numTaxAmount = Number(rawTaxAmount);
+    if (Number.isNaN(numTaxAmount) || numTaxAmount < 0) {
+      return Response.json({ error: "Tax amount cannot be negative" }, { status: 400 });
+    }
+    if (numTaxAmount > numAmount) {
+      return Response.json({ error: "Tax amount cannot exceed expense amount" }, { status: 400 });
+    }
 
     const amount = money(rawAmount);
-    const taxAmount = Math.max(0, money(rawTaxAmount));
+    const taxAmount = money(rawTaxAmount);
 
     const maxAllowed = 9999999;
     if (amount > maxAllowed) {
@@ -182,23 +207,65 @@ export async function POST(req) {
     if (vendorName.length < 3) {
       return Response.json({ error: "Vendor name must be at least 3 characters" }, { status: 400 });
     }
-    if (body.date) {
-      const expenseDate = dateValue(body.date);
-      const tomorrow = new Date();
-      tomorrow.setHours(23, 59, 59, 999);
-      if (expenseDate > tomorrow) {
-        return Response.json({ error: "Date cannot be in the future" }, { status: 400 });
-      }
-    }
-    const paidFrom = ["cash", "bank", "vendor-payable"].includes(body.paidFrom)
-      ? body.paidFrom
-      : "vendor-payable";
 
-    if (amount <= 0) {
-      return Response.json({ error: "Amount must be greater than zero" }, { status: 400 });
+    const expenseDate = dateValue(body.date);
+    const tomorrow = new Date();
+    tomorrow.setHours(23, 59, 59, 999);
+    if (expenseDate > tomorrow) {
+      return Response.json({ error: "Date cannot be in the future" }, { status: 400 });
+    }
+
+    if (body.paidFrom && !["cash", "bank", "vendor-payable"].includes(body.paidFrom)) {
+      return Response.json({ error: "Invalid payment mode. Must be cash, bank, or vendor-payable" }, { status: 400 });
+    }
+    const paidFrom = body.paidFrom || "vendor-payable";
+
+    const attachmentUrl = clean(body.attachmentUrl);
+    if (attachmentUrl && attachmentUrl.length > 500) {
+      return Response.json({ error: "Attachment URL is too long" }, { status: 400 });
     }
 
     const { connection, ExpenseEntry } = await getTenantModels(auth.tenantId);
+
+    // BUG-074 duplicate prevention: Check if same vendor, category, amount on same day already exists
+    const startOfDay = new Date(expenseDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(expenseDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    const escapeRegex = (s) => String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const duplicateExpense = await ExpenseEntry.findOne({
+      tenantId: auth.tenantId,
+      vendorName: { $regex: new RegExp(`^${escapeRegex(vendorName)}$`, "i") },
+      category: { $regex: new RegExp(`^${escapeRegex(category)}$`, "i") },
+      amount,
+      date: { $gte: startOfDay, $lte: endOfDay },
+    });
+
+    if (duplicateExpense) {
+      return Response.json(
+        { error: "Duplicate expense detected: An expense for this vendor, category, and amount has already been recorded on this date" },
+        { status: 409 }
+      );
+    }
+
+    const isRecurring = Boolean(body.isRecurring);
+    const recurringInterval = isRecurring
+      ? ["daily", "weekly", "monthly", "yearly"].includes(body.recurringInterval)
+        ? body.recurringInterval
+        : "monthly"
+      : null;
+
+    let nextDueDate = null;
+    if (isRecurring) {
+      const d = new Date(expenseDate);
+      if (recurringInterval === "daily") d.setDate(d.getDate() + 1);
+      else if (recurringInterval === "weekly") d.setDate(d.getDate() + 7);
+      else if (recurringInterval === "yearly") d.setFullYear(d.getFullYear() + 1);
+      else d.setMonth(d.getMonth() + 1);
+      nextDueDate = d;
+    }
+
     const expenseAccountCode = expenseAccountByCategory[category] || DEFAULT_EXPENSE_ACCOUNT;
     const result = await connection.transaction(async (session) => {
       const expenseAccount = body.accountId && mongoose.Types.ObjectId.isValid(body.accountId)
@@ -216,10 +283,13 @@ export async function POST(req) {
             amount,
             taxAmount,
             paidFrom,
-            date: dateValue(body.date),
+            date: expenseDate,
             accountId: expenseAccount._id,
             tenantId: auth.tenantId,
-            attachmentUrl: clean(body.attachmentUrl),
+            attachmentUrl,
+            isRecurring,
+            recurringInterval,
+            nextDueDate,
           },
         ],
         { session }

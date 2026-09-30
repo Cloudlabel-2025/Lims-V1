@@ -8,29 +8,48 @@ function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+const methodMap = {
+  cash: { key: "cash", method: "cash", accountCode: "1001" },
+  card: { key: "card", method: "card", accountCode: "1002" },
+  upi: { key: "online", method: "upi", accountCode: "1002" },
+  online: { key: "online", method: "upi", accountCode: "1002" },
+  cheque: { key: "cheque", method: "cheque", accountCode: "1002" },
+  check: { key: "cheque", method: "cheque", accountCode: "1002" },
+  "corporate-credit": { key: "corporate", method: "corporate-credit", accountCode: "1200" },
+  corporate: { key: "corporate", method: "corporate-credit", accountCode: "1200" },
+};
+
 function getPaymentParts(payment) {
   if (!payment) return [];
-  
-  // New format: { amount: number, method: string }
+
+  // Array of modes: [{ method, amount }]
+  if (Array.isArray(payment.modes) && payment.modes.length > 0) {
+    return payment.modes
+      .map((entry) => {
+        const config = methodMap[entry.method];
+        if (!config) return null;
+        return { ...config, amount: money(entry.amount) };
+      })
+      .filter((part) => part && part.amount > 0);
+  }
+
+  // Single format: { amount: number, method: string }
   if (payment.amount !== undefined && payment.method) {
-    const methodMap = {
-      cash: { key: "cash", method: "cash", accountCode: "1001" },
-      card: { key: "card", method: "card", accountCode: "1002" },
-      upi: { key: "online", method: "upi", accountCode: "1002" },
-      "corporate-credit": { key: "corporate", method: "corporate-credit", accountCode: "1200" },
-    };
     const config = methodMap[payment.method];
     if (!config) return [];
     return [{ ...config, amount: money(payment.amount) }].filter((part) => part.amount > 0);
   }
-  
-  // Legacy format: { cash, card, online, corporate }
-  return [
-    { key: "cash", method: "cash", accountCode: "1001", amount: money(payment.cash) },
-    { key: "card", method: "card", accountCode: "1002", amount: money(payment.card) },
-    { key: "online", method: "upi", accountCode: "1002", amount: money(payment.online) },
-    { key: "corporate", method: "corporate-credit", accountCode: "1200", amount: money(payment.corporate) },
-  ].filter((part) => part.amount > 0);
+
+  // Multi-key format: { cash, card, online, upi, cheque, check, corporate, ... }
+  const parts = [];
+  if (payment.cash) parts.push({ key: "cash", method: "cash", accountCode: "1001", amount: money(payment.cash) });
+  if (payment.card) parts.push({ key: "card", method: "card", accountCode: "1002", amount: money(payment.card) });
+  if (payment.online || payment.upi) parts.push({ key: "online", method: "upi", accountCode: "1002", amount: money(payment.online || payment.upi) });
+  if (payment.cheque || payment.check) parts.push({ key: "cheque", method: "cheque", accountCode: "1002", amount: money(payment.cheque || payment.check) });
+  if (payment.corporate || payment["corporate-credit"]) {
+    parts.push({ key: "corporate", method: "corporate-credit", accountCode: "1200", amount: money(payment.corporate || payment["corporate-credit"]) });
+  }
+  return parts.filter((part) => part.amount > 0);
 }
 
 export async function POST(req) {
@@ -159,23 +178,40 @@ export async function POST(req) {
       }
 
       const corporateAmount = paymentParts.find((part) => part.key === "corporate")?.amount || 0;
+      let effectiveCorporateAccountId = corporateAccountId || lockedBillingRecord.corporateAccount || payment.corporateAccountId;
 
       if (corporateAmount > 0) {
-        if (!corporateAccountId) throw new Error("Corporate account ID is required for corporate payment");
-        const corporateAccount = await CorporateAccount.findById(corporateAccountId).session(session);
+        if (!effectiveCorporateAccountId) {
+          const defaultCorp = await CorporateAccount.findOne({ tenantId }).session(session);
+          if (defaultCorp) {
+            effectiveCorporateAccountId = defaultCorp._id;
+          } else {
+            throw new Error("Corporate account ID is required for corporate payment");
+          }
+        }
+        const corporateAccount = await CorporateAccount.findById(effectiveCorporateAccountId).session(session);
         if (!corporateAccount) throw new Error("Corporate account not found");
         const newBalance = money(corporateAccount.outstandingBalance + corporateAmount);
         if (corporateAccount.creditLimit > 0 && newBalance > corporateAccount.creditLimit) {
-          throw new Error("Corporate payment exceeds credit limit");
+          throw new Error(`Corporate payment exceeds credit limit of Rs ${corporateAccount.creditLimit.toLocaleString("en-IN")}`);
         }
         corporateAccount.outstandingBalance = newBalance;
         await corporateAccount.save({ session });
+
+        lockedBillingRecord.corporateAccount = corporateAccount._id;
+        lockedBillingRecord.paymentMeta = {
+          ...(lockedBillingRecord.paymentMeta || {}),
+          corporateAccountId: corporateAccount._id,
+          corporateAccountName: corporateAccount.name,
+        };
       }
 
+      const chequeAmount = paymentParts.find((part) => part.key === "cheque")?.amount || 0;
       const alreadyPaid = money(
         (lockedBillingRecord.paymentBreakdown?.cash || 0) +
           (lockedBillingRecord.paymentBreakdown?.card || 0) +
           (lockedBillingRecord.paymentBreakdown?.online || 0) +
+          (lockedBillingRecord.paymentBreakdown?.cheque || 0) +
           (lockedBillingRecord.paymentBreakdown?.corporate || 0)
       );
       const remainingDue = money(lockedBillingRecord.totalAmount - alreadyPaid);
@@ -187,6 +223,7 @@ export async function POST(req) {
         cash: money((lockedBillingRecord.paymentBreakdown?.cash || 0) + (paymentParts.find((part) => part.key === "cash")?.amount || 0)),
         card: money((lockedBillingRecord.paymentBreakdown?.card || 0) + (paymentParts.find((part) => part.key === "card")?.amount || 0)),
         online: money((lockedBillingRecord.paymentBreakdown?.online || 0) + (paymentParts.find((part) => part.key === "online")?.amount || 0)),
+        cheque: money((lockedBillingRecord.paymentBreakdown?.cheque || 0) + chequeAmount),
         corporate: money((lockedBillingRecord.paymentBreakdown?.corporate || 0) + corporateAmount),
       };
 
@@ -249,6 +286,7 @@ export async function POST(req) {
           cash: lockedBillingRecord.paymentBreakdown?.cash || 0,
           card: lockedBillingRecord.paymentBreakdown?.card || 0,
           online: lockedBillingRecord.paymentBreakdown?.online || 0,
+          cheque: lockedBillingRecord.paymentBreakdown?.cheque || 0,
           corporate: lockedBillingRecord.paymentBreakdown?.corporate || 0,
         },
         firstPaymentDate: lockedBillingRecord.firstPaymentDate,
@@ -270,8 +308,22 @@ export async function POST(req) {
         billingStatus: result.billingStatus,
         invoiceStatus: result.invoiceStatus,
         receivedAmount: result.receivedAmount,
+        lastPaymentModes: result.lastPaymentModes,
       },
     });
+
+    if (result.paymentBreakdown?.corporate > 0) {
+      await writeAuditLog(req, auth, {
+        action: "billing.corporate_settled",
+        resourceType: "BillingRecord",
+        resourceId: billingRecordId,
+        metadata: {
+          corporateAmount: result.paymentBreakdown.corporate,
+          billingStatus: result.billingStatus,
+          actor: auth.session.email || auth.session.userId,
+        },
+      });
+    }
 
     return Response.json({
       message: result.billingStatus === "paid" ? "Bill closed successfully" : "Payment recorded successfully",
@@ -279,7 +331,20 @@ export async function POST(req) {
     });
 
   } catch (error) {
-    if (["Billing record not found", "Bill is already paid", "Payment amount cannot exceed bill balance", "Corporate payment exceeds credit limit"].includes(error.message)) {
+    if (error.message && error.message.includes("Corporate payment exceeds credit limit")) {
+      await writeAuditLog(req, auth, {
+        action: "billing.credit_limit_exceeded",
+        resourceType: "BillingRecord",
+        resourceId: billingRecordId,
+        metadata: {
+          error: error.message,
+          actor: auth.session.email || auth.session.userId,
+        },
+      });
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+
+    if (["Billing record not found", "Bill is already paid", "Payment amount cannot exceed bill balance", "Corporate account not found", "Corporate account ID is required for corporate payment"].includes(error.message)) {
       return Response.json(
         { error: error.message },
         { status: error.message === "Billing record not found" ? 404 : 400 }

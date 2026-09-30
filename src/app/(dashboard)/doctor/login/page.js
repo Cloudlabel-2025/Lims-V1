@@ -23,7 +23,8 @@ export default function DoctorLoginPage() {
         body: JSON.stringify({
           email: email.trim(),
           password,
-          subdomain: subdomain.trim(),
+          subdomain: subdomain.trim() || undefined,
+          tenantId: subdomain.trim() || undefined,
           portalType: "doctor",
         }),
       });
@@ -33,7 +34,20 @@ export default function DoctorLoginPage() {
         throw new Error(data.error || "Doctor login failed. Check your credentials.");
       }
 
-      router.push("/doctor/dashboard");
+      if (data.redirectUrl) {
+        if (data.redirectUrl.startsWith("http://") || data.redirectUrl.startsWith("https://")) {
+          const parsed = new URL(data.redirectUrl);
+          if (parsed.origin === window.location.origin) {
+            router.push(parsed.pathname + parsed.search);
+          } else {
+            window.location.href = data.redirectUrl;
+          }
+        } else {
+          router.push(data.redirectUrl);
+        }
+      } else {
+        router.push("/doctor/dashboard");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -71,10 +85,10 @@ export default function DoctorLoginPage() {
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Email or Doctor ID</label>
             <input
-              type="email"
+              type="text"
               required
               className="lims-input"
-              placeholder="doctor@example.com"
+              placeholder="doctor@example.com or Doctor ID"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />

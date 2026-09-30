@@ -15,6 +15,7 @@ import { hasDoctorPortalEntitlement } from "@/app/lib/portal-policy";
 import connectMasterDB from "@/app/lib/master-db";
 import { getSubscriptionPackageModel } from "@/app/models/master/SubscriptionPackage";
 import { getDeleteRestrictionReason } from "@/app/lib/deletion-policy";
+import { hashPassword } from "@/app/lib/password";
 
 // ── POST: Create a new Doctor ──
 export async function POST(req) {
@@ -47,12 +48,15 @@ export async function POST(req) {
     const mciValue = String(mciNumber ?? "").trim();
     const email = String(payload.email).toLowerCase();
 
-    // --- Duplicate Checks ---
+    const initialPassword = String(payload.password || "").trim();
+    delete payload.password;
+
+    const emailRegex = new RegExp("^" + escapeRegex(email) + "$", "i");
     const [existingMCI, existingPhone, existingDoctorEmail, existingUser] = await Promise.all([
       mciValue ? Doctor.findOne({ mciNumber: mciValue.toUpperCase() }) : Promise.resolve(null),
       Doctor.findOne({ phone: String(phone) }),
-      Doctor.findOne({ email }),
-      User.findOne({ email }).select("_id doctorId status"),
+      Doctor.findOne({ email: emailRegex }),
+      User.findOne({ email: emailRegex }).select("_id doctorId status"),
     ]);
 
     const conflicts = [];
@@ -81,9 +85,17 @@ export async function POST(req) {
     let invitationError = "";
 
     if (allowDoctorPortal) {
-      const doctorRole = await Role.findOne({ name: "Doctor Regular", status: "active" })
-        || await Role.findOne({ name: "Doctor", status: "active" })
-        || await Role.findOne({ status: "active" });
+      let doctorRole = await Role.findOne({ name: "Doctor Regular", status: "active" })
+        || await Role.findOne({ name: "Doctor", status: "active" });
+      if (!doctorRole) {
+        doctorRole = await Role.create({
+          name: "Doctor",
+          description: "Referring doctor portal account",
+          permissions: ["doctor-portal.access", "reports.view"],
+          isSystemRole: true,
+          status: "active",
+        });
+      }
       if (doctorRole) {
         const limit = subscription.entitlements?.quotas?.staffUsers ?? null;
         if (limit !== null) {
@@ -114,6 +126,8 @@ export async function POST(req) {
 
         const invitation = createDoctorInvitation();
         const { firstName, lastName } = splitDoctorName(payload.name);
+        const passwordHash = initialPassword ? await hashPassword(initialPassword) : undefined;
+        const portalStatus = initialPassword ? "active" : "invited";
 
         await connection.transaction(async (session) => {
           [doctor] = await Doctor.create([{
@@ -130,16 +144,17 @@ export async function POST(req) {
             lastName,
             email,
             role: doctorRole._id,
-            status: "invited",
+            status: portalStatus,
             doctorId: doctor._id,
             createdBy: auth.session.userId,
-            passwordResetTokenHash: invitation.otpHash,
-            passwordResetExpiresAt: invitation.expiresAt,
+            ...(passwordHash ? { passwordHash } : {}),
+            ...(!passwordHash ? {
+              passwordResetTokenHash: invitation.otpHash,
+              passwordResetExpiresAt: invitation.expiresAt,
+            } : {}),
           }], { session });
         });
 
-        // Do not automatically send portal activation email.
-        // The lab will send the access portal invitation link manually.
         invitationSent = false;
         invitationError = "";
       } else {
@@ -242,7 +257,7 @@ export async function GET(req) {
     const canViewFinancials = hasPermission(auth.session, "accounts.view");
     const selectFields = canViewFinancials
       ? null
-      : "-commission -pendingPayout";
+      : "-pendingPayout";
 
     const [doctors, total, subscription] = await Promise.all([
       Doctor.find(query)

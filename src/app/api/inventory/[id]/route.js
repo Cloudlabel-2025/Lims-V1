@@ -106,7 +106,7 @@ export async function PATCH(req, context) {
 
     if (body.name !== undefined && body.name !== null && clean(body.name)) {
       const v = clean(body.name);
-      if (v.length > 60) return Response.json(fieldError("Item name must not exceed 60 characters"), { status: 400 });
+      if (v.length > 120) return Response.json(fieldError("Item name must not exceed 120 characters"), { status: 400 });
       if ((v.match(/-/g) || []).length > 1) return Response.json(fieldError("Item name can contain at most one hyphen"), { status: 400 });
       if (!/^[A-Za-z0-9 -]*$/.test(v)) return Response.json(fieldError("Item name must contain only letters, numbers, spaces, and one hyphen"), { status: 400 });
     }

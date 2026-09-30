@@ -59,11 +59,11 @@ export async function getAccountByCode(tenantConnection, tenantId, code, options
 async function createJournalEntry(tenantConnection, payload, session) {
   const Account = getAccountModel(tenantConnection);
   const JournalEntry = getJournalEntryModel(tenantConnection);
-  const accountIds = payload.lines.map((line) => line.accountId);
-  const accounts = await Account.find({ tenantId: payload.tenantId, _id: { $in: accountIds } }).session(session);
+  const uniqueAccountIds = [...new Set(payload.lines.map((line) => String(line.accountId)))];
+  const accounts = await Account.find({ tenantId: payload.tenantId, _id: { $in: uniqueAccountIds } }).session(session);
   const accountsById = new Map(accounts.map((account) => [String(account._id), account]));
 
-  if (accounts.length !== accountIds.length) {
+  if (accounts.length !== uniqueAccountIds.length) {
     throw new Error("Journal entry contains an account outside this tenant or an unknown account");
   }
 

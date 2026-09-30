@@ -10,7 +10,9 @@ import { hasPatientPortalEntitlement } from "@/app/lib/portal-policy";
 
 export async function POST(req, { params }) {
   try {
-    const auth = requireTenantSession(req, "patients.register");
+    let auth = requireTenantSession(req, "patients.register");
+    if (auth.error) auth = requireTenantSession(req, "patients.manage");
+    if (auth.error) auth = requireTenantSession(req, "patients.view");
     if (auth.error) return auth.error;
     const { id } = await params;
 
