@@ -43,6 +43,18 @@ On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm.ps1`
 
 Required environment variables include MongoDB connection settings and session secrets. See the tenant, auth, and onboarding code under `src/app/lib` and `scripts` for the current expected values.
 
+The app and master seed scripts use `MASTER_DB_NAME`, defaulting to `CMS`. Configure `MASTER_MONGODB_URI` (or the fallback `MONGODB_URI`) in `.env.local`. To start fresh without copying employee or tenant data, set `MASTER_DB_NAME` to a new, unused database name and configure the new connection if changing clusters. Restart the app after changing these settings. To initialize platform permissions, subscription packages, and developer admin access, run:
+
+```bash
+npm run seed:rbac
+npm run seed:subscriptions
+npm run seed:developer
+```
+
+The developer seed uses `DEVELOPER_OWNER_EMAIL` and `DEVELOPER_OWNER_PASSWORD`, with optional `DEVELOPER_OWNER_FIRST_NAME` and `DEVELOPER_OWNER_LAST_NAME`. Rerunning it resets seeded developer passwords and activates the accounts. Additional CMS developers come from `CMS_DEVELOPER_EMAILS`; if omitted, the existing defaults in `scripts/seed-developer-owner.mjs` apply.
+
+The separate `scripts/migrate-test-to-cms.mjs` script copies collections from `test` to `CMS` and deletes existing destination documents first. Check the source and destination before running it against an existing database.
+
 Password reset emails use Resend when configured:
 
 - `RESEND_API_KEY`

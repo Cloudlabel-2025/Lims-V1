@@ -87,15 +87,15 @@ export default function MarketingPage() {
 
           <div className={styles.navLinks}>
             <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
+            <a href="#pricing" className={styles.navPricing}>Pricing</a>
             <a href="#contact" onClick={(e) => { e.preventDefault(); setModalOpen(true); }}>Contact</a>
           </div>
 
           <div className={styles.navActions}>
             <div className={styles.dropdownWrapper}>
-              <button 
-                type="button" 
-                className={styles.btnSecondary} 
+              <button
+                type="button"
+                className={styles.btnSecondary}
                 onClick={() => setDropdownOpen((prev) => !prev)}
                 aria-expanded={dropdownOpen}
               >
@@ -124,14 +124,10 @@ export default function MarketingPage() {
               </div>
             </div>
 
-            <button 
-              type="button" 
-              className={styles.btnPrimary} 
-              onClick={() => setModalOpen(true)}
-            >
-              Book a Demo
+            <a href="#pricing" className={styles.btnPrimary}>
+              View Packages
               {Icons.arrowRight}
-            </button>
+            </a>
           </div>
         </div>
       </nav>
@@ -139,106 +135,139 @@ export default function MarketingPage() {
       {/* Hero Section */}
       <header className={styles.hero}>
         <div className={styles.heroTag}>
-          <span>⚡</span> Introducing Multi-Tenant LIMS V1
+          Packages for every stage of your lab
         </div>
         <h1 className={styles.heroTitle}>
-          The Intelligent Cloud LIMS for <span>Modern Diagnostics</span>
+          Your lab. Your growth.<br /><span>Your LIMS package.</span>
         </h1>
         <p className={styles.heroSubtitle}>
-          Register patients, track specimens, customize branding, automate billing, and generate secure verified reports. Build a clinical network on a single, secure database infrastructure.
+          Manage patients, samples, billing, and reports with a package that fits your laboratory.
         </p>
 
         <div className={styles.heroButtons}>
-          <button 
-            type="button" 
-            className={styles.btnPrimary} 
-            onClick={() => setModalOpen(true)}
-          >
-            Request Custom Access
-            {Icons.arrowRight}
-          </button>
-          <a href="#features" className={styles.btnSecondary}>
-            Explore Platform Features
-          </a>
+          <a href="#pricing" className={styles.btnPrimary}>View Packages {Icons.arrowRight}</a>
+          <button type="button" className={styles.btnSecondary} onClick={() => setModalOpen(true)}>Book a Demo</button>
         </div>
 
-        {/* Dashboard Live Mockup */}
-        <div className={styles.dashboardPreview}>
-          <div className={styles.dashboardMockup}>
-            <div className={styles.mockHeader}>
-              <div className={styles.mockDots}>
-                <span />
-                <span />
-                <span />
-              </div>
-              <div className={styles.mockAddress}>
-                https://apex-labs.lims.store/dashboard
-              </div>
-              <div className={styles.mockUser} />
+      </header>
+
+      {/* Pricing & Interactive Slider */}
+      <section id="pricing" className={`${styles.section} ${styles.packagesSection}`} aria-labelledby="packages-title">
+        <div className={styles.sectionHeader}>
+          <h2 id="packages-title" className={styles.sectionTitle}>Choose your LIMS package</h2>
+          <p className={styles.sectionSubtitle}>
+            Compare monthly plans, find your fit, and give your lab room to grow.
+          </p>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className={styles.pricingGrid}>
+          {/* Starter Plan */}
+          <div className={`${styles.pricingCard} ${activePlan === "starter" ? styles.pricingCardActive : ""}`}>
+            <span className={styles.planLabel}>{activePlan === "starter" ? "Recommended for your volume" : "For independent labs"}</span>
+            <div className={styles.pricingHeader}>
+              <h3>Starter Portal</h3>
+              <p>Ideal for independent pathlabs starting out.</p>
             </div>
-            <div className={styles.mockGrid}>
-              <aside className={styles.mockSidebar}>
-                <div className={styles.mockSidebarItem} style={{ width: "100%", height: "16px", marginBottom: "12px" }} />
-                <div className={styles.mockSidebarItem} style={{ width: "80%" }} />
-                <div className={styles.mockSidebarItem} style={{ width: "70%" }} />
-                <div className={styles.mockSidebarItem} style={{ width: "90%" }} />
-                <div className={styles.mockSidebarItem} style={{ width: "75%" }} />
-                <div className={styles.mockSidebarItem} style={{ width: "60%" }} />
-              </aside>
-              <main className={styles.mockContent}>
-                <div className={styles.mockTitleBar}>
-                  <div className={styles.mockSidebarItem} style={{ width: "200px", height: "18px" }} />
-                  <div className={styles.mockSidebarItem} style={{ width: "80px", height: "18px" }} />
-                </div>
-                <div className={styles.mockStats}>
-                  <div className={styles.mockStatCard}>
-                    <div className={styles.mockStatBar} />
-                    <div className={styles.mockStatNumber} />
-                  </div>
-                  <div className={styles.mockStatCard}>
-                    <div className={styles.mockStatBar} />
-                    <div className={styles.mockStatNumber} />
-                  </div>
-                  <div className={styles.mockStatCard}>
-                    <div className={styles.mockStatBar} />
-                    <div className={styles.mockStatNumber} />
-                  </div>
-                  <div className={styles.mockStatCard}>
-                    <div className={styles.mockStatBar} />
-                    <div className={styles.mockStatNumber} />
-                  </div>
-                </div>
-                <div className={styles.mockTable}>
-                  <div className={`${styles.mockRow} ${styles.mockRowHeader}`}>
-                    <div className={styles.mockCell} />
-                    <div className={styles.mockCell} />
-                    <div className={styles.mockCell} />
-                    <div className={styles.mockCell} />
-                  </div>
-                  <div className={styles.mockRow}>
-                    <div className={styles.mockCell} style={{ width: "60px" }} />
-                    <div className={styles.mockCell} style={{ width: "100px" }} />
-                    <div className={styles.mockCell} style={{ width: "140px" }} />
-                    <div className={styles.mockCell} style={{ width: "40px", backgroundColor: "var(--m-primary)" }} />
-                  </div>
-                  <div className={styles.mockRow}>
-                    <div className={styles.mockCell} style={{ width: "50px" }} />
-                    <div className={styles.mockCell} style={{ width: "90px" }} />
-                    <div className={styles.mockCell} style={{ width: "160px" }} />
-                    <div className={styles.mockCell} style={{ width: "40px" }} />
-                  </div>
-                  <div className={styles.mockRow}>
-                    <div className={styles.mockCell} style={{ width: "70px" }} />
-                    <div className={styles.mockCell} style={{ width: "110px" }} />
-                    <div className={styles.mockCell} style={{ width: "110px" }} />
-                    <div className={styles.mockCell} style={{ width: "40px" }} />
-                  </div>
-                </div>
-              </main>
+            <div className={styles.pricingPrice}>
+              <strong>$99</strong>
+              <span>/month</span>
+            </div>
+            <ul className={styles.pricingFeatures}>
+              <li>{Icons.plus} Up to 1,500 tests/month</li>
+              <li>{Icons.plus} Single-tenant isolation</li>
+              <li>{Icons.plus} Standard patient registry</li>
+              <li>{Icons.plus} PDF test reports</li>
+              <li>{Icons.plus} Basic billing ledger</li>
+            </ul>
+            <button
+              type="button"
+              className={activePlan === "starter" ? styles.btnPrimary : styles.btnSecondary}
+              onClick={() => setModalOpen(true)}
+            >
+              Choose Starter
+            </button>
+          </div>
+
+          {/* Growth Plan */}
+          <div className={`${styles.pricingCard} ${activePlan === "growth" ? styles.pricingCardActive : ""}`}>
+            <span className={styles.planLabel}>{activePlan === "growth" ? "Recommended for your volume" : "For growing labs"}</span>
+            <div className={styles.pricingHeader}>
+              <h3>Growth Suite</h3>
+              <p>For expanding, busy clinical centers.</p>
+            </div>
+            <div className={styles.pricingPrice}>
+              <strong>$299</strong>
+              <span>/month</span>
+            </div>
+            <ul className={styles.pricingFeatures}>
+              <li>{Icons.plus} Up to 10,000 tests/month</li>
+              <li>{Icons.plus} Everything in Starter</li>
+              <li>{Icons.plus} Complete inventory tracking</li>
+              <li>{Icons.plus} Verified digital signatures</li>
+              <li>{Icons.plus} Multiple user roles & permissions</li>
+            </ul>
+            <button
+              type="button"
+              className={activePlan === "growth" ? styles.btnPrimary : styles.btnSecondary}
+              onClick={() => setModalOpen(true)}
+            >
+              Choose Growth
+            </button>
+          </div>
+
+          {/* Enterprise Plan */}
+          <div className={`${styles.pricingCard} ${activePlan === "enterprise" ? styles.pricingCardActive : ""}`}>
+            <span className={styles.planLabel}>{activePlan === "enterprise" ? "Recommended for your volume" : "For lab networks"}</span>
+            <div className={styles.pricingHeader}>
+              <h3>Enterprise Hub</h3>
+              <p>For complex multi-site hospital networks.</p>
+            </div>
+            <div className={styles.pricingPrice}>
+              <strong>$899</strong>
+              <span>/month</span>
+            </div>
+            <ul className={styles.pricingFeatures}>
+              <li>{Icons.plus} Unlimited monthly tests</li>
+              <li>{Icons.plus} Everything in Growth</li>
+              <li>{Icons.plus} Multi-lab developer console</li>
+              <li>{Icons.plus} Advanced doctor referral reports</li>
+              <li>{Icons.plus} SLA uptime guarantees & API access</li>
+            </ul>
+            <button
+              type="button"
+              className={activePlan === "enterprise" ? styles.btnPrimary : styles.btnSecondary}
+              onClick={() => setModalOpen(true)}
+            >
+              Request Enterprise
+            </button>
+          </div>
+        </div>
+        {/* Slider control */}
+        <div className={styles.pricingCalculator}>
+          <div className={styles.calculatorHeader}>
+            <h3>Estimate Your Processing Volume</h3>
+            <p>Slide the control to match your anticipated monthly processed tests.</p>
+          </div>
+          <div className={styles.sliderContainer}>
+            <input
+              type="range"
+              min="100"
+              max="20000"
+              step="100"
+              value={testCount}
+              onChange={(e) => setTestCount(parseInt(e.target.value))}
+              className={styles.slider}
+              aria-label="Monthly test volume slider"
+            />
+            <div className={styles.sliderLabel} aria-live="polite" aria-atomic="true">
+              {testCount.toLocaleString("en-IN")} <span>tests per month</span>
+              <small className={styles.recommendation}>Recommended: {activePlan === "starter" ? "Starter Portal" : activePlan === "growth" ? "Growth Suite" : "Enterprise Hub"}</small>
             </div>
           </div>
         </div>
-      </header>
+
+      </section>
 
       {/* Features Grid */}
       <section id="features" className={styles.section}>
@@ -289,123 +318,6 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      {/* Pricing & Interactive Slider */}
-      <section id="pricing" className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionEyebrow}>Fair & Flexible Pricing</span>
-          <h2 className={styles.sectionTitle}>Scale Dynamically as You Grow</h2>
-          <p className={styles.sectionSubtitle}>
-            Adjust the slider to match your laboratory volume. The system automatically recommends the perfect tier.
-          </p>
-        </div>
-
-        {/* Slider control */}
-        <div className={styles.pricingCalculator}>
-          <div className={styles.calculatorHeader}>
-            <h3>Estimate Your Processing Volume</h3>
-            <p>Slide the control to match your anticipated monthly processed tests.</p>
-          </div>
-          <div className={styles.sliderContainer}>
-            <input 
-              type="range" 
-              min="100" 
-              max="20000" 
-              step="100"
-              value={testCount} 
-              onChange={(e) => setTestCount(parseInt(e.target.value))}
-              className={styles.slider}
-              aria-label="Monthly test volume slider"
-            />
-            <div className={styles.sliderLabel}>
-              {testCount.toLocaleString()} <span>tests per month</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Pricing Cards */}
-        <div className={styles.pricingGrid}>
-          {/* Starter Plan */}
-          <div className={`${styles.pricingCard} ${activePlan === "starter" ? styles.pricingCardActive : ""}`}>
-            <div className={styles.pricingHeader}>
-              <h3>Starter Portal</h3>
-              <p>Ideal for independent pathlabs starting out.</p>
-            </div>
-            <div className={styles.pricingPrice}>
-              <strong>$99</strong>
-              <span>/month</span>
-            </div>
-            <ul className={styles.pricingFeatures}>
-              <li>{Icons.plus} Up to 1,500 tests/month</li>
-              <li>{Icons.plus} Single-tenant isolation</li>
-              <li>{Icons.plus} Standard patient registry</li>
-              <li>{Icons.plus} PDF test reports</li>
-              <li>{Icons.plus} Basic billing ledger</li>
-            </ul>
-            <button 
-              type="button" 
-              className={activePlan === "starter" ? styles.btnPrimary : styles.btnSecondary}
-              onClick={() => setModalOpen(true)}
-            >
-              Choose Starter
-            </button>
-          </div>
-
-          {/* Growth Plan */}
-          <div className={`${styles.pricingCard} ${activePlan === "growth" ? styles.pricingCardActive : ""}`}>
-            {activePlan === "growth" && <span className={styles.popularBadge}>Recommended</span>}
-            <div className={styles.pricingHeader}>
-              <h3>Growth Suite</h3>
-              <p>For expanding, busy clinical centers.</p>
-            </div>
-            <div className={styles.pricingPrice}>
-              <strong>$299</strong>
-              <span>/month</span>
-            </div>
-            <ul className={styles.pricingFeatures}>
-              <li>{Icons.plus} Up to 10,000 tests/month</li>
-              <li>{Icons.plus} Everything in Starter</li>
-              <li>{Icons.plus} Complete inventory tracking</li>
-              <li>{Icons.plus} Verified digital signatures</li>
-              <li>{Icons.plus} Multiple user roles & permissions</li>
-            </ul>
-            <button 
-              type="button" 
-              className={activePlan === "growth" ? styles.btnPrimary : styles.btnSecondary}
-              onClick={() => setModalOpen(true)}
-            >
-              Choose Growth
-            </button>
-          </div>
-
-          {/* Enterprise Plan */}
-          <div className={`${styles.pricingCard} ${activePlan === "enterprise" ? styles.pricingCardActive : ""}`}>
-            {activePlan === "enterprise" && <span className={styles.popularBadge}>Enterprise</span>}
-            <div className={styles.pricingHeader}>
-              <h3>Enterprise Hub</h3>
-              <p>For complex multi-site hospital networks.</p>
-            </div>
-            <div className={styles.pricingPrice}>
-              <strong>$899</strong>
-              <span>/month</span>
-            </div>
-            <ul className={styles.pricingFeatures}>
-              <li>{Icons.plus} Unlimited monthly tests</li>
-              <li>{Icons.plus} Everything in Growth</li>
-              <li>{Icons.plus} Multi-lab developer console</li>
-              <li>{Icons.plus} Advanced doctor referral reports</li>
-              <li>{Icons.plus} SLA uptime guarantees & API access</li>
-            </ul>
-            <button 
-              type="button" 
-              className={activePlan === "enterprise" ? styles.btnPrimary : styles.btnSecondary}
-              onClick={() => setModalOpen(true)}
-            >
-              Request Enterprise
-            </button>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Onboarding Section */}
       <section className={styles.section}>
         <div className={styles.ctaBanner}>
@@ -413,9 +325,9 @@ export default function MarketingPage() {
           <p>
             Deploy your dedicated LIMS instance in minutes. Securely record patient visits, coordinate referral commission payments, track reagents, and sign reports.
           </p>
-          <button 
-            type="button" 
-            className={styles.btnPrimary} 
+          <button
+            type="button"
+            className={styles.btnPrimary}
             onClick={() => setModalOpen(true)}
           >
             Contact Sales for Provisioning
@@ -460,16 +372,16 @@ export default function MarketingPage() {
       </footer>
 
       {/* Contact Form Modal */}
-      <div 
-        className={`${styles.modalOverlay} ${modalOpen ? styles.modalOverlayOpen : ""}`} 
+      <div
+        className={`${styles.modalOverlay} ${modalOpen ? styles.modalOverlayOpen : ""}`}
         onClick={closeContactModal}
         aria-modal="true"
         role="dialog"
       >
         <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-          <button 
-            type="button" 
-            className={styles.modalClose} 
+          <button
+            type="button"
+            className={styles.modalClose}
             onClick={closeContactModal}
             aria-label="Close modal"
           >
@@ -486,49 +398,49 @@ export default function MarketingPage() {
               <form className={styles.modalForm} onSubmit={handleFormSubmit}>
                 <div className={styles.formField}>
                   <label htmlFor="modal-name">Full Name</label>
-                  <input 
-                    type="text" 
-                    id="modal-name" 
-                    name="name" 
-                    value={formData.name} 
-                    onChange={handleInputChange} 
-                    placeholder="e.g. Dr. Alex Mercer" 
-                    required 
+                  <input
+                    type="text"
+                    id="modal-name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Dr. Alex Mercer"
+                    required
                   />
                 </div>
 
                 <div className={styles.formField}>
                   <label htmlFor="modal-email">Work Email</label>
-                  <input 
-                    type="email" 
-                    id="modal-email" 
-                    name="email" 
-                    value={formData.email} 
-                    onChange={handleInputChange} 
-                    placeholder="alex@pathlabs.com" 
-                    required 
+                  <input
+                    type="email"
+                    id="modal-email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="alex@pathlabs.com"
+                    required
                   />
                 </div>
 
                 <div className={styles.formField}>
                   <label htmlFor="modal-lab">Laboratory Name</label>
-                  <input 
-                    type="text" 
-                    id="modal-lab" 
-                    name="labName" 
-                    value={formData.labName} 
-                    onChange={handleInputChange} 
-                    placeholder="City Pathological Laboratories" 
-                    required 
+                  <input
+                    type="text"
+                    id="modal-lab"
+                    name="labName"
+                    value={formData.labName}
+                    onChange={handleInputChange}
+                    placeholder="City Pathological Laboratories"
+                    required
                   />
                 </div>
 
                 <div className={styles.formField}>
                   <label htmlFor="modal-tests">Monthly Volume</label>
-                  <select 
-                    id="modal-tests" 
-                    name="testsPerMonth" 
-                    value={formData.testsPerMonth} 
+                  <select
+                    id="modal-tests"
+                    name="testsPerMonth"
+                    value={formData.testsPerMonth}
                     onChange={handleInputChange}
                   >
                     <option value="under-1000">Under 1,000 tests/mo</option>
@@ -540,12 +452,12 @@ export default function MarketingPage() {
 
                 <div className={styles.formField}>
                   <label htmlFor="modal-msg">Special Requirements</label>
-                  <textarea 
-                    id="modal-msg" 
-                    name="message" 
-                    value={formData.message} 
-                    onChange={handleInputChange} 
-                    placeholder="Need custom report configurations, instrument interface details, etc." 
+                  <textarea
+                    id="modal-msg"
+                    name="message"
+                    value={formData.message}
+                    onChange={handleInputChange}
+                    placeholder="Need custom report configurations, instrument interface details, etc."
                     rows="3"
                   />
                 </div>
@@ -563,9 +475,9 @@ export default function MarketingPage() {
               <p>
                 Thank you for your interest. A platform architect will reach out to provision your custom LIMS tenant database.
               </p>
-              <button 
-                type="button" 
-                className={styles.btnSecondary} 
+              <button
+                type="button"
+                className={styles.btnSecondary}
                 onClick={closeContactModal}
                 style={{ width: "120px" }}
               >

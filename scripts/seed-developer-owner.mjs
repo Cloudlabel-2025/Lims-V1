@@ -51,6 +51,7 @@ async function main() {
 
   const connection = await mongoose
     .createConnection(masterUri, {
+      dbName: process.env.MASTER_DB_NAME?.trim() || "CMS",
       bufferCommands: false,
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,

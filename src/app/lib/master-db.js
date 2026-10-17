@@ -11,7 +11,7 @@ const connectionOptions = {
   bufferCommands: false,
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
-  dbName: "CMS",
+  dbName: process.env.MASTER_DB_NAME?.trim() || "CMS",
 };
 
 export async function connectMasterDB() {

@@ -2,6 +2,7 @@ import { jsonError } from "@/app/lib/api-response";
 import { getTenantModels } from "@/app/lib/tenant-db";
 import { requireEnabledTenantModule, requireTenantSession } from "@/app/lib/auth";
 import { reserveSampleInventory } from "@/app/lib/sample-inventory";
+import { parseSampleDateTime } from "@/app/utils/sample-datetime";
 
 export async function GET(req) {
   try {
@@ -64,6 +65,9 @@ export async function POST(req) {
     const batchId = String(body.batchId || "").trim();
     const receivedTime = body.receivedTime;
     const collectionTime = body.collectionTime;
+    const receivedAt = parseSampleDateTime(receivedTime);
+    const collectedAt = parseSampleDateTime(collectionTime);
+    const now = new Date();
 
     if (!patientId) {
       return Response.json({ error: "Patient is required" }, { status: 400 });
@@ -86,28 +90,28 @@ export async function POST(req) {
     }
 
     if (collectionTime) {
-      if (Number.isNaN(new Date(collectionTime).getTime())) {
+      if (Number.isNaN(collectedAt.getTime())) {
         return Response.json({ error: "Invalid collection time" }, { status: 400 });
       }
-      if (new Date(collectionTime) > new Date()) {
+      if (collectedAt > now) {
         return Response.json({ error: "Collection Time cannot be in the future" }, { status: 400 });
       }
-      if (patient.dob && new Date(collectionTime) < new Date(patient.dob)) {
+      if (patient.dob && collectedAt < new Date(patient.dob)) {
         return Response.json({ error: "Collection time cannot be before date of birth" }, { status: 400 });
       }
     }
 
     if (receivedTime) {
-      if (Number.isNaN(new Date(receivedTime).getTime())) {
+      if (Number.isNaN(receivedAt.getTime())) {
         return Response.json({ error: "Invalid received time" }, { status: 400 });
       }
-      if (new Date(receivedTime) > new Date()) {
+      if (receivedAt > now) {
         return Response.json({ error: "Received Time cannot be in the future" }, { status: 400 });
       }
-      if (patient.dob && new Date(receivedTime) < new Date(patient.dob)) {
+      if (patient.dob && receivedAt < new Date(patient.dob)) {
         return Response.json({ error: "Received time cannot be before date of birth" }, { status: 400 });
       }
-      if (collectionTime && new Date(receivedTime) < new Date(collectionTime)) {
+      if (collectionTime && receivedAt < collectedAt) {
         return Response.json({ error: "Received Time cannot be earlier than Collection Time" }, { status: 400 });
       }
     }
@@ -116,8 +120,8 @@ export async function POST(req) {
       patient: patient._id,
       sampleType: sampleType || test.sampleType || undefined,
       batchId: batchId || undefined,
-      receivedAt: receivedTime ? new Date(receivedTime) : new Date(),
-      collectionTime: collectionTime ? new Date(collectionTime) : undefined,
+      receivedAt: receivedTime ? receivedAt : now,
+      collectionTime: collectionTime ? collectedAt : undefined,
       receivedBy: auth.session.email,
       testDefinition: test._id,
       testSnapshot: {

@@ -159,6 +159,11 @@
   color: var(--m-primary);
 }
 
+.navLinks .navPricing {
+  color: var(--m-primary);
+  font-weight: 700;
+}
+
 .navActions {
   display: flex;
   align-items: center;
@@ -193,6 +198,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .btnPrimary:hover {
@@ -290,7 +296,7 @@
 
 /* Hero Section */
 .hero {
-  padding: 160px 24px 80px 24px;
+  padding: 112px 24px 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -308,11 +314,10 @@
   letter-spacing: 0.5px;
   padding: 6px 14px;
   border-radius: 9999px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 6px;
-  animation: pulseGlow 3s ease-in-out infinite alternate;
 }
 
 @keyframes pulseGlow {
@@ -322,12 +327,12 @@
 
 .heroTitle {
   font-family: var(--m-font-title);
-  font-size: clamp(36px, 5vw, 68px);
+  font-size: clamp(34px, 4.3vw, 56px);
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: -2px;
   max-width: 900px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   background: linear-gradient(to right, #ffffff 30%, rgba(255, 255, 255, 0.7) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -345,13 +350,13 @@
   color: var(--m-text-muted);
   line-height: 1.6;
   max-width: 680px;
-  margin-bottom: 40px;
+  margin-bottom: 22px;
 }
 
 .heroButtons {
   display: flex;
   gap: 16px;
-  margin-bottom: 64px;
+  margin-bottom: 0;
 }
 
 .heroButtons .btnPrimary {
@@ -362,186 +367,6 @@
 .heroButtons .btnSecondary {
   padding: 14px 28px;
   font-size: 15px;
-}
-
-.dashboardPreview {
-  width: 100%;
-  max-width: 1100px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--m-border);
-  padding: 8px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.5s ease;
-}
-
-.dashboardPreview:hover {
-  border-color: rgba(20, 184, 166, 0.25);
-}
-
-.dashboardMockup {
-  border-radius: 10px;
-  background: #0f1322;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  width: 100%;
-  aspect-ratio: 16/9;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Mockup UI Inner Details */
-.mockHeader {
-  height: 50px;
-  background: rgba(17, 24, 39, 0.8);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-}
-
-.mockDots {
-  display: flex;
-  gap: 6px;
-}
-
-.mockDots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.mockDots span:nth-child(1) { background: #ef4444; }
-.mockDots span:nth-child(2) { background: #f59e0b; }
-.mockDots span:nth-child(3) { background: #10b981; }
-
-.mockAddress {
-  background: rgba(255, 255, 255, 0.04);
-  padding: 4px 20px;
-  border-radius: 6px;
-  font-size: 10px;
-  color: var(--m-text-muted);
-  width: 250px;
-  text-align: center;
-}
-
-.mockGrid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  overflow: hidden;
-}
-
-.mockSidebar {
-  background: rgba(11, 15, 25, 0.5);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mockSidebarItem {
-  height: 12px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.mockSidebarItem:first-child {
-  background: var(--m-primary);
-  opacity: 0.7;
-}
-
-.mockContent {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  overflow: hidden;
-}
-
-.mockTitleBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.mockUser {
-  height: 24px;
-  width: 24px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.mockStats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.mockStatCard {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mockStatBar {
-  height: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  width: 60%;
-}
-
-.mockStatNumber {
-  height: 18px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  width: 40%;
-}
-
-.mockStatCard:first-child .mockStatNumber {
-  background: var(--m-primary);
-}
-
-.mockTable {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mockRow {
-  display: grid;
-  grid-template-columns: 80px 120px 1fr 60px;
-  gap: 16px;
-  align-items: center;
-}
-
-.mockCell {
-  height: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 4px;
-}
-
-.mockRowHeader {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 8px;
-}
-
-.mockRowHeader .mockCell {
-  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Features Grid Section */
@@ -651,12 +476,51 @@
 }
 
 /* Interactive Pricing Section */
+.packagesSection {
+  padding-top: 24px;
+  padding-bottom: 64px;
+  scroll-margin-top: 96px;
+}
+
+.packagesSection .sectionHeader {
+  margin-bottom: 36px;
+}
+
+.packagesSection .sectionTitle {
+  margin-bottom: 8px;
+  font-size: clamp(28px, 3.4vw, 38px);
+}
+
+.planLabel {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #1c2938;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.pricingCardActive .planLabel {
+  background: var(--m-primary);
+  color: #071b19;
+}
+
+.recommendation {
+  display: block;
+  margin-top: 8px;
+  color: var(--m-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .pricingCalculator {
   background: rgba(17, 24, 39, 0.4);
   border: 1px solid var(--m-border);
   border-radius: 20px;
-  padding: 40px;
-  margin-bottom: 48px;
+  padding: 24px;
+  margin-top: 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -730,40 +594,30 @@
 
 .pricingGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
   width: 100%;
 }
 
 .pricingCard {
-  background: var(--m-card-bg);
-  border: 1px solid var(--m-border);
+  background: #121c2b;
+  border: 1px solid #354357;
+  border-top: 3px solid #52677c;
   border-radius: 16px;
-  padding: 32px;
+  padding: 26px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  min-width: 0;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 
 .pricingCardActive {
   border-color: var(--m-primary);
-  box-shadow: 0 12px 30px -10px rgba(20, 184, 166, 0.15);
+  background: #102c30;
+  box-shadow: 0 0 0 1px var(--m-primary), 0 16px 48px -16px rgba(20, 184, 166, 0.35);
   transform: translateY(-8px);
-}
-
-.popularBadge {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: var(--m-primary);
-  color: #0b0f19;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 99px;
-  text-transform: uppercase;
 }
 
 .pricingHeader h3 {
@@ -787,7 +641,7 @@
 
 .pricingPrice strong {
   font-family: var(--m-font-title);
-  font-size: 42px;
+  font-size: clamp(42px, 4.5vw, 58px);
   font-weight: 800;
   color: #ffffff;
 }
@@ -1132,6 +986,20 @@
 }
 
 /* Responsive Overrides */
+.marketingBody :is(a, button, input):focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketingBody *,
+  .marketingBody *::before,
+  .marketingBody *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .navLinks {
     display: none; /* Hide links on mobile, direct actions only */
@@ -1140,7 +1008,7 @@
     height: 64px;
   }
   .hero {
-    padding-top: 120px;
+    padding: 96px 20px 28px;
   }
   .heroButtons {
     flex-direction: column;
@@ -1159,11 +1027,42 @@
   .pricingGrid {
     grid-template-columns: 1fr;
   }
+  .packagesSection {
+    padding: 16px 20px 48px;
+    scroll-margin-top: 80px;
+  }
+  .pricingCardActive {
+    transform: none;
+  }
+  .featuresGrid {
+    grid-template-columns: 1fr;
+  }
   .ctaBanner {
     padding: 32px 24px;
   }
   .footerLinks {
     gap: 32px;
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .navContainer {
+    padding: 0 12px;
+  }
+  .brand {
+    gap: 6px;
+    font-size: 16px;
+  }
+  .navActions {
+    gap: 6px;
+  }
+  .navActions .btnPrimary,
+  .navActions .btnSecondary {
+    padding: 10px;
+    font-size: 12px;
+  }
+  .navActions .btnPrimary svg {
+    display: none;
   }
 }
